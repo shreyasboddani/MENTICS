@@ -1,4 +1,4 @@
-# Mentor Web App
+# Velin
 
 A Flask-based web app designed to connect mentors and mentees.
 

@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Dashboard – Velin</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body class="dashboard-body">
+    <nav class="navbar">
+        <div class="logo">Velin</div>
+        <div class="nav-links">
+            <a href="/logout">Logout</a>
+        </div>
+    </nav>
+
+    <main class="dashboard-content">
+        <h1>Welcome to your Dashboard</h1>
+        <p class="subtext">Here’s where your journey begins. Track progress, connect, and grow.</p>
+
+        <div class="cards-container">
+            <div class="card">
+                <h3>Find a Mentor</h3>
+                <p>Connect with someone who aligns with your goals.</p>
+            </div>
+            <div class="card">
+                <h3>Your Matches</h3>
+                <p>View mentor/mentee matches and connection status.</p>
+            </div>
+            <div class="card">
+                <h3>Progress Tracker</h3>
+                <p>Track your learning and milestones as you grow.</p>
+            </div>
+        </div>
+    </main>
+</body>
+</html>
