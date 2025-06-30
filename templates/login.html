@@ -1,20 +1,44 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <title>Login – Mentics</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+  <meta charset="UTF-8">
+  <title>Login – Mentics</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Lalezar&display=swap" rel="stylesheet">
+  <link href="https://unpkg.com/aos@2.3.1/dist/aos.css" rel="stylesheet">
+  <style>
+    .font-lalezar {
+      font-family: 'Lalezar', cursive;
+    }
+  </style>
 </head>
-<body class="auth-body">
-    <div class="auth-container">
-        <h2>Welcome Back 👋</h2>
-        <p class="subtitle">Log in to your Mentics account</p>
-        <form method="POST">
-            <input type="email" name="email" placeholder="Email" required>
-            <input type="password" name="password" placeholder="Password" required>
-            <button type="submit">Log In</button>
-        </form>
-        <p class="switch-link">Don't have an account? <a href="/signup">Sign Up</a></p>
-    </div>
+<body class="bg-gradient-to-br from-purple-100 to-indigo-200 min-h-screen flex items-center justify-center px-4">
+
+  <div class="bg-white shadow-xl rounded-2xl p-10 w-full max-w-md" data-aos="zoom-in">
+    <h1 class="text-3xl font-lalezar text-purple-700 text-center mb-4">MENTICS</h1>
+    <h2 class="text-xl font-semibold text-center text-gray-800 mb-2">Welcome Back 👋</h2>
+    <p class="text-sm text-center text-gray-500 mb-6">Log in to your Mentics account</p>
+    
+    <form method="POST" class="space-y-4">
+      <input type="email" name="email" placeholder="Email" required
+        class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 transition" />
+      
+      <input type="password" name="password" placeholder="Password" required
+        class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 transition" />
+      
+      <button type="submit"
+        class="w-full bg-purple-600 hover:bg-purple-700 text-white font-semibold py-3 rounded-lg transition">
+        Log In
+      </button>
+    </form>
+
+    <p class="text-sm text-center text-gray-600 mt-6">Don't have an account? 
+      <a href="/signup" class="text-purple-600 hover:underline font-medium">Sign Up</a>
+    </p>
+  </div>
+
+  <script src="https://unpkg.com/aos@2.3.1/dist/aos.js"></script>
+  <script>AOS.init({ once: true, duration: 800 });</script>
 </body>
 </html>
