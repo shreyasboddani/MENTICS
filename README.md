@@ -35,7 +35,10 @@ Visit `http://127.0.0.1:5000` in your browser.
 ## 👥 Contributors
 
 - Shreyas Boddani
-- [Add teammates after inviting them]
+- Naman Sinha
+- Brandon Potter
+- Abhishek Chattopadhya
+- Prithvi Veliyath
 
 ## 🛠️ Tools Used
 
