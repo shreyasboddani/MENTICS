@@ -1,4 +1,4 @@
-# Velin
+# Mentics
 
 A Flask-based web app designed to connect mentors and mentees.
 
