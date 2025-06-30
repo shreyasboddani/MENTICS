@@ -1,3 +1,6 @@
+/* ===============================
+   Base Styles
+================================= */
 body {
     margin: 0;
     font-family: 'Segoe UI', Roboto, sans-serif;
@@ -5,6 +8,9 @@ body {
     color: #222;
 }
 
+/* ===============================
+   Buttons
+================================= */
 button {
     padding: 12px 24px;
     font-size: 16px;
@@ -19,17 +25,19 @@ button:hover {
     box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
 }
 
-.secondary {
+button.secondary {
     background-color: white;
     color: #4F46E5;
     border: 2px solid #4F46E5;
 }
 
-.secondary:hover {
+button.secondary:hover {
     background-color: #f0f0ff;
 }
 
-/* Homepage hero layout */
+/* ===============================
+   Homepage Hero Section
+================================= */
 .hero {
     display: flex;
     flex-direction: column;
@@ -58,7 +66,9 @@ button:hover {
     gap: 20px;
 }
 
-
+/* ===============================
+   Auth Pages (Login & Signup)
+================================= */
 .auth-body {
     display: flex;
     align-items: center;
@@ -141,6 +151,10 @@ button:hover {
 .switch-link a:hover {
     text-decoration: underline;
 }
+
+/* ===============================
+   Dashboard Page
+================================= */
 .dashboard-body {
     margin: 0;
     font-family: 'Segoe UI', sans-serif;
@@ -148,31 +162,39 @@ button:hover {
     color: #222;
 }
 
+/* Nav Bar */
 .navbar {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    background-color: #4F46E5;
+    background-color: #EDE9FE; /* light lavender */
     padding: 1rem 2rem;
-    color: white;
+    color: #4F46E5;
+    box-shadow: 0 1px 6px rgba(0, 0, 0, 0.05);
 }
 
 .logo {
     font-size: 1.5rem;
     font-weight: bold;
+    font-family: 'Lalezar', cursive;
+    letter-spacing: 1px;
 }
 
 .nav-links a {
-    color: white;
+    color: #4F46E5;
     text-decoration: none;
     margin-left: 20px;
     font-weight: 500;
+    padding: 8px 12px;
+    border-radius: 8px;
+    transition: 0.2s ease;
 }
 
 .nav-links a:hover {
-    text-decoration: underline;
+    background-color: #ddd6fe;
 }
 
+/* Dashboard Content */
 .dashboard-content {
     max-width: 900px;
     margin: 40px auto;
@@ -190,6 +212,7 @@ button:hover {
     margin-bottom: 2rem;
 }
 
+/* Dashboard Cards */
 .cards-container {
     display: flex;
     flex-wrap: wrap;
