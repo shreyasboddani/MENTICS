@@ -1,6 +1,6 @@
 # Mentics
 
-A Flask-based web app designed to connect mentors and mentees.
+A Flask-based web app designed to build your path to sucess.
 
 ## 🚀 Setup Instructions
 

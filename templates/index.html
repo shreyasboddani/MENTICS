@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8">
   <title>Mentics | Unlock Your Potential</title>
@@ -8,52 +9,56 @@
   <link href="https://unpkg.com/aos@2.3.1/dist/aos.css" rel="stylesheet">
   <link href="https://fonts.googleapis.com/css2?family=Lalezar&display=swap" rel="stylesheet">
 </head>
+
 <body class="bg-gray-50 text-gray-900 font-sans leading-relaxed scroll-smooth">
 
   <!-- Navbar -->
- <header class="fixed top-0 w-full z-50 bg-white/70 backdrop-blur-md shadow-sm">
-  <div class="max-w-7xl mx-auto flex flex-row justify-between items-center px-6 py-4">
-    <div class="flex-1">
-      <a href="/" class="text-xl font-bold text-purple-600 tracking-tight" style="font-family: 'Lalezar', cursive;">
+  <header class="fixed top-0 w-full z-50 bg-white/70 backdrop-blur-md shadow-sm">
+    <div class="max-w-7xl mx-auto flex flex-row justify-between items-center px-6 py-4">
+      <div class="flex-1">
+        <a href="/" class="text-xl font-bold text-purple-600 tracking-tight" style="font-family: 'Lalezar', cursive;">
+          MENTICS
+        </a>
+      </div>
+      <nav class="space-x-4 flex-1 text-right">
+        <a href="#features" class="text-gray-700 hover:text-purple-600">Features</a>
+        <a href="#about" class="text-gray-700 hover:text-purple-600">About</a>
+        <a href="/login" class="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 transition">Login</a>
+      </nav>
+    </div>
+  </header>
+
+  <!-- Hero Section -->
+  <section
+    class="h-screen flex flex-col justify-center text-center bg-gradient-to-b from-violet-600 to-indigo-700 text-white px-4"
+    data-aos="fade-up">
+    <div class="max-w-3xl mx-auto space-y-6 mt-10">
+
+      <!-- Mentics in Lalezar -->
+      <h1 class="text-6xl md:text-7xl" style="font-family: 'Lalezar', cursive;" data-aos="fade-down">
         MENTICS
-      </a>
+      </h1>
+
+      <!-- Tagline -->
+      <h2 class="text-4xl md:text-5xl font-bold" data-aos="fade-up" data-aos-delay="100">
+        The Path to Highschool Sucess
+      </h2>
+
+      <!-- Mission Statement -->
+      <p class="text-xl text-white/90" data-aos="fade-up" data-aos-delay="200">
+        Helping highschoolers acheive their college readiness goals.
+      </p>
+
+      <!-- Get Started Button -->
+      <div class="pt-4" data-aos="zoom-in" data-aos-delay="300">
+        <a href="/signup"
+          class="bg-white text-violet-700 px-6 py-3 rounded-xl text-lg font-semibold shadow hover:bg-gray-100 transition">
+          Get Started
+        </a>
+      </div>
+
     </div>
-    <nav class="space-x-4 flex-1 text-right">
-      <a href="#features" class="text-gray-700 hover:text-purple-600">Features</a>
-      <a href="#about" class="text-gray-700 hover:text-purple-600">About</a>
-      <a href="/login" class="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 transition">Login</a>
-    </nav>
-  </div>
-</header>
-
-<!-- Hero Section -->
-<section class="h-screen flex flex-col justify-center text-center bg-gradient-to-b from-violet-600 to-indigo-700 text-white px-4" data-aos="fade-up">
-  <div class="max-w-3xl mx-auto space-y-6 mt-10">
-
-    <!-- Mentics in Lalezar -->
-    <h1 class="text-6xl md:text-7xl" style="font-family: 'Lalezar', cursive;" data-aos="fade-down">
-      MENTICS
-    </h1>
-
-    <!-- Tagline -->
-    <h2 class="text-4xl md:text-5xl font-bold" data-aos="fade-up" data-aos-delay="100">
-      Mentorship. Modernized.
-    </h2>
-
-    <!-- Mission Statement -->
-    <p class="text-xl text-white/90" data-aos="fade-up" data-aos-delay="200">
-      Connecting high school students with college mentors to help them reach their dream schools.
-    </p>
-
-    <!-- Get Started Button -->
-    <div class="pt-4" data-aos="zoom-in" data-aos-delay="300">
-      <a href="/signup" class="bg-white text-violet-700 px-6 py-3 rounded-xl text-lg font-semibold shadow hover:bg-gray-100 transition">
-        Get Started
-      </a>
-    </div>
-
-  </div>
-</section>
+  </section>
 
   <!-- Features Section -->
   <section id="features" class="py-24 bg-white" data-aos="fade-up">
@@ -61,16 +66,19 @@
       <h3 class="text-4xl font-bold text-center mb-12">Features</h3>
       <div class="grid grid-cols-1 md:grid-cols-3 gap-10">
         <div class="bg-gray-50 p-6 rounded-xl shadow hover:shadow-lg transition" data-aos="zoom-in">
-          <h4 class="text-xl font-semibold mb-2 text-purple-600">Intelligent Matching</h4>
-          <p>Our smart algorithm connects you with the best-fit mentors for your goals.</p>
+          <h4 class="text-xl font-semibold mb-2 text-purple-600">Current Stats</h4>
+          <p>Stay organized with all of your info in one place.</p>
         </div>
-        <div class="bg-gray-50 p-6 rounded-xl shadow hover:shadow-lg transition" data-aos="zoom-in" data-aos-delay="100">
+        <div class="bg-gray-50 p-6 rounded-xl shadow hover:shadow-lg transition" data-aos="zoom-in"
+          data-aos-delay="100">
           <h4 class="text-xl font-semibold mb-2 text-purple-600">Progress Dashboard</h4>
-          <p>Track growth, set milestones, and stay accountable on your mentorship journey.</p>
+          <p>Track growth, set milestones, and stay accountable on your path to success on standardized testing and
+            college readiness.</p>
         </div>
-        <div class="bg-gray-50 p-6 rounded-xl shadow hover:shadow-lg transition" data-aos="zoom-in" data-aos-delay="200">
-          <h4 class="text-xl font-semibold mb-2 text-purple-600">Private Messaging</h4>
-          <p>Build real relationships with secure, focused conversations.</p>
+        <div class="bg-gray-50 p-6 rounded-xl shadow hover:shadow-lg transition" data-aos="zoom-in"
+          data-aos-delay="200">
+          <h4 class="text-xl font-semibold mb-2 text-purple-600">AI Consulting</h4>
+          <p> Improve your path with focused conversations.</p>
         </div>
       </div>
     </div>
@@ -80,9 +88,10 @@
   <section id="about" class="py-24 bg-gray-100" data-aos="fade-up">
     <div class="max-w-4xl mx-auto text-center px-6">
       <h3 class="text-4xl font-bold mb-6">Why Mentics?</h3>
-      <p class="text-lg text-gray-700 mb-4">Because mentorship should be personal, intuitive, and empowering — not random or outdated.</p>
-      <p class="text-lg text-gray-700">We’re reimagining how students grow together — through tech that connects high school ambition with college experience.</p>
-    </div>
+      <p class="text-lg text-gray-700 mb-4">Because highschool should'nt be as chaotic as it is — with mentics you can
+        stay organized, set goals, and strive to achive them.</p>
+      <p class="text-lg text-gray-700">We’re reimagining how students grow — through tech that discovers the path to
+        sucess.
   </section>
 
   <!-- Footer -->
@@ -94,4 +103,5 @@
   <script src="https://unpkg.com/aos@2.3.1/dist/aos.js"></script>
   <script>AOS.init({ once: true, duration: 800 });</script>
 </body>
+
 </html>
