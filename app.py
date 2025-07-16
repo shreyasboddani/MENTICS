@@ -6,8 +6,6 @@ app = Flask(__name__)
 app.secret_key = "supersecretkey"  # Needed for session management
 
 # Create database and user table if it doesn't exist
-
-
 def init_db():
     conn = sqlite3.connect("users.db")
     c = conn.cursor()
@@ -22,15 +20,11 @@ def init_db():
     conn.close()
 
 # Home page
-
-
 @app.route("/")
 def home():
     return render_template("index.html")
 
 # Signup route
-
-
 @app.route("/signup", methods=["GET", "POST"])
 def signup():
     if request.method == "POST":
@@ -49,8 +43,6 @@ def signup():
     return render_template("signup.html")
 
 # Login route
-
-
 @app.route("/login", methods=["GET", "POST"])
 def login():
     if request.method == "POST":
@@ -69,18 +61,37 @@ def login():
     return render_template("login.html")
 
 # Dashboard page
-
-
 @app.route("/dashboard")
 def dashboard():
     if "user" in session:
         return render_template("dashboard.html")
+    
+    
 
     return redirect(url_for("login"))
 
+@app.route("/dashboard/stats")
+def stats():
+    if "user" in session:
+        return render_template("stats.html")
+    
+    return redirect(url_for("login"))
+
+@app.route("/dashboard/builder")
+def builder():
+    if "user" in session:
+        return render_template("builder.html")
+    
+    return redirect(url_for("login"))
+
+@app.route("/dashboard/tracker")
+def tracker():
+    if "user" in session:
+        return render_template("tracker.html")
+    
+    return redirect(url_for("login"))
+
 # Logout
-
-
 @app.route("/logout")
 def logout():
     session.pop("user", None)

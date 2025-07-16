@@ -1,59 +1,112 @@
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
-  <meta charset="UTF-8" />
-  <title>Dashboard – Mentics</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <script src="https://cdn.tailwindcss.com"></script>
-  <link href="https://fonts.googleapis.com/css2?family=Lalezar&display=swap" rel="stylesheet" />
-  <link href="https://unpkg.com/aos@2.3.1/dist/aos.css" rel="stylesheet">
-  <style>
-    .lalezar {
-      font-family: 'Lalezar', cursive;
-    }
-  </style>
+    <meta charset="UTF-8" />
+    <title>Dashboard – Mentics</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Lalezar&display=swap" rel="stylesheet" />
+    <link href="https://unpkg.com/aos@2.3.1/dist/aos.css" rel="stylesheet">
+    <style>
+        .lalezar {
+            font-family: 'Lalezar', cursive;
+        }
+        
+        .dashboard-button {
+            cursor: pointer;
+            transition: all 0.3s ease;
+            border: none;
+            width: 100%;
+            text-align: center;
+        }
+        
+        .dashboard-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+        }
+        
+        .dashboard-button:active {
+            transform: translateY(0);
+        }
+        
+        .dashboard-button:focus {
+            outline: 2px solid #7c3aed;
+            outline-offset: 2px;
+        }
+    </style>
 </head>
-
 <body class="bg-gray-50 text-gray-900 scroll-smooth">
+    <!-- Navbar -->
+    <header class="fixed top-0 w-full z-50 bg-purple-100 shadow-sm">
+        <div class="max-w-7xl mx-auto flex justify-between items-center px-6 py-4">
+            <a href="/" class="text-xl font-bold text-purple-600 tracking-tight" style="font-family: 'Lalezar', cursive;">
+                MENTICS
+            </a>
+            <nav>
+                <a href="/logout" class="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 transition">Logout</a>
+            </nav>
+        </div>
+    </header>
 
-  <!-- Navbar -->
-  <header class="fixed top-0 w-full z-50 bg-purple-100 shadow-sm">
-    <div class="max-w-7xl mx-auto flex justify-between items-center px-6 py-4">
-      <a href="/" class="text-xl font-bold text-purple-600 tracking-tight" style="font-family: 'Lalezar', cursive;">
-        MENTICS
-      </a>
-      <nav>
-        <a href="/logout"
-          class="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 transition">Logout</a>
-      </nav>
-    </div>
-  </header>
+    <!-- Dashboard Content -->
+    <main class="pt-32 px-6 max-w-5xl mx-auto text-center" data-aos="fade-up">
+        <h1 class="text-4xl font-bold mb-2">Welcome to your Dashboard</h1>
+        <p class="text-gray-600 mb-10 text-lg">Here's where your journey begins. Track progress, connect, and grow.</p>
+        
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+            <button 
+                class="dashboard-button bg-white shadow-md rounded-xl p-6 hover:shadow-xl transition" 
+                data-aos="zoom-in"
+                onclick="handleStatsClick()"
+            >
+                <h3 class="text-xl font-semibold text-purple-700 mb-2">Stats</h3>
+                <p class="text-gray-600">View your stats.</p>
+            </button>
+            
+            <button 
+                class="dashboard-button bg-white shadow-md rounded-xl p-6 hover:shadow-xl transition" 
+                data-aos="zoom-in" 
+                data-aos-delay="100"
+                onclick="handlePathBuilderClick()"
+            >
+                <h3 class="text-xl font-semibold text-purple-700 mb-2">Path Builder</h3>
+                <p class="text-gray-600">Build/Update Your Path.</p>
+            </button>
+            
+            <button 
+                class="dashboard-button bg-white shadow-md rounded-xl p-6 hover:shadow-xl transition" 
+                data-aos="zoom-in" 
+                data-aos-delay="200"
+                onclick="handleProgressTrackerClick()"
+            >
+                <h3 class="text-xl font-semibold text-purple-700 mb-2">Progress Tracker</h3>
+                <p class="text-gray-600">Track your learning and milestones as you grow.</p>
+            </button>
+        </div>
+    </main>
 
-  <!-- Dashboard Content -->
-  <main class="pt-32 px-6 max-w-5xl mx-auto text-center" data-aos="fade-up">
-    <h1 class="text-4xl font-bold mb-2">Welcome to your Dashboard</h1>
-    <p class="text-gray-600 mb-10 text-lg">Here’s where your journey begins. Track progress, connect, and grow.</p>
-
-    <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
-      <div class="bg-white shadow-md rounded-xl p-6 hover:shadow-xl transition" data-aos="zoom-in">
-        <h3 class="text-xl font-semibold text-purple-700 mb-2">Stats</h3>
-        <p>View your stats.</p>
-      </div>
-      <div class="bg-white shadow-md rounded-xl p-6 hover:shadow-xl transition" data-aos="zoom-in" data-aos-delay="100">
-        <h3 class="text-xl font-semibold text-purple-700 mb-2">Path Builder</h3>
-        <p>Build/Update Your Path.</p>
-      </div>
-      <div class="bg-white shadow-md rounded-xl p-6 hover:shadow-xl transition" data-aos="zoom-in" data-aos-delay="200">
-        <h3 class="text-xl font-semibold text-purple-700 mb-2">Progress Tracker</h3>
-        <p>Track your learning and milestones as you grow.</p>
-      </div>
-    </div>
-  </main>
-
-  <!-- AOS Animation -->
-  <script src="https://unpkg.com/aos@2.3.1/dist/aos.js"></script>
-  <script>AOS.init({ once: true, duration: 800 });</script>
+    <!-- AOS Animation -->
+    <script src="https://unpkg.com/aos@2.3.1/dist/aos.js"></script>
+    <script>
+        AOS.init({ 
+            once: true, 
+            duration: 800 
+        });
+        
+        // Button click handlers
+        function handleStatsClick() {
+            // Add your stats navigation logic here
+            // Example: window.location.href = '/stats';
+            window.location.href = 'dashboard/stats'
+        }
+        
+        function handlePathBuilderClick() {
+            window.location.href = 'dashboard/builder'
+        }
+        
+        function handleProgressTrackerClick() {
+            window.location.href = 'dashboard/tracker'
+        }
+    </script>
 </body>
-
 </html>
