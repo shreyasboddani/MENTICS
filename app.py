@@ -1,23 +1,19 @@
 from flask import Flask, render_template, request, redirect, url_for, session
-import sqlite3
 from werkzeug.security import generate_password_hash, check_password_hash
+from dbhelper import DatabaseHandler
 
 app = Flask(__name__)
 app.secret_key = "supersecretkey"  # Needed for session management
 
+db = DatabaseHandler("users.db")
+
 # Create database and user table if it doesn't exist
 def init_db():
-    conn = sqlite3.connect("users.db")
-    c = conn.cursor()
-    c.execute('''
-        CREATE TABLE IF NOT EXISTS users (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            email TEXT NOT NULL UNIQUE,
-            password TEXT NOT NULL
-        )
-    ''')
-    conn.commit()
-    conn.close()
+    db.create_table("users", {
+        "id": "INTEGER PRIMARY KEY AUTOINCREMENT",
+        "email": "TEXT NOT NULL UNIQUE",
+        "password": "TEXT NOT NULL"
+    })
 
 # Home page
 @app.route("/")
@@ -31,14 +27,9 @@ def signup():
         email = request.form["email"]
         password = generate_password_hash(request.form["password"])
         try:
-            conn = sqlite3.connect("users.db")
-            c = conn.cursor()
-            c.execute(
-                "INSERT INTO users (email, password) VALUES (?, ?)", (email, password))
-            conn.commit()
-            conn.close()
+            db.insert("users", {"email": email, "password": password})
             return redirect(url_for("login"))
-        except sqlite3.IntegrityError:
+        except Exception:
             return "Email already exists!"
     return render_template("signup.html")
 
@@ -48,13 +39,9 @@ def login():
     if request.method == "POST":
         email = request.form["email"]
         password = request.form["password"]
-        conn = sqlite3.connect("users.db")
-        c = conn.cursor()
-        c.execute("SELECT * FROM users WHERE email = ?", (email,))
-        user = c.fetchone()
-        conn.close()
-        if user and check_password_hash(user[2], password):
-            session["user"] = user[1]
+        user = db.select("users", where={"email": email})
+        if user and check_password_hash(user[0][2], password):
+            session["user"] = user[0][1]
             return redirect(url_for("dashboard"))
         else:
             return "Invalid credentials"
@@ -65,30 +52,24 @@ def login():
 def dashboard():
     if "user" in session:
         return render_template("dashboard.html")
-    
-    
-
     return redirect(url_for("login"))
 
 @app.route("/dashboard/stats")
 def stats():
     if "user" in session:
         return render_template("stats.html")
-    
     return redirect(url_for("login"))
 
 @app.route("/dashboard/builder")
 def builder():
     if "user" in session:
         return render_template("builder.html")
-    
     return redirect(url_for("login"))
 
 @app.route("/dashboard/tracker")
 def tracker():
     if "user" in session:
         return render_template("tracker.html")
-    
     return redirect(url_for("login"))
 
 # Logout
@@ -96,7 +77,6 @@ def tracker():
 def logout():
     session.pop("user", None)
     return redirect(url_for("home"))
-
 
 if __name__ == "__main__":
     init_db()
