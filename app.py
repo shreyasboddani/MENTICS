@@ -48,12 +48,22 @@ def signup():
         email = request.form["email"]
         password = generate_password_hash(request.form["password"])
         try:
-            db.insert("users", {"email": email, "password": password,
-                      "stats": '{"sat": "0", "act": "0", "gpa": "0.0"}'})
+            db.insert("users", {
+                "email": email,
+                "password": password,
+                "stats": json.dumps({
+                    "sat_ebrw": "",
+                    "sat_math": "",
+                    "act_math": "",
+                    "act_reading": "",
+                    "act_science": "",
+                    "gpa": ""
+                })
+            })
             return redirect(url_for("login"))
         except Exception as e:
-            print(f"Signup error: {e}")  # for debugging in terminal
-            error = "Email already exists!"  # or a more generic message
+            print(f"Signup error: {e}")
+            error = "Email already exists!"
     return render_template("signup.html", error=error)
 
 # Login route
@@ -90,7 +100,15 @@ def stats():
         return redirect(url_for("login"))
 
     stats = user.get_stats()
-    return render_template("stats.html", sat=stats["sat"], act=stats["act"], gpa=stats["gpa"])
+    return render_template(
+        "stats.html",
+        sat_ebrw=stats.get("sat_ebrw", ""),
+        sat_math=stats.get("sat_math", ""),
+        act_math=stats.get("act_math", ""),
+        act_reading=stats.get("act_reading", ""),
+        act_science=stats.get("act_science", ""),
+        gpa=stats.get("gpa", "")
+    )
 
 
 @app.route("/dashboard/stats/edit", methods=["GET", "POST"])
@@ -102,19 +120,36 @@ def edit_stats():
     stats = user.get_stats()
     error = None
     if request.method == "POST":
-        sat = request.form.get("sat", "")
-        act = request.form.get("act", "")
+        # Get each field from the form
+        sat_ebrw = request.form.get("sat_ebrw", "")
+        sat_math = request.form.get("sat_math", "")
+        act_math = request.form.get("act_math", "")
+        act_reading = request.form.get("act_reading", "")
+        act_science = request.form.get("act_science", "")
         gpa = request.form.get("gpa", "")
         try:
-            stats["sat"] = sat
-            stats["act"] = act
+            stats["sat_ebrw"] = sat_ebrw
+            stats["sat_math"] = sat_math
+            stats["act_math"] = act_math
+            stats["act_reading"] = act_reading
+            stats["act_science"] = act_science
             stats["gpa"] = gpa
             user.set_stats(stats)
             return redirect(url_for("stats"))
         except Exception as e:
-            print("Error updating stats:", e)  # <--- Add this line
+            print("Error updating stats:", e)
             error = "Could not update stats."
-    return render_template("edit_stats.html", sat=stats.get("sat", ""), act=stats.get("act", ""), gpa=stats.get("gpa", ""), error=error)
+    # Pass all fields to the template
+    return render_template(
+        "edit_stats.html",
+        sat_ebrw=stats.get("sat_ebrw", ""),
+        sat_math=stats.get("sat_math", ""),
+        act_math=stats.get("act_math", ""),
+        act_reading=stats.get("act_reading", ""),
+        act_science=stats.get("act_science", ""),
+        gpa=stats.get("gpa", ""),
+        error=error
+    )
 
 
 @app.route("/dashboard/builder")

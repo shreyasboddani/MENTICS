@@ -8,9 +8,14 @@
   <script src="https://cdn.tailwindcss.com"></script>
   <link href="https://fonts.googleapis.com/css2?family=Lalezar&display=swap" rel="stylesheet" />
   <link href="https://unpkg.com/aos@2.3.1/dist/aos.css" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Lalezar&family=Oswald:wght@700&display=swap" rel="stylesheet">
   <style>
     .font-lalezar {
       font-family: 'Lalezar', cursive;
+    }
+
+    .font-oswald {
+      font-family: 'Oswald', sans-serif;
     }
   </style>
 </head>
@@ -36,24 +41,63 @@
     <h1 class="text-4xl font-bold mb-2 font-lalezar text-purple-700">Your Stats</h1>
     <p class="text-gray-600 mb-8 text-lg">See your progress and achievements at a glance.</p>
     <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
-      <div class="bg-white shadow-md rounded-xl p-6" data-aos="zoom-in">
+      <div class="bg-white shadow-md rounded-xl p-6 flex flex-col items-center justify-center" data-aos="zoom-in">
         <h2 class="text-xl font-semibold text-purple-600 mb-2">Milestones</h2>
-        <p class="text-gray-700">Completed: <span class="font-bold">0</span></p>
-        <p class="text-gray-700">Upcoming: <span class="font-bold">0</span></p>
+        <p class="text-gray-700 text-lg">Completed: <span
+            class="font-extrabold text-3xl text-purple-700 align-middle">0</span>
+        </p>
+        <p class="text-gray-700 text-lg">Upcoming: <span
+            class="font-extrabold text-3xl text-purple-700 align-middle">0</span>
+        </p>
       </div>
       <div class="bg-white shadow-md rounded-xl p-6" data-aos="zoom-in" data-aos-delay="100">
         <h2 class="text-xl font-semibold text-purple-600 mb-2">Tests Taken</h2>
-        {% if sat %}
-        <p class="text-gray-700">SAT: <span class="font-bold">{{ sat }}</span></p>
+        {% if sat_ebrw or sat_math %}
+        <div class="mb-2">
+          <span class="font-bold text-purple-700">SAT</span>
+          <div class="ml-2 text-left">
+            <p class="text-gray-700">EBRW: <span class="font-bold">{{ sat_ebrw or "—" }}</span></p>
+            <p class="text-gray-700">Math: <span class="font-bold">{{ sat_math or "—" }}</span></p>
+            <p class="text-gray-700 mt-2">Total: <span class="font-bold">
+                {% if sat_ebrw and sat_math %}
+                {{ sat_ebrw|int + sat_math|int }}
+                {% else %}
+                —
+                {% endif %}
+              </span></p>
+          </div>
+        </div>
         {% endif %}
-        {% if act %}
-        <p class="text-gray-700">ACT: <span class="font-bold">{{ act }}</span></p>
+        {% if act_math or act_reading or act_science %}
+        <div>
+          <span class="font-bold text-purple-700">ACT</span>
+          <div class="ml-2 text-left">
+            <p class="text-gray-700">Math: <span class="font-bold">{{ act_math or "—" }}</span></p>
+            <p class="text-gray-700">Reading: <span class="font-bold">{{ act_reading or "—" }}</span></p>
+            <p class="text-gray-700">Science: <span class="font-bold">{{ act_science or "—" }}</span></p>
+            <p class="text-gray-700 mt-2">Total: <span class="font-bold">
+                {% set act_scores = [] %}
+                {% if act_math %}{% set _ = act_scores.append(act_math|int) %}{% endif %}
+                {% if act_reading %}{% set _ = act_scores.append(act_reading|int) %}{% endif %}
+                {% if act_science %}{% set _ = act_scores.append(act_science|int) %}{% endif %}
+                {% if act_scores|length > 0 %}
+                {{ ((act_scores|sum) / (act_scores|length))|round|int }}
+                {% else %}
+                —
+                {% endif %}
+              </span></p>
+          </div>
+        </div>
         {% endif %}
       </div>
-      <div class="bg-white shadow-md rounded-xl p-6" data-aos="zoom-in" data-aos-delay="200">
+      <div class="bg-white shadow-md rounded-xl p-6 flex flex-col items-center justify-center h-full" data-aos="zoom-in"
+        data-aos-delay="200">
         <h2 class="text-xl font-semibold text-purple-600 mb-2">Current GPA</h2>
         {% if gpa %}
-        <p class="text-3xl font-bold text-purple-700">{{ gpa }}</p>
+        <p class="w-full text-[7rem] md:text-[10rem] font-extrabold text-purple-700 font-oswald tracking-tighter leading-none flex justify-center items-center select-text"
+          style="line-height: 0.85; min-height: 1em;">
+          {{ gpa }}
+        </p>
         {% endif %}
       </div>
     </div>
