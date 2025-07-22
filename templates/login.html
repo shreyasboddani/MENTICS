@@ -33,6 +33,10 @@
         class="w-full bg-purple-600 hover:bg-purple-700 text-white font-semibold py-3 rounded-lg transition">
         Log In
       </button>
+
+      {% if error %}
+      <div class="text-red-600 mb-4">{{ error }}</div>
+      {% endif %}
     </form>
 
     <p class="text-sm text-center text-gray-600 mt-6">Don't have an account?

@@ -194,3 +194,4 @@ cython_debug/
 .cursorindexingignore
 
 users.db
+users.db
