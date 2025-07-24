@@ -193,4 +193,8 @@ cython_debug/
 .cursorignore
 .cursorindexingignore
 
+<<<<<<< HEAD
 users.db
+=======
+users.db
+>>>>>>> a83a0b7bd0d31030968fb5a5977b1e7c48516e7e

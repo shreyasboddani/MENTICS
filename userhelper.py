@@ -1,6 +1,7 @@
 # userhelper.py
 import json
 
+
 class User:
     def __init__(self, db, email=None):
         self.db = db
@@ -21,7 +22,8 @@ class User:
 
     def set_stats(self, stats):
         if self.data:
-            self.db.update("users", {"stats": json.dumps(stats)}, where={"email": self.email})
+            self.db.update("users", {"stats": json.dumps(
+                stats)}, where={"email": self.email})
 
     @staticmethod
     def from_session(db, session):

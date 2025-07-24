@@ -6,14 +6,18 @@ class DatabaseHandler:
         self.db_name = db_name
 
     def execute(self, query, params=None):
+        import sqlite3
         conn = sqlite3.connect(self.db_name)
         c = conn.cursor()
         if params:
             c.execute(query, params)
         else:
             c.execute(query)
+        if query.strip().lower().startswith("select"):
+            result = c.fetchall()
+        else:
+            result = None
         conn.commit()
-        result = c.fetchall()
         conn.close()
         return result
 
@@ -47,7 +51,8 @@ class DatabaseHandler:
         set_clause = ', '.join([f"{k}=?" for k in data.keys()])
         where_clause = ' AND '.join([f"{k}=?" for k in where.keys()])
         query = f"UPDATE {table_name} SET {set_clause} WHERE {where_clause}"
-        self.execute(query, tuple(data.values()) + tuple(where.values()))
+        params = tuple(data.values()) + tuple(where.values())
+        self.execute(query, params)
 
     def delete(self, table_name, where):
         """
