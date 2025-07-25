@@ -57,7 +57,8 @@ def signup():
                     "act_math": "",
                     "act_reading": "",
                     "act_science": "",
-                    "gpa": ""
+                    "gpa": "",
+                    "milestones": 0
                 })
             })
             return redirect(url_for("login"))
@@ -89,7 +90,18 @@ def login():
 @app.route("/dashboard")
 @login_required
 def dashboard():
-    return render_template("dashboard.html")
+    user = User.from_session(db, session)
+    if not user:
+        return redirect(url_for("login"))
+    stats = user.get_stats()
+    test_prep_upcoming = stats.get("test_prep_upcoming", 0)
+    college_planning_upcoming = stats.get("college_planning_upcoming", 0)
+    return render_template(
+        "dashboard.html",
+        test_prep_upcoming=test_prep_upcoming,
+        college_planning_upcoming=college_planning_upcoming,
+        gpa=stats.get("gpa", "")
+    )
 
 
 @app.route("/dashboard/stats", methods=["GET"])
@@ -98,16 +110,24 @@ def stats():
     user = User.from_session(db, session)
     if not user:
         return redirect(url_for("login"))
-
     stats = user.get_stats()
+    # Default values if not set yet
+    test_prep_completed = stats.get("test_prep_completed", 0)
+    test_prep_upcoming = stats.get("test_prep_upcoming", 0)
+    college_planning_completed = stats.get("college_planning_completed", 0)
+    college_planning_upcoming = stats.get("college_planning_upcoming", 0)
     return render_template(
         "stats.html",
+        test_prep_completed=test_prep_completed,
+        test_prep_upcoming=test_prep_upcoming,
+        college_planning_completed=college_planning_completed,
+        college_planning_upcoming=college_planning_upcoming,
+        gpa=stats.get("gpa", ""),
         sat_ebrw=stats.get("sat_ebrw", ""),
         sat_math=stats.get("sat_math", ""),
         act_math=stats.get("act_math", ""),
         act_reading=stats.get("act_reading", ""),
-        act_science=stats.get("act_science", ""),
-        gpa=stats.get("gpa", "")
+        act_science=stats.get("act_science", "")
     )
 
 

@@ -37,20 +37,31 @@
   </header>
 
   <!-- Stats Content -->
-  <main class="pt-32 px-6 max-w-3xl mx-auto text-center" data-aos="fade-up">
+  <main class="pt-32 px-6 max-w-4xl mx-auto text-center" data-aos="fade-up">
     <h1 class="text-4xl font-bold mb-2 font-lalezar text-purple-700">Your Stats</h1>
     <p class="text-gray-600 mb-8 text-lg">See your progress and achievements at a glance.</p>
-    <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
-      <div class="bg-white shadow-md rounded-xl p-6 flex flex-col items-center justify-center" data-aos="zoom-in">
-        <h2 class="text-xl font-semibold text-purple-600 mb-2">Milestones</h2>
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-12 mb-12">
+      <div class="bg-white shadow-md rounded-xl p-8 flex flex-col items-center justify-center" data-aos="zoom-in">
+        <h2 class="text-xl font-semibold text-purple-600 mb-2">Test Prep Milestones</h2>
         <p class="text-gray-700 text-lg">Completed: <span
-            class="font-extrabold text-3xl text-purple-700 align-middle">0</span>
-        </p>
-        <p class="text-gray-700 text-lg">Upcoming: <span
-            class="font-extrabold text-3xl text-purple-700 align-middle">0</span>
-        </p>
+            class="font-extrabold text-3xl text-purple-700 align-middle">{{ test_prep_completed }}</span></p>
+        <p class="text-gray-700 text-lg">Upcoming: <span class="font-extrabold text-3xl text-purple-700 align-middle">{{
+            test_prep_upcoming }}</span></p>
+        <p class="text-gray-700 text-lg">Total: <span class="font-extrabold text-3xl text-purple-700 align-middle">{{
+            test_prep_completed + test_prep_upcoming }}</span></p>
       </div>
-      <div class="bg-white shadow-md rounded-xl p-6" data-aos="zoom-in" data-aos-delay="100">
+      <div class="bg-white shadow-md rounded-xl p-8 flex flex-col items-center justify-center" data-aos="zoom-in">
+        <h2 class="text-xl font-semibold text-purple-600 mb-2">College Planning Milestones</h2>
+        <p class="text-gray-700 text-lg">Completed: <span
+            class="font-extrabold text-3xl text-purple-700 align-middle">{{ college_planning_completed }}</span></p>
+        <p class="text-gray-700 text-lg">Upcoming: <span class="font-extrabold text-3xl text-purple-700 align-middle">{{
+            college_planning_upcoming }}</span></p>
+        <p class="text-gray-700 text-lg">Total: <span class="font-extrabold text-3xl text-purple-700 align-middle">{{
+            college_planning_completed + college_planning_upcoming }}</span></p>
+      </div>
+    </div>
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-12 mb-12">
+      <div class="bg-white shadow-md rounded-xl p-8" data-aos="zoom-in" data-aos-delay="100">
         <h2 class="text-xl font-semibold text-purple-600 mb-2">Tests Taken</h2>
         {% if sat_ebrw or sat_math %}
         <div class="mb-2">
@@ -90,7 +101,7 @@
         </div>
         {% endif %}
       </div>
-      <div class="bg-white shadow-md rounded-xl p-6 flex flex-col items-center justify-center h-full" data-aos="zoom-in"
+      <div class="bg-white shadow-md rounded-xl p-8 flex flex-col items-center justify-center h-full" data-aos="zoom-in"
         data-aos-delay="200">
         <h2 class="text-xl font-semibold text-purple-600 mb-2">Current GPA</h2>
         {% if gpa %}
