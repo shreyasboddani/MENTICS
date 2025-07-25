@@ -152,12 +152,6 @@ def edit_stats():
     )
 
 
-@app.route("/dashboard/builder")
-@login_required
-def builder():
-    return render_template("builder.html")
-
-
 @app.route("/dashboard/tracker")
 @login_required
 def tracker():
