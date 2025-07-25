@@ -37,32 +37,34 @@
                     <div>
                         <label class="block text-gray-700 mb-1 font-bold" for="desired_sat">Desired SAT Score</label>
                         <input type="number" min="400" max="1600" step="10" id="desired_sat" name="desired_sat"
-                            class="w-full border rounded p-2" placeholder="e.g., 1500">
+                            class="w-full border rounded p-2" placeholder="e.g., 1500" value="{{ desired_sat }}">
                     </div>
                     <div>
                         <label class="block text-gray-700 mb-1 font-bold" for="desired_act">Desired ACT Score</label>
                         <input type="number" min="1" max="36" id="desired_act" name="desired_act"
-                            class="w-full border rounded p-2" placeholder="e.g., 34">
+                            class="w-full border rounded p-2" placeholder="e.g., 34" value="{{ desired_act }}">
                     </div>
                 </div>
                 <div class="mb-4">
                     <label class="block text-gray-700 mb-1 font-bold" for="strengths">Strengths</label>
                     <textarea id="strengths" name="strengths" rows="3" class="w-full border rounded p-2"
-                        placeholder="What are you good at? (e.g., Algebra, Reading Comprehension)"></textarea>
+                        placeholder="What are you good at? (e.g., Algebra, Reading Comprehension)">{{ strengths }}</textarea>
                 </div>
                 <div class="mb-4">
                     <label class="block text-gray-700 mb-1 font-bold" for="weaknesses">Weaknesses</label>
                     <textarea id="weaknesses" name="weaknesses" rows="3" class="w-full border rounded p-2"
-                        placeholder="What do you need to work on? (e.g., Geometry, Punctuation Rules)"></textarea>
+                        placeholder="What do you need to work on? (e.g., Geometry, Punctuation Rules)">{{ weaknesses }}</textarea>
                 </div>
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
                     <div>
                         <label class="block text-gray-700 mb-1 font-bold" for="test_date">Test Date</label>
-                        <input type="date" id="test_date" name="test_date" class="w-full border rounded p-2">
+                        <input type="date" id="test_date" name="test_date" class="w-full border rounded p-2"
+                            value="{{ test_date }}">
                     </div>
                     <div>
                         <label class="block text-gray-700 mb-1 font-bold" for="test_time">Test Time</label>
-                        <input type="time" id="test_time" name="test_time" class="w-full border rounded p-2">
+                        <input type="time" id="test_time" name="test_time" class="w-full border rounded p-2"
+                            value="{{ test_time }}">
                     </div>
                 </div>
                 <div class="flex justify-end">

@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, redirect, url_for, session
+from flask import Flask, render_template, request, redirect, url_for, session, jsonify
 from werkzeug.security import generate_password_hash, check_password_hash
 from dbhelper import DatabaseHandler
 from userhelper import User
@@ -164,16 +164,67 @@ def tracker():
     return render_template("tracker.html")
 
 
-@app.route("/dashboard/test-path-builder")
+@app.route("/dashboard/test-path-builder", methods=["GET", "POST"])
 @login_required
 def test_path_builder():
-    return render_template("test_path_builder.html")
+    user = User.from_session(db, session)
+    if not user:
+        return redirect(url_for("login"))
+    stats = user.get_stats()
+    test_path = stats.get("test_path", {})
+    error = None
+
+    if request.method == "POST":
+        # Get form data
+        test_path = {
+            "desired_sat": request.form.get("desired_sat", ""),
+            "desired_act": request.form.get("desired_act", ""),
+            "strengths": request.form.get("strengths", ""),
+            "weaknesses": request.form.get("weaknesses", ""),
+            "test_date": request.form.get("test_date", ""),
+            "test_time": request.form.get("test_time", "")
+        }
+        stats["test_path"] = test_path
+        user.set_stats(stats)
+        return redirect(url_for("test_path_view"))
+
+    # Pre-fill form if data exists
+    return render_template(
+        "test_path_builder.html",
+        desired_sat=test_path.get("desired_sat", ""),
+        desired_act=test_path.get("desired_act", ""),
+        strengths=test_path.get("strengths", ""),
+        weaknesses=test_path.get("weaknesses", ""),
+        test_date=test_path.get("test_date", ""),
+        test_time=test_path.get("test_time", ""),
+        error=error
+    )
 
 
-@app.route("/dashboard/college-path-builder")
+@app.route("/dashboard/test-path-view")
 @login_required
-def college_path_builder():
-    return render_template("college_path_builder.html")
+def test_path_view():
+    user = User.from_session(db, session)
+    if not user:
+        return redirect(url_for("login"))
+    stats = user.get_stats()
+    test_path = stats.get("test_path", {})
+    return render_template(
+        "test_path_view.html",
+        test_path=test_path
+    )
+
+
+@app.route("/dashboard/test-path-status")
+@login_required
+def test_path_status():
+    user = User.from_session(db, session)
+    stats = user.get_stats()
+    test_path = stats.get("test_path", {})
+    # Check if any field in test_path is filled
+    has_path = any(test_path.get(k) for k in [
+                   "desired_sat", "desired_act", "strengths", "weaknesses", "test_date", "test_time"])
+    return jsonify({"has_path": has_path})
 
 # Logout
 
@@ -182,6 +233,12 @@ def college_path_builder():
 def logout():
     session.pop("user", None)
     return redirect(url_for("home"))
+
+
+@app.route('/dashboard/college-path-builder')
+@login_required
+def college_path_builder():
+    return render_template('college_path_builder.html')
 
 
 if __name__ == "__main__":

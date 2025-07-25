@@ -11,6 +11,7 @@
         }
     </style>
 </head>
+
 <body class="bg-gradient-to-br from-indigo-100 to-purple-200 min-h-screen text-gray-900 scroll-smooth">
     <!-- Navbar -->
     <header class="fixed top-0 w-full z-50 bg-white/70 backdrop-blur-md shadow-sm">
@@ -19,7 +20,8 @@
                 MENTICS
             </a>
             <nav>
-                <a href="/dashboard" class="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 transition">Dashboard</a>
+                <a href="/dashboard"
+                    class="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 transition">Dashboard</a>
                 <a href="/logout" class="ml-2 text-purple-600 hover:underline">Logout</a>
             </nav>
         </div>
@@ -27,23 +29,32 @@
 
     <!-- Tracker Content -->
     <main class="pt-32 px-6 max-w-3xl mx-auto text-center" data-aos="fade-up">
-        <h1 class="text-4xl font-bold mb-2 font-lalezar text-purple-700">Progress Tracker</h1>
+        <h1 class="text-4xl font-bold mb-2 font-lalezar text-purple-700 drop-shadow-lg">Progress Tracker</h1>
         <p class="text-gray-600 mb-8 text-lg">Track your learning and milestones as you grow.</p>
-        
+
         <section class="content-section">
-            <p>This is where you can track your progress and activities.</p>
-            <!-- Add tracker specific content here -->
+            <div class="bg-white rounded-xl shadow-lg p-10 flex flex-col items-center justify-center" data-aos="zoom-in"
+                data-aos-delay="200">
+                <svg class="w-20 h-20 text-purple-400 mb-6" fill="none" stroke="currentColor" stroke-width="2"
+                    viewBox="0 0 48 48">
+                    <circle cx="24" cy="24" r="20" stroke="currentColor" stroke-width="3" fill="none" />
+                    <path d="M24 14v10l8 4" stroke="currentColor" stroke-width="3" stroke-linecap="round"
+                        stroke-linejoin="round" />
+                </svg>
+                <h2 class="text-2xl font-lalezar text-purple-600 mb-2">Coming Soon!</h2>
+                <p class="text-gray-500 mb-4">Your progress tracker will appear here. Stay tuned for updates and new
+                    features to help you visualize your journey!</p>
+                <span
+                    class="inline-block bg-purple-100 text-purple-700 px-4 py-2 rounded-full font-semibold text-sm">Feature
+                    in development</span>
+            </div>
         </section>
     </main>
-
-    <!-- Footer -->
-    <footer class="bg-white py-10 text-center text-gray-500 text-sm border-t mt-16">
-        <p>&copy; 2025 Mentics. Crafted with clarity & care.</p>
-    </footer>
 
     <!-- AOS Animation -->
     <script src="https://unpkg.com/aos@2.3.1/dist/aos.js"></script>
     <script>AOS.init({ once: true, duration: 800 });</script>
 </body>
 </body>
+
 </html>

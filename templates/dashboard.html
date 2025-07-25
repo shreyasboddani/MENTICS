@@ -34,15 +34,33 @@
             outline: 2px solid #7c3aed;
             outline-offset: 2px;
         }
+
+        .modal-hidden {
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s;
+        }
+
+        .modal-visible {
+            opacity: 1;
+            pointer-events: auto;
+            transition: opacity 0.3s;
+        }
     </style>
 </head>
 
-<body class="bg-gradient-to-br from-indigo-100 to-purple-200 min-h-screen text-gray-900 scroll-smooth">
+<body
+    class="bg-gradient-to-br from-indigo-100 to-purple-200 min-h-screen text-gray-900 scroll-smooth relative overflow-x-hidden">
+    <!-- Animated Background Shape -->
+    <div
+        class="absolute top-0 left-1/2 transform -translate-x-1/2 -z-10 w-[700px] h-[700px] bg-gradient-to-br from-purple-300 via-indigo-200 to-white opacity-40 rounded-full blur-3xl">
+    </div>
+
     <!-- Navbar -->
     <header class="fixed top-0 w-full z-50 bg-white/70 backdrop-blur-md shadow-sm">
         <div class="max-w-7xl mx-auto flex justify-between items-center px-6 py-4">
-            <a href="/" class="text-xl font-bold text-purple-600 tracking-tight lalezar">
-                MENTICS
+            <a href="/" class="text-2xl font-bold text-purple-600 tracking-tight lalezar flex items-center gap-2">
+                <span></span> MENTICS
             </a>
             <nav>
                 <a href="/logout"
@@ -51,59 +69,96 @@
         </div>
     </header>
 
-    <!-- Dashboard Content -->
-    <main class="pt-32 px-6 max-w-5xl mx-auto text-center" data-aos="fade-up">
-        <h1 class="text-4xl font-bold mb-2 lalezar text-purple-700 drop-shadow-[0_2px_8px_rgba(196,144,255,0.8)]">
-            Welcome to your Dashboard
+    <!-- Hero Section -->
+    <section class="pt-32 pb-10 px-6 max-w-4xl mx-auto text-center">
+        <h1
+            class="text-5xl md:text-6xl font-bold lalezar text-purple-700 drop-shadow-[0_2px_8px_rgba(196,144,255,0.8)] mb-4 flex items-center justify-center gap-3">
+            Welcome to Your Dashboard
         </h1>
-        <p class="text-lg mb-10 lalezar text-purple-600 drop-shadow-[0_2px_8px_rgba(196,144,255,0.8)]">
-            Here's where your journey begins. Track progress, connect, and grow.
+        <p class="text-xl md:text-2xl text-gray-700 mb-6 font-semibold">
+            Your personal hub for progress, planning, and achievement. Everything you need for your journey is right
+            here—track your stats, build your path, and reach your goals!
         </p>
+    </section>
 
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
-            <button class="dashboard-button bg-white shadow-md rounded-xl p-6 hover:shadow-xl transition"
+    <!-- Overview Card -->
+    <section class="max-w-4xl mx-auto mb-12 px-6">
+        <div class="bg-white/80 rounded-2xl shadow-2xl p-8 flex flex-col md:flex-row items-center justify-between gap-8"
+            data-aos="zoom-in" data-aos-delay="100">
+            <div class="flex-1 text-left">
+                <h2 class="text-2xl font-bold lalezar text-purple-700 mb-2 flex items-center gap-2">📈 Quick Overview
+                </h2>
+                <p class="text-gray-600 mb-2">See your latest stats, upcoming milestones, and progress at a glance.</p>
+                <ul class="text-lg text-gray-700 space-y-1">
+                    <li>✅ <span class="font-bold">Milestones Completed:</span> <span class="text-purple-700">0</span>
+                    </li>
+                    <li>📅 <span class="font-bold">Upcoming:</span> <span class="text-purple-700">0</span></li>
+                    <li>🎯 <span class="font-bold">Current GPA:</span> <span class="text-purple-700">—</span></li>
+                </ul>
+            </div>
+            <div class="flex-1 flex flex-col items-center">
+                <span class="text-7xl mb-2"></span>
+                <span class="text-lg text-gray-500">Your journey is just getting started!</span>
+            </div>
+        </div>
+    </section>
+
+    <!-- Dashboard Main Buttons -->
+    <main class="max-w-5xl mx-auto text-center px-6">
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-10">
+            <button
+                class="dashboard-button bg-gradient-to-br from-white via-purple-100 to-purple-200 shadow-2xl rounded-3xl p-10 hover:scale-105 hover:shadow-2xl transition-all duration-300 flex flex-col items-center"
                 data-aos="zoom-in" onclick="handleStatsClick()">
-                <h3 class="text-xl font-semibold text-purple-700 mb-2">Stats</h3>
-                <p class="text-gray-600">View your stats.</p>
+                <span class="text-7xl mb-4">📊</span>
+                <h3 class="text-2xl font-semibold text-purple-700 mb-2 lalezar">Stats</h3>
+                <p class="text-gray-600 text-lg">View your stats and achievements.</p>
             </button>
 
-            <button type="button" class="dashboard-button bg-white shadow-md rounded-xl p-6 hover:shadow-xl transition"
+            <button type="button"
+                class="dashboard-button bg-gradient-to-br from-white via-indigo-100 to-purple-200 shadow-2xl rounded-3xl p-10 hover:scale-105 hover:shadow-2xl transition-all duration-300 flex flex-col items-center"
                 data-aos="zoom-in" data-aos-delay="100" onclick="handlePathBuilderClick()">
-                <h3 class="text-xl font-semibold text-purple-700 mb-2">Path Builder</h3>
-                <p class="text-gray-600">Build/Update Your Path.</p>
+                <span class="text-7xl mb-4">🛤️</span>
+                <h3 class="text-2xl font-semibold text-purple-700 mb-2 lalezar">Path Builder</h3>
+                <p class="text-gray-600 text-lg">Build or update your journey.</p>
             </button>
 
-            <button class="dashboard-button bg-white shadow-md rounded-xl p-6 hover:shadow-xl transition"
+            <button
+                class="dashboard-button bg-gradient-to-br from-white via-indigo-100 to-purple-200 shadow-2xl rounded-3xl p-10 hover:scale-105 hover:shadow-2xl transition-all duration-300 flex flex-col items-center"
                 data-aos="zoom-in" data-aos-delay="200" onclick="handleProgressTrackerClick()">
-                <h3 class="text-xl font-semibold text-purple-700 mb-2">Progress Tracker</h3>
-                <p class="text-gray-600">Track your learning and milestones as you grow.</p>
+                <span class="text-7xl mb-4">🚀</span>
+                <h3 class="text-2xl font-semibold text-purple-700 mb-2 lalezar">Progress Tracker</h3>
+                <p class="text-gray-600 text-lg">Track your learning and milestones.</p>
             </button>
         </div>
     </main>
 
     <!-- Modal Overlay -->
     <div id="pathModal" class="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50 hidden">
-        <div class="w-full max-w-3xl flex flex-col items-center" data-aos="zoom-in" data-aos-duration="800"
-            data-aos-easing="ease-in-out">
+        <div id="modalContent" class="w-full max-w-3xl flex flex-col items-center" data-aos="zoom-in"
+            data-aos-duration="800" data-aos-easing="ease-in-out" data-aos-once="false">
             <h2 class="text-5xl md:text-6xl font-bold lalezar mb-10 drop-shadow-lg text-white" data-aos="fade-down"
-                data-aos-delay="100" data-aos-duration="900">
+                data-aos-delay="100" data-aos-duration="900" data-aos-once="false">
                 Choose Your Path
             </h2>
             <div class="flex flex-col md:flex-row gap-8 w-full justify-center">
-                <button onclick="window.location.href='/dashboard/test-path-builder'"
-                    class="flex-1 bg-gradient-to-br from-purple-500 to-purple-700 text-white text-2xl lalezar py-16 rounded-2xl shadow-xl hover:scale-105 hover:shadow-2xl transition-all duration-300 focus:outline-none"
+                <button onclick="handleTestPrepPath()"
+                    class="flex-1 bg-gradient-to-br from-purple-500 to-purple-700 text-white text-2xl lalezar py-16 rounded-2xl shadow-xl hover:scale-105 hover:shadow-2xl transition-all duration-300 flex flex-col items-center"
                     data-aos="fade-right" data-aos-delay="300" data-aos-duration="900" data-aos-once="false">
-                    Test Prep Path Builder
+                    <span class="text-5xl mb-4">📝</span>
+                    <span class="font-bold text-2xl mb-1 text-white">Test Prep Path Builder</span>
+                    <span class="block text-sm mt-2 text-purple-200">SAT/ACT Journey</span>
                 </button>
                 <button onclick="window.location.href='/dashboard/college-path-builder'"
-                    class="flex-1 bg-gradient-to-br from-indigo-400 to-indigo-700 text-white text-2xl lalezar py-16 rounded-2xl shadow-xl hover:scale-105 hover:shadow-2xl transition-all duration-300 focus:outline-none"
+                    class="flex-1 bg-gradient-to-br from-indigo-400 to-indigo-700 text-white text-2xl lalezar py-16 rounded-2xl shadow-xl hover:scale-105 hover:shadow-2xl transition-all duration-300 flex flex-col items-center"
                     data-aos="fade-left" data-aos-delay="300" data-aos-duration="900" data-aos-once="false">
+                    <span class="text-5xl mb-4">🎓</span>
                     College Planning Path Builder
+                    <span class="block text-sm mt-2 text-indigo-200">Applications & More</span>
                 </button>
             </div>
             <button onclick="closePathModal()"
                 class="mt-10 text-white hover:text-purple-200 transition underline text-lg" data-aos="fade-up"
-                data-aos-delay="600" data-aos-duration="900">
+                data-aos-delay="600" data-aos-duration="900" data-aos-once="false">
                 Cancel
             </button>
         </div>
@@ -117,31 +172,70 @@
             duration: 800
         });
 
-        // Button click handlers
         function handleStatsClick() {
             window.location.href = 'dashboard/stats'
         }
 
         function handlePathBuilderClick() {
             const modal = document.getElementById('pathModal');
-            modal.classList.add('hidden'); // Hide first to reset
-            // Reset AOS attributes to trigger animation again
-            const buttons = modal.querySelectorAll('[data-aos]');
-            buttons.forEach(btn => {
-                btn.classList.remove('aos-animate');
-            });
-            setTimeout(() => {
-                modal.classList.remove('hidden');
-                setTimeout(() => AOS.refreshHard(), 50); // Use refreshHard for modals
-            }, 50);
+            const oldContent = document.getElementById('modalContent');
+            if (oldContent) oldContent.remove();
+
+            const modalHTML = `
+                <div id="modalContent" class="w-full max-w-3xl flex flex-col items-center" data-aos="zoom-in" data-aos-duration="800" data-aos-easing="ease-in-out" data-aos-once="false">
+                    <h2 class="text-5xl md:text-6xl font-bold lalezar mb-10 drop-shadow-lg text-white"
+                        data-aos="fade-down" data-aos-delay="100" data-aos-duration="900" data-aos-once="false">
+                        Choose Your Path
+                    </h2>
+                    <div class="flex flex-col md:flex-row gap-8 w-full justify-center">
+                        <button onclick="handleTestPrepPath()"
+                            class="flex-1 bg-gradient-to-br from-purple-500 to-purple-700 text-white text-2xl lalezar py-16 rounded-2xl shadow-xl hover:scale-105 hover:shadow-2xl transition-all duration-300 flex flex-col items-center"
+                            data-aos="fade-right" data-aos-delay="300" data-aos-duration="900" data-aos-once="false">
+                            <span class="text-5xl mb-4">📝</span>
+                            <span class="font-bold text-2xl mb-1 text-white">Test Prep Path Builder</span>
+                            <span class="block text-sm mt-2 text-purple-200">SAT/ACT Journey</span>
+                        </button>
+                        <button onclick="window.location.href='/dashboard/college-path-builder'"
+                            class="flex-1 bg-gradient-to-br from-indigo-400 to-indigo-700 text-white text-2xl lalezar py-16 rounded-2xl shadow-xl hover:scale-105 hover:shadow-2xl transition-all duration-300 flex flex-col items-center"
+                            data-aos="fade-left" data-aos-delay="300" data-aos-duration="900" data-aos-once="false">
+                            <span class="text-5xl mb-4">🎓</span>
+                            College Planning Path Builder
+                            <span class="block text-sm mt-2 text-indigo-200">Applications & More</span>
+                        </button>
+                    </div>
+                    <button onclick="closePathModal()"
+                        class="mt-10 text-white hover:text-purple-200 transition underline text-lg"
+                        data-aos="fade-up" data-aos-delay="600" data-aos-duration="900" data-aos-once="false">
+                        Cancel
+                    </button>
+                </div>
+            `;
+            modal.insertAdjacentHTML('beforeend', modalHTML);
+            modal.classList.remove('hidden');
+            AOS.refreshHard();
         }
 
         function closePathModal() {
-            document.getElementById('pathModal').classList.add('hidden');
+            const modal = document.getElementById('pathModal');
+            modal.classList.add('hidden');
+            const oldContent = document.getElementById('modalContent');
+            if (oldContent) oldContent.remove();
         }
 
         function handleProgressTrackerClick() {
             window.location.href = 'dashboard/tracker'
+        }
+
+        function handleTestPrepPath() {
+            fetch('/dashboard/test-path-status')
+                .then(response => response.json())
+                .then(data => {
+                    if (data.has_path) {
+                        window.location.href = '/dashboard/test-path-view';
+                    } else {
+                        window.location.href = '/dashboard/test-path-builder';
+                    }
+                });
         }
 
         // Optional: Close modal on background click
