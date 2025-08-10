@@ -26,27 +26,260 @@
             </nav>
         </div>
     </header>
-    <main class="pt-32 px-6 max-w-2xl mx-auto text-center" data-aos="fade-up">
-        <h1 class="text-5xl lalezar font-bold text-purple-700 mb-6" data-aos="fade-down">Your Test Prep Path</h1>
-        <div class="bg-white rounded-xl shadow-lg p-8 text-left" data-aos="zoom-in" data-aos-delay="400">
-            <ul class="mb-6">
-                <li class="mb-2"><strong>Desired SAT Score:</strong> {{ test_path.desired_sat or "—" }}</li>
-                <li class="mb-2"><strong>Desired ACT Score:</strong> {{ test_path.desired_act or "—" }}</li>
-                <li class="mb-2"><strong>Strengths:</strong> {{ test_path.strengths or "—" }}</li>
-                <li class="mb-2"><strong>Weaknesses:</strong> {{ test_path.weaknesses or "—" }}</li>
-                <li class="mb-2"><strong>Test Date:</strong> {{ test_path.test_date or "—" }}</li>
-                <li class="mb-2"><strong>Test Time:</strong> {{ test_path.test_time or "—" }}</li>
-            </ul>
-            <div class="flex justify-end">
-                <a href="{{ url_for('test_path_builder') }}"
-                    class="bg-purple-600 text-white px-6 py-2 rounded-lg hover:bg-purple-700 font-semibold transition">
-                    Edit / Rebuild Path
-                </a>
+    <main class="pt-32 px-6 mx-auto" data-aos="fade-up">
+        <h1 class="text-5xl lalezar font-bold text-purple-700 mb-6 text-center" data-aos="fade-down">Your Test Prep
+            Path</h1>
+
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+
+            <!-- Left Panel: The Path -->
+            <div class="lg:col-span-1">
+                <div class="bg-white rounded-xl shadow-lg p-8 text-left" data-aos="zoom-in" data-aos-delay="400">
+                    <ul class="mb-6">
+                        <li class="mb-2"><strong>Desired SAT Score:</strong> {{ test_path.desired_sat or "—" }}</li>
+                        <li class="mb-2"><strong>Desired ACT Score:</strong> {{ test_path.desired_act or "—" }}</li>
+                        <li class="mb-2"><strong>Strengths:</strong> {{ test_path.strengths or "—" }}</li>
+                        <li class="mb-2"><strong>Weaknesses:</strong> {{ test_path.weaknesses or "—" }}</li>
+                        <li class="mb-2"><strong>Test Date:</strong> {{ test_path.test_date or "—" }}</li>
+                        <li class="mb-2"><strong>Test Time:</strong> {{ test_path.test_time or "—" }}</li>
+                    </ul>
+                    <div class="flex justify-end">
+                        <a href="{{ url_for('test_path_builder') }}"
+                            class="bg-purple-600 text-white px-6 py-2 rounded-lg hover:bg-purple-700 font-semibold transition">
+                            Edit / Rebuild Path
+                        </a>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Middle Panel: Task List -->
+            <div class="lg:col-span-2">
+                <div class="bg-white rounded-xl shadow-lg p-8" data-aos="zoom-in" data-aos-delay="400">
+                    <h2 class="text-xl font-semibold mb-6 lalezar text-purple-600 text-left">Your Tasks</h2>
+                    <div id="task-list-container"></div>
+                </div>
+            </div>
+
+            <!-- Bottom Panel: AI Chat -->
+            <div class="lg:col-span-3">
+                <div class="bg-white/70 rounded-2xl shadow-lg p-4">
+                    <h2 class="text-xl font-semibold mb-2 lalezar text-purple-600">AI Chat</h2>
+                    <!-- Chat History -->
+                    <div class="h-64 overflow-y-auto mb-2 p-2">
+                        <!-- Chat messages will go here -->
+                        <div>Example AI message</div>
+                        <div>Your reply</div>
+                    </div>
+                    <!-- Input and Send Button -->
+                    <div class="flex">
+                        <input type="text" class="w-full border rounded p-2 mr-2" placeholder="Type your message...">
+                        <button class="bg-purple-600 text-white px-4 py-2 rounded hover:bg-purple-700 transition">Send</button>
+                    </div>
+                </div>
             </div>
         </div>
+        <!-- Stat Entry Modal -->
+        <div id="statModal"
+            class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 hidden transition-opacity duration-300">
+            <div class="bg-white rounded-2xl shadow-xl p-8 max-w-md w-full m-4 transform transition-all"
+                id="stat-modal-panel">
+                <div class="flex justify-between items-start">
+                    <h3 class="text-2xl font-bold lalezar text-purple-700 mb-4">Milestone Reached!</h3>
+                    <button onclick="closeStatModal()" class="text-gray-400 hover:text-gray-600 text-3xl">&times;</button>
+                </div>
+                <p id="statModalDescription" class="text-gray-700 mb-4">
+                    Great job! Please enter your latest practice test score to track your progress.
+                </p>
+                <div class="mt-4">
+                    <label for="statInput" class="block text-sm font-medium text-gray-700">SAT Score</label>
+                    <input type="number" name="statInput" id="statInput"
+                        class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm p-2"
+                        placeholder="e.g., 1450">
+                </div>
+                <div class="mt-6 flex justify-end gap-4">
+                    <button onclick="closeStatModal()" class="bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold py-2 px-4 rounded-lg transition">Skip</button>
+                    <button onclick="submitStat()" class="bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 px-4 rounded-lg transition">Submit</button>
+                </div>
+            </div>
+        </div>
+        <!-- Task Modal -->
+        <div id="taskModal"
+            class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden transition-opacity duration-300">
+            <div class="bg-white rounded-2xl shadow-xl p-8 max-w-lg w-full m-4 transform transition-all" id="modal-panel">
+                <div class="flex justify-between items-start">
+                    <h3 id="modalTitle" class="text-2xl font-bold lalezar text-purple-700 mb-4">Task Details</h3>
+                    <button onclick="closeTaskModal()" class="text-gray-400 hover:text-gray-600 text-3xl">&times;</button>
+                </div>
+                <p id="modalDescription" class="text-gray-700 mb-6"></p>
+                <div id="modal-actions" class="flex justify-end gap-4">
+                </div>
+            </div>
+        </div>
+        <script>
+            // Global state for tasks
+            let tasks = [];
+
+            function renderPath(tasks) {
+                const taskListContainer = document.getElementById('task-list-container');
+                taskListContainer.className = 'flex items-center';
+                taskListContainer.innerHTML = ''; // Clear previous tasks
+
+                tasks.forEach((task, index) => {
+                    const taskItemContainer = document.createElement('div');
+                    taskItemContainer.className = 'flex items-center';
+                    if (index < tasks.length - 1) {
+                        taskItemContainer.classList.add('flex-grow');
+                    }
+
+                    // 1. Status Circle
+                    const taskButton = document.createElement('button');
+                    taskButton.className = 'w-10 h-10 rounded-full bg-gray-200 text-gray-600 flex items-center justify-center font-semibold text-lg shrink-0 hover:bg-gray-300 cursor-pointer transition focus:outline-none focus:ring-2 focus:ring-purple-500';
+                    taskButton.dataset.taskId = index;
+                    taskButton.id = `status-circle-${index}`;
+                    taskButton.textContent = index + 1;
+                    taskButton.onclick = () => {
+                        openTaskModal(task, index);
+                    };
+
+                    // Assemble the task node
+                    taskItemContainer.appendChild(taskButton);
+
+                    // 2. Connector Line
+                    if (index < tasks.length - 1) {
+                        const connector = document.createElement('div');
+                        connector.className = 'h-0.5 flex-grow bg-gray-300';
+                        taskItemContainer.appendChild(connector);
+                    }
+
+                    taskListContainer.appendChild(taskItemContainer);
+                });
+            }
+
+            function openTaskModal(task, index) {
+                const modal = document.getElementById('taskModal');
+                const modalPanel = document.getElementById('modal-panel');
+                const modalDescription = document.getElementById('modalDescription');
+                const modalActions = document.getElementById('modal-actions');
+
+                modalDescription.textContent = task.description;
+                modalActions.innerHTML = ''; // Clear old actions
+
+                // Create 'Stuck' button
+                const stuckButton = document.createElement('button');
+                stuckButton.className = 'bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-4 rounded-lg transition';
+                stuckButton.textContent = 'Stuck';
+                stuckButton.onclick = () => {
+                    fetchAndRenderTasks();
+                    closeTaskModal();
+                };
+
+                // Create 'Complete' button
+                const completeButton = document.createElement('button');
+                completeButton.className = 'bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-4 rounded-lg transition';
+                completeButton.textContent = 'Complete';
+                completeButton.onclick = () => {
+                    handleTaskStatusChange(index, 'complete');
+                    closeTaskModal();
+                };
+
+                modalActions.appendChild(stuckButton);
+                modalActions.appendChild(completeButton);
+
+                modal.classList.remove('hidden');
+                modal.classList.add('opacity-100');
+                modalPanel.classList.add('scale-100');
+            }
+
+            function closeTaskModal() {
+                const modal = document.getElementById('taskModal');
+                const modalPanel = document.getElementById('modal-panel');
+                modal.classList.remove('opacity-100');
+                modalPanel.classList.remove('scale-100');
+                setTimeout(() => modal.classList.add('hidden'), 300);
+            }
+
+            function openStatModal(taskIndex) {
+                const modal = document.getElementById('statModal');
+                modal.classList.remove('hidden');
+                document.getElementById('statInput').focus();
+            }
+
+            function closeStatModal() {
+                const modal = document.getElementById('statModal');
+                modal.classList.add('hidden');
+            }
+
+            function submitStat() {
+                const score = document.getElementById('statInput').value;
+                console.log(`Stat submitted: ${score}`); // Placeholder for actual submission logic
+                alert(`Score of ${score} saved!`);
+                closeStatModal();
+            }
+
+            function checkCompletion() {
+                const allComplete = tasks.every(task => task.status === 'complete');
+                if (allComplete) {
+                    setTimeout(() => {
+                        alert("Congratulations! You've completed this path segment. Generating your next set of tasks.");
+                        fetchAndRenderTasks();
+                    }, 500);
+                }
+            }
+
+            function handleTaskStatusChange(index, status) {
+                const taskNode = document.getElementById(`status-circle-${index}`);
+                if (!taskNode) return;
+
+                // Update the data model first
+                tasks[index].status = status;
+
+                // Update the UI
+                taskNode.disabled = true;
+                taskNode.classList.remove('hover:bg-gray-300', 'cursor-pointer');
+
+                if (status === 'complete') {
+                    taskNode.className = 'w-10 h-10 rounded-full bg-purple-600 text-white flex items-center justify-center font-semibold text-lg shrink-0';
+                    taskNode.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" /></svg>`;
+
+                    if (tasks[index].is_milestone) {
+                        openStatModal(index);
+                    }
+                    checkCompletion();
+                }
+            }
+
+            function fetchAndRenderTasks() {
+                const taskListContainer = document.getElementById('task-list-container');
+                taskListContainer.innerHTML = '<p class="text-gray-500">Generating your path with AI...</p>';
+                fetch('/api/generate-tasks')
+                    .then(response => {
+                        if (!response.ok) {
+                            throw new Error('Network response was not ok');
+                        }
+                        return response.json();
+                    })
+                    .then(newTasks => {
+                        tasks = newTasks; // Update global tasks state
+                        renderPath(tasks);
+                    })
+                    .catch(error => {
+                        console.error('Error fetching tasks:', error);
+                        taskListContainer.innerHTML = '<p class="text-red-500">Could not load tasks. Please try again later.</p>';
+                    });
+            }
+
+            // Initial load of tasks from the backend
+            document.addEventListener('DOMContentLoaded', fetchAndRenderTasks);
+            document.addEventListener('click', function (e) {
+                if (e.target === document.getElementById('taskModal')) closeTaskModal();
+            });
+            document.addEventListener('keydown', function (e) {
+                if (e.key === "Escape") closeTaskModal();
+            });
+
+        </script>
     </main>
     <script src="https://unpkg.com/aos@2.3.1/dist/aos.js"></script>
     <script>AOS.init({ once: true, duration: 800 });</script>
 </body>
-
 </html>

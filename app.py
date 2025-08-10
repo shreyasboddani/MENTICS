@@ -4,12 +4,17 @@ from dbhelper import DatabaseHandler
 from userhelper import User
 from functools import wraps
 import json
+import openai
+import os
 
 app = Flask(__name__)
 app.secret_key = "supersecretkey"  # Needed for session management
 app.url_map.strict_slashes = False
 
 db = DatabaseHandler("users.db")
+
+# Setup OpenAI API Key from environment variable
+openai.api_key = os.getenv("OPENAI_API_KEY")
 
 # Create database and user table if it doesn't exist
 
@@ -227,6 +232,105 @@ def test_path_view():
         "test_path_view.html",
         test_path=test_path
     )
+
+
+def _generate_mock_tasks(strengths, weaknesses, num_tasks=5):
+    """
+    Generates a list of mock tasks. Used as a fallback if the AI API fails.
+    """
+    tasks = []
+    # A very basic "AI" logic for demonstration
+    if "geometry" in weaknesses.lower():
+        tasks.append(
+            {"description": "Focus on circle theorems and properties of triangles.", "status": "pending"})
+    if "punctuation" in weaknesses.lower():
+        tasks.append(
+            {"description": "Complete a drill on comma, semicolon, and colon usage.", "status": "pending"})
+    if "algebra" in strengths.lower():
+        tasks.append(
+            {"description": "Solidify your algebra skills with advanced function problems.", "status": "pending"})
+
+    # Generic tasks to fill up the list
+    generic_tasks = [
+        {"description": "Complete a timed mini-section for your weakest subject.", "status": "pending"},
+        {"description": "Review 20 new vocabulary words using flashcards.", "status": "pending"},
+        {"description": "Analyze the structure of a sample essay prompt.", "status": "pending"},
+        {"description": "Review 20 new vocabulary words using flashcards.", "status": "pending"},
+        {"description": "Analyze the structure of a sample essay prompt.", "status": "pending"}
+    ]
+
+    while len(tasks) < num_tasks and generic_tasks:
+        tasks.append(generic_tasks.pop(0))
+
+    # Ensure the last task is a milestone
+    if tasks:
+        tasks[-1]['is_milestone'] = True
+
+    return tasks[:num_tasks]
+
+
+def _generate_ai_tasks(strengths, weaknesses, num_tasks=5):
+    """
+    Calls the OpenAI API to generate personalized tasks based on user input.
+    """
+    if not openai.api_key:
+        print("Warning: OPENAI_API_KEY environment variable not set. Falling back to mock tasks.")
+        return _generate_mock_tasks(strengths, weaknesses, num_tasks)
+
+    prompt_content = (
+        f"Based on a student's strengths in '{strengths}' and weaknesses in '{weaknesses}', "
+        f"create a list of exactly {num_tasks} personalized tasks for SAT/ACT test prep. "
+        "The last task must be a milestone task, like taking a practice test. "
+        "Return the response as a single, valid JSON object with a key 'tasks' which is an array of objects. "
+        "Each object must have two keys: 'description' (a string) and 'is_milestone' (a boolean)."
+    )
+
+    try:
+        completion = openai.chat.completions.create(
+            model="gpt-3.5-turbo-1106",  # A model that supports JSON mode
+            messages=[
+                {"role": "system", "content": "You are an expert test prep tutor that creates personalized study plans and responds in valid JSON."},
+                {"role": "user", "content": prompt_content}
+            ],
+            response_format={"type": "json_object"},
+            temperature=0.7,
+        )
+        response_text = completion.choices[0].message.content
+        data = json.loads(response_text)
+        tasks = data.get("tasks", [])
+
+        # Validate and clean the response
+        if not isinstance(tasks, list):
+            raise ValueError("AI response did not contain a 'tasks' list.")
+
+        processed_tasks = []
+        for task in tasks:
+            if 'description' in task and isinstance(task['description'], str):
+                processed_tasks.append({
+                    "description": task['description'],
+                    "status": "pending",
+                    "is_milestone": task.get('is_milestone', False)
+                })
+
+        if not processed_tasks:
+            raise ValueError("AI response contained no valid tasks.")
+
+        processed_tasks[-1]['is_milestone'] = True
+        return processed_tasks[:num_tasks]
+
+    except Exception as e:
+        print(f"Error calling OpenAI or parsing response: {e}")
+        return _generate_mock_tasks(strengths, weaknesses, num_tasks)
+
+
+@app.route("/api/generate-tasks")
+@login_required
+def generate_tasks():
+    user = User.from_session(db, session)
+    stats = user.get_stats()
+    test_path = stats.get("test_path", {})
+    tasks = _generate_ai_tasks(test_path.get("strengths", ""), test_path.get("weaknesses", ""))
+    return jsonify(tasks)
 
 
 @app.route("/dashboard/test-path-status")
