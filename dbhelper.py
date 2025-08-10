@@ -6,15 +6,17 @@ class DatabaseHandler:
         self.db_name = db_name
 
     def execute(self, query, params=None):
-        import sqlite3
         conn = sqlite3.connect(self.db_name)
         c = conn.cursor()
         if params:
             c.execute(query, params)
         else:
             c.execute(query)
-        if query.strip().lower().startswith("select"):
+        verb = query.strip().lower().split()[0]
+        if verb == "select":
             result = c.fetchall()
+        elif verb == "insert":
+            result = c.lastrowid
         else:
             result = None
         conn.commit()
@@ -41,7 +43,7 @@ class DatabaseHandler:
         cols = ', '.join(data.keys())
         placeholders = ', '.join(['?' for _ in data])
         query = f"INSERT INTO {table_name} ({cols}) VALUES ({placeholders})"
-        self.execute(query, tuple(data.values()))
+        return self.execute(query, tuple(data.values()))
 
     def update(self, table_name, data, where):
         """

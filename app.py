@@ -6,9 +6,14 @@ from functools import wraps
 import json
 import openai
 import os
+from dotenv import load_dotenv
+import random
+
+# Load environment variables from .env file
+load_dotenv()
 
 app = Flask(__name__)
-app.secret_key = "supersecretkey"  # Needed for session management
+app.secret_key = "supersecretkey"
 app.url_map.strict_slashes = False
 
 db = DatabaseHandler("users.db")
@@ -16,9 +21,8 @@ db = DatabaseHandler("users.db")
 # Setup OpenAI API Key from environment variable
 openai.api_key = os.getenv("OPENAI_API_KEY")
 
-# Create database and user table if it doesn't exist
 
-
+# --- DATABASE INITIALIZATION ---
 def init_db():
     db.create_table("users", {
         "id": "INTEGER PRIMARY KEY AUTOINCREMENT",
@@ -26,8 +30,18 @@ def init_db():
         "password": "TEXT NOT NULL",
         "stats": "TEXT NOT NULL"
     })
+    db.create_table("paths", {
+        "id": "INTEGER PRIMARY KEY AUTOINCREMENT",
+        "user_id": "INTEGER NOT NULL",
+        "task_order": "INTEGER NOT NULL",
+        "description": "TEXT NOT NULL",
+        "is_completed": "BOOLEAN DEFAULT FALSE",
+        "is_active": "BOOLEAN DEFAULT TRUE",
+        "created_at": "TIMESTAMP DEFAULT CURRENT_TIMESTAMP"
+    })
 
 
+# --- DECORATORS ---
 def login_required(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
@@ -36,9 +50,103 @@ def login_required(f):
         return f(*args, **kwargs)
     return decorated_function
 
-# Home page
+
+# --- AI HELPER FUNCTIONS (Consolidated and Fixed) ---
+
+def _get_ai_tasks(strengths, weaknesses):
+    """Generates tasks from AI, with a reliable 5-task mock fallback."""
+
+    # This is the single source of mock tasks, ensuring consistency.
+    def get_mock_tasks_reliably():
+        print("Warning: OPENAI_API_KEY not set or AI failed. Returning mock tasks.")
+        all_mock_tasks = [
+            {"description":
+                "Focus on circle theorems and properties of triangles (Mock)."},
+            {"description":
+                "Complete a drill on comma, semicolon, and colon usage (Mock)."},
+            {"description":
+                "Solidify your algebra skills with advanced function problems (Mock)."},
+            {"description":
+                "Complete a timed mini-section for your weakest subject (Mock)."},
+            {"description":
+                "Review 20 new vocabulary words using flashcards (Mock)."},
+            {"description":
+                "Analyze the structure of a sample essay prompt (Mock)."},
+            {"description":
+                "Practice reading comprehension with a news article (Mock)."},
+            {"description":
+                "Take a 15-minute quiz on data interpretation graphs (Mock)."}
+        ]
+        return random.sample(all_mock_tasks, 5)
+
+    if not openai.api_key:
+        return get_mock_tasks_reliably()
+
+    prompt = (
+        f"A student has strengths: '{strengths}' and weaknesses: '{weaknesses}'. "
+        "Create a 5-step study plan. Return ONLY a valid JSON object with a key 'tasks', which is an array of 5 objects, each with a 'description' key."
+    )
+    try:
+        completion = openai.chat.completions.create(
+            model="gpt-3.5-turbo",
+            messages=[
+                {"role": "system", "content": "You are a test prep tutor who provides study plans in JSON format."},
+                {"role": "user", "content": prompt}
+            ],
+            temperature=0.7
+        )
+        response_data = json.loads(completion.choices[0].message.content)
+        tasks = response_data.get("tasks", [])
+        if isinstance(tasks, list) and len(tasks) == 5:
+            return tasks
+        raise ValueError("Invalid format from AI")
+    except Exception as e:
+        print(f"AI task generation failed: {e}")
+        return get_mock_tasks_reliably()
 
 
+def _get_ai_chat_response(history, user_stats):
+    """Gets a chat response from the AI, with a mock fallback."""
+    if not openai.api_key:
+        return "I'm currently in offline mode and can't chat right now."
+
+    system_message = {
+        "role": "system",
+        "content": f"You are a helpful test prep assistant. Student's profile: {json.dumps(user_stats)}. Keep answers concise."
+    }
+    messages = [system_message] + history
+
+    try:
+        completion = openai.chat.completions.create(
+            model="gpt-3.5-turbo", messages=messages)
+        return completion.choices[0].message.content
+    except Exception as e:
+        print(f"AI chat response failed: {e}")
+        return "Sorry, I encountered an error connecting to the AI."
+
+
+def _generate_and_save_new_path(user_id, strengths, weaknesses):
+    """Deactivates old path, gets new tasks, and saves them."""
+    db.update("paths", {"is_active": False}, where={"user_id": user_id})
+    tasks = _get_ai_tasks(strengths, weaknesses)
+    saved_tasks = []
+    for i, task in enumerate(tasks):
+        task_id = db.insert("paths", {
+            "user_id": user_id,
+            "task_order": i + 1,
+            "description": task.get("description", "No description provided."),
+            "is_active": True,
+            "is_completed": False
+        })
+        saved_tasks.append({
+            "id": task_id,
+            "description": task.get("description", "No description provided."),
+            "is_completed": False
+        })
+    return saved_tasks
+
+
+# --- ORIGINAL PAGE ROUTES (Unchanged) ---
 @app.route("/")
 def home():
     return render_template("index.html")
@@ -190,161 +298,29 @@ def test_path_builder():
     if not user:
         return redirect(url_for("login"))
     stats = user.get_stats()
-    test_path = stats.get("test_path", {})
-    error = None
-
     if request.method == "POST":
-        # Get form data
         test_path = {
             "desired_sat": request.form.get("desired_sat", ""),
             "desired_act": request.form.get("desired_act", ""),
-            "strengths": request.form.get("strengths", ""),
-            "weaknesses": request.form.get("weaknesses", ""),
             "test_date": request.form.get("test_date", ""),
-            "test_time": request.form.get("test_time", "")
+            "test_time": request.form.get("test_time", ""),
+            "strengths": request.form.get("strengths", ""),
+            "weaknesses": request.form.get("weaknesses", "")
         }
         stats["test_path"] = test_path
         user.set_stats(stats)
+        # Generate the first path upon submission
+        _generate_and_save_new_path(
+            user.data[0], test_path['strengths'], test_path['weaknesses'])
         return redirect(url_for("test_path_view"))
-
-    # Pre-fill form if data exists
-    return render_template(
-        "test_path_builder.html",
-        desired_sat=test_path.get("desired_sat", ""),
-        desired_act=test_path.get("desired_act", ""),
-        strengths=test_path.get("strengths", ""),
-        weaknesses=test_path.get("weaknesses", ""),
-        test_date=test_path.get("test_date", ""),
-        test_time=test_path.get("test_time", ""),
-        error=error
-    )
+    # Pre-fill the form with saved values if they exist
+    return render_template("test_path_builder.html", **stats.get("test_path", {}))
 
 
 @app.route("/dashboard/test-path-view")
 @login_required
 def test_path_view():
-    user = User.from_session(db, session)
-    if not user:
-        return redirect(url_for("login"))
-    stats = user.get_stats()
-    test_path = stats.get("test_path", {})
-    return render_template(
-        "test_path_view.html",
-        test_path=test_path
-    )
-
-
-def _generate_mock_tasks(strengths, weaknesses, num_tasks=5):
-    """
-    Generates a list of mock tasks. Used as a fallback if the AI API fails.
-    """
-    tasks = []
-    # A very basic "AI" logic for demonstration
-    if "geometry" in weaknesses.lower():
-        tasks.append(
-            {"description": "Focus on circle theorems and properties of triangles.", "status": "pending"})
-    if "punctuation" in weaknesses.lower():
-        tasks.append(
-            {"description": "Complete a drill on comma, semicolon, and colon usage.", "status": "pending"})
-    if "algebra" in strengths.lower():
-        tasks.append(
-            {"description": "Solidify your algebra skills with advanced function problems.", "status": "pending"})
-
-    # Generic tasks to fill up the list
-    generic_tasks = [
-        {"description": "Complete a timed mini-section for your weakest subject.", "status": "pending"},
-        {"description": "Review 20 new vocabulary words using flashcards.", "status": "pending"},
-        {"description": "Analyze the structure of a sample essay prompt.", "status": "pending"},
-        {"description": "Review 20 new vocabulary words using flashcards.", "status": "pending"},
-        {"description": "Analyze the structure of a sample essay prompt.", "status": "pending"}
-    ]
-
-    while len(tasks) < num_tasks and generic_tasks:
-        tasks.append(generic_tasks.pop(0))
-
-    # Ensure the last task is a milestone
-    if tasks:
-        tasks[-1]['is_milestone'] = True
-
-    return tasks[:num_tasks]
-
-
-def _generate_ai_tasks(strengths, weaknesses, num_tasks=5):
-    """
-    Calls the OpenAI API to generate personalized tasks based on user input.
-    """
-    if not openai.api_key:
-        print("Warning: OPENAI_API_KEY environment variable not set. Falling back to mock tasks.")
-        return _generate_mock_tasks(strengths, weaknesses, num_tasks)
-
-    prompt_content = (
-        f"Based on a student's strengths in '{strengths}' and weaknesses in '{weaknesses}', "
-        f"create a list of exactly {num_tasks} personalized tasks for SAT/ACT test prep. "
-        "The last task must be a milestone task, like taking a practice test. "
-        "Return the response as a single, valid JSON object with a key 'tasks' which is an array of objects. "
-        "Each object must have two keys: 'description' (a string) and 'is_milestone' (a boolean)."
-    )
-
-    try:
-        completion = openai.chat.completions.create(
-            model="gpt-3.5-turbo-1106",  # A model that supports JSON mode
-            messages=[
-                {"role": "system", "content": "You are an expert test prep tutor that creates personalized study plans and responds in valid JSON."},
-                {"role": "user", "content": prompt_content}
-            ],
-            response_format={"type": "json_object"},
-            temperature=0.7,
-        )
-        response_text = completion.choices[0].message.content
-        data = json.loads(response_text)
-        tasks = data.get("tasks", [])
-
-        # Validate and clean the response
-        if not isinstance(tasks, list):
-            raise ValueError("AI response did not contain a 'tasks' list.")
-
-        processed_tasks = []
-        for task in tasks:
-            if 'description' in task and isinstance(task['description'], str):
-                processed_tasks.append({
-                    "description": task['description'],
-                    "status": "pending",
-                    "is_milestone": task.get('is_milestone', False)
-                })
-
-        if not processed_tasks:
-            raise ValueError("AI response contained no valid tasks.")
-
-        processed_tasks[-1]['is_milestone'] = True
-        return processed_tasks[:num_tasks]
-
-    except Exception as e:
-        print(f"Error calling OpenAI or parsing response: {e}")
-        return _generate_mock_tasks(strengths, weaknesses, num_tasks)
-
-
-@app.route("/api/generate-tasks")
-@login_required
-def generate_tasks():
-    user = User.from_session(db, session)
-    stats = user.get_stats()
-    test_path = stats.get("test_path", {})
-    tasks = _generate_ai_tasks(test_path.get("strengths", ""), test_path.get("weaknesses", ""))
-    return jsonify(tasks)
-
-
-@app.route("/dashboard/test-path-status")
-@login_required
-def test_path_status():
-    user = User.from_session(db, session)
-    stats = user.get_stats()
-    test_path = stats.get("test_path", {})
-    # Check if any field in test_path is filled
-    has_path = any(test_path.get(k) for k in [
-                   "desired_sat", "desired_act", "strengths", "weaknesses", "test_date", "test_time"])
-    return jsonify({"has_path": has_path})
-
-# Logout
+    return render_template("test_path_view.html")
 
 
 @app.route("/logout")
@@ -353,12 +329,113 @@ def logout():
     return redirect(url_for("home"))
 
 
+@app.route('/api/test-path-status')
+@login_required
+def test_path_status():
+    """
+    FIXED: This function now correctly checks for an existing active path
+    and returns the JSON key 'has_path' (snake_case) that the frontend expects.
+    """
+    user = User.from_session(db, session)
+    if not user:
+        # This case is handled by @login_required, but as a fallback:
+        return jsonify({"has_path": False, "error": "User not found"}), 404
+
+    # A user has a "path" if they have active tasks in the 'paths' table.
+    # This is more reliable than checking if the form fields in 'stats' are empty.
+    user_id = user.data[0]
+    active_tasks = db.select(
+        "paths", where={"user_id": user_id, "is_active": True})
+
+    # Return a boolean indicating if any active tasks were found.
+    # The key 'has_path' now matches the frontend JavaScript.
+    return jsonify({"has_path": bool(active_tasks)})
+
+
 @app.route('/dashboard/college-path-builder')
 @login_required
 def college_path_builder():
     return render_template('college_path_builder.html')
 
 
+# --- API ROUTES FOR THE PATH BUILDER (Fixed) ---
+
+@app.route("/api/tasks", methods=['GET', 'POST'])
+@login_required
+def api_tasks():
+    user = User.from_session(db, session)
+    user_id = user.data[0]
+    stats = user.get_stats()
+    test_path_info = stats.get("test_path", {})
+    strengths = test_path_info.get("strengths", "general studying")
+    weaknesses = test_path_info.get("weaknesses", "test-taking skills")
+
+    try:
+        # Get all active tasks for this user
+        active_path = db.select("paths", where={
+            "user_id": user_id, "is_active": True})
+
+        # Sort the tasks by task_order if active_path exists
+        if active_path:
+            # Sort by task_order column
+            active_path = sorted(active_path, key=lambda x: x[2])
+
+        # Generate a new path if one doesn't exist or if a regeneration is forced via POST
+        if request.method == "POST" or not active_path:
+            tasks = _generate_and_save_new_path(user_id, strengths, weaknesses)
+            return jsonify(tasks)
+    except Exception as e:  # It's better to catch specific database errors
+        print(f"API tasks error: {e}")
+        return jsonify({"error": "Could not retrieve or generate tasks due to a server error."}), 500
+
+    tasks = []
+    for row in active_path:
+        tasks.append({
+            "id": row[0],
+            "description": row[3],
+            "is_completed": bool(row[4]) if row[4] is not None else False
+        })
+    return jsonify(tasks)
+
+
+@app.route("/api/update_task_status", methods=['POST'])
+@login_required
+def api_update_task_status():
+    user = User.from_session(db, session)
+    user_id = user.data[0]
+    data = request.get_json()
+    status = data.get("status")
+    task_id = data.get("taskId")
+
+    if status == 'failed':
+        stats = user.get_stats()
+        test_path_info = stats.get("test_path", {})
+        strengths = test_path_info.get("strengths", "general studying")
+        weaknesses = test_path_info.get("weaknesses", "test-taking skills")
+        # Regenerate the path if a task is failed
+        new_tasks = _generate_and_save_new_path(user_id, strengths, weaknesses)
+        return jsonify({"success": True, "tasks": new_tasks})
+    elif status == 'complete' and task_id:
+        # Update the specific task's completion status
+        db.update("paths", {"is_completed": True}, where={
+            "id": task_id, "user_id": user_id})
+
+    return jsonify({"success": True})
+
+
+@app.route("/api/chat", methods=['POST'])
+@login_required
+def api_chat():
+    user = User.from_session(db, session)
+    stats = user.get_stats()
+    data = request.get_json()
+    history = data.get("history", [])
+
+    reply = _get_ai_chat_response(history, stats)
+    return jsonify({"reply": reply})
+
+
+# --- MAIN EXECUTION ---
 if __name__ == "__main__":
     init_db()
     app.run(debug=True)
