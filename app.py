@@ -53,7 +53,8 @@ def login_required(f):
 
 # --- AI HELPER FUNCTIONS (Consolidated and Fixed) ---
 
-def _get_ai_tasks(strengths, weaknesses):
+# REPLACE the existing _get_ai_tasks function with this one
+def _get_ai_tasks(strengths, weaknesses, user_stats={}):
     """Generates tasks from AI, with a reliable 5-task mock fallback."""
 
     # This is the single source of mock tasks, ensuring consistency.
@@ -99,6 +100,8 @@ def _get_ai_tasks(strengths, weaknesses):
         "Return ONLY a valid JSON object with a key 'tasks', which is an array of 5 objects, "
         "each with a 'description' key."
     )
+    # --- END OF ENHANCED PROMPT ---
+
     try:
         completion = openai.chat.completions.create(
             model="gpt-3.5-turbo",
@@ -138,10 +141,22 @@ def _get_ai_chat_response(history, user_stats):
         return "Sorry, I encountered an error connecting to the AI."
 
 
+# REPLACE the existing _generate_and_save_new_path function with this one
 def _generate_and_save_new_path(user_id, strengths, weaknesses):
     """Deactivates old path, gets new tasks, and saves them."""
+    # Fetch the user's full data record from the database using their ID
+    user_record = db.select("users", where={"id": user_id})
+    user_stats = {}  # Default to empty stats
+    if user_record:
+        # The stats are in the 4th column (index 3), stored as a JSON string
+        user_stats = json.loads(user_record[0][3])
+
+    # Deactivate the old path
     db.update("paths", {"is_active": False}, where={"user_id": user_id})
-    tasks = _get_ai_tasks(strengths, weaknesses)
+
+    # Pass the full context to the AI task generator
+    tasks = _get_ai_tasks(strengths, weaknesses, user_stats)
+
     saved_tasks = []
     for i, task in enumerate(tasks):
         task_id = db.insert("paths", {
