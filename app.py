@@ -82,9 +82,22 @@ def _get_ai_tasks(strengths, weaknesses):
     if not openai.api_key:
         return get_mock_tasks_reliably()
 
+    # --- ENHANCED PROMPT ---
+    # Get more context from the user's stats
+    desired_sat = user_stats.get("test_path", {}).get("desired_sat", "N/A")
+    desired_act = user_stats.get("test_path", {}).get("desired_act", "N/A")
+    current_gpa = user_stats.get("gpa", "N/A")
+
     prompt = (
-        f"A student has strengths: '{strengths}' and weaknesses: '{weaknesses}'. "
-        "Create a 5-step study plan. Return ONLY a valid JSON object with a key 'tasks', which is an array of 5 objects, each with a 'description' key."
+        f"A student has the following profile:\n"
+        f"- Strengths: '{strengths}'\n"
+        f"- Weaknesses: '{weaknesses}'\n"
+        f"- Current GPA: {current_gpa}\n"
+        f"- Desired SAT Score: {desired_sat}\n"
+        f"- Desired ACT Score: {desired_act}\n\n"
+        "Based on this, create a 5-step study plan. "
+        "Return ONLY a valid JSON object with a key 'tasks', which is an array of 5 objects, "
+        "each with a 'description' key."
     )
     try:
         completion = openai.chat.completions.create(
@@ -433,6 +446,30 @@ def api_chat():
 
     reply = _get_ai_chat_response(history, stats)
     return jsonify({"reply": reply})
+
+
+@app.route("/api/update_stats", methods=['POST'])
+@login_required
+def api_update_stats():
+    user = User.from_session(db, session)
+    if not user:
+        return jsonify({"success": False, "error": "User not found"}), 404
+
+    data = request.get_json()
+    stat_name = data.get("stat_name")  # e.g., "gpa", "sat_math"
+    stat_value = data.get("stat_value")
+
+    if not stat_name or stat_value is None:
+        return jsonify({"success": False, "error": "Missing stat name or value"}), 400
+
+    try:
+        stats = user.get_stats()
+        stats[stat_name] = stat_value
+        user.set_stats(stats)
+        return jsonify({"success": True, "message": "Stats updated successfully"})
+    except Exception as e:
+        print(f"Error updating stats via API: {e}")
+        return jsonify({"success": False, "error": "Server error"}), 500
 
 
 # --- MAIN EXECUTION ---
