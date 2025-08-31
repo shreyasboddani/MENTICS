@@ -83,6 +83,35 @@
         </div>
     </div>
 
+    <div id="statEntryModal"
+        class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden transition-opacity duration-300">
+        <div class="bg-white rounded-2xl shadow-xl p-8 max-w-lg w-full m-4 transform transition-all scale-95"
+            id="stat-modal-panel">
+            <div class="flex justify-between items-start">
+                <h3 id="statModalTitle" class="text-2xl font-bold lalezar text-purple-700 mb-4">Update Your Progress
+                </h3>
+                <button onclick="closeStatModal()" class="text-gray-400 hover:text-gray-600 text-3xl">&times;</button>
+            </div>
+            <p class="text-gray-700 mb-4">Great job on completing a milestone! Please enter your new score below.</p>
+            <div class="space-y-4">
+                <div>
+                    <label id="statModalLabel" for="statValue" class="block text-gray-700 mb-1 font-bold">New
+                        Score</label>
+                    <input type="number" id="statValue" name="statValue"
+                        class="w-full border rounded p-2 focus:ring-2 focus:ring-purple-500"
+                        placeholder="Enter score...">
+                    <input type="hidden" id="statNameToUpdate">
+                </div>
+                <div id="stat-modal-actions" class="flex justify-end gap-4">
+                    <button onclick="closeStatModal()" class="text-purple-600 hover:underline">Cancel</button>
+                    <button onclick="handleSaveStat()"
+                        class="bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 px-4 rounded-lg transition">Save
+                        Score</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <script>
         let currentTasks = [];
         let currentTaskId = null;
@@ -90,37 +119,24 @@
 
         async function fetchPath(isRegeneration = false) {
             const nodesContainer = document.getElementById('path-nodes-container');
-            nodesContainer.innerHTML = `<p class="text-gray-500 text-center">${isRegeneration ? 'Generating your path with AI...' : 'Loading your path...'}</p>`;
-
+            nodesContainer.innerHTML = `<p class="text-gray-500 text-center">${isRegeneration ? 'Generating new path...' : 'Loading your path...'}</p>`;
             try {
-                const response = await fetch('/api/tasks', {
-                    method: isRegeneration ? 'POST' : 'GET',
-                    headers: { 'Content-Type': 'application/json' }
-                });
-
+                const response = await fetch('/api/tasks', { method: isRegeneration ? 'POST' : 'GET' });
                 if (!response.ok) throw new Error('Network response was not ok');
                 const tasks = await response.json();
-
-                if (Array.isArray(tasks)) {
+                if (Array.isArray(tasks) && tasks.length > 0) {
                     currentTasks = tasks.map((task, index) => ({
                         ...task,
-                        id: index + 1,
+                        client_id: index + 1,
                         status: task.is_completed ? 'complete' : 'pending'
                     }));
                     renderPathAndConnectors(currentTasks);
                 } else {
-                    throw new Error('Invalid response format');
+                    fetchPath(true);
                 }
             } catch (error) {
                 console.error('Error fetching path:', error);
-                nodesContainer.innerHTML = `
-                    <div class="text-center">
-                        <p class="text-red-500 mb-4">Could not load your path.</p>
-                        <button onclick="fetchPath(true)" 
-                                class="bg-purple-600 text-white px-4 py-2 rounded hover:bg-purple-700">
-                            Try Again
-                        </button>
-                    </div>`;
+                nodesContainer.innerHTML = `<div class="text-center"><p class="text-red-500 mb-4">Could not load path.</p><button onclick="fetchPath(true)" class="bg-purple-600 text-white px-4 py-2 rounded hover:bg-purple-700">Try Again</button></div>`;
             }
         }
 
@@ -128,29 +144,25 @@
             const nodesContainer = document.getElementById('path-nodes-container');
             nodesContainer.innerHTML = '';
             const firstPendingIndex = tasks.findIndex(t => t.status === 'pending');
-
             tasks.forEach((task, index) => {
                 const isCompleted = task.status === 'complete';
                 const isUnlocked = index === firstPendingIndex;
                 const isLocked = index > firstPendingIndex && firstPendingIndex !== -1;
-
                 const alignmentWrapper = document.createElement('div');
                 alignmentWrapper.className = 'flex';
                 const positions = ['justify-start pl-4', 'justify-center', 'justify-end pr-4'];
                 alignmentWrapper.classList.add(...positions[index % 3].split(' '));
-
                 const taskButton = document.createElement('button');
-                taskButton.id = `task-node-${task.id}`;
+                taskButton.id = `task-node-${task.client_id}`;
                 taskButton.className = 'w-24 h-24 rounded-full flex items-center justify-center font-bold text-2xl text-white transition transform hover:scale-110 focus:outline-none focus:ring-4 focus:ring-offset-2 focus:ring-purple-400';
                 taskButton.onclick = () => openTaskModal(task);
                 taskButton.disabled = isLocked;
-
                 if (isCompleted) {
-                    taskButton.classList.add('bg-purple-600');
+                    taskButton.classList.add('bg-green-500');
                     taskButton.innerHTML = `<svg class="h-10 w-10" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" /></svg>`;
                 } else if (isUnlocked) {
-                    taskButton.classList.add('bg-purple-400', 'animate-pulse');
-                    taskButton.textContent = task.id;
+                    taskButton.classList.add('bg-purple-500', 'animate-pulse');
+                    taskButton.textContent = task.client_id;
                 } else {
                     taskButton.classList.add('bg-gray-300', 'cursor-not-allowed');
                     taskButton.innerHTML = `<svg class="h-10 w-10 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg>`;
@@ -158,34 +170,26 @@
                 alignmentWrapper.appendChild(taskButton);
                 nodesContainer.appendChild(alignmentWrapper);
             });
-
             setTimeout(drawConnectors, 50);
         }
 
         function drawConnectors() {
             const path = document.getElementById('connector-path');
-            const nodes = currentTasks.map(task => document.getElementById(`task-node-${task.id}`));
+            const nodes = currentTasks.map(task => document.getElementById(`task-node-${task.client_id}`));
             const svg = document.getElementById('path-svg');
+            if (!svg) return;
             const containerRect = svg.getBoundingClientRect();
             let pathData = "";
-
             for (let i = 0; i < nodes.length - 1; i++) {
-                const startNode = nodes[i];
-                const endNode = nodes[i + 1];
+                const startNode = nodes[i]; const endNode = nodes[i + 1];
                 if (!startNode || !endNode) continue;
-                const startRect = startNode.getBoundingClientRect();
-                const endRect = endNode.getBoundingClientRect();
-
+                const startRect = startNode.getBoundingClientRect(); const endRect = endNode.getBoundingClientRect();
                 const startX = startRect.left + startRect.width / 2 - containerRect.left;
                 const startY = startRect.top + startRect.height / 2 - containerRect.top;
                 const endX = endRect.left + endRect.width / 2 - containerRect.left;
                 const endY = endRect.top + endRect.height / 2 - containerRect.top;
-
-                const controlX1 = startX + (endX - startX) * 0.2;
-                const controlY1 = startY + (endY - startY) * 0.8;
-                const controlX2 = startX + (endX - startX) * 0.8;
-                const controlY2 = startY + (endY - startY) * 0.2;
-
+                const controlX1 = startX + (endX - startX) * 0.2; const controlY1 = startY + (endY - startY) * 0.8;
+                const controlX2 = startX + (endX - startX) * 0.8; const controlY2 = startY + (endY - startY) * 0.2;
                 if (pathData === "") pathData += `M ${startX} ${startY} `;
                 pathData += `C ${controlX1} ${controlY1}, ${controlX2} ${controlY2}, ${endX} ${endY} `;
             }
@@ -195,13 +199,11 @@
         function openTaskModal(task) {
             currentTaskId = task.id;
             const modal = document.getElementById('taskModal');
-            document.getElementById('modalTitle').textContent = `Step ${task.id}: Your Task`;
+            document.getElementById('modalTitle').textContent = `Step ${task.client_id}: Your Task`;
             document.getElementById('modalDescription').textContent = task.description;
-            const actionsContainer = document.getElementById('modal-actions');
-            actionsContainer.innerHTML = `
+            document.getElementById('modal-actions').innerHTML = `
                 <button onclick="handleTaskAction('failed')" class="bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-4 rounded-lg transition">I'm Stuck</button>
-                <button onclick="handleTaskAction('complete')" class="bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-4 rounded-lg transition">Mark as Complete</button>
-            `;
+                <button onclick="handleTaskAction('complete')" class="bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-4 rounded-lg transition">Mark as Complete</button>`;
             modal.classList.remove('hidden');
             setTimeout(() => {
                 modal.classList.add('opacity-100');
@@ -219,34 +221,30 @@
         async function handleTaskAction(status) {
             const task = currentTasks.find(t => t.id === currentTaskId);
             if (!task) return;
-
             closeTaskModal();
-
             try {
                 const response = await fetch('/api/update_task_status', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ taskId: task.id, status: status, description: task.description })
+                    body: JSON.stringify({ taskId: task.id, status: status })
                 });
                 if (!response.ok) throw new Error('Could not update task status');
-
+                const result = await response.json();
                 if (status === 'complete') {
-                    task.status = 'complete';
+                    const taskIndex = currentTasks.findIndex(t => t.id === currentTaskId);
+                    if (taskIndex !== -1) currentTasks[taskIndex].status = 'complete';
                     renderPathAndConnectors(currentTasks);
-
-                    // --- THIS IS THE NEW LOGIC ---
-                    // If the completed task is a milestone, open the stat entry modal.
                     if (task.type === 'milestone' && task.stat_to_update) {
-                        setTimeout(() => openStatModal(task), 500); // Wait a moment for effect
+                        setTimeout(() => openStatModal(task), 500);
                     } else {
-                        // Otherwise, check if the whole path is done.
                         await checkPathCompletion();
                     }
-                    // --- END OF NEW LOGIC ---
-
-                } else if (status === 'failed') {
+                } else if (status === 'failed' && result.tasks) {
                     alert("No worries! We'll generate a new path for you.");
-                    await fetchPath(true); // Pass true to indicate regeneration
+                    currentTasks = result.tasks.map((task, index) => ({
+                        ...task, client_id: index + 1, status: task.is_completed ? 'complete' : 'pending'
+                    }));
+                    renderPathAndConnectors(currentTasks);
                 }
             } catch (error) {
                 console.error("Error updating task status:", error);
@@ -255,22 +253,89 @@
         }
 
         async function checkPathCompletion() {
-            if (currentTasks.every(t => t.status === 'complete')) {
+            const allComplete = currentTasks.every(t => t.status === 'complete');
+            if (allComplete && currentTasks.length > 0) {
                 setTimeout(async () => {
                     alert("Great job! Generating your next set of challenges.");
-                    await fetchPath(true); // Pass true to indicate regeneration
+                    await fetchPath(true);
                 }, 500);
             }
         }
 
+        function openStatModal(task) {
+            const statName = task.stat_to_update;
+            const friendlyName = {
+                "sat_math": "New SAT Math Score", "sat_ebrw": "New SAT EBRW Score",
+                "act_math": "New ACT Math Score", "act_reading": "New ACT Reading Score",
+                "act_science": "New ACT Science Score", "gpa": "New GPA"
+            }[statName] || "New Score";
+            document.getElementById('statModalLabel').textContent = friendlyName;
+            document.getElementById('statNameToUpdate').value = statName;
+            const modal = document.getElementById('statEntryModal');
+            modal.classList.remove('hidden');
+            setTimeout(() => {
+                modal.classList.add('opacity-100');
+                document.getElementById('stat-modal-panel').classList.add('scale-100');
+            }, 10);
+        }
+
+        function closeStatModal() {
+            const modal = document.getElementById('statEntryModal');
+            modal.classList.remove('opacity-100');
+            document.getElementById('stat-modal-panel').classList.remove('scale-100');
+            setTimeout(() => {
+                modal.classList.add('hidden');
+                document.getElementById('statValue').value = '';
+                document.getElementById('statNameToUpdate').value = '';
+            }, 300);
+        }
+
+        async function handleSaveStat() {
+            const stat_name = document.getElementById('statNameToUpdate').value;
+            const stat_value = document.getElementById('statValue').value;
+            if (!stat_value) { alert("Please enter a value."); return; }
+            try {
+                const response = await fetch('/api/update_stats', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ stat_name, stat_value })
+                });
+                if (!response.ok) throw new Error('Failed to save stats.');
+                const result = await response.json();
+                if (result.success) {
+                    alert("Your stats have been updated!");
+                    closeStatModal();
+                    await checkPathCompletion();
+                } else {
+                    throw new Error(result.error || 'An unknown error occurred.');
+                }
+            } catch (error) {
+                console.error("Error saving stat:", error);
+                alert("Could not save your stats. Please try again.");
+            }
+        }
+
+        // REPLACE your current handleUserChat function with this correct version
+
         async function handleUserChat() {
             const chatInput = document.getElementById('userInput');
             const sendButton = document.getElementById('send-btn');
-            const message = chatInput.value.trim();
-            if (message === "") return;
+            let message = chatInput.value.trim();
 
-            appendChatMessage(message, 'user');
-            conversationHistory.push({ role: 'user', content: message });
+            // Check if this is the special initial message
+            const isInitialMessage = conversationHistory.length > 0 && conversationHistory[conversationHistory.length - 1].content === 'INITIAL_MESSAGE';
+            if (isInitialMessage) {
+                // If it is the initial message, we don't display it to the user
+                chatInput.value = "";
+            } else if (message === "") {
+                return; // Don't send empty messages from the user
+            }
+
+            if (!isInitialMessage) {
+                appendChatMessage(message, 'user');
+                conversationHistory.push({ role: 'user', content: message });
+            }
+
             chatInput.value = "";
             chatInput.disabled = true;
             sendButton.disabled = true;
@@ -289,6 +354,12 @@
                 const aiReply = data.reply;
 
                 typingIndicator.remove();
+
+                // Don't add the placeholder 'INITIAL_MESSAGE' to the chat history that the AI sees next time
+                if (isInitialMessage) {
+                    conversationHistory = [];
+                }
+
                 appendChatMessage(aiReply, 'bot');
                 conversationHistory.push({ role: 'assistant', content: aiReply });
 
@@ -296,6 +367,7 @@
                 typingIndicator.querySelector('p').textContent = "Sorry, I'm having trouble connecting.";
                 console.error("Chat error:", error);
             } finally {
+                // This is the crucial part that was missing: re-enable the inputs
                 chatInput.disabled = false;
                 sendButton.disabled = false;
                 chatInput.focus();
@@ -319,125 +391,33 @@
             return messageDiv;
         }
 
+        // REPLACE your current DOMContentLoaded function with this correct version
+
         document.addEventListener('DOMContentLoaded', () => {
+            // Get the chat elements right away
             const userInput = document.getElementById('userInput');
             const sendButton = document.getElementById('send-btn');
 
-            appendChatMessage("I'm your AI assistant. I can help you understand your path or answer questions about test prep.", 'bot');
-            conversationHistory.push({ role: 'assistant', content: "I'm your AI assistant." });
+            // First, load the user's path
+            fetchPath();
 
-            fetchPath().then(() => {
-                userInput.disabled = false;
-                sendButton.disabled = false;
-            });
+            // Then, send the special initial message to get the AI's proactive greeting
+            // We add a placeholder so handleUserChat knows what's happening
+            conversationHistory.push({ role: 'user', content: 'INITIAL_MESSAGE' });
+
+            // Call handleUserChat, which will now handle enabling the inputs
+            handleUserChat();
         });
 
-        window.addEventListener('resize', () => renderPathAndConnectors(currentTasks));
+        window.addEventListener('resize', () => drawConnectors());
         document.getElementById('send-btn').addEventListener('click', handleUserChat);
         document.getElementById('userInput').addEventListener('keypress', (e) => {
             if (e.key === 'Enter') handleUserChat();
         });
 
-        function openStatModal(task) {
-            // Prepare the modal with the correct info
-            const statName = task.stat_to_update;
-            const friendlyName = {
-                "sat_math": "New SAT Math Score",
-                "sat_ebrw": "New SAT EBRW Score",
-                "act_math": "New ACT Math Score",
-                "act_reading": "New ACT Reading Score",
-                "act_science": "New ACT Science Score",
-                "gpa": "New GPA"
-            }[statName] || "New Score";
-
-            document.getElementById('statModalLabel').textContent = friendlyName;
-            document.getElementById('statNameToUpdate').value = statName;
-
-            // Show the modal
-            const modal = document.getElementById('statEntryModal');
-            modal.classList.remove('hidden');
-            setTimeout(() => {
-                modal.classList.add('opacity-100');
-                document.getElementById('stat-modal-panel').classList.add('scale-100');
-            }, 10);
-        }
-
-        function closeStatModal() {
-            const modal = document.getElementById('statEntryModal');
-            modal.classList.remove('opacity-100');
-            document.getElementById('stat-modal-panel').classList.remove('scale-100');
-            setTimeout(() => {
-                modal.classList.add('hidden');
-                // Clear the input for next time
-                document.getElementById('statValue').value = '';
-                document.getElementById('statNameToUpdate').value = '';
-            }, 300);
-        }
-
-        async function handleSaveStat() {
-            const stat_name = document.getElementById('statNameToUpdate').value;
-            const stat_value = document.getElementById('statValue').value;
-
-            if (!stat_value) {
-                alert("Please enter a value.");
-                return;
-            }
-
-            try {
-                const response = await fetch('/api/update_stats', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ stat_name, stat_value })
-                });
-
-                if (!response.ok) throw new Error('Failed to save stats.');
-
-                const result = await response.json();
-                if (result.success) {
-                    alert("Your stats have been updated!");
-                    closeStatModal();
-                } else {
-                    throw new Error(result.error || 'An unknown error occurred.');
-                }
-            } catch (error) {
-                console.error("Error saving stat:", error);
-                alert("Could not save your stats. Please try again.");
-            }
-        }
     </script>
     <script src="https://unpkg.com/aos@2.3.1/dist/aos.js"></script>
     <script>AOS.init({ once: true, duration: 800 });</script>
-
-    <div id="statEntryModal"
-        class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden transition-opacity duration-300">
-        <div class="bg-white rounded-2xl shadow-xl p-8 max-w-lg w-full m-4 transform transition-all scale-95"
-            id="stat-modal-panel">
-            <div class="flex justify-between items-start">
-                <h3 id="statModalTitle" class="text-2xl font-bold lalezar text-purple-700 mb-4">Update Your Progress
-                </h3>
-                <button onclick="closeStatModal()" class="text-gray-400 hover:text-gray-600 text-3xl">&times;</button>
-            </div>
-
-            <p class="text-gray-700 mb-4">Great job on completing a milestone! Please enter your new score below.</p>
-
-            <div class="space-y-4">
-                <div>
-                    <label id="statModalLabel" for="statValue" class="block text-gray-700 mb-1 font-bold">New
-                        Score</label>
-                    <input type="number" id="statValue" name="statValue"
-                        class="w-full border rounded p-2 focus:ring-2 focus:ring-purple-500"
-                        placeholder="Enter score...">
-                    <input type="hidden" id="statNameToUpdate">
-                </div>
-                <div id="stat-modal-actions" class="flex justify-end gap-4">
-                    <button onclick="closeStatModal()" class="text-purple-600 hover:underline">Cancel</button>
-                    <button onclick="handleSaveStat()"
-                        class="bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 px-4 rounded-lg transition">Save
-                        Score</button>
-                </div>
-            </div>
-        </div>
-    </div>
 </body>
 
 </html>

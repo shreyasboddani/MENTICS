@@ -73,17 +73,29 @@
                 <h2 class="text-2xl font-bold lalezar text-purple-700 mb-2 flex items-center gap-2">📈 Quick Overview
                 </h2>
                 <p class="text-gray-600 mb-2">See your upcoming milestones and progress at a glance.</p>
-                <ul class="text-lg text-gray-700 space-y-1">
-                    <li>📅 <span class="font-bold">Test Prep Upcoming:</span>
-                        <span class="text-purple-700">{{ test_prep_upcoming }}</span>
-                    </li>
-                    <li>📅 <span class="font-bold">College Planning Upcoming:</span>
-                        <span class="text-purple-700">{{ college_planning_upcoming }}</span>
-                    </li>
-                    <li>🎯 <span class="font-bold">Current GPA:</span>
-                        <span class="text-purple-700">{{ gpa if gpa else "—" }}</span>
-                    </li>
-                </ul>
+                <div class="space-y-4">
+                    <div class="bg-white/90 rounded-lg p-4">
+                        <h3 class="text-lg font-bold text-purple-700 mb-2">📝 Test Prep Progress</h3>
+                        <div class="text-left space-y-1">
+                            <p class="text-gray-700">Current Generation: <span class="font-bold text-purple-700">{{
+                                    test_prep_completed }}/5</span> completed</p>
+                            <p class="text-gray-700">Remaining: <span class="font-bold text-purple-700">{{ 5 -
+                                    test_prep_completed }}</span></p>
+                            <p class="text-gray-700 border-t border-purple-100 mt-2 pt-2">Total Completed: <span
+                                    class="font-bold text-purple-700">{{ total_test_prep_completed }}</span></p>
+                        </div>
+                    </div>
+
+                    <div class="bg-white/90 rounded-lg p-4">
+                        <h3 class="text-lg font-bold text-purple-700 mb-2">🎓 College Planning</h3>
+                        <div class="text-left space-y-1">
+                            <p class="text-gray-700">Completed: <span class="font-bold text-purple-700">{{
+                                    college_planning_completed }}</span></p>
+                            <p class="text-gray-700">Upcoming: <span class="font-bold text-purple-700">{{
+                                    college_planning_upcoming }}</span></p>
+                        </div>
+                    </div>
+                </div>
             </div>
             <div class="flex-1 flex flex-col items-center">
                 <span class="text-7xl mb-2">🔋</span>

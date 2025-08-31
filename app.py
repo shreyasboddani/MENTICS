@@ -8,7 +8,8 @@ import openai
 import os
 from dotenv import load_dotenv
 import random
-from pathlib import Path  # <-- Add this import
+from pathlib import Path
+from datetime import datetime  # NEW: Import datetime to handle dates
 
 # Explicitly load the .env file from the correct path
 env_path = Path('.') / '.env'
@@ -20,10 +21,12 @@ app.url_map.strict_slashes = False
 
 db = DatabaseHandler("users.db")
 
-# Setup OpenAI API Key from environment variable
-openai.api_key = os.getenv("OPENAI_API_KEY")
+# To use the live API, uncomment the line below
+# openai.api_key = os.getenv("OPENAI_API_KEY")
 
 # --- DATABASE INITIALIZATION ---
+
+
 def init_db():
     db.create_table("users", {
         "id": "INTEGER PRIMARY KEY AUTOINCREMENT",
@@ -38,11 +41,15 @@ def init_db():
         "description": "TEXT NOT NULL",
         "is_completed": "BOOLEAN DEFAULT FALSE",
         "is_active": "BOOLEAN DEFAULT TRUE",
-        "created_at": "TIMESTAMP DEFAULT CURRENT_TIMESTAMP"
+        "created_at": "TIMESTAMP DEFAULT CURRENT_TIMESTAMP",
+        "type": "TEXT",
+        "stat_to_update": "TEXT",
+        "category": "TEXT DEFAULT 'Test Prep'"
     })
 
-
 # --- DECORATORS ---
+
+
 def login_required(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
@@ -51,43 +58,67 @@ def login_required(f):
         return f(*args, **kwargs)
     return decorated_function
 
+# --- AI HELPER FUNCTIONS ---
 
-# --- AI HELPER FUNCTIONS (Consolidated and Fixed) ---
 
-# REPLACE the existing _get_ai_tasks function with this one
-# In app.py, replace _get_ai_tasks and _get_ai_chat_response with these
-
-def _get_ai_tasks(strengths, weaknesses, user_stats={}):
-    """Generates tasks from an external AI API, with a reliable 5-task mock fallback."""
+def _get_ai_tasks(strengths, weaknesses, user_stats={}, chat_history=[], path_history={}):
+    """Generates tasks with full context: profile, chat, and path history."""
 
     def get_mock_tasks_reliably():
-        print("Warning: API call failed. Returning mock tasks.")
-        all_mock_tasks = [
-            {"description": "Focus on circle theorems and properties of triangles.", "type": "standard", "stat_to_update": None},
-            {"description": "Complete a full timed SAT Math practice section and record your score.", "type": "milestone", "stat_to_update": "sat_math"},
-            {"description": "Solidify your algebra skills with advanced function problems.", "type": "standard", "stat_to_update": None},
-            {"description": "Review 20 new vocabulary words using flashcards.", "type": "standard", "stat_to_update": None},
-            {"description": "Drill comma, semicolon, and colon usage rules.", "type": "standard", "stat_to_update": None},
+        print("--- DEBUG: Running mock generator with Test Prep tasks only. ---")
+        test_prep_tasks = [
+            {"description": "Focus on circle theorems.", "type": "standard",
+                "stat_to_update": None, "category": "Test Prep"},
+            {"description": "Complete a timed SAT Math section.", "type": "milestone",
+                "stat_to_update": "sat_math", "category": "Test Prep"},
+            {"description": "Review 20 new vocabulary words.", "type": "standard",
+                "stat_to_update": None, "category": "Test Prep"},
+            {"description": "Practice SAT Reading comprehension.", "type": "standard",
+                "stat_to_update": None, "category": "Test Prep"},
+            {"description": "Take a full ACT practice test.", "type": "milestone",
+                "stat_to_update": None, "category": "Test Prep"}
         ]
-        return random.sample(all_mock_tasks, 5)
+        # Return all 5 tasks, shuffled
+        random.shuffle(test_prep_tasks)
+        return test_prep_tasks
 
-    if not openai.api_key:
-        print("Warning: OPENAI_API_KEY is not set in the environment.")
+    if not hasattr(openai, 'api_key') or not openai.api_key:
         return get_mock_tasks_reliably()
 
+    # NEW: Format the entire path history for the prompt
+    completed_tasks_str = "\n".join(
+        [f"- {task[3]}" for task in path_history.get('completed', [])]) or "None"
+    incomplete_tasks_str = "\n".join(
+        [f"- {task[3]}" for task in path_history.get('incomplete', [])]) or "None"
+
+    # NEW: Calculate days until the test
+    days_left = "Not set"
+    test_date_str = user_stats.get("test_path", {}).get("test_date")
+    if test_date_str:
+        try:
+            test_date = datetime.strptime(test_date_str, '%Y-%m-%d')
+            delta = test_date - datetime.now()
+            days_left = f"{delta.days} days"
+        except ValueError:
+            days_left = "Invalid date format"
+
+    # --- NEW SUPER-PROMPT ---
     prompt = (
-        f"A student has the following profile:\n"
-        f"- Strengths: '{strengths}'\n"
-        f"- Weaknesses: '{weaknesses}'\n"
+        f"You are a long-term test prep coach for a high school student.\n\n"
+        f"STUDENT PROFILE:\n"
+        f"- Strengths: {strengths}\n"
+        f"- Weaknesses: {weaknesses}\n"
         f"- Current GPA: {user_stats.get('gpa', 'N/A')}\n"
-        f"- Desired SAT Score: {user_stats.get('test_path', {}).get('desired_sat', 'N/A')}\n"
-        f"- Desired ACT Score: {user_stats.get('test_path', {}).get('desired_act', 'N/A')}\n\n"
-        "Create a 5-step study plan. Make one of the steps a 'milestone' task that involves taking a practice test or section.\n"
-        "Your response MUST be a valid JSON object with a key 'tasks', which is an array of 5 objects.\n"
-        "Each object MUST have these keys:\n"
-        "1. 'description': A string with the task description.\n"
-        "2. 'type': A string that is either 'standard' for a regular task, or 'milestone' for a task that requires a score update.\n"
-        "3. 'stat_to_update': If type is 'milestone', this MUST be one of the following strings: 'sat_math', 'sat_ebrw', 'act_math', 'act_reading', 'act_science', 'gpa'. If type is 'standard', this should be null."
+        f"- GOAL: Reach desired scores by the test date, which is in {days_left}.\n\n"
+        f"STUDENT'S TASK HISTORY:\n"
+        f"Recently Completed Tasks:\n{completed_tasks_str}\n\n"
+        f"Recently Failed or Incomplete Tasks:\n{incomplete_tasks_str}\n\n"
+        f"INSTRUCTIONS:\n"
+        "1. Analyze the student's profile and their complete task history.\n"
+        "2. Create a NEW 5-step study plan that logically progresses them forward.\n"
+        "3. CRITICAL: Do NOT repeat any tasks from their history.\n"
+        "4. The plan should be appropriate for someone with {days_left} until their test.\n"
+        "5. Return your response ONLY as a valid JSON object in the required format."
     )
 
     try:
@@ -105,70 +136,91 @@ def _get_ai_tasks(strengths, weaknesses, user_stats={}):
             return tasks
         raise ValueError("Invalid format from AI")
     except Exception as e:
-        # --- BETTER ERROR LOGGING ---
-        print("\n--- OPENAI API ERROR IN _get_ai_tasks ---")
-        print(f"An error occurred: {e}")
-        print("-------------------------------------------\n")
+        print(f"\n--- OPENAI API ERROR IN _get_ai_tasks: {e} ---\n")
         return get_mock_tasks_reliably()
 
 
 def _get_ai_chat_response(history, user_stats):
-    """Gets a chat response from the AI, with a mock fallback."""
-    if not openai.api_key:
-        return "I'm currently in offline mode and can't chat right now."
+    if not hasattr(openai, 'api_key') or not openai.api_key:
+        return "I'm in testing mode, but I'm saving our conversation!"
 
+    # NEW: Add test date context to chat
+    days_left = "a future date"
+    test_date_str = user_stats.get("test_path", {}).get("test_date")
+    if test_date_str:
+        try:
+            test_date = datetime.strptime(test_date_str, '%Y-%m-%d')
+            delta = test_date - datetime.now()
+            days_left = f"{delta.days} days"
+        except ValueError:
+            pass  # Ignore invalid date format in chat
+
+    # NEW: Proactive and context-aware system prompt
     system_message = {
         "role": "system",
-        "content": f"You are a helpful test prep assistant. Student's profile: {json.dumps(user_stats)}. Keep answers concise."
+        "content": (
+            "You are a friendly and proactive study coach. Your student's test is in "
+            f"{days_left}. If the conversation history is empty, greet the user, "
+            "remind them of their test date, and ask what they'd like to focus on. "
+            "In subsequent messages, be an encouraging tutor. Acknowledge scores and struggles."
+        )
     }
-    messages = [system_message] + history
 
+    messages = [system_message] + history
     try:
         completion = openai.chat.completions.create(
             model="gpt-3.5-turbo", messages=messages)
         return completion.choices[0].message.content
     except Exception as e:
-        # --- BETTER ERROR LOGGING ---
-        print("\n--- OPENAI API ERROR IN _get_ai_chat_response ---")
-        print(f"An error occurred: {e}")
-        print("---------------------------------------------------\n")
+        print(f"\n--- OPENAI API ERROR IN _get_ai_chat_response: {e} ---\n")
         return "Sorry, I encountered an error connecting to the AI."
 
 
-# REPLACE the existing _generate_and_save_new_path function with this one
 def _generate_and_save_new_path(user_id, strengths, weaknesses):
-    """Deactivates old path, gets new tasks, and saves them."""
-    # Fetch the user's full data record from the database using their ID
     user_record = db.select("users", where={"id": user_id})
-    user_stats = {}  # Default to empty stats
-    if user_record:
-        # The stats are in the 4th column (index 3), stored as a JSON string
-        user_stats = json.loads(user_record[0][3])
+    user_stats = json.loads(user_record[0][3]) if user_record else {}
+    chat_history = session.get('chat_history', [])
 
-    # Deactivate the old path
+    # NEW: Fetch and process the user's entire path history
+    all_tasks = db.select("paths", where={"user_id": user_id})
+    path_history = {
+        # is_completed is column 4
+        "completed": [task for task in all_tasks if task[4]],
+        "incomplete": [task for task in all_tasks if not task[4]]
+    }
+
     db.update("paths", {"is_active": False}, where={"user_id": user_id})
 
-    # Pass the full context to the AI task generator
-    tasks = _get_ai_tasks(strengths, weaknesses, user_stats)
+    # Pass all context to the AI
+    tasks = _get_ai_tasks(strengths, weaknesses,
+                          user_stats, chat_history, path_history)
 
     saved_tasks = []
     for i, task in enumerate(tasks):
         task_id = db.insert("paths", {
             "user_id": user_id,
             "task_order": i + 1,
-            "description": task.get("description", "No description provided."),
+            "description": task.get("description"),
+            "type": task.get("type"),
+            "stat_to_update": task.get("stat_to_update"),
+            # Default to Test Prep if not specified
+            "category": task.get("category", "Test Prep"),
             "is_active": True,
             "is_completed": False
         })
+        new_task_data = db.select("paths", where={"id": task_id})[0]
         saved_tasks.append({
-            "id": task_id,
-            "description": task.get("description", "No description provided."),
+            "id": new_task_data[0],
+            "description": new_task_data[3],
+            "type": new_task_data[7],
+            "stat_to_update": new_task_data[8],
             "is_completed": False
         })
     return saved_tasks
 
-
 # --- ORIGINAL PAGE ROUTES (Unchanged) ---
+
+
 @app.route("/")
 def home():
     return render_template("index.html")
@@ -229,15 +281,48 @@ def dashboard():
     if not user:
         return redirect(url_for("login"))
     stats = user.get_stats()
-    test_prep_upcoming = stats.get("test_prep_upcoming", 0)
-    college_planning_upcoming = stats.get("college_planning_upcoming", 0)
+    user_id = user.data[0]
+
+    # Get all tasks for the user
+    all_user_tasks = db.select("paths", where={"user_id": user_id})
+
+    # Get active Test Prep tasks for current generation
+    active_tasks = [task for task in all_user_tasks
+                    # is_active is True and category is Test Prep
+                    if task[5] and task[9] == 'Test Prep']
+
+    # Count completed tasks in current generation (out of 5 total tasks)
+    test_prep_completed = sum(
+        1 for task in active_tasks if task[4])  # is_completed
+
+    # Count total completed tasks across ALL generations
+    total_test_prep_completed = sum(
+        1 for task in all_user_tasks
+        # is_completed and category is Test Prep
+        if task[4] and task[9] == 'Test Prep'
+    )
+
+    # Keep college planning as is for now
+    college_planning_completed = sum(
+        1 for task in all_user_tasks
+        if task[4] and task[9] == 'College Planning'
+    )
+    college_planning_upcoming = sum(
+        1 for task in all_user_tasks
+        if not task[4] and task[5] and task[9] == 'College Planning'
+    )
+
     return render_template(
         "dashboard.html",
-        test_prep_upcoming=test_prep_upcoming,
+        test_prep_completed=test_prep_completed,
+        total_test_prep_completed=total_test_prep_completed,
+        college_planning_completed=college_planning_completed,
         college_planning_upcoming=college_planning_upcoming,
         gpa=stats.get("gpa", "")
     )
 
+
+# In app.py, replace the existing /dashboard/stats function
 
 @app.route("/dashboard/stats", methods=["GET"])
 @login_required
@@ -246,15 +331,38 @@ def stats():
     if not user:
         return redirect(url_for("login"))
     stats = user.get_stats()
-    # Default values if not set yet
-    test_prep_completed = stats.get("test_prep_completed", 0)
-    test_prep_upcoming = stats.get("test_prep_upcoming", 0)
-    college_planning_completed = stats.get("college_planning_completed", 0)
-    college_planning_upcoming = stats.get("college_planning_upcoming", 0)
+    user_id = user.data[0]
+
+    # Get all tasks for the user
+    all_user_tasks = db.select("paths", where={"user_id": user_id})
+
+    # Get active Test Prep tasks for current generation
+    active_tasks = [task for task in all_user_tasks
+                    # is_active is True and category is Test Prep
+                    if task[5] and task[9] == 'Test Prep']
+
+    # Count completed tasks in current generation (out of 5 total tasks)
+    test_prep_completed = sum(
+        1 for task in active_tasks if task[4])  # is_completed
+    # Always 5 total tasks in current generation
+    test_prep_upcoming = 5 - test_prep_completed
+
+    # Count total completed tasks across ALL generations
+    total_test_prep_completed = sum(
+        1 for task in all_user_tasks
+        # is_completed and category is Test Prep
+        if task[4] and task[9] == 'Test Prep'
+    )
+
+    # Keep college planning at 0 for now
+    college_planning_completed = 0
+    college_planning_upcoming = 0
+
     return render_template(
         "stats.html",
         test_prep_completed=test_prep_completed,
         test_prep_upcoming=test_prep_upcoming,
+        total_test_prep_completed=total_test_prep_completed,
         college_planning_completed=college_planning_completed,
         college_planning_upcoming=college_planning_upcoming,
         gpa=stats.get("gpa", ""),
@@ -313,7 +421,6 @@ def tracker():
     return render_template("tracker.html")
 
 
-
 @app.route("/dashboard/test-path-builder", methods=["GET", "POST"])
 @login_required
 def test_path_builder():
@@ -333,16 +440,18 @@ def test_path_builder():
         # First, save the user's updated goals
         stats["test_path"] = test_path
         user.set_stats(stats)
-        
+
         user_id = user.data[0]
-        active_path = db.select("paths", where={"user_id": user_id, "is_active": True})
-        
+        active_path = db.select(
+            "paths", where={"user_id": user_id, "is_active": True})
+
         # Only generate a new path if one doesn't already exist.
         if not active_path:
-            _generate_and_save_new_path(user_id, test_path['strengths'], test_path['weaknesses'])
-        
+            _generate_and_save_new_path(
+                user_id, test_path['strengths'], test_path['weaknesses'])
+
         return redirect(url_for("test_path_view"))
-        
+
     # Pre-fill the form with saved values if they exist
     return render_template("test_path_builder.html", **stats.get("test_path", {}))
 
@@ -370,9 +479,11 @@ def test_path_status():
 
     # This is more reliable: it checks for an *actual* active path in the database.
     user_id = user.data[0]
-    active_tasks = db.select("paths", where={"user_id": user_id, "is_active": True})
+    active_tasks = db.select(
+        "paths", where={"user_id": user_id, "is_active": True})
 
     return jsonify({"has_path": bool(active_tasks)})
+
 
 @app.route('/dashboard/college-path-builder')
 @login_required
@@ -394,13 +505,15 @@ def api_tasks():
 
     try:
         # Get all active tasks for this user
-        active_path = db.select("paths", where={"user_id": user_id, "is_active": True})
+        active_path = db.select(
+            "paths", where={"user_id": user_id, "is_active": True})
 
         # Generate new path only on POST (explicit regeneration) or if no active path exists
         if request.method == "POST" or not active_path:
             # Deactivate old path before generating new one
             if active_path:
-                db.update("paths", {"is_active": False}, where={"user_id": user_id})
+                db.update("paths", {"is_active": False},
+                          where={"user_id": user_id})
             tasks = _generate_and_save_new_path(user_id, strengths, weaknesses)
             return jsonify(tasks)
 
@@ -414,7 +527,7 @@ def api_tasks():
                 "is_completed": bool(row[4]) if row[4] is not None else False
             } for row in active_path]
             return jsonify(tasks)
-            
+
         # If we get here, there are no active tasks (shouldn't happen normally)
         return jsonify([])
 
@@ -465,7 +578,18 @@ def api_chat():
     data = request.get_json()
     history = data.get("history", [])
 
+    # If the history is empty, it's the first message.
+    # The frontend will send an empty placeholder user message to trigger the AI's proactive greeting.
+    if not history or (len(history) == 1 and history[0]['role'] == 'user' and history[0]['content'] == 'INITIAL_MESSAGE'):
+        history = []  # Start with a clean slate for the AI's first turn
+
     reply = _get_ai_chat_response(history, stats)
+
+    # Add the AI's response to the history
+    history.append({"role": "assistant", "content": reply})
+    # Save the updated history to the session
+    session['chat_history'] = history
+
     return jsonify({"reply": reply})
 
 
