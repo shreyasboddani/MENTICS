@@ -9,7 +9,8 @@ import os
 from dotenv import load_dotenv
 import random
 from pathlib import Path
-from datetime import datetime  # NEW: Import datetime to handle dates
+# NEW: Import datetime and timedelta to handle dates and session timeout
+from datetime import datetime, timedelta
 
 # Explicitly load the .env file from the correct path
 env_path = Path('.') / '.env'
@@ -18,6 +19,8 @@ load_dotenv(dotenv_path=env_path)
 app = Flask(__name__)
 app.secret_key = "supersecretkey"
 app.url_map.strict_slashes = False
+app.permanent_session_lifetime = timedelta(
+    minutes=10)  # Set session timeout to 10 minutes
 
 db = DatabaseHandler("users.db")
 
@@ -249,7 +252,8 @@ def _generate_and_save_new_test_path(user_id, strengths, weaknesses):
 
 @app.route("/")
 def home():
-    return render_template("index.html")
+    is_logged_in = "user" in session
+    return render_template("index.html", is_logged_in=is_logged_in)
 
 # Signup route
 
@@ -261,7 +265,7 @@ def signup():
         email = request.form["email"]
         password = generate_password_hash(request.form["password"])
         try:
-            db.insert("users", {
+            user_id = db.insert("users", {
                 "email": email,
                 "password": password,
                 "stats": json.dumps({
@@ -274,7 +278,11 @@ def signup():
                     "milestones": 0
                 })
             })
-            return redirect(url_for("login"))
+            # Automatically log in the user after successful signup
+            session["user"] = email
+            session["user_id"] = user_id
+            session.permanent = True  # Enable permanent session
+            return redirect(url_for("dashboard"))
         except Exception as e:
             print(f"Signup error: {e}")
             error = "Email already exists!"
@@ -286,12 +294,18 @@ def signup():
 @app.route("/login", methods=["GET", "POST"])
 def login():
     error = None
+    # If user is already logged in, redirect to dashboard
+    if "user" in session:
+        return redirect(url_for("dashboard"))
+
     if request.method == "POST":
         email = request.form["email"]
         password = request.form["password"]
         user = db.select("users", where={"email": email})
         if user and check_password_hash(user[0][2], password):
             session["user"] = user[0][1]
+            session["user_id"] = user[0][0]  # Store user_id in session
+            session.permanent = True  # Enable session timeout
             return redirect(url_for("dashboard"))
         else:
             error = "Invalid credentials"

@@ -23,7 +23,12 @@
       <nav class="space-x-4 flex-1 text-right">
         <a href="#features" class="text-gray-700 hover:text-purple-600">Features</a>
         <a href="#about" class="text-gray-700 hover:text-purple-600">About</a>
+        {% if is_logged_in %}
+        <a href="/dashboard"
+          class="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 transition">Dashboard</a>
+        {% else %}
         <a href="/login" class="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 transition">Login</a>
+        {% endif %}
       </nav>
     </div>
   </header>
@@ -51,9 +56,9 @@
 
       <!-- Get Started Button -->
       <div class="pt-4" data-aos="zoom-in" data-aos-delay="300">
-        <a href="/signup"
+        <a href="{% if is_logged_in %}/dashboard{% else %}/signup{% endif %}"
           class="bg-white text-violet-700 px-6 py-3 rounded-xl text-lg font-semibold shadow hover:bg-gray-100 transition">
-          Get Started
+          {% if is_logged_in %}Go to Dashboard{% else %}Get Started{% endif %}
         </a>
       </div>
 
