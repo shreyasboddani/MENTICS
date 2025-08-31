@@ -61,71 +61,96 @@ def login_required(f):
 # --- AI HELPER FUNCTIONS ---
 
 
-def _get_ai_tasks(strengths, weaknesses, user_stats={}, chat_history=[], path_history={}):
-    """Generates tasks with full context: profile, chat, and path history."""
+def _get_test_prep_ai_tasks(strengths, weaknesses, user_stats={}, chat_history=[], path_history={}):
+    """Generates test preparation tasks with a hyper-detailed prompt for maximum reliability."""
 
     def get_mock_tasks_reliably():
-        print("--- DEBUG: Running mock generator with Test Prep tasks only. ---")
+        # This mock data generator remains your fallback for testing
+        print("--- DEBUG: Running mock generator with categories. ---")
         test_prep_tasks = [
             {"description": "Focus on circle theorems.", "type": "standard",
                 "stat_to_update": None, "category": "Test Prep"},
-            {"description": "Complete a timed SAT Math section.", "type": "milestone",
-                "stat_to_update": "sat_math", "category": "Test Prep"},
-            {"description": "Review 20 new vocabulary words.", "type": "standard",
-                "stat_to_update": None, "category": "Test Prep"},
-            {"description": "Practice SAT Reading comprehension.", "type": "standard",
-                "stat_to_update": None, "category": "Test Prep"},
-            {"description": "Take a full ACT practice test.", "type": "milestone",
-                "stat_to_update": None, "category": "Test Prep"}
+            {"description": "Complete a timed SAT Math section and record your score in the chat.",
+                "type": "milestone", "stat_to_update": "sat_math", "category": "Test Prep"}
         ]
-        # Return all 5 tasks, shuffled
-        random.shuffle(test_prep_tasks)
-        return test_prep_tasks
+        college_tasks = [
+            {"description": "Brainstorm ideas for your personal essay.",
+                "type": "standard", "stat_to_update": None, "category": "College Planning"},
+            {"description": "Finalize your college list and categorize schools.",
+                "type": "milestone", "stat_to_update": None, "category": "College Planning"}
+        ]
+        final_tasks = random.sample(
+            test_prep_tasks, 2) + random.sample(college_tasks, 2)
+        final_tasks.append({"description": "Review 20 new vocabulary words.",
+                           "type": "standard", "stat_to_update": None, "category": "Test Prep"})
+        random.shuffle(final_tasks)
+        return final_tasks
 
     if not hasattr(openai, 'api_key') or not openai.api_key:
         return get_mock_tasks_reliably()
 
-    # NEW: Format the entire path history for the prompt
+    # --- DATA FORMATTING FOR THE PROMPT ---
     completed_tasks_str = "\n".join(
-        [f"- {task[3]}" for task in path_history.get('completed', [])]) or "None"
+        [f"- {task[3]}" for task in path_history.get('completed', [])]) or "None."
     incomplete_tasks_str = "\n".join(
-        [f"- {task[3]}" for task in path_history.get('incomplete', [])]) or "None"
+        [f"- {task[3]}" for task in path_history.get('incomplete', [])]) or "None."
 
-    # NEW: Calculate days until the test
     days_left = "Not set"
     test_date_str = user_stats.get("test_path", {}).get("test_date")
     if test_date_str:
         try:
-            test_date = datetime.strptime(test_date_str, '%Y-%m-%d')
-            delta = test_date - datetime.now()
-            days_left = f"{delta.days} days"
+            delta = datetime.strptime(
+                test_date_str, '%Y-%m-%d') - datetime.now()
+            days_left = f"{delta.days} days remaining"
         except ValueError:
             days_left = "Invalid date format"
 
-    # --- NEW SUPER-PROMPT ---
+    # --- NEW HYPER-DETAILED PROMPT ---
     prompt = (
-        f"You are a long-term test prep coach for a high school student.\n\n"
-        f"STUDENT PROFILE:\n"
+        f"# CONTEXT\n"
+        f"You are an expert AI test prep (SAT & ACT) coach creating a study plan for a high school student.\n"
+        f"The student's test is in: {days_left}.\n\n"
+
+        f"# STUDENT PROFILE\n"
         f"- Strengths: {strengths}\n"
         f"- Weaknesses: {weaknesses}\n"
-        f"- Current GPA: {user_stats.get('gpa', 'N/A')}\n"
-        f"- GOAL: Reach desired scores by the test date, which is in {days_left}.\n\n"
-        f"STUDENT'S TASK HISTORY:\n"
-        f"Recently Completed Tasks:\n{completed_tasks_str}\n\n"
-        f"Recently Failed or Incomplete Tasks:\n{incomplete_tasks_str}\n\n"
-        f"INSTRUCTIONS:\n"
-        "1. Analyze the student's profile and their complete task history.\n"
-        "2. Create a NEW 5-step study plan that logically progresses them forward.\n"
-        "3. CRITICAL: Do NOT repeat any tasks from their history.\n"
-        "4. The plan should be appropriate for someone with {days_left} until their test.\n"
-        "5. Return your response ONLY as a valid JSON object in the required format."
+        f"- Current GPA: {user_stats.get('gpa', 'N/A')}\n\n"
+
+        f"# STUDENT HISTORY\n"
+        f"## Recently Completed Tasks:\n{completed_tasks_str}\n\n"
+        f"## Recently Incomplete or Failed Tasks:\n{incomplete_tasks_str}\n\n"
+
+        f"# YOUR TASK\n"
+        f"Generate a new, 5-step study plan based on all the context provided.\n\n"
+
+        f"# CRITICAL RULES\n"
+        f"- Your ENTIRE output must be a single, raw JSON object. Do not include any text, explanations, or markdown formatting like ```json before or after the JSON.\n"
+        f"- The plan must contain exactly 5 task objects.\n"
+        f"- The tasks must be novel. DO NOT repeat any tasks from the student's history.\n"
+        f"- The plan must logically progress the student forward from their previous tasks.\n"
+        f"- The plan must be appropriate for the time remaining before the test ({days_left}).\n"
+        f"- Create a list of appropriate 'Test Prep' tasks if applicable, otherwise focus on the student's stated weaknesses.\n\n"
+
+        f"# JSON SCHEMA\n"
+        f"Your output must conform to this exact structure:\n"
+        f"{{\n"
+        f'  "tasks": [\n'
+        f'    {{\n'
+        f'      "description": "A string describing the specific, actionable task.",\n'
+        f'      "type": "A string, either \'standard\' or \'milestone\'.",\n'
+        f'      "stat_to_update": "A string if type is \'milestone\' (must be one of [\'sat_math\', \'sat_ebrw\', \'act_math\', \'act_reading\', \'act_science\', \'gpa\']), otherwise null.",\n'
+        f'      "category": "A string, either \'Test Prep\' or \'College Planning\'."\n'
+        f'    }},\n'
+        f'    ...\n'
+        f'  ]\n'
+        f'}}'
     )
 
     try:
         completion = openai.chat.completions.create(
             model="gpt-3.5-turbo",
             messages=[
-                {"role": "system", "content": "You are a test prep tutor who provides study plans in a specific JSON format."},
+                {"role": "system", "content": "You are a helpful assistant that responds only in perfectly formatted JSON based on the user's instructions."},
                 {"role": "user", "content": prompt}
             ],
             temperature=0.7
@@ -136,11 +161,11 @@ def _get_ai_tasks(strengths, weaknesses, user_stats={}, chat_history=[], path_hi
             return tasks
         raise ValueError("Invalid format from AI")
     except Exception as e:
-        print(f"\n--- OPENAI API ERROR IN _get_ai_tasks: {e} ---\n")
+        print(f"\n--- OPENAI API ERROR IN _get_test_prep_ai_tasks: {e} ---\n")
         return get_mock_tasks_reliably()
 
 
-def _get_ai_chat_response(history, user_stats):
+def _get_test_prep_ai_chat_response(history, user_stats):
     if not hasattr(openai, 'api_key') or not openai.api_key:
         return "I'm in testing mode, but I'm saving our conversation!"
 
@@ -172,11 +197,12 @@ def _get_ai_chat_response(history, user_stats):
             model="gpt-3.5-turbo", messages=messages)
         return completion.choices[0].message.content
     except Exception as e:
-        print(f"\n--- OPENAI API ERROR IN _get_ai_chat_response: {e} ---\n")
+        print(
+            f"\n--- OPENAI API ERROR IN _get_test_prep_ai_chat_response: {e} ---\n")
         return "Sorry, I encountered an error connecting to the AI."
 
 
-def _generate_and_save_new_path(user_id, strengths, weaknesses):
+def _generate_and_save_new_test_path(user_id, strengths, weaknesses):
     user_record = db.select("users", where={"id": user_id})
     user_stats = json.loads(user_record[0][3]) if user_record else {}
     chat_history = session.get('chat_history', [])
@@ -192,8 +218,8 @@ def _generate_and_save_new_path(user_id, strengths, weaknesses):
     db.update("paths", {"is_active": False}, where={"user_id": user_id})
 
     # Pass all context to the AI
-    tasks = _get_ai_tasks(strengths, weaknesses,
-                          user_stats, chat_history, path_history)
+    tasks = _get_test_prep_ai_tasks(strengths, weaknesses,
+                                    user_stats, chat_history, path_history)
 
     saved_tasks = []
     for i, task in enumerate(tasks):
@@ -447,7 +473,7 @@ def test_path_builder():
 
         # Only generate a new path if one doesn't already exist.
         if not active_path:
-            _generate_and_save_new_path(
+            _generate_and_save_new_test_path(
                 user_id, test_path['strengths'], test_path['weaknesses'])
 
         return redirect(url_for("test_path_view"))
@@ -514,7 +540,8 @@ def api_tasks():
             if active_path:
                 db.update("paths", {"is_active": False},
                           where={"user_id": user_id})
-            tasks = _generate_and_save_new_path(user_id, strengths, weaknesses)
+            tasks = _generate_and_save_new_test_path(
+                user_id, strengths, weaknesses)
             return jsonify(tasks)
 
         # For GET requests with existing active path, return current tasks
@@ -560,7 +587,8 @@ def api_update_task_status():
         strengths = test_path_info.get("strengths", "general studying")
         weaknesses = test_path_info.get("weaknesses", "test-taking skills")
         # Regenerate the path if a task is failed
-        new_tasks = _generate_and_save_new_path(user_id, strengths, weaknesses)
+        new_tasks = _generate_and_save_new_test_path(
+            user_id, strengths, weaknesses)
         return jsonify({"success": True, "tasks": new_tasks})
     elif status == 'complete' and task_id:
         # Update the specific task's completion status
@@ -583,7 +611,7 @@ def api_chat():
     if not history or (len(history) == 1 and history[0]['role'] == 'user' and history[0]['content'] == 'INITIAL_MESSAGE'):
         history = []  # Start with a clean slate for the AI's first turn
 
-    reply = _get_ai_chat_response(history, stats)
+    reply = _get_test_prep_ai_chat_response(history, stats)
 
     # Add the AI's response to the history
     history.append({"role": "assistant", "content": reply})
