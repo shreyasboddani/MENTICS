@@ -84,25 +84,43 @@
     </div>
 
     <script>
-        // All JavaScript remains the same as the previous correct version.
         let currentTasks = [];
         let currentTaskId = null;
         let conversationHistory = [];
 
         async function fetchPath(isRegeneration = false) {
             const nodesContainer = document.getElementById('path-nodes-container');
-            nodesContainer.innerHTML = `<p class="text-gray-500 text-center">Generating your path with AI...</p>`;
+            nodesContainer.innerHTML = `<p class="text-gray-500 text-center">${isRegeneration ? 'Generating your path with AI...' : 'Loading your path...'}</p>`;
+
             try {
                 const response = await fetch('/api/tasks', {
-                    method: isRegeneration ? 'POST' : 'GET'
+                    method: isRegeneration ? 'POST' : 'GET',
+                    headers: { 'Content-Type': 'application/json' }
                 });
+
                 if (!response.ok) throw new Error('Network response was not ok');
-                const newTasks = await response.json();
-                currentTasks = newTasks.map((task, index) => ({ ...task, id: index + 1, status: 'pending' }));
-                renderPathAndConnectors(currentTasks);
+                const tasks = await response.json();
+
+                if (Array.isArray(tasks)) {
+                    currentTasks = tasks.map((task, index) => ({
+                        ...task,
+                        id: index + 1,
+                        status: task.is_completed ? 'complete' : 'pending'
+                    }));
+                    renderPathAndConnectors(currentTasks);
+                } else {
+                    throw new Error('Invalid response format');
+                }
             } catch (error) {
                 console.error('Error fetching path:', error);
-                nodesContainer.innerHTML = `<p class="text-red-500 text-center">Could not load path. Please refresh the page.</p>`;
+                nodesContainer.innerHTML = `
+                    <div class="text-center">
+                        <p class="text-red-500 mb-4">Could not load your path.</p>
+                        <button onclick="fetchPath(true)" 
+                                class="bg-purple-600 text-white px-4 py-2 rounded hover:bg-purple-700">
+                            Try Again
+                        </button>
+                    </div>`;
             }
         }
 
@@ -205,16 +223,27 @@
             closeTaskModal();
 
             try {
-                await fetch('/api/update_task_status', {
+                const response = await fetch('/api/update_task_status', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ taskId: task.id, status: status, description: task.description })
                 });
+                if (!response.ok) throw new Error('Could not update task status');
 
                 if (status === 'complete') {
                     task.status = 'complete';
                     renderPathAndConnectors(currentTasks);
-                    await checkPathCompletion();
+
+                    // --- THIS IS THE NEW LOGIC ---
+                    // If the completed task is a milestone, open the stat entry modal.
+                    if (task.type === 'milestone' && task.stat_to_update) {
+                        setTimeout(() => openStatModal(task), 500); // Wait a moment for effect
+                    } else {
+                        // Otherwise, check if the whole path is done.
+                        await checkPathCompletion();
+                    }
+                    // --- END OF NEW LOGIC ---
+
                 } else if (status === 'failed') {
                     alert("No worries! We'll generate a new path for you.");
                     await fetchPath(true); // Pass true to indicate regeneration
@@ -308,9 +337,107 @@
         document.getElementById('userInput').addEventListener('keypress', (e) => {
             if (e.key === 'Enter') handleUserChat();
         });
+
+        function openStatModal(task) {
+            // Prepare the modal with the correct info
+            const statName = task.stat_to_update;
+            const friendlyName = {
+                "sat_math": "New SAT Math Score",
+                "sat_ebrw": "New SAT EBRW Score",
+                "act_math": "New ACT Math Score",
+                "act_reading": "New ACT Reading Score",
+                "act_science": "New ACT Science Score",
+                "gpa": "New GPA"
+            }[statName] || "New Score";
+
+            document.getElementById('statModalLabel').textContent = friendlyName;
+            document.getElementById('statNameToUpdate').value = statName;
+
+            // Show the modal
+            const modal = document.getElementById('statEntryModal');
+            modal.classList.remove('hidden');
+            setTimeout(() => {
+                modal.classList.add('opacity-100');
+                document.getElementById('stat-modal-panel').classList.add('scale-100');
+            }, 10);
+        }
+
+        function closeStatModal() {
+            const modal = document.getElementById('statEntryModal');
+            modal.classList.remove('opacity-100');
+            document.getElementById('stat-modal-panel').classList.remove('scale-100');
+            setTimeout(() => {
+                modal.classList.add('hidden');
+                // Clear the input for next time
+                document.getElementById('statValue').value = '';
+                document.getElementById('statNameToUpdate').value = '';
+            }, 300);
+        }
+
+        async function handleSaveStat() {
+            const stat_name = document.getElementById('statNameToUpdate').value;
+            const stat_value = document.getElementById('statValue').value;
+
+            if (!stat_value) {
+                alert("Please enter a value.");
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/update_stats', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ stat_name, stat_value })
+                });
+
+                if (!response.ok) throw new Error('Failed to save stats.');
+
+                const result = await response.json();
+                if (result.success) {
+                    alert("Your stats have been updated!");
+                    closeStatModal();
+                } else {
+                    throw new Error(result.error || 'An unknown error occurred.');
+                }
+            } catch (error) {
+                console.error("Error saving stat:", error);
+                alert("Could not save your stats. Please try again.");
+            }
+        }
     </script>
     <script src="https://unpkg.com/aos@2.3.1/dist/aos.js"></script>
     <script>AOS.init({ once: true, duration: 800 });</script>
+
+    <div id="statEntryModal"
+        class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden transition-opacity duration-300">
+        <div class="bg-white rounded-2xl shadow-xl p-8 max-w-lg w-full m-4 transform transition-all scale-95"
+            id="stat-modal-panel">
+            <div class="flex justify-between items-start">
+                <h3 id="statModalTitle" class="text-2xl font-bold lalezar text-purple-700 mb-4">Update Your Progress
+                </h3>
+                <button onclick="closeStatModal()" class="text-gray-400 hover:text-gray-600 text-3xl">&times;</button>
+            </div>
+
+            <p class="text-gray-700 mb-4">Great job on completing a milestone! Please enter your new score below.</p>
+
+            <div class="space-y-4">
+                <div>
+                    <label id="statModalLabel" for="statValue" class="block text-gray-700 mb-1 font-bold">New
+                        Score</label>
+                    <input type="number" id="statValue" name="statValue"
+                        class="w-full border rounded p-2 focus:ring-2 focus:ring-purple-500"
+                        placeholder="Enter score...">
+                    <input type="hidden" id="statNameToUpdate">
+                </div>
+                <div id="stat-modal-actions" class="flex justify-end gap-4">
+                    <button onclick="closeStatModal()" class="text-purple-600 hover:underline">Cancel</button>
+                    <button onclick="handleSaveStat()"
+                        class="bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 px-4 rounded-lg transition">Save
+                        Score</button>
+                </div>
+            </div>
+        </div>
+    </div>
 </body>
 
 </html>

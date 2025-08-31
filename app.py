@@ -8,9 +8,11 @@ import openai
 import os
 from dotenv import load_dotenv
 import random
+from pathlib import Path  # <-- Add this import
 
-# Load environment variables from .env file
-load_dotenv()
+# Explicitly load the .env file from the correct path
+env_path = Path('.') / '.env'
+load_dotenv(dotenv_path=env_path)
 
 app = Flask(__name__)
 app.secret_key = "supersecretkey"
@@ -20,7 +22,6 @@ db = DatabaseHandler("users.db")
 
 # Setup OpenAI API Key from environment variable
 openai.api_key = os.getenv("OPENAI_API_KEY")
-
 
 # --- DATABASE INITIALIZATION ---
 def init_db():
@@ -54,59 +55,46 @@ def login_required(f):
 # --- AI HELPER FUNCTIONS (Consolidated and Fixed) ---
 
 # REPLACE the existing _get_ai_tasks function with this one
-def _get_ai_tasks(strengths, weaknesses, user_stats={}):
-    """Generates tasks from AI, with a reliable 5-task mock fallback."""
+# In app.py, replace _get_ai_tasks and _get_ai_chat_response with these
 
-    # This is the single source of mock tasks, ensuring consistency.
+def _get_ai_tasks(strengths, weaknesses, user_stats={}):
+    """Generates tasks from an external AI API, with a reliable 5-task mock fallback."""
+
     def get_mock_tasks_reliably():
-        print("Warning: OPENAI_API_KEY not set or AI failed. Returning mock tasks.")
+        print("Warning: API call failed. Returning mock tasks.")
         all_mock_tasks = [
-            {"description":
-                "Focus on circle theorems and properties of triangles (Mock)."},
-            {"description":
-                "Complete a drill on comma, semicolon, and colon usage (Mock)."},
-            {"description":
-                "Solidify your algebra skills with advanced function problems (Mock)."},
-            {"description":
-                "Complete a timed mini-section for your weakest subject (Mock)."},
-            {"description":
-                "Review 20 new vocabulary words using flashcards (Mock)."},
-            {"description":
-                "Analyze the structure of a sample essay prompt (Mock)."},
-            {"description":
-                "Practice reading comprehension with a news article (Mock)."},
-            {"description":
-                "Take a 15-minute quiz on data interpretation graphs (Mock)."}
+            {"description": "Focus on circle theorems and properties of triangles.", "type": "standard", "stat_to_update": None},
+            {"description": "Complete a full timed SAT Math practice section and record your score.", "type": "milestone", "stat_to_update": "sat_math"},
+            {"description": "Solidify your algebra skills with advanced function problems.", "type": "standard", "stat_to_update": None},
+            {"description": "Review 20 new vocabulary words using flashcards.", "type": "standard", "stat_to_update": None},
+            {"description": "Drill comma, semicolon, and colon usage rules.", "type": "standard", "stat_to_update": None},
         ]
         return random.sample(all_mock_tasks, 5)
 
     if not openai.api_key:
+        print("Warning: OPENAI_API_KEY is not set in the environment.")
         return get_mock_tasks_reliably()
-
-    # --- ENHANCED PROMPT ---
-    # Get more context from the user's stats
-    desired_sat = user_stats.get("test_path", {}).get("desired_sat", "N/A")
-    desired_act = user_stats.get("test_path", {}).get("desired_act", "N/A")
-    current_gpa = user_stats.get("gpa", "N/A")
 
     prompt = (
         f"A student has the following profile:\n"
         f"- Strengths: '{strengths}'\n"
         f"- Weaknesses: '{weaknesses}'\n"
-        f"- Current GPA: {current_gpa}\n"
-        f"- Desired SAT Score: {desired_sat}\n"
-        f"- Desired ACT Score: {desired_act}\n\n"
-        "Based on this, create a 5-step study plan. "
-        "Return ONLY a valid JSON object with a key 'tasks', which is an array of 5 objects, "
-        "each with a 'description' key."
+        f"- Current GPA: {user_stats.get('gpa', 'N/A')}\n"
+        f"- Desired SAT Score: {user_stats.get('test_path', {}).get('desired_sat', 'N/A')}\n"
+        f"- Desired ACT Score: {user_stats.get('test_path', {}).get('desired_act', 'N/A')}\n\n"
+        "Create a 5-step study plan. Make one of the steps a 'milestone' task that involves taking a practice test or section.\n"
+        "Your response MUST be a valid JSON object with a key 'tasks', which is an array of 5 objects.\n"
+        "Each object MUST have these keys:\n"
+        "1. 'description': A string with the task description.\n"
+        "2. 'type': A string that is either 'standard' for a regular task, or 'milestone' for a task that requires a score update.\n"
+        "3. 'stat_to_update': If type is 'milestone', this MUST be one of the following strings: 'sat_math', 'sat_ebrw', 'act_math', 'act_reading', 'act_science', 'gpa'. If type is 'standard', this should be null."
     )
-    # --- END OF ENHANCED PROMPT ---
 
     try:
         completion = openai.chat.completions.create(
             model="gpt-3.5-turbo",
             messages=[
-                {"role": "system", "content": "You are a test prep tutor who provides study plans in JSON format."},
+                {"role": "system", "content": "You are a test prep tutor who provides study plans in a specific JSON format."},
                 {"role": "user", "content": prompt}
             ],
             temperature=0.7
@@ -117,7 +105,10 @@ def _get_ai_tasks(strengths, weaknesses, user_stats={}):
             return tasks
         raise ValueError("Invalid format from AI")
     except Exception as e:
-        print(f"AI task generation failed: {e}")
+        # --- BETTER ERROR LOGGING ---
+        print("\n--- OPENAI API ERROR IN _get_ai_tasks ---")
+        print(f"An error occurred: {e}")
+        print("-------------------------------------------\n")
         return get_mock_tasks_reliably()
 
 
@@ -137,7 +128,10 @@ def _get_ai_chat_response(history, user_stats):
             model="gpt-3.5-turbo", messages=messages)
         return completion.choices[0].message.content
     except Exception as e:
-        print(f"AI chat response failed: {e}")
+        # --- BETTER ERROR LOGGING ---
+        print("\n--- OPENAI API ERROR IN _get_ai_chat_response ---")
+        print(f"An error occurred: {e}")
+        print("---------------------------------------------------\n")
         return "Sorry, I encountered an error connecting to the AI."
 
 
@@ -319,6 +313,7 @@ def tracker():
     return render_template("tracker.html")
 
 
+
 @app.route("/dashboard/test-path-builder", methods=["GET", "POST"])
 @login_required
 def test_path_builder():
@@ -335,12 +330,19 @@ def test_path_builder():
             "strengths": request.form.get("strengths", ""),
             "weaknesses": request.form.get("weaknesses", "")
         }
+        # First, save the user's updated goals
         stats["test_path"] = test_path
         user.set_stats(stats)
-        # Generate the first path upon submission
-        _generate_and_save_new_path(
-            user.data[0], test_path['strengths'], test_path['weaknesses'])
+        
+        user_id = user.data[0]
+        active_path = db.select("paths", where={"user_id": user_id, "is_active": True})
+        
+        # Only generate a new path if one doesn't already exist.
+        if not active_path:
+            _generate_and_save_new_path(user_id, test_path['strengths'], test_path['weaknesses'])
+        
         return redirect(url_for("test_path_view"))
+        
     # Pre-fill the form with saved values if they exist
     return render_template("test_path_builder.html", **stats.get("test_path", {}))
 
@@ -357,28 +359,20 @@ def logout():
     return redirect(url_for("home"))
 
 
+# REPLACE the existing test_path_status function with this one
+
 @app.route('/api/test-path-status')
 @login_required
 def test_path_status():
-    """
-    FIXED: This function now correctly checks for an existing active path
-    and returns the JSON key 'has_path' (snake_case) that the frontend expects.
-    """
     user = User.from_session(db, session)
     if not user:
-        # This case is handled by @login_required, but as a fallback:
         return jsonify({"has_path": False, "error": "User not found"}), 404
 
-    # A user has a "path" if they have active tasks in the 'paths' table.
-    # This is more reliable than checking if the form fields in 'stats' are empty.
+    # This is more reliable: it checks for an *actual* active path in the database.
     user_id = user.data[0]
-    active_tasks = db.select(
-        "paths", where={"user_id": user_id, "is_active": True})
+    active_tasks = db.select("paths", where={"user_id": user_id, "is_active": True})
 
-    # Return a boolean indicating if any active tasks were found.
-    # The key 'has_path' now matches the frontend JavaScript.
     return jsonify({"has_path": bool(active_tasks)})
-
 
 @app.route('/dashboard/college-path-builder')
 @login_required
@@ -400,21 +394,33 @@ def api_tasks():
 
     try:
         # Get all active tasks for this user
-        active_path = db.select("paths", where={
-            "user_id": user_id, "is_active": True})
+        active_path = db.select("paths", where={"user_id": user_id, "is_active": True})
 
-        # Sort the tasks by task_order if active_path exists
-        if active_path:
-            # Sort by task_order column
-            active_path = sorted(active_path, key=lambda x: x[2])
-
-        # Generate a new path if one doesn't exist or if a regeneration is forced via POST
+        # Generate new path only on POST (explicit regeneration) or if no active path exists
         if request.method == "POST" or not active_path:
+            # Deactivate old path before generating new one
+            if active_path:
+                db.update("paths", {"is_active": False}, where={"user_id": user_id})
             tasks = _generate_and_save_new_path(user_id, strengths, weaknesses)
             return jsonify(tasks)
-    except Exception as e:  # It's better to catch specific database errors
+
+        # For GET requests with existing active path, return current tasks
+        if active_path:
+            # Sort by task_order
+            active_path = sorted(active_path, key=lambda x: x[2])
+            tasks = [{
+                "id": row[0],
+                "description": row[3],
+                "is_completed": bool(row[4]) if row[4] is not None else False
+            } for row in active_path]
+            return jsonify(tasks)
+            
+        # If we get here, there are no active tasks (shouldn't happen normally)
+        return jsonify([])
+
+    except Exception as e:
         print(f"API tasks error: {e}")
-        return jsonify({"error": "Could not retrieve or generate tasks due to a server error."}), 500
+        return jsonify({"error": "Database error occurred"}), 500
 
     tasks = []
     for row in active_path:
