@@ -89,10 +89,12 @@
                     <div class="bg-white/90 rounded-lg p-4">
                         <h3 class="text-lg font-bold text-purple-700 mb-2">🎓 College Planning</h3>
                         <div class="text-left space-y-1">
-                            <p class="text-gray-700">Completed: <span class="font-bold text-purple-700">{{
+                            <p class="text-gray-700">Current Generation: <span class="font-bold text-purple-700">{{
+                                    college_planning_completed }}/5</span> completed</p>
+                            <p class="text-gray-700">Remaining: <span class="font-bold text-purple-700">{{ 5 -
                                     college_planning_completed }}</span></p>
-                            <p class="text-gray-700">Upcoming: <span class="font-bold text-purple-700">{{
-                                    college_planning_upcoming }}</span></p>
+                            <p class="text-gray-700 border-t border-purple-100 mt-2 pt-2">Total Completed: <span
+                                    class="font-bold text-purple-700">{{ total_college_planning_completed }}</span></p>
                         </div>
                     </div>
                 </div>
@@ -165,7 +167,7 @@
                             <span class="font-bold text-2xl mb-1 text-white">Test Prep Path</span>
                             <span class="block text-sm mt-2 text-purple-200">SAT/ACT Journey</span>
                         </button>
-                        <button onclick="window.location.href='/dashboard/college-path-builder'"
+                        <button onclick="handleCollegePathClick()"
                             class="flex-1 bg-gradient-to-br from-indigo-400 to-indigo-700 text-white text-2xl lalezar py-16 rounded-2xl shadow-xl hover:scale-105 hover:shadow-2xl transition-all duration-300 flex flex-col items-center"
                             data-aos="fade-left" data-aos-delay="200" data-aos-duration="700" data-aos-once="false">
                             <span class="text-5xl mb-4">🎓</span>
@@ -213,6 +215,31 @@
                     console.error('Error checking path status:', error);
                     alert('Could not check your path status. Taking you to the builder page.');
                     window.location.href = '/dashboard/test-path-builder';
+                });
+        }
+        // In dashboard.html, ADD this new function inside the <script> tag
+
+        function handleCollegePathClick() {
+            fetch('/api/college-path-status')
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('Network response was not ok');
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    if (data.has_path) {
+                        // If a path exists, go directly to the view page
+                        window.location.href = "{{ url_for('college_path_view') }}";
+                    } else {
+                        // Otherwise, go to the builder page
+                        window.location.href = "{{ url_for('college_path_builder') }}";
+                    }
+                })
+                .catch(error => {
+                    console.error('Error checking college path status:', error);
+                    // As a fallback, just go to the builder page
+                    window.location.href = "{{ url_for('college_path_builder') }}";
                 });
         }
 

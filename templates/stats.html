@@ -57,12 +57,18 @@
       </div>
       <div class="bg-white shadow-md rounded-xl p-8 flex flex-col items-center justify-center" data-aos="zoom-in">
         <h2 class="text-xl font-semibold text-purple-600 mb-2">College Planning Milestones</h2>
-        <p class="text-gray-700 text-lg">Completed: <span
-            class="font-extrabold text-3xl text-purple-700 align-middle">{{ college_planning_completed }}</span></p>
-        <p class="text-gray-700 text-lg">Upcoming: <span class="font-extrabold text-3xl text-purple-700 align-middle">{{
-            college_planning_upcoming }}</span></p>
-        <p class="text-gray-700 text-lg">Total: <span class="font-extrabold text-3xl text-purple-700 align-middle">{{
-            college_planning_completed + college_planning_upcoming }}</span></p>
+        <p class="text-gray-700 text-lg">Current Generation</p>
+        <div class="mb-4">
+          <p class="text-gray-700">Completed: <span class="font-extrabold text-3xl text-purple-700 align-middle">{{
+              college_planning_completed_current }}</span></p>
+          <p class="text-gray-700">Remaining: <span class="font-extrabold text-3xl text-purple-700 align-middle">{{ 5 -
+              college_planning_completed_current }}</span></p>
+        </div>
+        <div class="border-t pt-4">
+          <p class="text-gray-700">Total Completed: <span
+              class="font-extrabold text-3xl text-purple-700 align-middle">{{ total_college_planning_completed }}</span>
+          </p>
+        </div>
       </div>
     </div>
     <div class="grid grid-cols-1 md:grid-cols-2 gap-12 mb-12">

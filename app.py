@@ -69,26 +69,20 @@ def _get_test_prep_ai_tasks(strengths, weaknesses, user_stats={}, chat_history=[
     """Generates test preparation tasks with a hyper-detailed prompt for maximum reliability."""
 
     def get_mock_tasks_reliably():
-        # This mock data generator remains your fallback for testing
-        print("--- DEBUG: Running mock generator with categories. ---")
-        test_prep_tasks = [
+        print("--- DEBUG: Running corrected Test Prep mock generator. ---")
+        all_mock_tasks = [
             {"description": "Focus on circle theorems.", "type": "standard",
                 "stat_to_update": None, "category": "Test Prep"},
             {"description": "Complete a timed SAT Math section and record your score in the chat.",
-                "type": "milestone", "stat_to_update": "sat_math", "category": "Test Prep"}
+                "type": "milestone", "stat_to_update": "sat_math", "category": "Test Prep"},
+            {"description": "Review 20 new vocabulary words using flashcards.",
+                "type": "standard", "stat_to_update": None, "category": "Test Prep"},
+            {"description": "Practice reading comprehension passages.",
+                "type": "standard", "stat_to_update": None, "category": "Test Prep"},
+            {"description": "Take a full ACT Science practice test.", "type": "milestone",
+                "stat_to_update": "act_science", "category": "Test Prep"}
         ]
-        college_tasks = [
-            {"description": "Brainstorm ideas for your personal essay.",
-                "type": "standard", "stat_to_update": None, "category": "College Planning"},
-            {"description": "Finalize your college list and categorize schools.",
-                "type": "milestone", "stat_to_update": None, "category": "College Planning"}
-        ]
-        final_tasks = random.sample(
-            test_prep_tasks, 2) + random.sample(college_tasks, 2)
-        final_tasks.append({"description": "Review 20 new vocabulary words.",
-                           "type": "standard", "stat_to_update": None, "category": "Test Prep"})
-        random.shuffle(final_tasks)
-        return final_tasks
+        return random.sample(all_mock_tasks, 5)
 
     if not hasattr(openai, 'api_key') or not openai.api_key:
         return get_mock_tasks_reliably()
@@ -255,22 +249,20 @@ def _get_college_planning_ai_tasks(college_context, user_stats, path_history):
     """Generates college planning tasks with a hyper-detailed prompt."""
 
     def get_mock_tasks_reliably():
-        """Provides a reliable set of mock tasks for testing college planning."""
-        print("--- DEBUG: Running mock generator for College Planning. ---")
-        mock_tasks = [
-            {"description": "Research 5 colleges that match your interests and grade profile.",
-                "type": "milestone", "stat_to_update": "colleges_researched", "category": "College Planning"},
-            {"description": "Write a rough draft of your main college application essay.",
+        print("--- DEBUG: Running corrected College Planning mock generator. ---")
+        all_mock_tasks = [
+            {"description": "Research 5 colleges that match your interests.", "type": "milestone",
+                "stat_to_update": "colleges_researched", "category": "College Planning"},
+            {"description": "Write a rough draft of your Common App personal statement.",
                 "type": "milestone", "stat_to_update": "essay_progress", "category": "College Planning"},
             {"description": "Complete the activities section of the Common App.",
                 "type": "standard", "stat_to_update": None, "category": "College Planning"},
-            {"description": "Identify and ask three teachers for letters of recommendation.",
+            {"description": "Request three letters of recommendation from teachers.",
                 "type": "standard", "stat_to_update": None, "category": "College Planning"},
-            {"description": "Create a calendar with all relevant application deadlines.",
+            {"description": "Create a spreadsheet to track application deadlines.",
                 "type": "standard", "stat_to_update": None, "category": "College Planning"}
         ]
-        random.shuffle(mock_tasks)
-        return mock_tasks
+        return random.sample(all_mock_tasks, 5)
 
     if not hasattr(openai, 'api_key') or not openai.api_key:
         return get_mock_tasks_reliably()
@@ -290,6 +282,8 @@ def _get_college_planning_ai_tasks(college_context, user_stats, path_history):
         f"- Current Grade: {college_context.get('grade', 'N/A')}\n"
         f"- Current Planning Stage: {college_context.get('planning_stage', 'N/A')}\n"
         f"- Interested Majors: {college_context.get('majors', 'N/A')}\n"
+        # <-- ADDED
+        f"- Target Colleges: {college_context.get('target_colleges', 'None specified')}\n"
         f"- Current GPA: {user_stats.get('gpa', 'N/A')}\n\n"
 
         f"# STUDENT HISTORY\n"
@@ -427,33 +421,40 @@ def _generate_and_save_new_college_path(user_id, college_context):
         print(f"Error in _generate_and_save_new_college_path: {e}")
         return []  # Return an empty list if anything goes wrong
 
-# In app.py, ADD these new routes before the API routes
-
 
 @app.route("/dashboard/college-path-builder", methods=["GET", "POST"])
 @login_required
 def college_path_builder():
     user = User.from_session(db, session)
+    if not user:
+        return redirect(url_for('login'))
+
     stats = user.get_stats()
     college_stats = stats.get('college_path', {})
 
     if request.method == "POST":
+        # Collect all context from the form, including the new field
         college_context = {
             'grade': request.form.get('current_grade'),
             'planning_stage': request.form.get('planning_stage'),
-            'majors': request.form.get('interested_majors')
+            'majors': request.form.get('interested_majors'),
+            # <-- ADDED
+            'target_colleges': request.form.get('target_colleges', '')
         }
+        # Save the context to the user's profile
         stats['college_path'] = college_context
         user.set_stats(stats)
 
+        # Generate the first path for the user
         _generate_and_save_new_college_path(user.data[0], college_context)
+
+        # Go to the view page
         return redirect(url_for('college_path_view'))
 
+    # For GET requests, render the builder page with existing data
     return render_template(
         "college_path_builder.html",
-        grade=college_stats.get('grade', ''),
-        planning_stage=college_stats.get('planning_stage'),
-        majors=college_stats.get('majors', '')
+        **college_stats
     )
 
 
@@ -538,47 +539,31 @@ def dashboard():
         return redirect(url_for("login"))
     stats = user.get_stats()
     user_id = user.data[0]
+    all_tasks = db.select("paths", where={"user_id": user_id})
 
-    # Get all tasks for the user
-    all_user_tasks = db.select("paths", where={"user_id": user_id})
-
-    # Get active Test Prep tasks for current generation
-    active_tasks = [task for task in all_user_tasks
-                    # is_active is True and category is Test Prep
-                    if task[5] and task[9] == 'Test Prep']
-
-    # Count completed tasks in current generation (out of 5 total tasks)
-    test_prep_completed = sum(
-        1 for task in active_tasks if task[4])  # is_completed
-
-    # Count total completed tasks across ALL generations
+    # Test Prep Counts
+    active_test_tasks = [t for t in all_tasks if t[5] and t[9] == 'Test Prep']
+    test_prep_completed_current = sum(1 for t in active_test_tasks if t[4])
     total_test_prep_completed = sum(
-        1 for task in all_user_tasks
-        # is_completed and category is Test Prep
-        if task[4] and task[9] == 'Test Prep'
-    )
+        1 for t in all_tasks if t[4] and t[9] == 'Test Prep')
 
-    # Keep college planning as is for now
-    college_planning_completed = sum(
-        1 for task in all_user_tasks
-        if task[4] and task[9] == 'College Planning'
-    )
-    college_planning_upcoming = sum(
-        1 for task in all_user_tasks
-        if not task[4] and task[5] and task[9] == 'College Planning'
-    )
+    # College Planning Counts
+    active_college_tasks = [
+        t for t in all_tasks if t[5] and t[9] == 'College Planning']
+    college_planning_completed_current = sum(
+        1 for t in active_college_tasks if t[4])
+    total_college_planning_completed = sum(
+        1 for t in all_tasks if t[4] and t[9] == 'College Planning')
 
     return render_template(
         "dashboard.html",
-        test_prep_completed=test_prep_completed,
+        test_prep_completed=test_prep_completed_current,
         total_test_prep_completed=total_test_prep_completed,
-        college_planning_completed=college_planning_completed,
-        college_planning_upcoming=college_planning_upcoming,
+        college_planning_completed=college_planning_completed_current,
+        total_college_planning_completed=total_college_planning_completed,
         gpa=stats.get("gpa", "")
     )
 
-
-# In app.py, replace the existing /dashboard/stats function
 
 @app.route("/dashboard/stats", methods=["GET"])
 @login_required
@@ -588,39 +573,30 @@ def stats():
         return redirect(url_for("login"))
     stats = user.get_stats()
     user_id = user.data[0]
+    all_tasks = db.select("paths", where={"user_id": user_id})
 
-    # Get all tasks for the user
-    all_user_tasks = db.select("paths", where={"user_id": user_id})
-
-    # Get active Test Prep tasks for current generation
-    active_tasks = [task for task in all_user_tasks
-                    # is_active is True and category is Test Prep
-                    if task[5] and task[9] == 'Test Prep']
-
-    # Count completed tasks in current generation (out of 5 total tasks)
-    test_prep_completed = sum(
-        1 for task in active_tasks if task[4])  # is_completed
-    # Always 5 total tasks in current generation
+    # Test Prep Counts
+    active_test_tasks = [t for t in all_tasks if t[5] and t[9] == 'Test Prep']
+    test_prep_completed = sum(1 for t in active_test_tasks if t[4])
     test_prep_upcoming = 5 - test_prep_completed
-
-    # Count total completed tasks across ALL generations
     total_test_prep_completed = sum(
-        1 for task in all_user_tasks
-        # is_completed and category is Test Prep
-        if task[4] and task[9] == 'Test Prep'
-    )
+        1 for t in all_tasks if t[4] and t[9] == 'Test Prep')
 
-    # Keep college planning at 0 for now
-    college_planning_completed = 0
-    college_planning_upcoming = 0
+    # College Planning Counts
+    active_college_tasks = [
+        t for t in all_tasks if t[5] and t[9] == 'College Planning']
+    college_planning_completed_current = sum(
+        1 for t in active_college_tasks if t[4])
+    total_college_planning_completed = sum(
+        1 for t in all_tasks if t[4] and t[9] == 'College Planning')
 
     return render_template(
         "stats.html",
         test_prep_completed=test_prep_completed,
         test_prep_upcoming=test_prep_upcoming,
         total_test_prep_completed=total_test_prep_completed,
-        college_planning_completed=college_planning_completed,
-        college_planning_upcoming=college_planning_upcoming,
+        college_planning_completed_current=college_planning_completed_current,
+        total_college_planning_completed=total_college_planning_completed,
         gpa=stats.get("gpa", ""),
         sat_ebrw=stats.get("sat_ebrw", ""),
         sat_math=stats.get("sat_math", ""),
@@ -737,6 +713,21 @@ def test_path_status():
     user_id = user.data[0]
     active_tasks = db.select(
         "paths", where={"user_id": user_id, "is_active": True})
+
+    return jsonify({"has_path": bool(active_tasks)})
+
+
+@app.route('/api/college-path-status')
+@login_required
+def college_path_status():
+    """Checks if a user has an active College Planning path."""
+    user = User.from_session(db, session)
+    if not user:
+        return jsonify({"has_path": False, "error": "User not found"}), 404
+
+    user_id = user.data[0]
+    active_tasks = db.select(
+        "paths", where={"user_id": user_id, "is_active": True, "category": "College Planning"})
 
     return jsonify({"has_path": bool(active_tasks)})
 
