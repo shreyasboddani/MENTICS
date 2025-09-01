@@ -121,7 +121,7 @@
             const nodesContainer = document.getElementById('path-nodes-container');
             nodesContainer.innerHTML = `<p class="text-gray-500 text-center">${isRegeneration ? 'Generating new path...' : 'Loading your path...'}</p>`;
             try {
-                const response = await fetch('/api/tasks', { method: isRegeneration ? 'POST' : 'GET' });
+                const response = await fetch('/api/tasks?category=Test Prep', { method: isRegeneration ? 'POST' : 'GET' });
                 if (!response.ok) throw new Error('Network response was not ok');
                 const tasks = await response.json();
                 if (Array.isArray(tasks) && tasks.length > 0) {
@@ -343,7 +343,7 @@
             const typingIndicator = appendChatMessage('...', 'bot', true);
 
             try {
-                const response = await fetch('/api/chat', {
+                const response = await fetch('/api/chat?category=Test Prep', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ history: conversationHistory })

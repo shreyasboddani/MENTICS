@@ -740,51 +740,49 @@ def api_tasks():
     user = User.from_session(db, session)
     user_id = user.data[0]
     stats = user.get_stats()
-    test_path_info = stats.get("test_path", {})
-    strengths = test_path_info.get("strengths", "general studying")
-    weaknesses = test_path_info.get("weaknesses", "test-taking skills")
+    # NEW: Determine the category from the request URL
+    category = request.args.get('category', 'Test Prep')
 
     try:
-        # Get all active tasks for this user
+        # UPDATED: Filter tasks by the specific category
         active_path = db.select(
-            "paths", where={"user_id": user_id, "is_active": True})
+            "paths", where={"user_id": user_id, "is_active": True, "category": category})
 
-        # Generate new path only on POST (explicit regeneration) or if no active path exists
         if request.method == "POST" or not active_path:
-            # Deactivate old path before generating new one
             if active_path:
                 db.update("paths", {"is_active": False},
-                          where={"user_id": user_id})
-            tasks = _generate_and_save_new_test_path(
-                user_id, strengths, weaknesses)
+                          where={"user_id": user_id, "category": category})
+
+            # NEW: Call the correct generator based on the category
+            if category == 'College Planning':
+                college_context = stats.get("college_path", {})
+                tasks = _generate_and_save_new_college_path(
+                    user_id, college_context)
+            else:  # Default to Test Prep
+                test_path_info = stats.get("test_path", {})
+                strengths = test_path_info.get("strengths", "general studying")
+                weaknesses = test_path_info.get(
+                    "weaknesses", "test-taking skills")
+                tasks = _generate_and_save_new_test_path(
+                    user_id, strengths, weaknesses)
             return jsonify(tasks)
 
-        # For GET requests with existing active path, return current tasks
         if active_path:
-            # Sort by task_order
             active_path = sorted(active_path, key=lambda x: x[2])
             tasks = [{
                 "id": row[0],
                 "description": row[3],
-                "is_completed": bool(row[4]) if row[4] is not None else False
+                "is_completed": bool(row[4]),
+                "type": row[7],
+                "stat_to_update": row[8]
             } for row in active_path]
             return jsonify(tasks)
 
-        # If we get here, there are no active tasks (shouldn't happen normally)
         return jsonify([])
 
     except Exception as e:
-        print(f"API tasks error: {e}")
-        return jsonify({"error": "Database error occurred"}), 500
-
-    tasks = []
-    for row in active_path:
-        tasks.append({
-            "id": row[0],
-            "description": row[3],
-            "is_completed": bool(row[4]) if row[4] is not None else False
-        })
-    return jsonify(tasks)
+        print(f"API tasks error for category {category}: {e}")
+        return jsonify({"error": "An error occurred"}), 500
 
 
 @app.route("/api/update_task_status", methods=['POST'])
@@ -797,16 +795,29 @@ def api_update_task_status():
     task_id = data.get("taskId")
 
     if status == 'failed':
+        # NEW: Find the task to determine its category before regenerating
+        task_info = db.select(
+            "paths", where={"id": task_id, "user_id": user_id})
+        if not task_info:
+            return jsonify({"success": False, "error": "Task not found"}), 404
+
+        category = task_info[0][9]  # category is the 10th column (index 9)
         stats = user.get_stats()
-        test_path_info = stats.get("test_path", {})
-        strengths = test_path_info.get("strengths", "general studying")
-        weaknesses = test_path_info.get("weaknesses", "test-taking skills")
-        # Regenerate the path if a task is failed
-        new_tasks = _generate_and_save_new_test_path(
-            user_id, strengths, weaknesses)
+
+        if category == 'College Planning':
+            college_context = stats.get("college_path", {})
+            new_tasks = _generate_and_save_new_college_path(
+                user_id, college_context)
+        else:  # Default to Test Prep
+            test_path_info = stats.get("test_path", {})
+            strengths = test_path_info.get("strengths", "general studying")
+            weaknesses = test_path_info.get("weaknesses", "test-taking skills")
+            new_tasks = _generate_and_save_new_test_path(
+                user_id, strengths, weaknesses)
+
         return jsonify({"success": True, "tasks": new_tasks})
+
     elif status == 'complete' and task_id:
-        # Update the specific task's completion status
         db.update("paths", {"is_completed": True}, where={
             "id": task_id, "user_id": user_id})
 
@@ -820,17 +831,19 @@ def api_chat():
     stats = user.get_stats()
     data = request.get_json()
     history = data.get("history", [])
+    category = request.args.get(
+        'category', 'Test Prep')  # Read category from URL
 
-    # If the history is empty, it's the first message.
-    # The frontend will send an empty placeholder user message to trigger the AI's proactive greeting.
     if not history or (len(history) == 1 and history[0]['role'] == 'user' and history[0]['content'] == 'INITIAL_MESSAGE'):
-        history = []  # Start with a clean slate for the AI's first turn
+        history = []
 
-    reply = _get_test_prep_ai_chat_response(history, stats)
+    # NEW: Call the correct AI chat helper based on the category
+    if category == 'College Planning':
+        reply = _get_college_planning_ai_chat_response(history, stats)
+    else:
+        reply = _get_test_prep_ai_chat_response(history, stats)
 
-    # Add the AI's response to the history
     history.append({"role": "assistant", "content": reply})
-    # Save the updated history to the session
     session['chat_history'] = history
 
     return jsonify({"reply": reply})
