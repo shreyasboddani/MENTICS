@@ -213,7 +213,14 @@ def _generate_and_save_new_test_path(user_id, strengths, weaknesses):
         "incomplete": [task for task in all_tasks if not task[4]]
     }
 
-    db.update("paths", {"is_active": False}, where={"user_id": user_id})
+    # --- FIX START ---
+    # The original line was: db.update("paths", {"is_active": False}, where={"user_id": user_id})
+    # This was too broad and deactivated ALL of the user's paths.
+    # The corrected line below specifically targets only the "Test Prep" tasks,
+    # leaving the "College Planning" path untouched.
+    db.update("paths", {"is_active": False}, where={
+              "user_id": user_id, "category": "Test Prep"})
+    # --- FIX END ---
 
     # Pass all context to the AI
     tasks = _get_test_prep_ai_tasks(strengths, weaknesses,
