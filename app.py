@@ -48,7 +48,15 @@ def init_db():
         "created_at": "TIMESTAMP DEFAULT CURRENT_TIMESTAMP",
         "type": "TEXT",
         "stat_to_update": "TEXT",
-        "category": "TEXT"  # <-- This column is now added
+        "category": "TEXT"
+    })
+    # --- ADD THIS NEW TABLE ---
+    db.create_table("stat_history", {
+        "id": "INTEGER PRIMARY KEY AUTOINCREMENT",
+        "user_id": "INTEGER NOT NULL",
+        "stat_name": "TEXT NOT NULL",
+        "stat_value": "TEXT NOT NULL",
+        "recorded_at": "TIMESTAMP DEFAULT CURRENT_TIMESTAMP"
     })
 
 # --- DECORATORS ---
@@ -666,33 +674,48 @@ def tracker():
         "paths", where={"user_id": user_id}, order_by="created_at DESC")
     stats = user.get_stats()
 
-    # --- FIX START: Add logic to fetch score history ---
-    # The original function was missing this entire block to collect
-    # historical data needed for the charts on the tracker page.
+    # --- REPLACE THE OLD LOGIC WITH THIS ---
+    # Fetch all historical stat entries for the user
+    history_records = db.select(
+        "stat_history", where={"user_id": user_id}, order_by="recorded_at ASC")
+
     sat_history = []
     act_history = []
 
-    # This simulates fetching historical scores that would normally be
-    # stored over time. For this example, we'll pull from the current stats
-    # to ensure the chart has data to display.
-    if stats.get("sat_math") and stats.get("sat_ebrw"):
-        sat_history.append({
-            "date": datetime.now().isoformat(),
-            "score": int(stats["sat_math"]) + int(stats["sat_ebrw"])
-        })
+    # Process the records into chart-friendly lists
+    # This logic assumes SAT scores are logged in pairs (Math & EBRW) and aggregates them.
+    # ACT scores are logged individually and will appear as distinct points.
 
-    if stats.get("act_math") and stats.get("act_reading") and stats.get("act_science"):
-        scores = [int(s) for s in [stats["act_math"],
-                                   stats["act_reading"], stats["act_science"]] if s]
-        if scores:
+    temp_sat_scores = {}  # Used to combine SAT Math and EBRW scores by date
+
+    for record in history_records:
+        stat_name = record[2]
+        stat_value = record[3]
+        recorded_at = record[4]
+
+        if "sat" in stat_name:
+            date_key = recorded_at.split(" ")[0]  # Group by day
+            if date_key not in temp_sat_scores:
+                temp_sat_scores[date_key] = {}
+            temp_sat_scores[date_key][stat_name] = int(stat_value)
+
+        elif "act" in stat_name:
             act_history.append({
-                "date": datetime.now().isoformat(),
-                "score": sum(scores) / len(scores)  # Store the average
+                "date": recorded_at,
+                "score": int(stat_value)
+            })
+
+    # Combine the SAT scores into total scores
+    for date, scores in temp_sat_scores.items():
+        if "sat_math" in scores and "sat_ebrw" in scores:
+            sat_history.append({
+                "date": date,
+                "score": scores["sat_math"] + scores["sat_ebrw"]
             })
 
     stats['sat_history'] = sat_history
     stats['act_history'] = act_history
-    # --- FIX END ---
+    # --- END OF REPLACEMENT ---
 
     test_prep_generations = {}
     college_planning_generations = {}
@@ -700,7 +723,6 @@ def tracker():
     for task in all_tasks:
         generation_key = task[6]
         category = task[9]
-
         if category == 'Test Prep':
             if generation_key not in test_prep_generations:
                 test_prep_generations[generation_key] = []
@@ -922,16 +944,27 @@ def api_update_stats():
         return jsonify({"success": False, "error": "User not found"}), 404
 
     data = request.get_json()
-    stat_name = data.get("stat_name")  # e.g., "gpa", "sat_math"
+    stat_name = data.get("stat_name")
     stat_value = data.get("stat_value")
 
     if not stat_name or stat_value is None:
         return jsonify({"success": False, "error": "Missing stat name or value"}), 400
 
     try:
+        # First, update the user's current stats
         stats = user.get_stats()
         stats[stat_name] = stat_value
         user.set_stats(stats)
+
+        # --- ADD THIS LOGIC ---
+        # Now, save a snapshot to the new history table
+        db.insert("stat_history", {
+            "user_id": user.data[0],
+            "stat_name": stat_name,
+            "stat_value": stat_value
+        })
+        # --- END OF NEW LOGIC ---
+
         return jsonify({"success": True, "message": "Stats updated successfully"})
     except Exception as e:
         print(f"Error updating stats via API: {e}")
