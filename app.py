@@ -30,6 +30,7 @@ db = DatabaseHandler("users.db")
 # --- DATABASE INITIALIZATION ---
 
 
+# In app.py, REPLACE your init_db function
 def init_db():
     db.create_table("users", {
         "id": "INTEGER PRIMARY KEY AUTOINCREMENT",
@@ -47,7 +48,7 @@ def init_db():
         "created_at": "TIMESTAMP DEFAULT CURRENT_TIMESTAMP",
         "type": "TEXT",
         "stat_to_update": "TEXT",
-        "category": "TEXT DEFAULT 'Test Prep'"
+        "category": "TEXT"  # <-- This column is now added
     })
 
 # --- DECORATORS ---
@@ -246,6 +247,221 @@ def _generate_and_save_new_test_path(user_id, strengths, weaknesses):
             "is_completed": False
         })
     return saved_tasks
+
+# In app.py, ADD this new function in the AI HELPER FUNCTIONS section
+
+
+def _get_college_planning_ai_tasks(college_context, user_stats, path_history):
+    """Generates college planning tasks with a hyper-detailed prompt."""
+
+    def get_mock_tasks_reliably():
+        """Provides a reliable set of mock tasks for testing college planning."""
+        print("--- DEBUG: Running mock generator for College Planning. ---")
+        mock_tasks = [
+            {"description": "Research 5 colleges that match your interests and grade profile.",
+                "type": "milestone", "stat_to_update": "colleges_researched", "category": "College Planning"},
+            {"description": "Write a rough draft of your main college application essay.",
+                "type": "milestone", "stat_to_update": "essay_progress", "category": "College Planning"},
+            {"description": "Complete the activities section of the Common App.",
+                "type": "standard", "stat_to_update": None, "category": "College Planning"},
+            {"description": "Identify and ask three teachers for letters of recommendation.",
+                "type": "standard", "stat_to_update": None, "category": "College Planning"},
+            {"description": "Create a calendar with all relevant application deadlines.",
+                "type": "standard", "stat_to_update": None, "category": "College Planning"}
+        ]
+        random.shuffle(mock_tasks)
+        return mock_tasks
+
+    if not hasattr(openai, 'api_key') or not openai.api_key:
+        return get_mock_tasks_reliably()
+
+    # --- DATA FORMATTING FOR THE PROMPT ---
+    completed_tasks_str = "\n".join(
+        [f"- {task[3]}" for task in path_history.get('completed', [])]) or "None."
+    incomplete_tasks_str = "\n".join(
+        [f"- {task[3]}" for task in path_history.get('incomplete', [])]) or "None."
+
+    # --- NEW HYPER-DETAILED PROMPT FOR COLLEGE PLANNING ---
+    prompt = (
+        f"# CONTEXT\n"
+        f"You are an expert AI college admissions counselor creating a personalized roadmap for a high school student.\n\n"
+
+        f"# STUDENT PROFILE\n"
+        f"- Current Grade: {college_context.get('grade', 'N/A')}\n"
+        f"- Current Planning Stage: {college_context.get('planning_stage', 'N/A')}\n"
+        f"- Interested Majors: {college_context.get('majors', 'N/A')}\n"
+        f"- Current GPA: {user_stats.get('gpa', 'N/A')}\n\n"
+
+        f"# STUDENT HISTORY\n"
+        f"## Recently Completed Tasks:\n{completed_tasks_str}\n\n"
+        f"## Recently Incomplete or Failed Tasks:\n{incomplete_tasks_str}\n\n"
+
+        f"# YOUR TASK\n"
+        f"Generate a new, 5-step college planning roadmap based on all the context provided.\n\n"
+
+        f"# CRITICAL RULES\n"
+        f"- Your ENTIRE output must be a single, raw JSON object. Do not include any text, explanations, or markdown formatting.\n"
+        f"- The plan must contain exactly 5 task objects.\n"
+        f"- The tasks must be novel and not repeat tasks from the student's history.\n"
+        f"- The plan must be appropriate for the student's grade level and current planning stage.\n\n"
+
+        f"# JSON SCHEMA\n"
+        f"Your output must conform to this exact structure:\n"
+        f"{{\n"
+        f'  "tasks": [\n'
+        f'    {{\n'
+        f'      "description": "A string describing the specific, actionable task.",\n'
+        f'      "type": "A string, either \'standard\' or \'milestone\'.",\n'
+        f'      "stat_to_update": "A string if type is \'milestone\' (e.g., \'essay_progress\', \'applications_submitted\', \'colleges_researched\'), otherwise null.",\n'
+        f'      "category": "This MUST be the string \'College Planning\'."\n'
+        f'    }}\n'
+        f'  ]\n'
+        f'}}'
+    )
+
+    try:
+        completion = openai.chat.completions.create(
+            model="gpt-3.5-turbo",
+            messages=[
+                {"role": "system", "content": "You are an assistant that responds only in perfectly formatted JSON."},
+                {"role": "user", "content": prompt}
+            ],
+            temperature=0.7
+        )
+        response_data = json.loads(completion.choices[0].message.content)
+        tasks = response_data.get("tasks", [])
+        if isinstance(tasks, list) and len(tasks) == 5:
+            return tasks
+        raise ValueError("Invalid format from AI")
+    except Exception as e:
+        print(
+            f"\n--- OPENAI API ERROR IN _get_college_planning_ai_tasks: {e} ---\n")
+        return get_mock_tasks_reliably()
+
+
+def _get_college_planning_ai_chat_response(history, user_stats):
+    """Generates a proactive and context-aware chat response for college planning."""
+    if not hasattr(openai, 'api_key') or not openai.api_key:
+        return "I'm in testing mode, but I'm saving our conversation!"
+
+    college_info = user_stats.get("college_path", {})
+    system_message = {
+        "role": "system",
+        "content": (
+            "You are a friendly and proactive college planning advisor. The student is in "
+            f"grade {college_info.get('grade', 'N/A')} and is in the '{college_info.get('planning_stage', 'N/A')}' stage. "
+            "If the conversation is just beginning, greet the user and ask what specific part of college planning they want to discuss (e.g., essays, applications, college lists). "
+            "In subsequent messages, be an encouraging and helpful advisor."
+        )
+    }
+    messages = [system_message] + history
+    try:
+        completion = openai.chat.completions.create(
+            model="gpt-3.5-turbo", messages=messages)
+        return completion.choices[0].message.content
+    except Exception as e:
+        print(
+            f"\n--- OPENAI API ERROR IN _get_college_planning_ai_chat_response: {e} ---\n")
+        return "Sorry, I encountered an error connecting to the AI."
+
+
+def _generate_and_save_new_college_path(user_id, college_context):
+    """
+    Gathers all context, generates, and saves a new college planning path.
+    This function mirrors the robust logic of the test prep version.
+    """
+    try:
+        # 1. --- GATHER FULL CONTEXT ---
+        # Get the user's academic stats (GPA, test scores, etc.)
+        user_record = db.select("users", where={"id": user_id})
+        if not user_record:
+            raise ValueError(f"User with ID {user_id} not found.")
+        user_stats = json.loads(user_record[0][3])
+
+        # Get the user's chat history from the session
+        chat_history = session.get('chat_history', [])
+
+        # Get the user's previous College Planning tasks to use as history
+        all_college_tasks = db.select(
+            "paths", where={"user_id": user_id, "category": "College Planning"})
+        path_history = {
+            # is_completed is column 4
+            "completed": [task for task in all_college_tasks if task[4]],
+            "incomplete": [task for task in all_college_tasks if not task[4]]
+        }
+
+        # 2. --- DEACTIVATE OLD PATH ---
+        # This preserves history by marking old tasks as inactive instead of deleting them.
+        db.update("paths", {"is_active": False}, where={
+                  "user_id": user_id, "category": "College Planning"})
+
+        # 3. --- GENERATE NEW TASKS ---
+        # Call the AI helper with all the rich context we've gathered
+        tasks = _get_college_planning_ai_tasks(
+            college_context, user_stats, path_history)
+
+        if not tasks or len(tasks) != 5:
+            raise ValueError(
+                "AI task generation did not return the expected 5 tasks.")
+
+        # 4. --- SAVE NEW TASKS ---
+        saved_tasks = []
+        for i, task_data in enumerate(tasks):
+            task_id = db.insert("paths", {
+                "user_id": user_id,
+                "task_order": i + 1,
+                "description": task_data.get("description"),
+                "type": task_data.get("type"),
+                "stat_to_update": task_data.get("stat_to_update"),
+                "category": "College Planning",  # Hardcode the correct category
+                "is_active": True,
+                "is_completed": False
+            })
+            # Return the full task data, including the new database ID
+            saved_tasks.append(
+                {**task_data, "id": task_id, "is_completed": False})
+
+        return saved_tasks
+
+    except Exception as e:
+        print(f"Error in _generate_and_save_new_college_path: {e}")
+        return []  # Return an empty list if anything goes wrong
+
+# In app.py, ADD these new routes before the API routes
+
+
+@app.route("/dashboard/college-path-builder", methods=["GET", "POST"])
+@login_required
+def college_path_builder():
+    user = User.from_session(db, session)
+    stats = user.get_stats()
+    college_stats = stats.get('college_path', {})
+
+    if request.method == "POST":
+        college_context = {
+            'grade': request.form.get('current_grade'),
+            'planning_stage': request.form.get('planning_stage'),
+            'majors': request.form.get('interested_majors')
+        }
+        stats['college_path'] = college_context
+        user.set_stats(stats)
+
+        _generate_and_save_new_college_path(user.data[0], college_context)
+        return redirect(url_for('college_path_view'))
+
+    return render_template(
+        "college_path_builder.html",
+        grade=college_stats.get('grade', ''),
+        planning_stage=college_stats.get('planning_stage'),
+        majors=college_stats.get('majors', '')
+    )
+
+
+@app.route('/dashboard/college-path-view')
+@login_required
+def college_path_view():
+    return render_template("college_path_view.html")
+
 
 # --- ORIGINAL PAGE ROUTES (Unchanged) ---
 
@@ -523,12 +739,6 @@ def test_path_status():
         "paths", where={"user_id": user_id, "is_active": True})
 
     return jsonify({"has_path": bool(active_tasks)})
-
-
-@app.route('/dashboard/college-path-builder')
-@login_required
-def college_path_builder():
-    return render_template('college_path_builder.html')
 
 
 # --- API ROUTES FOR THE PATH BUILDER (Fixed) ---
