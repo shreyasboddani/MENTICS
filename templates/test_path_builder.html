@@ -6,70 +6,132 @@
     <title>Test Prep Path Builder – Mentics</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Lalezar&display=swap" rel="stylesheet" />
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Lalezar&display=swap"
+        rel="stylesheet">
     <link href="https://unpkg.com/aos@2.3.1/dist/aos.css" rel="stylesheet">
+
     <style>
-        .lalezar {
+        .font-lalezar {
             font-family: 'Lalezar', cursive;
+        }
+
+        .font-sans {
+            font-family: 'Inter', sans-serif;
+        }
+
+        body::before {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background: radial-gradient(circle at 10% 20%, rgba(167, 139, 250, 0.2), transparent 40%),
+                radial-gradient(circle at 80% 90%, rgba(127, 13, 239, 0.2), transparent 40%),
+                radial-gradient(circle at 50% 50%, rgba(196, 181, 253, 0.1), transparent 50%);
+            animation: aurora 20s infinite linear;
+            z-index: -1;
+        }
+
+        @keyframes aurora {
+            0% {
+                transform: rotate(0deg) scale(1.2);
+            }
+
+            50% {
+                transform: rotate(180deg) scale(1.5);
+            }
+
+            100% {
+                transform: rotate(360deg) scale(1.2);
+            }
         }
     </style>
 </head>
 
-<body class="bg-gradient-to-br from-indigo-100 to-purple-200 min-h-screen text-gray-900 scroll-smooth">
-    <header class="fixed top-0 w-full z-50 bg-white/70 backdrop-blur-md shadow-sm">
-        <div class="max-w-7xl mx-auto flex justify-between items-center px-6 py-4">
-            <a href="/" class="text-xl font-bold text-purple-600 tracking-tight lalezar">MENTICS</a>
+<body
+    class="bg-[#F8F7FF] font-sans text-slate-800 antialiased min-h-screen flex flex-col items-center justify-center p-4">
+
+    <header class="absolute top-0 left-0 w-full z-10">
+        <div class="max-w-5xl mx-auto flex justify-between items-center px-6 py-4">
+            <a href="/dashboard" class="text-3xl font-bold text-purple-600 tracking-tight font-lalezar">
+                MENTICS
+            </a>
             <nav>
                 <a href="/dashboard"
-                    class="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 transition">Dashboard</a>
-                <a href="/logout" class="ml-2 text-purple-600 hover:underline">Logout</a>
+                    class="text-sm font-semibold text-slate-600 hover:text-purple-600 transition-colors duration-200">
+                    &larr; Back to Dashboard
+                </a>
             </nav>
         </div>
     </header>
-    <main class="pt-32 px-6 max-w-2xl mx-auto text-center" data-aos="fade-up">
-        <h1 class="text-5xl lalezar font-bold text-purple-700 mb-6" data-aos="fade-down">Test Prep Path Builder</h1>
-        <p class="text-lg text-gray-700 mb-8" data-aos="fade-up" data-aos-delay="200">
-            Start building your personalized test prep journey here!
-        </p>
-        <div class="bg-white rounded-xl shadow-lg p-8 text-left" data-aos="zoom-in" data-aos-delay="400">
+
+    <main class="w-full max-w-2xl" data-aos="fade-up">
+        <div
+            class="bg-white/60 backdrop-blur-xl border border-white/20 rounded-2xl shadow-2xl shadow-purple-100/40 p-6 md:p-8">
+            <div class="text-center mb-6">
+                <h1 class="text-3xl font-bold font-lalezar text-purple-700 mb-2">Test Prep Path Builder</h1>
+                <p class="text-slate-600">Tell us your goals to create a personalized test prep journey.</p>
+            </div>
+
             <form method="POST">
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                    <div>
-                        <label class="block text-gray-700 mb-1 font-bold" for="desired_sat">Desired SAT Score</label>
-                        <input type="number" min="400" max="1600" step="10" id="desired_sat" name="desired_sat"
-                            class="w-full border rounded p-2" placeholder="e.g., 1500" value="{{ desired_sat }}">
+                <div class="space-y-5">
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm font-semibold text-slate-700 mb-1" for="desired_sat">Desired SAT
+                                Score</label>
+                            <input type="number" min="400" max="1600" step="10" id="desired_sat" name="desired_sat"
+                                class="w-full bg-white/50 border border-slate-300/70 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition"
+                                placeholder="e.g., 1500" value="{{ desired_sat }}">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-semibold text-slate-700 mb-1" for="desired_act">Desired ACT
+                                Score</label>
+                            <input type="number" min="1" max="36" id="desired_act" name="desired_act"
+                                class="w-full bg-white/50 border border-slate-300/70 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition"
+                                placeholder="e.g., 34" value="{{ desired_act }}">
+                        </div>
                     </div>
+
                     <div>
-                        <label class="block text-gray-700 mb-1 font-bold" for="desired_act">Desired ACT Score</label>
-                        <input type="number" min="1" max="36" id="desired_act" name="desired_act"
-                            class="w-full border rounded p-2" placeholder="e.g., 34" value="{{ desired_act }}">
+                        <label class="block text-sm font-semibold text-slate-700 mb-1" for="strengths">Strengths</label>
+                        <textarea id="strengths" name="strengths" rows="3"
+                            class="w-full bg-white/50 border border-slate-300/70 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition"
+                            placeholder="What are you good at? (e.g., Algebra, Reading Comprehension)">{{ strengths }}</textarea>
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-semibold text-slate-700 mb-1"
+                            for="weaknesses">Weaknesses</label>
+                        <textarea id="weaknesses" name="weaknesses" rows="3"
+                            class="w-full bg-white/50 border border-slate-300/70 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition"
+                            placeholder="What do you need to work on? (e.g., Geometry, Punctuation Rules)">{{ weaknesses }}</textarea>
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm font-semibold text-slate-700 mb-1" for="test_date">Test
+                                Date</label>
+                            <input type="date" id="test_date" name="test_date"
+                                class="w-full bg-white/50 border border-slate-300/70 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition"
+                                value="{{ test_date }}">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-semibold text-slate-700 mb-1" for="test_time">Test
+                                Time</label>
+                            <input type="time" id="test_time" name="test_time"
+                                class="w-full bg-white/50 border border-slate-300/70 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition"
+                                value="{{ test_time }}">
+                        </div>
                     </div>
                 </div>
-                <div class="mb-4">
-                    <label class="block text-gray-700 mb-1 font-bold" for="strengths">Strengths</label>
-                    <textarea id="strengths" name="strengths" rows="3" class="w-full border rounded p-2"
-                        placeholder="What are you good at? (e.g., Algebra, Reading Comprehension)">{{ strengths }}</textarea>
-                </div>
-                <div class="mb-4">
-                    <label class="block text-gray-700 mb-1 font-bold" for="weaknesses">Weaknesses</label>
-                    <textarea id="weaknesses" name="weaknesses" rows="3" class="w-full border rounded p-2"
-                        placeholder="What do you need to work on? (e.g., Geometry, Punctuation Rules)">{{ weaknesses }}</textarea>
-                </div>
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-                    <div>
-                        <label class="block text-gray-700 mb-1 font-bold" for="test_date">Test Date</label>
-                        <input type="date" id="test_date" name="test_date" class="w-full border rounded p-2"
-                            value="{{ test_date }}">
-                    </div>
-                    <div>
-                        <label class="block text-gray-700 mb-1 font-bold" for="test_time">Test Time</label>
-                        <input type="time" id="test_time" name="test_time" class="w-full border rounded p-2"
-                            value="{{ test_time }}">
-                    </div>
-                </div>
-                <div class="flex justify-end">
+
+                <div class="mt-8 pt-6 border-t border-slate-200/80 flex justify-end">
                     <button type="submit"
-                        class="bg-purple-600 text-white px-6 py-2 rounded-lg hover:bg-purple-700 font-semibold transition">
+                        class="bg-purple-600 text-white px-6 py-2.5 rounded-lg hover:bg-purple-700 font-semibold transition shadow-md hover:shadow-lg transform hover:-translate-y-0.5 focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-500 focus-visible:ring-offset-2">
                         Build My Path
                     </button>
                 </div>

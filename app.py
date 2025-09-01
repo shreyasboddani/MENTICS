@@ -650,7 +650,39 @@ def edit_stats():
 @app.route("/dashboard/tracker")
 @login_required
 def tracker():
-    return render_template("tracker.html")
+    user = User.from_session(db, session)
+    if not user:
+        return redirect(url_for("login"))
+
+    user_id = user.data[0]
+    all_tasks = db.select(
+        "paths", where={"user_id": user_id}, order_by="created_at DESC")
+    stats = user.get_stats()
+
+    # Process tasks into generations
+    test_prep_generations = {}
+    college_planning_generations = {}
+
+    for task in all_tasks:
+        # Using created_at (column 6) as a generation key
+        generation_key = task[6]
+        category = task[9]
+
+        if category == 'Test Prep':
+            if generation_key not in test_prep_generations:
+                test_prep_generations[generation_key] = []
+            test_prep_generations[generation_key].append(task)
+        elif category == 'College Planning':
+            if generation_key not in college_planning_generations:
+                college_planning_generations[generation_key] = []
+            college_planning_generations[generation_key].append(task)
+
+    return render_template(
+        "tracker.html",
+        stats=stats,
+        test_prep_generations=test_prep_generations,
+        college_planning_generations=college_planning_generations
+    )
 
 
 @app.route("/dashboard/test-path-builder", methods=["GET", "POST"])

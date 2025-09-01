@@ -64,10 +64,11 @@ class DatabaseHandler:
         query = f"DELETE FROM {table_name} WHERE {where_clause}"
         self.execute(query, tuple(where.values()))
 
-    def select(self, table_name, columns='*', where=None):
+    def select(self, table_name, columns='*', where=None, order_by=None):
         """
         columns: list or str
         where: dict of column_name: value for WHERE clause
+        order_by: str column name to order by
         """
         if isinstance(columns, list):
             cols = ', '.join(columns)
@@ -79,4 +80,6 @@ class DatabaseHandler:
             where_clause = ' AND '.join([f"{k}=?" for k in where.keys()])
             query += f" WHERE {where_clause}"
             params = tuple(where.values())
+        if order_by:
+            query += f" ORDER BY {order_by}"
         return self.execute(query, params)

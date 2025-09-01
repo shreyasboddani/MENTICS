@@ -6,106 +6,234 @@
     <title>Your Test Prep Path – Mentics</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Lalezar&display=swap" rel="stylesheet" />
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Lalezar&display=swap"
+        rel="stylesheet">
     <link href="https://unpkg.com/aos@2.3.1/dist/aos.css" rel="stylesheet">
+
     <style>
-        .lalezar {
+        .font-lalezar {
             font-family: 'Lalezar', cursive;
+        }
+
+        .font-sans {
+            font-family: 'Inter', sans-serif;
+        }
+
+        body::before {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background: radial-gradient(circle at 10% 20%, rgba(167, 139, 250, 0.2), transparent 40%),
+                radial-gradient(circle at 80% 90%, rgba(127, 13, 239, 0.2), transparent 40%),
+                radial-gradient(circle at 50% 50%, rgba(196, 181, 253, 0.1), transparent 50%);
+            animation: aurora 20s infinite linear;
+            z-index: -1;
+        }
+
+        @keyframes aurora {
+            0% {
+                transform: rotate(0deg) scale(1.2);
+            }
+
+            50% {
+                transform: rotate(180deg) scale(1.5);
+            }
+
+            100% {
+                transform: rotate(360deg) scale(1.2);
+            }
+        }
+
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: rgba(129, 140, 248, 0.4);
+            border-radius: 3px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: rgba(129, 140, 248, 0.6);
+        }
+
+        #chat-history {
+            scroll-behavior: smooth;
         }
     </style>
 </head>
 
-<body class="bg-gradient-to-br from-indigo-100 to-purple-200 min-h-screen text-gray-900 scroll-smooth">
-
-    <header class="fixed top-0 w-full z-50 bg-white/70 backdrop-blur-md shadow-sm">
-        <div class="max-w-7xl mx-auto flex justify-between items-center px-6 py-4">
-            <a href="/" class="text-xl font-bold text-purple-600 tracking-tight lalezar">MENTICS</a>
-            <nav>
+<body class="bg-[#F8F7FF] font-sans text-slate-800 antialiased">
+    <div class="flex h-screen">
+        <aside
+            class="w-64 flex-shrink-0 bg-white/60 backdrop-blur-xl border-r border-white/20 p-6 flex-col hidden md:flex">
+            <a href="/" class="text-3xl font-bold text-purple-600 tracking-tight font-lalezar mb-12">
+                MENTICS
+            </a>
+            <nav class="flex flex-col space-y-2">
                 <a href="/dashboard"
-                    class="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 transition">Dashboard</a>
-                <a href="/logout" class="ml-2 text-purple-600 hover:underline">Logout</a>
+                    class="flex items-center gap-3 px-4 py-2 text-slate-600 font-semibold rounded-lg hover:bg-purple-50 hover:text-purple-700 transition-colors">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-5 h-5">
+                        <path
+                            d="M11.25 4.533A9.707 9.707 0 0 0 6 3a9.735 9.735 0 0 0-3.25.555.75.75 0 0 0-.5.707v14.522c0 .318.22.6.5.707a9.735 9.735 0 0 0 3.25.555 9.707 9.707 0 0 0 5.25-1.533v-1.37a.75.75 0 0 0-.56-0.723c-1.428-.344-2.285-.945-2.285-1.717s.857-1.373 2.285-1.717a.75.75 0 0 0 .56-.723v-1.37c0-.629-.444-1.21-1.141-1.423-1.02-.3-1.859-.933-1.859-1.828s.839-1.528 1.859-1.828c.697-.213 1.141-.794 1.141-1.423v-1.37ZM18 3a9.735 9.735 0 0 0-3.25.555.75.75 0 0 0-.5.707v14.522c0 .318.22.6.5.707a9.735 9.735 0 0 0 3.25.555 9.707 9.707 0 0 0 5.25-1.533v-1.37a.75.75 0 0 0-.56-.723c-1.428-.344-2.285-.945-2.285-1.717s.857-1.373 2.285-1.717a.75.75 0 0 0 .56-.723v-1.37c0-.629-.444-1.21-1.141-1.423-1.02-.3-1.859-.933-1.859-1.828s.839-1.528 1.859-1.828c.697-.213 1.141-.794 1.141-1.423v-1.37A9.707 9.707 0 0 0 18 3Z" />
+                    </svg>
+                    Dashboard
+                </a>
+                <a href="/dashboard/stats"
+                    class="flex items-center gap-3 px-4 py-2 text-slate-600 font-semibold rounded-lg hover:bg-purple-50 hover:text-purple-700 transition-colors">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-5 h-5">
+                        <path fill-rule="evenodd"
+                            d="M2.25 13.5a8.25 8.25 0 0 1 8.25-8.25.75.75 0 0 1 .75.75v6.75H18a.75.75 0 0 1 .75.75 8.25 8.25 0 0 1-16.5 0Z"
+                            clip-rule="evenodd" />
+                        <path fill-rule="evenodd"
+                            d="M12.75 3a.75.75 0 0 1 .75-.75 8.25 8.25 0 0 1 8.25 8.25.75.75 0 0 1-.75.75h-7.5a.75.75 0 0 1-.75-.75V3Z"
+                            clip-rule="evenodd" />
+                    </svg>
+                    Stats
+                </a>
+                <a href="/dashboard/tracker"
+                    class="flex items-center gap-3 px-4 py-2 text-slate-600 font-semibold rounded-lg hover:bg-purple-50 hover:text-purple-700 transition-colors">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-5 h-5">
+                        <path
+                            d="m11.08 4.135.418-.21a.75.75 0 0 1 .864 1.22l-1.01 1.01a.75.75 0 0 1-1.06 0l-2.12-2.122a.75.75 0 0 1 1.06-1.06l1.85 1.85ZM12 5.25a.75.75 0 0 1 .75.75v.008l.008.008a.75.75 0 0 1 0 1.052l-.008.008a.75.75 0 0 1-1.052 0l-.008-.008a.75.75 0 0 1 .3-1.06Zm-2.71 4.46a.75.75 0 0 1 0 1.06l-1.01 1.01a.75.75 0 0 1-1.22-.864l.21-.418 1.85-1.85a.75.75 0 0 1 1.06 0Zm10.53-2.181a.75.75 0 0 0-1.06-1.06l-1.85 1.85-.21.418a.75.75 0 0 0 .865 1.22l1.01-1.01a.75.75 0 0 0 0-1.06ZM12 15.75a.75.75 0 0 1 .75.75v.008l.008.008a.75.75 0 0 1 0 1.052l-.008.008a.75.75 0 0 1-1.052 0l-.008-.008a.75.75 0 0 1 .3-1.06ZM9.29 16.03a.75.75 0 0 0 0 1.06l-1.01 1.01a.75.75 0 1 0 1.22.865l.418-.21 1.85-1.85a.75.75 0 0 0-1.06-1.06l-1.42 1.42Zm3.78-2.81a.75.75 0 0 1 1.06 0l2.12 2.121a.75.75 0 0 1-1.06 1.06l-1.85-1.85.418-.21a.75.75 0 0 1 .865 1.22l-1.01 1.01a.75.75 0 0 1-1.06 0l-2.12-2.122a.75.75 0 0 1 1.06-1.06Zm-3.78 2.81a.75.75 0 0 1 1.06 0l1.42-1.42 1.85 1.85.21.418a.75.75 0 0 1-.865 1.22l-1.01-1.01a.75.75 0 0 1 0-1.06ZM12 2.25a9.75 9.75 0 1 0 0 19.5 9.75 9.75 0 0 0 0-19.5Z" />
+                    </svg>
+                    Tracker
+                </a>
             </nav>
-        </div>
-    </header>
-
-    <main class="pt-32 px-6 max-w-7xl mx-auto" data-aos="fade-up">
-        <h1 class="text-5xl lalezar font-bold text-purple-700 mb-8 text-center" data-aos="fade-down">
-            Your Personalized Test Prep Path
-        </h1>
-
-        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
-
-            <div class="lg:col-span-1 bg-white/70 rounded-2xl shadow-lg p-6 flex flex-col h-[600px]"
-                data-aos="fade-right">
-                <h2 class="text-2xl lalezar text-purple-600 mb-4 border-b pb-2">AI Assistant</h2>
-                <div id="chat-history" class="flex-grow overflow-y-auto space-y-4 pr-2">
-                </div>
-                <div class="mt-4 flex">
-                    <input type="text" id="userInput" placeholder="Ask a question..."
-                        class="w-full border rounded-l-lg p-2 focus:ring-2 focus:ring-purple-500 transition disabled:bg-gray-200"
-                        disabled>
-                    <button id="send-btn"
-                        class="bg-purple-600 text-white px-4 rounded-r-lg hover:bg-purple-700 font-semibold transition disabled:bg-gray-400"
-                        disabled>Send</button>
-                </div>
-            </div>
-
-            <div class="lg:col-span-2 bg-white/80 rounded-2xl shadow-2xl p-8 relative flex flex-col"
-                data-aos="fade-left" data-aos-delay="200">
-                <svg id="path-svg" class="absolute top-0 left-0 w-full h-full z-0">
-                    <path id="connector-path" d="" stroke="#D1D5DB" stroke-width="4" fill="none" stroke-dasharray="1 8"
-                        stroke-linecap="round" />
+            <a href="/logout"
+                class="mt-auto flex items-center gap-3 px-4 py-2 text-slate-600 font-semibold rounded-lg hover:bg-red-50 hover:text-red-700 transition-colors">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-5 h-5">
+                    <path fill-rule="evenodd"
+                        d="M7.5 3.75A1.5 1.5 0 0 0 6 5.25v13.5a1.5 1.5 0 0 0 1.5 1.5h6a1.5 1.5 0 0 0 1.5-1.5V15a.75.75 0 0 1 1.5 0v3.75a3 3 0 0 1-3 3h-6a3 3 0 0 1-3-3V5.25a3 3 0 0 1 3-3h6a3 3 0 0 1 3 3V9A.75.75 0 0 1 15 9V5.25a1.5 1.5 0 0 0-1.5-1.5h-6Zm10.72 4.72a.75.75 0 0 1 1.06 0l3 3a.75.75 0 0 1 0 1.06l-3 3a.75.75 0 1 1-1.06-1.06l1.72-1.72H9a.75.75 0 0 1 0-1.5h10.94l-1.72-1.72a.75.75 0 0 1 0-1.06Z"
+                        clip-rule="evenodd" />
                 </svg>
-                <div id="path-nodes-container" class="space-y-8 relative z-10 flex-grow">
-                </div>
+                Logout
+            </a>
+        </aside>
 
-                <div class="mt-8 pt-6 border-t border-gray-200 flex justify-end">
-                    <a href="{{ url_for('test_path_builder') }}"
-                        class="bg-purple-600 text-white px-6 py-3 rounded-lg hover:bg-purple-700 font-semibold transition shadow-md hover:shadow-lg transform hover:-translate-y-1">
-                        Edit Path Goals
-                    </a>
+        <div class="flex-1 flex flex-col h-screen overflow-y-auto">
+            <header class="sticky top-0 bg-[#F8F7FF]/60 backdrop-blur-xl z-10 border-b border-white/20">
+                <div class="flex justify-between items-center px-6 py-4">
+                    <h1 class="text-xl font-bold text-slate-900">Test Prep Path</h1>
                 </div>
-            </div>
+            </header>
 
+            <main class="flex-1 p-6">
+                <div class="grid grid-cols-1 xl:grid-cols-5 gap-6 h-full">
+
+                    <div class="xl:col-span-2 bg-white/60 backdrop-blur-xl border border-white/20 rounded-2xl shadow-lg shadow-purple-100/30 p-6 flex flex-col h-[85vh]"
+                        data-aos="fade-right">
+                        <h2 class="text-xl font-bold text-slate-900 mb-4 font-lalezar">AI Assistant</h2>
+                        <div id="chat-history" class="flex-grow overflow-y-auto space-y-4 pr-2 -mr-2"></div>
+                        <div class="mt-4 flex items-center gap-2 pt-4 border-t border-slate-200/80">
+                            <input type="text" id="userInput" placeholder="Ask a question..."
+                                class="w-full bg-white/50 border border-slate-300/70 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition disabled:bg-slate-100"
+                                disabled>
+                            <button id="send-btn"
+                                class="bg-purple-600 text-white p-2.5 rounded-lg hover:bg-purple-700 font-semibold transition disabled:bg-slate-400 focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-500 focus-visible:ring-offset-2"
+                                disabled>
+                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"
+                                    class="w-5 h-5">
+                                    <path
+                                        d="M3.478 2.404a.75.75 0 0 0-.926.941l2.432 7.905H13.5a.75.75 0 0 1 0 1.5H4.984l-2.432 7.905a.75.75 0 0 0 .926.94 60.519 60.519 0 0 0 18.445-8.986.75.75 0 0 0 0-1.218A60.517 60.517 0 0 0 3.478 2.404Z" />
+                                </svg>
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="xl:col-span-3 bg-white/60 backdrop-blur-xl border border-white/20 rounded-2xl shadow-lg shadow-purple-100/30 p-6 relative flex flex-col h-[85vh]"
+                        data-aos="fade-left" data-aos-delay="100">
+                        <h1 class="text-3xl font-bold font-lalezar text-purple-700 mb-1">Your Personalized Path</h1>
+                        <p class="text-slate-600 mb-6">Complete each task to move to the next step. Click a node for
+                            details.</p>
+
+                        <div class="relative flex-grow">
+                            <svg id="path-svg" class="absolute top-0 left-0 w-full h-full z-0">
+                                <path id="connector-path" d="" stroke="#C7B8F9" stroke-width="3" fill="none"
+                                    stroke-dasharray="2 8" stroke-linecap="round" />
+                            </svg>
+                            <div id="path-nodes-container"
+                                class="space-y-10 relative z-10 flex-grow h-full overflow-y-auto pr-4"></div>
+                        </div>
+
+                        <div class="mt-auto pt-6 border-t border-slate-200/80 flex justify-end">
+                            <a href="{{ url_for('test_path_builder') }}"
+                                class="bg-purple-600 text-white px-5 py-2.5 rounded-lg hover:bg-purple-700 font-semibold transition shadow-md hover:shadow-lg transform hover:-translate-y-0.5 focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-500 focus-visible:ring-offset-2">
+                                Edit Path Goals
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </main>
         </div>
-    </main>
+    </div>
 
     <div id="taskModal"
-        class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden transition-opacity duration-300">
-        <div class="bg-white rounded-2xl shadow-xl p-8 max-w-lg w-full m-4 transform transition-all scale-95"
-            id="modal-panel">
+        class="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 hidden p-4"
+        aria-labelledby="modal-title-task" role="dialog" aria-modal="true">
+        <div id="modal-panel"
+            class="bg-white/60 backdrop-blur-xl border border-white/20 w-full max-w-lg rounded-2xl shadow-2xl p-6 md:p-8"
+            data-aos="zoom-in" data-aos-duration="400">
             <div class="flex justify-between items-start">
-                <h3 id="modalTitle" class="text-2xl font-bold lalezar text-purple-700 mb-4">Task Details</h3>
-                <button onclick="closeTaskModal()" class="text-gray-400 hover:text-gray-600 text-3xl">&times;</button>
+                <h3 id="modalTitle" class="text-2xl font-bold font-lalezar text-purple-700 mb-4">Task Details</h3>
+                <button onclick="closeTaskModal()"
+                    class="text-slate-400 hover:text-slate-600 transition-colors rounded-full p-1 -mt-2 -mr-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-500">
+                    <span class="sr-only">Close</span>
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-6 h-6">
+                        <path fill-rule="evenodd"
+                            d="M5.47 5.47a.75.75 0 0 1 1.06 0L12 10.94l5.47-5.47a.75.75 0 1 1 1.06 1.06L13.06 12l5.47 5.47a.75.75 0 1 1-1.06 1.06L12 13.06l-5.47 5.47a.75.75 0 0 1-1.06-1.06L10.94 12 5.47 6.53a.75.75 0 0 1 0-1.06Z"
+                            clip-rule="evenodd" />
+                    </svg>
+                </button>
             </div>
-            <p id="modalDescription" class="text-gray-700 mb-6"></p>
-            <div id="modal-actions" class="flex justify-end gap-4"></div>
+            <p id="modalDescription" class="text-slate-700 mb-6"></p>
+            <div id="modal-actions" class="flex justify-end gap-3"></div>
         </div>
     </div>
 
     <div id="statEntryModal"
-        class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden transition-opacity duration-300">
-        <div class="bg-white rounded-2xl shadow-xl p-8 max-w-lg w-full m-4 transform transition-all scale-95"
-            id="stat-modal-panel">
+        class="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 hidden p-4"
+        aria-labelledby="modal-title-stat" role="dialog" aria-modal="true">
+        <div id="stat-modal-panel"
+            class="bg-white/60 backdrop-blur-xl border border-white/20 w-full max-w-lg rounded-2xl shadow-2xl p-6 md:p-8"
+            data-aos="zoom-in" data-aos-duration="400">
             <div class="flex justify-between items-start">
-                <h3 id="statModalTitle" class="text-2xl font-bold lalezar text-purple-700 mb-4">Update Your Progress
-                </h3>
-                <button onclick="closeStatModal()" class="text-gray-400 hover:text-gray-600 text-3xl">&times;</button>
+                <h3 id="statModalTitle" class="text-2xl font-bold font-lalezar text-purple-700 mb-2">Update Your
+                    Progress</h3>
+                <button onclick="closeStatModal()"
+                    class="text-slate-400 hover:text-slate-600 transition-colors rounded-full p-1 -mt-2 -mr-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-500">
+                    <span class="sr-only">Close</span>
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-6 h-6">
+                        <path fill-rule="evenodd"
+                            d="M5.47 5.47a.75.75 0 0 1 1.06 0L12 10.94l5.47-5.47a.75.75 0 1 1 1.06 1.06L13.06 12l5.47 5.47a.75.75 0 1 1-1.06 1.06L12 13.06l-5.47 5.47a.75.75 0 0 1-1.06-1.06L10.94 12 5.47 6.53a.75.75 0 0 1 0-1.06Z"
+                            clip-rule="evenodd" />
+                    </svg>
+                </button>
             </div>
-            <p class="text-gray-700 mb-4">Great job on completing a milestone! Please enter your new score below.</p>
+            <p class="text-slate-600 mb-6">Great job on completing a milestone! Please enter your new score below.</p>
             <div class="space-y-4">
                 <div>
-                    <label id="statModalLabel" for="statValue" class="block text-gray-700 mb-1 font-bold">New
-                        Score</label>
+                    <label id="statModalLabel" for="statValue"
+                        class="block text-sm font-semibold text-slate-700 mb-1">New Score</label>
                     <input type="number" id="statValue" name="statValue"
-                        class="w-full border rounded p-2 focus:ring-2 focus:ring-purple-500"
+                        class="w-full bg-white/50 border border-slate-300/70 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition"
                         placeholder="Enter score...">
                     <input type="hidden" id="statNameToUpdate">
                 </div>
-                <div id="stat-modal-actions" class="flex justify-end gap-4">
-                    <button onclick="closeStatModal()" class="text-purple-600 hover:underline">Cancel</button>
+                <div id="stat-modal-actions" class="flex justify-end gap-3 pt-2">
+                    <button onclick="closeStatModal()"
+                        class="text-slate-600 font-semibold px-4 py-2 rounded-lg hover:bg-slate-100 transition">Cancel</button>
                     <button onclick="handleSaveStat()"
-                        class="bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 px-4 rounded-lg transition">Save
+                        class="bg-purple-600 hover:bg-purple-700 text-white font-semibold py-2 px-4 rounded-lg transition">Save
                         Score</button>
                 </div>
             </div>
@@ -119,24 +247,18 @@
 
         async function fetchPath(isRegeneration = false) {
             const nodesContainer = document.getElementById('path-nodes-container');
-            nodesContainer.innerHTML = `<p class="text-gray-500 text-center">${isRegeneration ? 'Generating new path...' : 'Loading your path...'}</p>`;
+            nodesContainer.innerHTML = `<div class="text-center text-slate-500 p-8">${isRegeneration ? 'Generating new path...' : 'Loading your path...'}</div>`;
             try {
                 const response = await fetch('/api/tasks?category=Test Prep', { method: isRegeneration ? 'POST' : 'GET' });
                 if (!response.ok) throw new Error('Network response was not ok');
                 const tasks = await response.json();
                 if (Array.isArray(tasks) && tasks.length > 0) {
-                    currentTasks = tasks.map((task, index) => ({
-                        ...task,
-                        client_id: index + 1,
-                        status: task.is_completed ? 'complete' : 'pending'
-                    }));
+                    currentTasks = tasks.map((task, index) => ({ ...task, client_id: index + 1, status: task.is_completed ? 'complete' : 'pending' }));
                     renderPathAndConnectors(currentTasks);
-                } else {
-                    fetchPath(true);
-                }
+                } else { fetchPath(true); }
             } catch (error) {
                 console.error('Error fetching path:', error);
-                nodesContainer.innerHTML = `<div class="text-center"><p class="text-red-500 mb-4">Could not load path.</p><button onclick="fetchPath(true)" class="bg-purple-600 text-white px-4 py-2 rounded hover:bg-purple-700">Try Again</button></div>`;
+                nodesContainer.innerHTML = `<div class="text-center p-8"><p class="text-red-500 mb-4">Could not load path.</p><button onclick="fetchPath(true)" class="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700">Try Again</button></div>`;
             }
         }
 
@@ -154,18 +276,19 @@
                 alignmentWrapper.classList.add(...positions[index % 3].split(' '));
                 const taskButton = document.createElement('button');
                 taskButton.id = `task-node-${task.client_id}`;
-                taskButton.className = 'w-24 h-24 rounded-full flex items-center justify-center font-bold text-2xl text-white transition transform hover:scale-110 focus:outline-none focus:ring-4 focus:ring-offset-2 focus:ring-purple-400';
+                // Node size adjusted for the new layout
+                taskButton.className = 'w-28 h-28 rounded-full flex items-center justify-center font-bold text-4xl text-white transition-all duration-300 transform hover:scale-110 focus:outline-none focus-visible:ring-4 focus-visible:ring-offset-2 focus-visible:ring-purple-400';
                 taskButton.onclick = () => openTaskModal(task);
                 taskButton.disabled = isLocked;
                 if (isCompleted) {
-                    taskButton.classList.add('bg-green-500');
-                    taskButton.innerHTML = `<svg class="h-10 w-10" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" /></svg>`;
+                    taskButton.classList.add('bg-emerald-500', 'shadow-lg');
+                    taskButton.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-10 h-10"><path fill-rule="evenodd" d="M19.916 4.626a.75.75 0 0 1 .208 1.04l-9 13.5a.75.75 0 0 1-1.154.114l-6-6a.75.75 0 0 1 1.06-1.06l5.353 5.353 8.493-12.74a.75.75 0 0 1 1.04-.207Z" clip-rule="evenodd" /></svg>`;
                 } else if (isUnlocked) {
-                    taskButton.classList.add('bg-purple-500', 'animate-pulse');
+                    taskButton.classList.add('bg-purple-500', 'animate-pulse', 'shadow-lg', 'shadow-purple-400/50');
                     taskButton.textContent = task.client_id;
                 } else {
-                    taskButton.classList.add('bg-gray-300', 'cursor-not-allowed');
-                    taskButton.innerHTML = `<svg class="h-10 w-10 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg>`;
+                    taskButton.classList.add('bg-slate-300', 'cursor-not-allowed');
+                    taskButton.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-10 h-10 text-slate-500"><path fill-rule="evenodd" d="M12 1.5a5.25 5.25 0 0 0-5.25 5.25v3a3 3 0 0 0-3 3v6.75a3 3 0 0 0 3 3h10.5a3 3 0 0 0 3-3v-6.75a3 3 0 0 0-3-3v-3c0-2.9-2.35-5.25-5.25-5.25Zm3.75 8.25v-3a3.75 3.75 0 1 0-7.5 0v3h7.5Z" clip-rule="evenodd" /></svg>`;
                 }
                 alignmentWrapper.appendChild(taskButton);
                 nodesContainer.appendChild(alignmentWrapper);
@@ -173,11 +296,12 @@
             setTimeout(drawConnectors, 50);
         }
 
+        // --- THIS IS THE FINAL, CORRECTED VERSION OF THE DRAWING FUNCTION ---
         function drawConnectors() {
             const path = document.getElementById('connector-path');
             const nodes = currentTasks.map(task => document.getElementById(`task-node-${task.client_id}`));
             const svg = document.getElementById('path-svg');
-            if (!svg) return;
+            if (!svg || !path || nodes.some(n => !n)) return;
             const containerRect = svg.getBoundingClientRect();
             let pathData = "";
             for (let i = 0; i < nodes.length - 1; i++) {
@@ -188,8 +312,13 @@
                 const startY = startRect.top + startRect.height / 2 - containerRect.top;
                 const endX = endRect.left + endRect.width / 2 - containerRect.left;
                 const endY = endRect.top + endRect.height / 2 - containerRect.top;
-                const controlX1 = startX + (endX - startX) * 0.2; const controlY1 = startY + (endY - startY) * 0.8;
-                const controlX2 = startX + (endX - startX) * 0.8; const controlY2 = startY + (endY - startY) * 0.2;
+
+                // This logic creates the smooth, alternating S-curves
+                const controlX1 = startX + (endX - startX) * 0.2;
+                const controlY1 = startY + (endY - startY) * 0.8;
+                const controlX2 = startX + (endX - startX) * 0.8;
+                const controlY2 = startY + (endY - startY) * 0.2;
+
                 if (pathData === "") pathData += `M ${startX} ${startY} `;
                 pathData += `C ${controlX1} ${controlY1}, ${controlX2} ${controlY2}, ${endX} ${endY} `;
             }
@@ -202,21 +331,13 @@
             document.getElementById('modalTitle').textContent = `Step ${task.client_id}: Your Task`;
             document.getElementById('modalDescription').textContent = task.description;
             document.getElementById('modal-actions').innerHTML = `
-                <button onclick="handleTaskAction('failed')" class="bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-4 rounded-lg transition">I'm Stuck</button>
-                <button onclick="handleTaskAction('complete')" class="bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-4 rounded-lg transition">Mark as Complete</button>`;
+                <button onclick="handleTaskAction('failed')" class="bg-red-500 hover:bg-red-600 text-white font-semibold py-2 px-4 rounded-lg transition">I'm Stuck</button>
+                <button onclick="handleTaskAction('complete')" class="bg-emerald-500 hover:bg-emerald-600 text-white font-semibold py-2 px-4 rounded-lg transition">Mark as Complete</button>`;
             modal.classList.remove('hidden');
-            setTimeout(() => {
-                modal.classList.add('opacity-100');
-                document.getElementById('modal-panel').classList.add('scale-100');
-            }, 10);
         }
 
-        function closeTaskModal() {
-            const modal = document.getElementById('taskModal');
-            modal.classList.remove('opacity-100');
-            document.getElementById('modal-panel').classList.remove('scale-100');
-            setTimeout(() => modal.classList.add('hidden'), 300);
-        }
+        function closeTaskModal() { document.getElementById('taskModal').classList.add('hidden'); }
+        function closeStatModal() { document.getElementById('statEntryModal').classList.add('hidden'); }
 
         async function handleTaskAction(status) {
             const task = currentTasks.find(t => t.id === currentTaskId);
@@ -236,14 +357,10 @@
                     renderPathAndConnectors(currentTasks);
                     if (task.type === 'milestone' && task.stat_to_update) {
                         setTimeout(() => openStatModal(task), 500);
-                    } else {
-                        await checkPathCompletion();
-                    }
+                    } else { await checkPathCompletion(); }
                 } else if (status === 'failed' && result.tasks) {
                     alert("No worries! We'll generate a new path for you.");
-                    currentTasks = result.tasks.map((task, index) => ({
-                        ...task, client_id: index + 1, status: task.is_completed ? 'complete' : 'pending'
-                    }));
+                    currentTasks = result.tasks.map((task, index) => ({ ...task, client_id: index + 1, status: task.is_completed ? 'complete' : 'pending' }));
                     renderPathAndConnectors(currentTasks);
                 }
             } catch (error) {
@@ -271,23 +388,7 @@
             }[statName] || "New Score";
             document.getElementById('statModalLabel').textContent = friendlyName;
             document.getElementById('statNameToUpdate').value = statName;
-            const modal = document.getElementById('statEntryModal');
-            modal.classList.remove('hidden');
-            setTimeout(() => {
-                modal.classList.add('opacity-100');
-                document.getElementById('stat-modal-panel').classList.add('scale-100');
-            }, 10);
-        }
-
-        function closeStatModal() {
-            const modal = document.getElementById('statEntryModal');
-            modal.classList.remove('opacity-100');
-            document.getElementById('stat-modal-panel').classList.remove('scale-100');
-            setTimeout(() => {
-                modal.classList.add('hidden');
-                document.getElementById('statValue').value = '';
-                document.getElementById('statNameToUpdate').value = '';
-            }, 300);
+            document.getElementById('statEntryModal').classList.remove('hidden');
         }
 
         async function handleSaveStat() {
@@ -306,42 +407,28 @@
                     alert("Your stats have been updated!");
                     closeStatModal();
                     await checkPathCompletion();
-                } else {
-                    throw new Error(result.error || 'An unknown error occurred.');
-                }
+                } else { throw new Error(result.error || 'An unknown error occurred.'); }
             } catch (error) {
                 console.error("Error saving stat:", error);
                 alert("Could not save your stats. Please try again.");
             }
         }
 
-        // REPLACE your current handleUserChat function with this correct version
-
         async function handleUserChat() {
             const chatInput = document.getElementById('userInput');
             const sendButton = document.getElementById('send-btn');
             let message = chatInput.value.trim();
-
-            // Check if this is the special initial message
             const isInitialMessage = conversationHistory.length > 0 && conversationHistory[conversationHistory.length - 1].content === 'INITIAL_MESSAGE';
-            if (isInitialMessage) {
-                // If it is the initial message, we don't display it to the user
-                chatInput.value = "";
-            } else if (message === "") {
-                return; // Don't send empty messages from the user
-            }
-
+            if (isInitialMessage) { chatInput.value = ""; }
+            else if (message === "") { return; }
             if (!isInitialMessage) {
                 appendChatMessage(message, 'user');
                 conversationHistory.push({ role: 'user', content: message });
             }
-
             chatInput.value = "";
             chatInput.disabled = true;
             sendButton.disabled = true;
-
             const typingIndicator = appendChatMessage('...', 'bot', true);
-
             try {
                 const response = await fetch('/api/chat?category=Test Prep', {
                     method: 'POST',
@@ -349,25 +436,16 @@
                     body: JSON.stringify({ history: conversationHistory })
                 });
                 if (!response.ok) throw new Error('AI response error.');
-
                 const data = await response.json();
                 const aiReply = data.reply;
-
                 typingIndicator.remove();
-
-                // Don't add the placeholder 'INITIAL_MESSAGE' to the chat history that the AI sees next time
-                if (isInitialMessage) {
-                    conversationHistory = [];
-                }
-
+                if (isInitialMessage) { conversationHistory = []; }
                 appendChatMessage(aiReply, 'bot');
                 conversationHistory.push({ role: 'assistant', content: aiReply });
-
             } catch (error) {
                 typingIndicator.querySelector('p').textContent = "Sorry, I'm having trouble connecting.";
                 console.error("Chat error:", error);
             } finally {
-                // This is the crucial part that was missing: re-enable the inputs
                 chatInput.disabled = false;
                 sendButton.disabled = false;
                 chatInput.focus();
@@ -376,45 +454,31 @@
 
         function appendChatMessage(text, role, isTyping = false) {
             const chatHistory = document.getElementById('chat-history');
+            const messageWrapper = document.createElement('div');
+            messageWrapper.className = 'flex ' + (role === 'user' ? 'justify-end' : 'justify-start');
             const messageDiv = document.createElement('div');
-            let cssClass = 'p-3 rounded-lg max-w-xs';
-            if (role === 'user') {
-                cssClass += ' bg-purple-600 text-white self-end';
-            } else {
-                cssClass += ' bg-indigo-100 text-gray-700 self-start';
+            let cssClass = 'p-3 rounded-xl max-w-xs text-sm';
+            if (role === 'user') { cssClass += ' bg-purple-600 text-white'; }
+            else {
+                cssClass += ' bg-white/80 text-slate-700';
                 if (isTyping) cssClass += ' animate-pulse';
             }
             messageDiv.className = cssClass;
             messageDiv.innerHTML = `<p>${text}</p>`;
-            chatHistory.appendChild(messageDiv);
+            messageWrapper.appendChild(messageDiv);
+            chatHistory.appendChild(messageWrapper);
             chatHistory.scrollTop = chatHistory.scrollHeight;
             return messageDiv;
         }
 
-        // REPLACE your current DOMContentLoaded function with this correct version
-
         document.addEventListener('DOMContentLoaded', () => {
-            // Get the chat elements right away
-            const userInput = document.getElementById('userInput');
-            const sendButton = document.getElementById('send-btn');
-
-            // First, load the user's path
             fetchPath();
-
-            // Then, send the special initial message to get the AI's proactive greeting
-            // We add a placeholder so handleUserChat knows what's happening
             conversationHistory.push({ role: 'user', content: 'INITIAL_MESSAGE' });
-
-            // Call handleUserChat, which will now handle enabling the inputs
             handleUserChat();
         });
-
         window.addEventListener('resize', () => drawConnectors());
         document.getElementById('send-btn').addEventListener('click', handleUserChat);
-        document.getElementById('userInput').addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') handleUserChat();
-        });
-
+        document.getElementById('userInput').addEventListener('keypress', (e) => { if (e.key === 'Enter') handleUserChat(); });
     </script>
     <script src="https://unpkg.com/aos@2.3.1/dist/aos.js"></script>
     <script>AOS.init({ once: true, duration: 800 });</script>
