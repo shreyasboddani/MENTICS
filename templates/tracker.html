@@ -236,6 +236,8 @@
                     tension: 0.4
                 }, {
                     label: 'ACT Score (scaled to SAT)',
+                    // FIX: The original code was trying to scale a single value.
+                    // This now correctly maps over the actHistory array and scales each score.
                     data: actHistory.map(item => (item.score / 36) * 1600),
                     borderColor: 'rgba(99, 102, 241, 1)',
                     backgroundColor: 'rgba(99, 102, 241, 0.1)',

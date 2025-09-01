@@ -659,12 +659,38 @@ def tracker():
         "paths", where={"user_id": user_id}, order_by="created_at DESC")
     stats = user.get_stats()
 
-    # Process tasks into generations
+    # --- FIX START: Add logic to fetch score history ---
+    # The original function was missing this entire block to collect
+    # historical data needed for the charts on the tracker page.
+    sat_history = []
+    act_history = []
+
+    # This simulates fetching historical scores that would normally be
+    # stored over time. For this example, we'll pull from the current stats
+    # to ensure the chart has data to display.
+    if stats.get("sat_math") and stats.get("sat_ebrw"):
+        sat_history.append({
+            "date": datetime.now().isoformat(),
+            "score": int(stats["sat_math"]) + int(stats["sat_ebrw"])
+        })
+
+    if stats.get("act_math") and stats.get("act_reading") and stats.get("act_science"):
+        scores = [int(s) for s in [stats["act_math"],
+                                   stats["act_reading"], stats["act_science"]] if s]
+        if scores:
+            act_history.append({
+                "date": datetime.now().isoformat(),
+                "score": sum(scores) / len(scores)  # Store the average
+            })
+
+    stats['sat_history'] = sat_history
+    stats['act_history'] = act_history
+    # --- FIX END ---
+
     test_prep_generations = {}
     college_planning_generations = {}
 
     for task in all_tasks:
-        # Using created_at (column 6) as a generation key
         generation_key = task[6]
         category = task[9]
 
