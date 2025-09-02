@@ -419,16 +419,23 @@
             const sendButton = document.getElementById('send-btn');
             let message = chatInput.value.trim();
             const isInitialMessage = conversationHistory.length > 0 && conversationHistory[conversationHistory.length - 1].content === 'INITIAL_MESSAGE';
-            if (isInitialMessage) { chatInput.value = ""; }
-            else if (message === "") { return; }
+
+            if (isInitialMessage) {
+                chatInput.value = "";
+            } else if (message === "") {
+                return;
+            }
+
             if (!isInitialMessage) {
                 appendChatMessage(message, 'user');
                 conversationHistory.push({ role: 'user', content: message });
             }
+
             chatInput.value = "";
             chatInput.disabled = true;
             sendButton.disabled = true;
             const typingIndicator = appendChatMessage('...', 'bot', true);
+
             try {
                 const response = await fetch('/api/chat?category=Test Prep', {
                     method: 'POST',
@@ -436,12 +443,28 @@
                     body: JSON.stringify({ history: conversationHistory })
                 });
                 if (!response.ok) throw new Error('AI response error.');
+
                 const data = await response.json();
-                const aiReply = data.reply;
                 typingIndicator.remove();
-                if (isInitialMessage) { conversationHistory = []; }
-                appendChatMessage(aiReply, 'bot');
-                conversationHistory.push({ role: 'assistant', content: aiReply });
+
+                if (isInitialMessage) {
+                    conversationHistory = [];
+                }
+
+                // ** NEW LOGIC TO HANDLE REGENERATION **
+                if (data.new_path) {
+                    // If the API sends a new path, render it
+                    appendChatMessage("I've generated a new path for you based on our conversation.", 'bot');
+                    conversationHistory.push({ role: 'assistant', content: "I've generated a new path for you based on our conversation." });
+                    currentTasks = data.new_path.map((task, index) => ({ ...task, client_id: index + 1, status: task.is_completed ? 'complete' : 'pending' }));
+                    renderPathAndConnectors(currentTasks);
+                } else {
+                    // Otherwise, just display the chat reply
+                    const aiReply = data.reply;
+                    appendChatMessage(aiReply, 'bot');
+                    conversationHistory.push({ role: 'assistant', content: aiReply });
+                }
+
             } catch (error) {
                 typingIndicator.querySelector('p').textContent = "Sorry, I'm having trouble connecting.";
                 console.error("Chat error:", error);
