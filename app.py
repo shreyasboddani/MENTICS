@@ -151,7 +151,7 @@ def _get_test_prep_ai_tasks(strengths, weaknesses, user_stats={}, chat_history=[
 
     try:
         model = genai.GenerativeModel(
-            'gemini-1.5-flash',
+            'gemini-2.5-flash-lite',
             generation_config={"response_mime_type": "application/json"}
         )
         response = model.generate_content(prompt)
@@ -195,7 +195,7 @@ def _get_test_prep_ai_chat_response(history, user_stats):
 
     try:
         model = genai.GenerativeModel(
-            'gemini-1.5-flash', system_instruction=system_message)
+            'gemini-2.5-flash-lite', system_instruction=system_message)
         chat = model.start_chat(history=gemini_history[:-1])
         last_user_message = gemini_history[-1]['parts'][0] if gemini_history else "Hello"
         response = chat.send_message(last_user_message)
@@ -310,7 +310,7 @@ def _get_college_planning_ai_tasks(college_context, user_stats, path_history, ch
 
     try:
         model = genai.GenerativeModel(
-            'gemini-1.5-flash',
+            'gemini-2.5-flash-lite',
             generation_config={"response_mime_type": "application/json"}
         )
         response = model.generate_content(prompt)
@@ -345,7 +345,7 @@ def _get_college_planning_ai_chat_response(history, user_stats):
 
     try:
         model = genai.GenerativeModel(
-            'gemini-1.5-flash', system_instruction=system_message)
+            'gemini-2.5-flash-lite', system_instruction=system_message)
         chat = model.start_chat(history=gemini_history[:-1])
         last_user_message = gemini_history[-1]['parts'][0] if gemini_history else "Hello"
         response = chat.send_message(last_user_message)
