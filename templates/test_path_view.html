@@ -132,7 +132,19 @@
 
                     <div class="xl:col-span-2 bg-white/60 backdrop-blur-xl border border-white/20 rounded-2xl shadow-lg shadow-purple-100/30 p-6 flex flex-col h-[85vh]"
                         data-aos="fade-right">
-                        <h2 class="text-xl font-bold text-slate-900 mb-4 font-lalezar">AI Assistant</h2>
+                        <div class="flex justify-between items-center mb-4">
+                            <h2 class="text-xl font-bold text-slate-900 font-lalezar">AI Assistant</h2>
+                            <button id="reset-chat-btn" title="Reset Chat History"
+                                class="flex items-center gap-2 text-sm text-slate-500 font-semibold hover:text-red-600 transition-colors py-1 px-3 rounded-lg hover:bg-red-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-red-500">
+                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"
+                                    class="w-5 h-5">
+                                    <path fill-rule="evenodd"
+                                        d="M8.75 1A2.75 2.75 0 0 0 6 3.75v.443c-1.157.06-2.185.44-3.094 1.1a.75.75 0 0 0 .537 1.344C4.1 6.1 4.9 5.75 6 5.75v9.5c-1.1 0-1.9.35-2.557.89a.75.75 0 0 0 .537 1.344c.91-.66 1.936-1.034 3.094-1.1v.443A2.75 2.75 0 0 0 8.75 19h2.5A2.75 2.75 0 0 0 14 16.25v-12.5A2.75 2.75 0 0 0 11.25 1h-2.5ZM7.5 3.75a1.25 1.25 0 0 1 1.25-1.25h2.5a1.25 1.25 0 0 1 1.25 1.25v12.5a1.25 1.25 0 0 1-1.25-1.25h-2.5a1.25 1.25 0 0 1-1.25-1.25v-12.5Z"
+                                        clip-rule="evenodd" />
+                                </svg>
+                                Reset Chat
+                            </button>
+                        </div>
                         <div id="chat-history" class="flex-grow overflow-y-auto space-y-4 pr-2 -mr-2"></div>
                         <div class="mt-4 flex items-center gap-2 pt-4 border-t border-slate-200/80">
                             <input type="text" id="userInput" placeholder="Ask a question..."
@@ -244,12 +256,44 @@
         let currentTasks = [];
         let currentTaskId = null;
         let conversationHistory = [];
+        const chatCategory = 'Test Prep'; // Define category for this page
+
+        // Function to load chat history from the server
+        async function loadChatHistory() {
+            try {
+                const response = await fetch(`/api/chat_history?category=${chatCategory}`);
+                if (response.ok) {
+                    const history = await response.json();
+                    if (history && history.length > 0) {
+                        conversationHistory = history;
+                        const chatHistoryDiv = document.getElementById('chat-history');
+                        chatHistoryDiv.innerHTML = '';
+                        conversationHistory.forEach(msg => appendChatMessage(msg.content, msg.role));
+                        document.getElementById('userInput').disabled = false;
+                        document.getElementById('send-btn').disabled = false;
+                    } else {
+                        startInitialChat();
+                    }
+                } else {
+                    startInitialChat();
+                }
+            } catch (error) {
+                console.error("Could not load chat history:", error);
+                startInitialChat();
+            }
+        }
+
+        // Function to trigger the initial greeting from the bot
+        function startInitialChat() {
+            conversationHistory.push({ role: 'user', content: 'INITIAL_MESSAGE' });
+            handleUserChat();
+        }
 
         async function fetchPath(isRegeneration = false) {
             const nodesContainer = document.getElementById('path-nodes-container');
             nodesContainer.innerHTML = `<div class="text-center text-slate-500 p-8">${isRegeneration ? 'Generating new path...' : 'Loading your path...'}</div>`;
             try {
-                const response = await fetch('/api/tasks?category=Test Prep', { method: isRegeneration ? 'POST' : 'GET' });
+                const response = await fetch(`/api/tasks?category=${chatCategory}`, { method: isRegeneration ? 'POST' : 'GET' });
                 if (!response.ok) throw new Error('Network response was not ok');
                 const tasks = await response.json();
                 if (Array.isArray(tasks) && tasks.length > 0) {
@@ -276,7 +320,6 @@
                 alignmentWrapper.classList.add(...positions[index % 3].split(' '));
                 const taskButton = document.createElement('button');
                 taskButton.id = `task-node-${task.client_id}`;
-                // Node size adjusted for the new layout
                 taskButton.className = 'w-28 h-28 rounded-full flex items-center justify-center font-bold text-4xl text-white transition-all duration-300 transform hover:scale-110 focus:outline-none focus-visible:ring-4 focus-visible:ring-offset-2 focus-visible:ring-purple-400';
                 taskButton.onclick = () => openTaskModal(task);
                 taskButton.disabled = isLocked;
@@ -296,7 +339,6 @@
             setTimeout(drawConnectors, 50);
         }
 
-        // --- THIS IS THE FINAL, CORRECTED VERSION OF THE DRAWING FUNCTION ---
         function drawConnectors() {
             const path = document.getElementById('connector-path');
             const nodes = currentTasks.map(task => document.getElementById(`task-node-${task.client_id}`));
@@ -313,7 +355,6 @@
                 const endX = endRect.left + endRect.width / 2 - containerRect.left;
                 const endY = endRect.top + endRect.height / 2 - containerRect.top;
 
-                // This logic creates the smooth, alternating S-curves
                 const controlX1 = startX + (endX - startX) * 0.2;
                 const controlY1 = startY + (endY - startY) * 0.8;
                 const controlX2 = startX + (endX - startX) * 0.8;
@@ -437,7 +478,7 @@
             const typingIndicator = appendChatMessage('...', 'bot', true);
 
             try {
-                const response = await fetch('/api/chat?category=Test Prep', {
+                const response = await fetch(`/api/chat?category=${chatCategory}`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ history: conversationHistory })
@@ -447,19 +488,17 @@
                 const data = await response.json();
                 typingIndicator.remove();
 
+                // Clear the 'INITIAL_MESSAGE' placeholder after the first real response
                 if (isInitialMessage) {
                     conversationHistory = [];
                 }
 
-                // ** NEW LOGIC TO HANDLE REGENERATION **
                 if (data.new_path) {
-                    // If the API sends a new path, render it
                     appendChatMessage("I've generated a new path for you based on our conversation.", 'bot');
                     conversationHistory.push({ role: 'assistant', content: "I've generated a new path for you based on our conversation." });
                     currentTasks = data.new_path.map((task, index) => ({ ...task, client_id: index + 1, status: task.is_completed ? 'complete' : 'pending' }));
                     renderPathAndConnectors(currentTasks);
                 } else {
-                    // Otherwise, just display the chat reply
                     const aiReply = data.reply;
                     appendChatMessage(aiReply, 'bot');
                     conversationHistory.push({ role: 'assistant', content: aiReply });
@@ -475,6 +514,27 @@
             }
         }
 
+        // NEW: Function to handle chat reset
+        async function handleResetChat() {
+            if (confirm("Are you sure you want to reset your chat history? This cannot be undone.")) {
+                try {
+                    const response = await fetch('/api/reset_chat', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ category: chatCategory })
+                    });
+                    if (!response.ok) throw new Error('Failed to reset chat.');
+
+                    document.getElementById('chat-history').innerHTML = '';
+                    conversationHistory = [];
+                    startInitialChat(); // Get a fresh greeting from the bot
+                } catch (error) {
+                    console.error("Error resetting chat:", error);
+                    alert("Could not reset chat history. Please try again.");
+                }
+            }
+        }
+
         function appendChatMessage(text, role, isTyping = false) {
             const chatHistory = document.getElementById('chat-history');
             const messageWrapper = document.createElement('div');
@@ -487,21 +547,23 @@
                 if (isTyping) cssClass += ' animate-pulse';
             }
             messageDiv.className = cssClass;
-            messageDiv.innerHTML = `<p>${text}</p>`;
+            // A simple markdown-to-HTML conversion
+            let formattedText = text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+            messageDiv.innerHTML = `<p>${formattedText}</p>`;
             messageWrapper.appendChild(messageDiv);
             chatHistory.appendChild(messageWrapper);
             chatHistory.scrollTop = chatHistory.scrollHeight;
-            return messageDiv;
+            return messageWrapper;
         }
 
         document.addEventListener('DOMContentLoaded', () => {
             fetchPath();
-            conversationHistory.push({ role: 'user', content: 'INITIAL_MESSAGE' });
-            handleUserChat();
+            loadChatHistory();
         });
         window.addEventListener('resize', () => drawConnectors());
         document.getElementById('send-btn').addEventListener('click', handleUserChat);
         document.getElementById('userInput').addEventListener('keypress', (e) => { if (e.key === 'Enter') handleUserChat(); });
+        document.getElementById('reset-chat-btn').addEventListener('click', handleResetChat);
     </script>
     <script src="https://unpkg.com/aos@2.3.1/dist/aos.js"></script>
     <script>AOS.init({ once: true, duration: 800 });</script>

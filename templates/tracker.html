@@ -236,8 +236,6 @@
                     tension: 0.4
                 }, {
                     label: 'ACT Score (scaled to SAT)',
-                    // FIX: The original code was trying to scale a single value.
-                    // This now correctly maps over the actHistory array and scales each score.
                     data: actHistory.map(item => (item.score / 36) * 1600),
                     borderColor: 'rgba(99, 102, 241, 1)',
                     backgroundColor: 'rgba(99, 102, 241, 0.1)',
@@ -268,7 +266,7 @@
             },
             options: { maintainAspectRatio: false, responsive: true, plugins: { legend: { display: false } } }
         });
-        });
+    });
     </script>
     <script src="https://unpkg.com/aos@2.3.1/dist/aos.js"></script>
     <script>AOS.init({ once: true, duration: 800 });</script>

@@ -55,6 +55,14 @@ def init_db():
         "stat_value": "TEXT NOT NULL",
         "recorded_at": "TIMESTAMP DEFAULT CURRENT_TIMESTAMP"
     })
+    # NEW: Table to store chat history
+    db.create_table("chat_conversations", {
+        "id": "INTEGER PRIMARY KEY AUTOINCREMENT",
+        "user_id": "INTEGER NOT NULL",
+        "category": "TEXT NOT NULL",
+        "history": "TEXT NOT NULL",
+        "UNIQUE": "(user_id, category)"
+    })
 
 # --- DECORATORS ---
 
@@ -67,7 +75,7 @@ def login_required(f):
         return f(*args, **kwargs)
     return decorated_function
 
-# --- AI HELPER FUNCTIONS ---
+# --- AI HELPER FUNCTIONS (No changes needed in these) ---
 
 
 def _get_test_prep_ai_tasks(strengths, weaknesses, user_stats={}, chat_history=[], path_history={}):
@@ -81,14 +89,12 @@ def _get_test_prep_ai_tasks(strengths, weaknesses, user_stats={}, chat_history=[
                 "type": "milestone", "stat_to_update": "sat_total", "category": "Test Prep"},
             {"description": "Review algebra concepts from your SAT practice test.",
                 "type": "standard", "stat_to_update": None, "category": "Test Prep"},
-            {"description": "Update your GPA in your profile.", "type": "milestone",
-                "stat_to_update": "gpa", "category": "Test Prep"},
             {"description": "Practice 15 difficult vocabulary words.", "type": "standard",
                 "stat_to_update": None, "category": "Test Prep"},
             {"description": "Take a timed ACT Science practice section.", "type": "milestone",
                 "stat_to_update": "act_science", "category": "Test Prep"}
         ]
-        return random.sample(all_mock_tasks, 5)
+        return random.sample(all_mock_tasks, 4) + [{"description": "Work on time management strategies for the reading section.", "type": "standard", "stat_to_update": None, "category": "Test Prep"}]
 
     if not os.getenv("GEMINI_API_KEY"):
         return get_mock_tasks_reliably()
@@ -116,8 +122,7 @@ def _get_test_prep_ai_tasks(strengths, weaknesses, user_stats={}, chat_history=[
         f"The student's test is in: {days_left}.\n\n"
         f"# STUDENT PROFILE\n"
         f"- Strengths: {strengths}\n"
-        f"- Weaknesses: {weaknesses}\n"
-        f"- Current GPA: {user_stats.get('gpa', 'N/A')}\n\n"
+        f"- Weaknesses: {weaknesses}\n\n"
         f"# STUDENT HISTORY\n"
         f"## Recently Completed Tasks:\n{completed_tasks_str}\n\n"
         f"## Recently Incomplete or Failed Tasks:\n{incomplete_tasks_str}\n\n"
@@ -127,7 +132,7 @@ def _get_test_prep_ai_tasks(strengths, weaknesses, user_stats={}, chat_history=[
         f"# CRITICAL RULES\n"
         f"- Your ENTIRE output must be a single, raw JSON object.\n"
         f"- **Focus is Key:** If the user's conversation indicates a preference for ONLY the SAT or ONLY the ACT, you MUST generate tasks for that specific test. Do not include tasks for the other test.\n"
-        f"- **Stat Updates for Milestones Only:** The 'stat_to_update' field should ONLY be used for 'milestone' tasks that involve completing a practice test or a major goal like updating a GPA. Standard review tasks should have 'stat_to_update' set to null.\n"
+        f"- **Stat Updates for Milestones Only:** The 'stat_to_update' field should ONLY be used for 'milestone' tasks that involve completing a practice test. Standard review tasks should have 'stat_to_update' set to null.\n"
         f"- **Specific Stat Names:** When a milestone is a practice test, the 'stat_to_update' value must match the specific test section (e.g., 'sat_math', 'act_science'). For a full SAT test, use 'sat_total'.\n"
         f"- The plan must contain exactly 5 task objects and must be novel.\n\n"
         f"# JSON SCHEMA\n"
@@ -137,7 +142,7 @@ def _get_test_prep_ai_tasks(strengths, weaknesses, user_stats={}, chat_history=[
         f'    {{\n'
         f'      "description": "A string describing the specific, actionable task.",\n'
         f'      "type": "A string, either \'standard\' or \'milestone\'.",\n'
-        f'      "stat_to_update": "A string ONLY if type is milestone (must be one of [\'sat_math\', \'sat_ebrw\', \'sat_total\', \'act_math\', \'act_reading\', \'act_science\', \'gpa\']), otherwise null.",\n'
+        f'      "stat_to_update": "A string ONLY if type is milestone (must be one of [\'sat_math\', \'sat_ebrw\', \'sat_total\', \'act_math\', \'act_reading\', \'act_science\']), otherwise null.",\n'
         f'      "category": "This MUST be the string \'Test Prep\'."\n'
         f'    }}\n'
         f'  ]\n'
@@ -146,7 +151,7 @@ def _get_test_prep_ai_tasks(strengths, weaknesses, user_stats={}, chat_history=[
 
     try:
         model = genai.GenerativeModel(
-            'gemini-2.5-flash-lite',
+            'gemini-1.5-flash',
             generation_config={"response_mime_type": "application/json"}
         )
         response = model.generate_content(prompt)
@@ -178,6 +183,7 @@ def _get_test_prep_ai_chat_response(history, user_stats):
         "You are a friendly and proactive study coach. Your student's test is in "
         f"{days_left}. If the conversation history is empty, greet the user, "
         "remind them of their test date, and ask what they'd like to focus on. "
+        "Also, let them know they can say 'regenerate' or 'new path' to get an updated plan based on our chat. "
         "In subsequent messages, be an encouraging tutor. Acknowledge scores and struggles. "
         "If the user asks to change focus or regenerate their path, confirm that you will create a new path for them."
     )
@@ -189,7 +195,7 @@ def _get_test_prep_ai_chat_response(history, user_stats):
 
     try:
         model = genai.GenerativeModel(
-            'gemini-2.5-flash-lite', system_instruction=system_message)
+            'gemini-1.5-flash', system_instruction=system_message)
         chat = model.start_chat(history=gemini_history[:-1])
         last_user_message = gemini_history[-1]['parts'][0] if gemini_history else "Hello"
         response = chat.send_message(last_user_message)
@@ -304,7 +310,7 @@ def _get_college_planning_ai_tasks(college_context, user_stats, path_history, ch
 
     try:
         model = genai.GenerativeModel(
-            'gemini-2.5-flash-lite',
+            'gemini-1.5-flash',
             generation_config={"response_mime_type": "application/json"}
         )
         response = model.generate_content(prompt)
@@ -329,6 +335,7 @@ def _get_college_planning_ai_chat_response(history, user_stats):
         "You are a friendly and proactive college planning advisor. The student is in "
         f"grade {college_info.get('grade', 'N/A')} and is in the '{college_info.get('planning_stage', 'N/A')}' stage. "
         "If the conversation is just beginning, greet the user and ask what specific part of college planning they want to discuss (e.g., essays, applications, college lists). "
+        "Also, let them know they can say 'regenerate' or 'new path' to get an updated plan based on our chat. "
         "In subsequent messages, be an encouraging and helpful advisor. If the user asks to change their path, confirm you will regenerate it for them."
     )
     gemini_history = []
@@ -338,7 +345,7 @@ def _get_college_planning_ai_chat_response(history, user_stats):
 
     try:
         model = genai.GenerativeModel(
-            'gemini-2.5-flash-lite', system_instruction=system_message)
+            'gemini-1.5-flash', system_instruction=system_message)
         chat = model.start_chat(history=gemini_history[:-1])
         last_user_message = gemini_history[-1]['parts'][0] if gemini_history else "Hello"
         response = chat.send_message(last_user_message)
@@ -393,6 +400,8 @@ def _generate_and_save_new_college_path(user_id, college_context, chat_history=[
     except Exception as e:
         print(f"Error in _generate_and_save_new_college_path: {e}")
         return []
+
+# --- Standard Routes (No changes needed) ---
 
 
 @app.route("/dashboard/college-path-builder", methods=["GET", "POST"])
@@ -705,7 +714,9 @@ def api_tasks():
         active_path = db.select(
             "paths", where={"user_id": user_id, "is_active": True, "category": category})
         if request.method == "POST" or not active_path:
-            chat_history = session.get('chat_history', [])
+            chat_record = db.select("chat_conversations", where={
+                                    "user_id": user_id, "category": category})
+            chat_history = json.loads(chat_record[0][3]) if chat_record else []
             if category == 'College Planning':
                 college_context = stats.get("college_path", {})
                 tasks = _generate_and_save_new_college_path(
@@ -746,7 +757,10 @@ def api_update_task_status():
             return jsonify({"success": False, "error": "Task not found"}), 404
         category = task_info[0][9]
         stats = user.get_stats()
-        chat_history = session.get('chat_history', [])
+        chat_record = db.select("chat_conversations", where={
+                                "user_id": user_id, "category": category})
+        chat_history = json.loads(chat_record[0][3]) if chat_record else []
+
         if category == 'College Planning':
             college_context = stats.get("college_path", {})
             new_tasks = _generate_and_save_new_college_path(
@@ -764,10 +778,12 @@ def api_update_task_status():
     return jsonify({"success": True})
 
 
+# MODIFIED: Now saves chat history to the database
 @app.route("/api/chat", methods=['POST'])
 @login_required
 def api_chat():
     user = User.from_session(db, session)
+    user_id = user.data[0]
     stats = user.get_stats()
     data = request.get_json()
     history = data.get("history", [])
@@ -781,15 +797,29 @@ def api_chat():
         if category == 'College Planning':
             college_context = stats.get("college_path", {})
             new_tasks = _generate_and_save_new_college_path(
-                user.data[0], college_context, chat_history=history)
-            return jsonify({"new_path": new_tasks})
+                user_id, college_context, chat_history=history)
         else:
             test_path_info = stats.get("test_path", {})
             strengths = test_path_info.get("strengths", "general studying")
             weaknesses = test_path_info.get("weaknesses", "test-taking skills")
             new_tasks = _generate_and_save_new_test_path(
-                user.data[0], strengths, weaknesses, chat_history=history)
-            return jsonify({"new_path": new_tasks})
+                user_id, strengths, weaknesses, chat_history=history)
+
+        # Save chat history after regeneration
+        if history:
+            history.append(
+                {"role": "assistant", "content": "I've generated a new path for you based on our conversation."})
+            history_json = json.dumps(history)
+            existing_chat = db.select("chat_conversations", where={
+                                      "user_id": user_id, "category": category})
+            if existing_chat:
+                db.update("chat_conversations", {"history": history_json}, where={
+                          "user_id": user_id, "category": category})
+            else:
+                db.insert("chat_conversations", {
+                          "user_id": user_id, "category": category, "history": history_json})
+
+        return jsonify({"new_path": new_tasks})
 
     if category == 'College Planning':
         reply = _get_college_planning_ai_chat_response(history, stats)
@@ -797,8 +827,55 @@ def api_chat():
         reply = _get_test_prep_ai_chat_response(history, stats)
 
     history.append({"role": "assistant", "content": reply})
-    session['chat_history'] = history
+
+    # Save to DB
+    history_json = json.dumps(history)
+    existing_chat = db.select("chat_conversations", where={
+                              "user_id": user_id, "category": category})
+    if existing_chat:
+        db.update("chat_conversations", {"history": history_json}, where={
+                  "user_id": user_id, "category": category})
+    else:
+        db.insert("chat_conversations", {
+                  "user_id": user_id, "category": category, "history": history_json})
+
     return jsonify({"reply": reply})
+
+# NEW: Endpoint to get chat history
+
+
+@app.route('/api/chat_history')
+@login_required
+def get_chat_history():
+    user = User.from_session(db, session)
+    user_id = user.data[0]
+    category = request.args.get('category')
+    chat_record = db.select("chat_conversations", where={
+                            "user_id": user_id, "category": category})
+    if chat_record:
+        history = json.loads(chat_record[0][3])
+        return jsonify(history)
+    return jsonify([])
+
+# NEW: Endpoint to reset chat history
+
+
+@app.route('/api/reset_chat', methods=['POST'])
+@login_required
+def reset_chat_history():
+    user = User.from_session(db, session)
+    user_id = user.data[0]
+    data = request.get_json()
+    category = data.get('category')
+    if not category:
+        return jsonify({"success": False, "error": "Category is required"}), 400
+    try:
+        db.delete("chat_conversations", where={
+                  "user_id": user_id, "category": category})
+        return jsonify({"success": True})
+    except Exception as e:
+        print(f"Error resetting chat: {e}")
+        return jsonify({"success": False, "error": "Could not reset chat"}), 500
 
 
 @app.route("/api/update_stats", methods=['POST'])
@@ -832,3 +909,4 @@ def api_update_stats():
 if __name__ == "__main__":
     init_db()
     app.run(debug=True)
+# --- END OF FILE ---
