@@ -193,5 +193,3 @@ cython_debug/
 .cursorignore
 .cursorindexingignore
 
-users.db
-.vscode

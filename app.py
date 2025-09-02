@@ -4,7 +4,7 @@ from dbhelper import DatabaseHandler
 from userhelper import User
 from functools import wraps
 import json
-import openai
+import google.generativeai as genai
 import os
 from dotenv import load_dotenv
 import random
@@ -24,8 +24,8 @@ app.permanent_session_lifetime = timedelta(
 
 db = DatabaseHandler("users.db")
 
-# To use the live API, uncomment the line below
-# openai.api_key = os.getenv("OPENAI_API_KEY")
+# Configure the Gemini API key
+genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
 
 # --- DATABASE INITIALIZATION ---
 
@@ -92,7 +92,7 @@ def _get_test_prep_ai_tasks(strengths, weaknesses, user_stats={}, chat_history=[
         ]
         return random.sample(all_mock_tasks, 5)
 
-    if not hasattr(openai, 'api_key') or not openai.api_key:
+    if not os.getenv("GEMINI_API_KEY"):
         return get_mock_tasks_reliably()
 
     # --- DATA FORMATTING FOR THE PROMPT ---
@@ -153,26 +153,24 @@ def _get_test_prep_ai_tasks(strengths, weaknesses, user_stats={}, chat_history=[
     )
 
     try:
-        completion = openai.chat.completions.create(
-            model="gpt-3.5-turbo",
-            messages=[
-                {"role": "system", "content": "You are a helpful assistant that responds only in perfectly formatted JSON based on the user's instructions."},
-                {"role": "user", "content": prompt}
-            ],
-            temperature=0.7
+        # Use the Gemini model and enforce JSON output
+        model = genai.GenerativeModel(
+            'gemini-2.5-flash-lite',
+            generation_config={"response_mime_type": "application/json"}
         )
-        response_data = json.loads(completion.choices[0].message.content)
+        response = model.generate_content(prompt)
+        response_data = json.loads(response.text)
         tasks = response_data.get("tasks", [])
         if isinstance(tasks, list) and len(tasks) == 5:
             return tasks
         raise ValueError("Invalid format from AI")
     except Exception as e:
-        print(f"\n--- OPENAI API ERROR IN _get_test_prep_ai_tasks: {e} ---\n")
+        print(f"\n--- GEMINI API ERROR IN _get_test_prep_ai_tasks: {e} ---\n")
         return get_mock_tasks_reliably()
 
 
 def _get_test_prep_ai_chat_response(history, user_stats):
-    if not hasattr(openai, 'api_key') or not openai.api_key:
+    if not os.getenv("GEMINI_API_KEY"):
         return "I'm in testing mode, but I'm saving our conversation!"
 
     # NEW: Add test date context to chat
@@ -187,24 +185,31 @@ def _get_test_prep_ai_chat_response(history, user_stats):
             pass  # Ignore invalid date format in chat
 
     # NEW: Proactive and context-aware system prompt
-    system_message = {
-        "role": "system",
-        "content": (
-            "You are a friendly and proactive study coach. Your student's test is in "
-            f"{days_left}. If the conversation history is empty, greet the user, "
-            "remind them of their test date, and ask what they'd like to focus on. "
-            "In subsequent messages, be an encouraging tutor. Acknowledge scores and struggles."
-        )
-    }
+    system_message = (
+        "You are a friendly and proactive study coach. Your student's test is in "
+        f"{days_left}. If the conversation history is empty, greet the user, "
+        "remind them of their test date, and ask what they'd like to focus on. "
+        "In subsequent messages, be an encouraging tutor. Acknowledge scores and struggles."
+    )
 
-    messages = [system_message] + history
+    # Convert OpenAI history to Gemini format
+    gemini_history = []
+    for message in history:
+        role = "model" if message["role"] == "assistant" else "user"
+        gemini_history.append({"role": role, "parts": [message["content"]]})
+
     try:
-        completion = openai.chat.completions.create(
-            model="gpt-3.5-turbo", messages=messages)
-        return completion.choices[0].message.content
+        model = genai.GenerativeModel(
+            'gemini-2.5-flash-lite', system_instruction=system_message)
+        # History excluding the last message
+        chat = model.start_chat(history=gemini_history[:-1])
+
+        last_user_message = gemini_history[-1]['parts'][0] if gemini_history else "Hello"
+        response = chat.send_message(last_user_message)
+        return response.text
     except Exception as e:
         print(
-            f"\n--- OPENAI API ERROR IN _get_test_prep_ai_chat_response: {e} ---\n")
+            f"\n--- GEMINI API ERROR IN _get_test_prep_ai_chat_response: {e} ---\n")
         return "Sorry, I encountered an error connecting to the AI."
 
 
@@ -279,7 +284,7 @@ def _get_college_planning_ai_tasks(college_context, user_stats, path_history):
         ]
         return random.sample(all_mock_tasks, 5)
 
-    if not hasattr(openai, 'api_key') or not openai.api_key:
+    if not os.getenv("GEMINI_API_KEY"):
         return get_mock_tasks_reliably()
 
     # --- DATA FORMATTING FOR THE PROMPT ---
@@ -329,48 +334,52 @@ def _get_college_planning_ai_tasks(college_context, user_stats, path_history):
     )
 
     try:
-        completion = openai.chat.completions.create(
-            model="gpt-3.5-turbo",
-            messages=[
-                {"role": "system", "content": "You are an assistant that responds only in perfectly formatted JSON."},
-                {"role": "user", "content": prompt}
-            ],
-            temperature=0.7
+        model = genai.GenerativeModel(
+            'gemini-2.5-flash-lite',
+            generation_config={"response_mime_type": "application/json"}
         )
-        response_data = json.loads(completion.choices[0].message.content)
+        response = model.generate_content(prompt)
+        response_data = json.loads(response.text)
         tasks = response_data.get("tasks", [])
         if isinstance(tasks, list) and len(tasks) == 5:
             return tasks
         raise ValueError("Invalid format from AI")
     except Exception as e:
         print(
-            f"\n--- OPENAI API ERROR IN _get_college_planning_ai_tasks: {e} ---\n")
+            f"\n--- GEMINI API ERROR IN _get_college_planning_ai_tasks: {e} ---\n")
         return get_mock_tasks_reliably()
 
 
 def _get_college_planning_ai_chat_response(history, user_stats):
     """Generates a proactive and context-aware chat response for college planning."""
-    if not hasattr(openai, 'api_key') or not openai.api_key:
+    if not os.getenv("GEMINI_API_KEY"):
         return "I'm in testing mode, but I'm saving our conversation!"
 
     college_info = user_stats.get("college_path", {})
-    system_message = {
-        "role": "system",
-        "content": (
-            "You are a friendly and proactive college planning advisor. The student is in "
-            f"grade {college_info.get('grade', 'N/A')} and is in the '{college_info.get('planning_stage', 'N/A')}' stage. "
-            "If the conversation is just beginning, greet the user and ask what specific part of college planning they want to discuss (e.g., essays, applications, college lists). "
-            "In subsequent messages, be an encouraging and helpful advisor."
-        )
-    }
-    messages = [system_message] + history
+    system_message = (
+        "You are a friendly and proactive college planning advisor. The student is in "
+        f"grade {college_info.get('grade', 'N/A')} and is in the '{college_info.get('planning_stage', 'N/A')}' stage. "
+        "If the conversation is just beginning, greet the user and ask what specific part of college planning they want to discuss (e.g., essays, applications, college lists). "
+        "In subsequent messages, be an encouraging and helpful advisor."
+    )
+    # Convert OpenAI history to Gemini format
+    gemini_history = []
+    for message in history:
+        role = "model" if message["role"] == "assistant" else "user"
+        gemini_history.append({"role": role, "parts": [message["content"]]})
+
     try:
-        completion = openai.chat.completions.create(
-            model="gpt-3.5-turbo", messages=messages)
-        return completion.choices[0].message.content
+        model = genai.GenerativeModel(
+            'gemini-2.5-flash-lite', system_instruction=system_message)
+        # History excluding the last message
+        chat = model.start_chat(history=gemini_history[:-1])
+
+        last_user_message = gemini_history[-1]['parts'][0] if gemini_history else "Hello"
+        response = chat.send_message(last_user_message)
+        return response.text
     except Exception as e:
         print(
-            f"\n--- OPENAI API ERROR IN _get_college_planning_ai_chat_response: {e} ---\n")
+            f"\n--- GEMINI API ERROR IN _get_college_planning_ai_chat_response: {e} ---\n")
         return "Sorry, I encountered an error connecting to the AI."
 
 
