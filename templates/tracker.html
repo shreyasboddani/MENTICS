@@ -309,14 +309,15 @@
             });
         }
 
-        // FIX: This function now correctly handles 'composite'
         function renderActChart(subject = 'composite') {
             const ctx = document.getElementById('actChart').getContext('2d');
             let labels = [];
             let data = [];
             let label;
 
-            const historyData = statHistory[subject] || [];
+            const dataKey = subject === 'composite' ? 'act_composite' : subject;
+            const historyData = statHistory[dataKey] || [];
+
             if (subject === 'composite') {
                 label = 'ACT Composite Score';
             } else {
