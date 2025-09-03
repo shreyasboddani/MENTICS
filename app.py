@@ -72,10 +72,14 @@ def login_required(f):
     def decorated_function(*args, **kwargs):
         if "user" not in session:
             return redirect(url_for("login"))
+        user = User.from_session(db, session)
+        if user is None:
+            session.clear()
+            return redirect(url_for("login"))
         return f(*args, **kwargs)
     return decorated_function
 
-# --- AI HELPER FUNCTIONS (No changes needed in these) ---
+# --- AI HELPER FUNCTIONS ---
 
 
 def _get_test_prep_ai_tasks(strengths, weaknesses, user_stats={}, chat_history=[], path_history={}):
@@ -83,7 +87,6 @@ def _get_test_prep_ai_tasks(strengths, weaknesses, user_stats={}, chat_history=[
 
     def get_mock_tasks_reliably():
         print("--- DEBUG: Running corrected Test Prep mock generator. ---")
-        # This mock function is now more realistic to the new rules
         all_mock_tasks = [
             {"description": "Take a full-length, timed SAT practice test.",
                 "type": "milestone", "stat_to_update": "sat_total", "category": "Test Prep"},
@@ -92,9 +95,11 @@ def _get_test_prep_ai_tasks(strengths, weaknesses, user_stats={}, chat_history=[
             {"description": "Practice 15 difficult vocabulary words.", "type": "standard",
                 "stat_to_update": None, "category": "Test Prep"},
             {"description": "Take a timed ACT Science practice section.", "type": "milestone",
-                "stat_to_update": "act_science", "category": "Test Prep"}
+                "stat_to_update": "act_science", "category": "Test Prep"},
+            {"description": "Work on time management strategies for the reading section.",
+                "type": "standard", "stat_to_update": None, "category": "Test Prep"}
         ]
-        return random.sample(all_mock_tasks, 4) + [{"description": "Work on time management strategies for the reading section.", "type": "standard", "stat_to_update": None, "category": "Test Prep"}]
+        return random.sample(all_mock_tasks, 5)
 
     if not os.getenv("GEMINI_API_KEY"):
         return get_mock_tasks_reliably()
@@ -130,10 +135,10 @@ def _get_test_prep_ai_tasks(strengths, weaknesses, user_stats={}, chat_history=[
         f"# YOUR TASK\n"
         f"Generate a new, 5-step study plan based on all the context provided. You MUST adapt the plan based on the student's recent conversation. The new plan must logically progress from previous tasks and chat history.\n\n"
         f"# CRITICAL RULES\n"
-        f"- Your ENTIRE output must be a single, raw JSON object.\n"
+        f"- Your ENTIRE output must be a single, raw JSON object containing a list of EXACTLY 5 task objects.\n"
         f"- **Focus is Key:** If the user's conversation indicates a preference for ONLY the SAT or ONLY the ACT, you MUST generate tasks for that specific test. Do not include tasks for the other test.\n"
         f"- **Stat Updates for Milestones Only:** The 'stat_to_update' field should ONLY be used for 'milestone' tasks that involve completing a practice test. Standard review tasks should have 'stat_to_update' set to null.\n"
-        f"- **Specific Stat Names:** When a milestone is a practice test, the 'stat_to_update' value must match the specific test section (e.g., 'sat_math', 'act_science'). For a full SAT test, use 'sat_total'.\n"
+        f"- **Specific Stat Names:** When a milestone is a practice test, the 'stat_to_update' value must match the specific test section (e.g., 'sat_math', 'act_science'). For a full SAT test, use 'sat_total'. For a full ACT test, use 'act_composite'.\n"
         f"- The plan must contain exactly 5 task objects and must be novel.\n\n"
         f"# JSON SCHEMA\n"
         f"Your output must conform to this exact structure:\n"
@@ -142,7 +147,7 @@ def _get_test_prep_ai_tasks(strengths, weaknesses, user_stats={}, chat_history=[
         f'    {{\n'
         f'      "description": "A string describing the specific, actionable task.",\n'
         f'      "type": "A string, either \'standard\' or \'milestone\'.",\n'
-        f'      "stat_to_update": "A string ONLY if type is milestone (must be one of [\'sat_math\', \'sat_ebrw\', \'sat_total\', \'act_math\', \'act_reading\', \'act_science\']), otherwise null.",\n'
+        f'      "stat_to_update": "A string ONLY if type is milestone (must be one of [\'sat_math\', \'sat_ebrw\', \'sat_total\', \'act_math\', \'act_reading\', \'act_science\', \'act_composite\']), otherwise null.",\n'
         f'      "category": "This MUST be the string \'Test Prep\'."\n'
         f'    }}\n'
         f'  ]\n'
@@ -157,7 +162,7 @@ def _get_test_prep_ai_tasks(strengths, weaknesses, user_stats={}, chat_history=[
         response = model.generate_content(prompt)
         response_data = json.loads(response.text)
         tasks = response_data.get("tasks", [])
-        if isinstance(tasks, list) and len(tasks) == 5:
+        if isinstance(tasks, list) and len(tasks) > 0:
             return tasks
         raise ValueError("Invalid format from AI")
     except Exception as e:
@@ -222,6 +227,9 @@ def _generate_and_save_new_test_path(user_id, strengths, weaknesses, chat_histor
 
     tasks = _get_test_prep_ai_tasks(strengths, weaknesses,
                                     user_stats, chat_history, path_history)
+
+    # BUG FIX: Ensure exactly 5 tasks are saved
+    tasks = tasks[:5]
 
     saved_tasks = []
     for i, task in enumerate(tasks):
@@ -291,7 +299,7 @@ def _get_college_planning_ai_tasks(college_context, user_stats, path_history, ch
         f"# YOUR TASK\n"
         f"Generate a new, 5-step college planning roadmap based on all the context provided. You MUST adapt the plan based on the student's recent conversation and planning stage. The new plan must logically progress from previous tasks and chat history.\n\n"
         f"# CRITICAL RULES\n"
-        f"- Your ENTIRE output must be a single, raw JSON object.\n"
+        f"- Your ENTIRE output must be a single, raw JSON object containing a list of EXACTLY 5 task objects.\n"
         f"- **Stat Updates for Milestones Only:** The 'stat_to_update' field should ONLY be used for 'milestone' tasks that represent major goals (like 'essay_progress', 'applications_submitted', or 'gpa'). Standard research or small tasks should have 'stat_to_update' set to null.\n"
         f"- The plan must contain exactly 5 task objects and must be novel.\n\n"
         f"# JSON SCHEMA\n"
@@ -316,7 +324,7 @@ def _get_college_planning_ai_tasks(college_context, user_stats, path_history, ch
         response = model.generate_content(prompt)
         response_data = json.loads(response.text)
         tasks = response_data.get("tasks", [])
-        if isinstance(tasks, list) and len(tasks) == 5:
+        if isinstance(tasks, list) and len(tasks) > 0:
             return tasks
         raise ValueError("Invalid format from AI")
     except Exception as e:
@@ -377,6 +385,9 @@ def _generate_and_save_new_college_path(user_id, college_context, chat_history=[
         tasks = _get_college_planning_ai_tasks(
             college_context, user_stats, path_history, chat_history)
 
+        # BUG FIX: Ensure exactly 5 tasks are saved
+        tasks = tasks[:5]
+
         if not tasks or len(tasks) != 5:
             raise ValueError(
                 "AI task generation did not return the expected 5 tasks.")
@@ -401,41 +412,7 @@ def _generate_and_save_new_college_path(user_id, college_context, chat_history=[
         print(f"Error in _generate_and_save_new_college_path: {e}")
         return []
 
-# --- Standard Routes (No changes needed) ---
-
-
-@app.route("/dashboard/college-path-builder", methods=["GET", "POST"])
-@login_required
-def college_path_builder():
-    user = User.from_session(db, session)
-    if not user:
-        return redirect(url_for('login'))
-
-    stats = user.get_stats()
-    college_stats = stats.get('college_path', {})
-
-    if request.method == "POST":
-        college_context = {
-            'grade': request.form.get('current_grade'),
-            'planning_stage': request.form.get('planning_stage'),
-            'majors': request.form.get('interested_majors'),
-            'target_colleges': request.form.get('target_colleges', '')
-        }
-        stats['college_path'] = college_context
-        user.set_stats(stats)
-        _generate_and_save_new_college_path(user.data[0], college_context)
-        return redirect(url_for('college_path_view'))
-
-    return render_template(
-        "college_path_builder.html",
-        **college_stats
-    )
-
-
-@app.route('/dashboard/college-path-view')
-@login_required
-def college_path_view():
-    return render_template("college_path_view.html")
+# --- Standard Routes ---
 
 
 @app.route("/")
@@ -446,7 +423,6 @@ def home():
 
 @app.route("/signup", methods=["GET", "POST"])
 def signup():
-    error = None
     if request.method == "POST":
         email = request.form["email"]
         password = generate_password_hash(request.form["password"])
@@ -465,13 +441,12 @@ def signup():
             return redirect(url_for("dashboard"))
         except Exception as e:
             print(f"Signup error: {e}")
-            error = "Email already exists!"
-    return render_template("signup.html", error=error)
+            return render_template("signup.html", error="Email already exists!")
+    return render_template("signup.html")
 
 
 @app.route("/login", methods=["GET", "POST"])
 def login():
-    error = None
     if "user" in session:
         return redirect(url_for("dashboard"))
 
@@ -485,16 +460,22 @@ def login():
             session.permanent = True
             return redirect(url_for("dashboard"))
         else:
-            error = "Invalid credentials"
-    return render_template("login.html", error=error)
+            return render_template("login.html", error="Invalid credentials")
+    return render_template("login.html")
+
+
+@app.route("/logout")
+def logout():
+    session.clear()
+    return redirect(url_for("home"))
+
+# --- Dashboard & Path Routes ---
 
 
 @app.route("/dashboard")
 @login_required
 def dashboard():
     user = User.from_session(db, session)
-    if not user:
-        return redirect(url_for("login"))
     stats = user.get_stats()
     user_id = user.data[0]
     all_tasks = db.select("paths", where={"user_id": user_id})
@@ -521,28 +502,77 @@ def dashboard():
     )
 
 
+@app.route("/dashboard/test-path-builder", methods=["GET", "POST"])
+@login_required
+def test_path_builder():
+    user = User.from_session(db, session)
+    stats = user.get_stats()
+    if request.method == "POST":
+        test_path = {
+            "desired_sat": request.form.get("desired_sat", ""),
+            "desired_act": request.form.get("desired_act", ""),
+            "test_date": request.form.get("test_date", ""),
+            "test_time": request.form.get("test_time", ""),
+            "strengths": request.form.get("strengths", ""),
+            "weaknesses": request.form.get("weaknesses", "")
+        }
+        stats["test_path"] = test_path
+        user.set_stats(stats)
+        _generate_and_save_new_test_path(
+            user.data[0], test_path['strengths'], test_path['weaknesses'])
+        return redirect(url_for("test_path_view"))
+    return render_template("test_path_builder.html", **stats.get("test_path", {}))
+
+
+@app.route("/dashboard/test-path-view")
+@login_required
+def test_path_view():
+    return render_template("test_path_view.html")
+
+
+@app.route("/dashboard/college-path-builder", methods=["GET", "POST"])
+@login_required
+def college_path_builder():
+    user = User.from_session(db, session)
+    stats = user.get_stats()
+    if request.method == "POST":
+        college_context = {
+            'grade': request.form.get('current_grade'),
+            'planning_stage': request.form.get('planning_stage'),
+            'majors': request.form.get('interested_majors'),
+            'target_colleges': request.form.get('target_colleges', '')
+        }
+        stats['college_path'] = college_context
+        user.set_stats(stats)
+        _generate_and_save_new_college_path(user.data[0], college_context)
+        return redirect(url_for('college_path_view'))
+    return render_template("college_path_builder.html", **stats.get('college_path', {}))
+
+
+@app.route('/dashboard/college-path-view')
+@login_required
+def college_path_view():
+    return render_template("college_path_view.html")
+
+# --- Stats & Tracker Routes ---
+
+
 @app.route("/dashboard/stats", methods=["GET"])
 @login_required
 def stats():
     user = User.from_session(db, session)
-    if not user:
-        return redirect(url_for("login"))
     stats = user.get_stats()
-
     all_tasks = db.select("paths", where={"user_id": user.data[0]})
-
     active_test_tasks = [t for t in all_tasks if t[5] and t[9] == 'Test Prep']
     test_prep_completed = sum(1 for t in active_test_tasks if t[4])
     total_test_prep_completed = sum(
         1 for t in all_tasks if t[4] and t[9] == 'Test Prep')
-
     active_college_tasks = [
         t for t in all_tasks if t[5] and t[9] == 'College Planning']
     college_planning_completed_current = sum(
         1 for t in active_college_tasks if t[4])
     total_college_planning_completed = sum(
         1 for t in all_tasks if t[4] and t[9] == 'College Planning')
-
     return render_template(
         "stats.html",
         test_prep_completed=test_prep_completed,
@@ -559,8 +589,6 @@ def stats():
 @login_required
 def edit_stats():
     user = User.from_session(db, session)
-    if not user:
-        return redirect(url_for("login"))
     stats = user.get_stats()
     if request.method == "POST":
         stats["sat_ebrw"] = request.form.get("sat_ebrw", "")
@@ -571,7 +599,6 @@ def edit_stats():
         stats["gpa"] = request.form.get("gpa", "")
         user.set_stats(stats)
         return redirect(url_for("stats"))
-
     return render_template(
         "edit_stats.html",
         sat_ebrw=stats.get("sat_ebrw", ""),
@@ -587,39 +614,9 @@ def edit_stats():
 @login_required
 def tracker():
     user = User.from_session(db, session)
-    if not user:
-        return redirect(url_for("login"))
-
     user_id = user.data[0]
     all_tasks = db.select(
         "paths", where={"user_id": user_id}, order_by="created_at DESC")
-    stats = user.get_stats()
-
-    history_records = db.select(
-        "stat_history", where={"user_id": user_id}, order_by="recorded_at ASC")
-
-    sat_history = []
-    act_history = []
-    temp_sat_scores = {}
-
-    for record in history_records:
-        stat_name, stat_value, recorded_at = record[2], record[3], record[4]
-        if "sat" in stat_name:
-            date_key = recorded_at.split(" ")[0]
-            if date_key not in temp_sat_scores:
-                temp_sat_scores[date_key] = {}
-            temp_sat_scores[date_key][stat_name] = int(stat_value)
-        elif "act" in stat_name:
-            act_history.append({"date": recorded_at, "score": int(stat_value)})
-
-    for date, scores in temp_sat_scores.items():
-        if "sat_math" in scores and "sat_ebrw" in scores:
-            sat_history.append(
-                {"date": date, "score": scores["sat_math"] + scores["sat_ebrw"]})
-
-    stats['sat_history'] = sat_history
-    stats['act_history'] = act_history
-
     test_prep_generations, college_planning_generations = {}, {}
     for task in all_tasks:
         generation_key, category = task[6], task[9]
@@ -631,50 +628,30 @@ def tracker():
             if generation_key not in college_planning_generations:
                 college_planning_generations[generation_key] = []
             college_planning_generations[generation_key].append(task)
-
+    stat_history_processed = {
+        "sat_math": [], "sat_ebrw": [], "act_math": [],
+        "act_reading": [], "act_science": [], "colleges_researched": [],
+        "applications_submitted": [], "essay_progress": [],
+        "sat_total": [], "act_composite": []  # Added keys for full tests
+    }
+    history_records = db.select(
+        "stat_history", where={"user_id": user_id}, order_by="recorded_at ASC")
+    for record in history_records:
+        stat_name, stat_value, recorded_at = record[2], record[3], record[4]
+        if stat_name in stat_history_processed:
+            try:
+                stat_history_processed[stat_name].append({
+                    "date": recorded_at.split(" ")[0],
+                    "value": int(stat_value)
+                })
+            except (ValueError, TypeError):
+                continue
     return render_template(
         "tracker.html",
-        stats=stats,
+        stat_history=stat_history_processed,
         test_prep_generations=test_prep_generations,
         college_planning_generations=college_planning_generations
     )
-
-
-@app.route("/dashboard/test-path-builder", methods=["GET", "POST"])
-@login_required
-def test_path_builder():
-    user = User.from_session(db, session)
-    if not user:
-        return redirect(url_for("login"))
-    stats = user.get_stats()
-    if request.method == "POST":
-        test_path = {
-            "desired_sat": request.form.get("desired_sat", ""),
-            "desired_act": request.form.get("desired_act", ""),
-            "test_date": request.form.get("test_date", ""),
-            "test_time": request.form.get("test_time", ""),
-            "strengths": request.form.get("strengths", ""),
-            "weaknesses": request.form.get("weaknesses", "")
-        }
-        stats["test_path"] = test_path
-        user.set_stats(stats)
-        user_id = user.data[0]
-        _generate_and_save_new_test_path(
-            user_id, test_path['strengths'], test_path['weaknesses'])
-        return redirect(url_for("test_path_view"))
-    return render_template("test_path_builder.html", **stats.get("test_path", {}))
-
-
-@app.route("/dashboard/test-path-view")
-@login_required
-def test_path_view():
-    return render_template("test_path_view.html")
-
-
-@app.route("/logout")
-def logout():
-    session.pop("user", None)
-    return redirect(url_for("home"))
 
 # --- API ROUTES ---
 
@@ -683,8 +660,6 @@ def logout():
 @login_required
 def test_path_status():
     user = User.from_session(db, session)
-    if not user:
-        return jsonify({"has_path": False, "error": "User not found"}), 404
     user_id = user.data[0]
     active_tasks = db.select(
         "paths", where={"user_id": user_id, "is_active": True, "category": "Test Prep"})
@@ -695,8 +670,6 @@ def test_path_status():
 @login_required
 def college_path_status():
     user = User.from_session(db, session)
-    if not user:
-        return jsonify({"has_path": False, "error": "User not found"}), 404
     user_id = user.data[0]
     active_tasks = db.select(
         "paths", where={"user_id": user_id, "is_active": True, "category": "College Planning"})
@@ -778,7 +751,6 @@ def api_update_task_status():
     return jsonify({"success": True})
 
 
-# MODIFIED: Now saves chat history to the database
 @app.route("/api/chat", methods=['POST'])
 @login_required
 def api_chat():
@@ -805,7 +777,6 @@ def api_chat():
             new_tasks = _generate_and_save_new_test_path(
                 user_id, strengths, weaknesses, chat_history=history)
 
-        # Save chat history after regeneration
         if history:
             history.append(
                 {"role": "assistant", "content": "I've generated a new path for you based on our conversation."})
@@ -828,7 +799,6 @@ def api_chat():
 
     history.append({"role": "assistant", "content": reply})
 
-    # Save to DB
     history_json = json.dumps(history)
     existing_chat = db.select("chat_conversations", where={
                               "user_id": user_id, "category": category})
@@ -840,8 +810,6 @@ def api_chat():
                   "user_id": user_id, "category": category, "history": history_json})
 
     return jsonify({"reply": reply})
-
-# NEW: Endpoint to get chat history
 
 
 @app.route('/api/chat_history')
@@ -856,8 +824,6 @@ def get_chat_history():
         history = json.loads(chat_record[0][3])
         return jsonify(history)
     return jsonify([])
-
-# NEW: Endpoint to reset chat history
 
 
 @app.route('/api/reset_chat', methods=['POST'])
@@ -882,23 +848,30 @@ def reset_chat_history():
 @login_required
 def api_update_stats():
     user = User.from_session(db, session)
-    if not user:
-        return jsonify({"success": False, "error": "User not found"}), 404
     data = request.get_json()
     stat_name = data.get("stat_name")
     stat_value = data.get("stat_value")
 
     if not stat_name or stat_value is None:
         return jsonify({"success": False, "error": "Missing stat name or value"}), 400
+
     try:
-        stats = user.get_stats()
-        stats[stat_name] = stat_value
-        user.set_stats(stats)
-        db.insert("stat_history", {
-            "user_id": user.data[0],
-            "stat_name": stat_name,
-            "stat_value": stat_value
-        })
+        # These are practice scores and should only go to the tracker
+        if stat_name in ["sat_total", "act_composite"]:
+            db.insert("stat_history", {
+                "user_id": user.data[0],
+                "stat_name": stat_name,
+                "stat_value": stat_value
+            })
+        else:  # These are official scores/stats, update both
+            stats = user.get_stats()
+            stats[stat_name] = stat_value
+            user.set_stats(stats)
+            db.insert("stat_history", {
+                "user_id": user.data[0],
+                "stat_name": stat_name,
+                "stat_value": stat_value
+            })
         return jsonify({"success": True, "message": "Stats updated successfully"})
     except Exception as e:
         print(f"Error updating stats via API: {e}")
@@ -909,4 +882,3 @@ def api_update_stats():
 if __name__ == "__main__":
     init_db()
     app.run(debug=True)
-# --- END OF FILE ---

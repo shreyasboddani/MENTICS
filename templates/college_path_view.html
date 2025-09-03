@@ -423,13 +423,35 @@
 
         function openStatModal(task) {
             const statName = task.stat_to_update;
-            const friendlyName = {
-                "colleges_researched": "Number of Colleges Researched",
-                "essay_progress": "Essay Progress (1=draft, 2=final)"
-            }[statName] || "Progress Update";
-            document.getElementById('statModalLabel').textContent = friendlyName;
-            document.getElementById('statNameToUpdate').value = statName;
-            document.getElementById('statEntryModal').classList.remove('hidden');
+            const modal = document.getElementById('statEntryModal');
+            const modalTitle = document.getElementById('statModalTitle');
+            const modalLabel = document.getElementById('statModalLabel');
+            const statValueInput = document.getElementById('statValue');
+            const statNameToUpdate = document.getElementById('statNameToUpdate');
+
+            const statDetails = {
+                "gpa": { name: "New GPA", placeholder: "Enter new GPA (e.g., 3.85)", min: 0, max: 5 },
+                "colleges_researched": { name: "Number of Colleges Researched", placeholder: "Enter a number", min: 0 },
+                "essay_progress": { name: "Essay Progress", placeholder: "1=Draft, 2=Final", min: 1, max: 2 },
+                "applications_submitted": { name: "Applications Submitted", placeholder: "Enter a number", min: 0 }
+            };
+
+            const details = statDetails[statName] || { name: "Update Progress", placeholder: "Enter value" };
+
+            modalTitle.textContent = `Update: ${details.name}`;
+            modalLabel.textContent = details.name;
+            statValueInput.placeholder = details.placeholder;
+            statValueInput.min = details.min || "";
+            statValueInput.max = details.max || "";
+            statNameToUpdate.value = statName;
+
+            statValueInput.value = ""; // Clear previous input
+
+            // Update the descriptive paragraph for clarity
+            const p = modal.querySelector('p');
+            p.innerHTML = `Great job on this milestone! The information you enter will be saved to your <a href="/dashboard/stats" class="text-indigo-600 hover:underline font-semibold">Stats</a> page and will help tailor your future college planning paths.`;
+
+            modal.classList.remove('hidden');
         }
 
         async function handleSaveStat() {

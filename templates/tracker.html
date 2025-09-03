@@ -126,85 +126,121 @@
 
             <main class="flex-1 p-6 space-y-6">
                 <section data-aos="fade-up">
-                    <h2 class="text-2xl font-bold font-lalezar text-purple-700 mb-4">Test Prep Tracker</h2>
-                    <div
-                        class="bg-white/60 backdrop-blur-xl border border-white/20 rounded-2xl shadow-lg shadow-purple-100/30 p-6">
-                        <h3 class="font-bold text-slate-800 mb-4">Score Progression</h3>
-                        <div class="h-64"><canvas id="testPrepChart"></canvas></div>
-                        <h3 class="font-bold text-slate-800 mt-8 mb-4">Path History</h3>
-                        <div class="space-y-4 max-h-96 overflow-y-auto pr-2">
-                            {% for date, tasks in test_prep_generations.items() %}
-                            <div class="p-4 bg-purple-50/50 rounded-lg">
-                                <p class="text-sm font-semibold text-purple-800">Generation from: {{ date.split(' ')[0]
-                                    }}</p>
-                                <ul class="mt-2 text-sm space-y-1">
-                                    {% for task in tasks %}
-                                    <li class="flex items-center gap-2 {% if not task[4] %}text-slate-500{% endif %}">
-                                        {% if task[4] %}
-                                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"
-                                            class="w-5 h-5 text-emerald-500">
-                                            <path fill-rule="evenodd"
-                                                d="M10 18a8 8 0 1 0 0-16 8 8 0 0 0 0 16Zm3.857-9.809a.75.75 0 0 0-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 1 0-1.06 1.061l2.5 2.5a.75.75 0 0 0 1.137-.089l4-5.5Z"
-                                                clip-rule="evenodd" />
-                                        </svg>
-                                        {% else %}
-                                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"
-                                            class="w-5 h-5 text-slate-400">
-                                            <path fill-rule="evenodd"
-                                                d="M10 18a8 8 0 1 0 0-16 8 8 0 0 0 0 16ZM8.28 7.22a.75.75 0 0 0-1.06 1.06L8.94 10l-1.72 1.72a.75.75 0 1 0 1.06 1.06L10 11.06l1.72 1.72a.75.75 0 1 0 1.06-1.06L11.06 10l1.72-1.72a.75.75 0 0 0-1.06-1.06L10 8.94 8.28 7.22Z"
-                                                clip-rule="evenodd" />
-                                        </svg>
-                                        {% endif %}
-                                        <span>{{ task[3] }}</span>
-                                    </li>
-                                    {% endfor %}
-                                </ul>
+                    <h2 class="text-2xl font-bold font-lalezar text-purple-700 mb-4">Test Score Tracker</h2>
+                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                        <div
+                            class="bg-white/60 backdrop-blur-xl border border-white/20 rounded-2xl shadow-lg shadow-purple-100/30 p-6">
+                            <div class="flex justify-between items-center mb-4">
+                                <h3 class="font-bold text-slate-800">SAT Score Progression</h3>
+                                <select id="sat-subject-selector"
+                                    class="text-sm bg-white/50 border border-slate-300/70 rounded-lg p-1 focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition">
+                                    <option value="total">Total</option>
+                                    <option value="sat_math">Math</option>
+                                    <option value="sat_ebrw">EBRW</option>
+                                </select>
                             </div>
-                            {% else %}
-                            <p class="text-slate-500 text-center py-8">No Test Prep history found.</p>
-                            {% endfor %}
+                            <div class="h-64"><canvas id="satChart"></canvas></div>
+                        </div>
+                        <div
+                            class="bg-white/60 backdrop-blur-xl border border-white/20 rounded-2xl shadow-lg shadow-purple-100/30 p-6">
+                            <div class="flex justify-between items-center mb-4">
+                                <h3 class="font-bold text-slate-800">ACT Score Progression</h3>
+                                <select id="act-subject-selector"
+                                    class="text-sm bg-white/50 border border-slate-300/70 rounded-lg p-1 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition">
+                                    <option value="composite">Composite</option>
+                                    <option value="act_math">Math</option>
+                                    <option value="act_reading">Reading</option>
+                                    <option value="act_science">Science</option>
+                                </select>
+                            </div>
+                            <div class="h-64"><canvas id="actChart"></canvas></div>
                         </div>
                     </div>
                 </section>
 
                 <section data-aos="fade-up" data-aos-delay="100">
-                    <h2 class="text-2xl font-bold font-lalezar text-indigo-700 mb-4">College Planning Tracker</h2>
+                    <h2 class="text-2xl font-bold font-lalezar text-indigo-700 mb-4">College Planning Progress</h2>
                     <div
                         class="bg-white/60 backdrop-blur-xl border border-white/20 rounded-2xl shadow-lg shadow-indigo-100/30 p-6">
-                        <h3 class="font-bold text-slate-800 mb-4">Application Progress</h3>
+                        <h3 class="font-bold text-slate-800 mb-4">Application Progress Tracker</h3>
                         <div class="h-64"><canvas id="collegeChart"></canvas></div>
-                        <h3 class="font-bold text-slate-800 mt-8 mb-4">Path History</h3>
-                        <div class="space-y-4 max-h-96 overflow-y-auto pr-2">
-                            {% for date, tasks in college_planning_generations.items() %}
-                            <div class="p-4 bg-indigo-50/50 rounded-lg">
-                                <p class="text-sm font-semibold text-indigo-800">Generation from: {{ date.split(' ')[0]
-                                    }}</p>
-                                <ul class="mt-2 text-sm space-y-1">
-                                    {% for task in tasks %}
-                                    <li class="flex items-center gap-2 {% if not task[4] %}text-slate-500{% endif %}">
-                                        {% if task[4] %}
-                                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"
-                                            class="w-5 h-5 text-emerald-500">
-                                            <path fill-rule="evenodd"
-                                                d="M10 18a8 8 0 1 0 0-16 8 8 0 0 0 0 16Zm3.857-9.809a.75.75 0 0 0-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 1 0-1.06 1.061l2.5 2.5a.75.75 0 0 0 1.137-.089l4-5.5Z"
-                                                clip-rule="evenodd" />
-                                        </svg>
-                                        {% else %}
-                                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"
-                                            class="w-5 h-5 text-slate-400">
-                                            <path fill-rule="evenodd"
-                                                d="M10 18a8 8 0 1 0 0-16 8 8 0 0 0 0 16ZM8.28 7.22a.75.75 0 0 0-1.06 1.06L8.94 10l-1.72 1.72a.75.75 0 1 0 1.06 1.06L10 11.06l1.72 1.72a.75.75 0 1 0 1.06-1.06L11.06 10l1.72-1.72a.75.75 0 0 0-1.06-1.06L10 8.94 8.28 7.22Z"
-                                                clip-rule="evenodd" />
-                                        </svg>
-                                        {% endif %}
-                                        <span>{{ task[3] }}</span>
-                                    </li>
-                                    {% endfor %}
-                                </ul>
+                    </div>
+                </section>
+
+                <section data-aos="fade-up" data-aos-delay="200">
+                    <h2 class="text-2xl font-bold font-lalezar text-slate-700 mb-4">Path History</h2>
+                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                        <div>
+                            <h3 class="font-semibold text-slate-800 mb-2">Test Prep Paths</h3>
+                            <div class="space-y-4 max-h-96 overflow-y-auto pr-2">
+                                {% for date, tasks in test_prep_generations.items() %}
+                                <div class="p-4 bg-purple-50/50 rounded-lg">
+                                    <p class="text-sm font-semibold text-purple-800">Generated: {{ date.split(' ')[0]
+                                        }}</p>
+                                    <ul class="mt-2 text-sm space-y-1">
+                                        {% for task in tasks %}
+                                        <li
+                                            class="flex items-center gap-2 {% if not task[4] %}text-slate-500{% endif %}">
+                                            {% if task[4] %}
+                                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"
+                                                fill="currentColor" class="w-5 h-5 text-emerald-500 flex-shrink-0">
+                                                <path fill-rule="evenodd"
+                                                    d="M10 18a8 8 0 1 0 0-16 8 8 0 0 0 0 16Zm3.857-9.809a.75.75 0 0 0-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 1 0-1.06 1.061l2.5 2.5a.75.75 0 0 0 1.137-.089l4-5.5Z"
+                                                    clip-rule="evenodd" />
+                                            </svg>
+                                            {% else %}
+                                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"
+                                                fill="currentColor" class="w-5 h-5 text-slate-400 flex-shrink-0">
+                                                <path fill-rule="evenodd"
+                                                    d="M10 18a8 8 0 1 0 0-16 8 8 0 0 0 0 16ZM8.28 7.22a.75.75 0 0 0-1.06 1.06L8.94 10l-1.72 1.72a.75.75 0 1 0 1.06 1.06L10 11.06l1.72 1.72a.75.75 0 1 0 1.06-1.06L11.06 10l1.72-1.72a.75.75 0 0 0-1.06-1.06L10 8.94 8.28 7.22Z"
+                                                    clip-rule="evenodd" />
+                                            </svg>
+                                            {% endif %}
+                                            <span>{{ task[3] }}</span>
+                                        </li>
+                                        {% endfor %}
+                                    </ul>
+                                </div>
+                                {% else %}
+                                <p class="text-slate-500 text-center py-8">No Test Prep history found.</p>
+                                {% endfor %}
                             </div>
-                            {% else %}
-                            <p class="text-slate-500 text-center py-8">No College Planning history found.</p>
-                            {% endfor %}
+                        </div>
+                        <div>
+                            <h3 class="font-semibold text-slate-800 mb-2">College Planning Paths</h3>
+                            <div class="space-y-4 max-h-96 overflow-y-auto pr-2">
+                                {% for date, tasks in college_planning_generations.items() %}
+                                <div class="p-4 bg-indigo-50/50 rounded-lg">
+                                    <p class="text-sm font-semibold text-indigo-800">Generated: {{ date.split(' ')[0]
+                                        }}</p>
+                                    <ul class="mt-2 text-sm space-y-1">
+                                        {% for task in tasks %}
+                                        <li
+                                            class="flex items-center gap-2 {% if not task[4] %}text-slate-500{% endif %}">
+                                            {% if task[4] %}
+                                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"
+                                                fill="currentColor" class="w-5 h-5 text-emerald-500 flex-shrink-0">
+                                                <path fill-rule="evenodd"
+                                                    d="M10 18a8 8 0 1 0 0-16 8 8 0 0 0 0 16Zm3.857-9.809a.75.75 0 0 0-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 1 0-1.06 1.061l2.5 2.5a.75.75 0 0 0 1.137-.089l4-5.5Z"
+                                                    clip-rule="evenodd" />
+                                            </svg>
+                                            {% else %}
+                                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"
+                                                fill="currentColor" class="w-5 h-5 text-slate-400 flex-shrink-0">
+                                                <path fill-rule="evenodd"
+                                                    d="M10 18a8 8 0 1 0 0-16 8 8 0 0 0 0 16ZM8.28 7.22a.75.75 0 0 0-1.06 1.06L8.94 10l-1.72 1.72a.75.75 0 1 0 1.06 1.06L10 11.06l1.72 1.72a.75.75 0 1 0 1.06-1.06L11.06 10l1.72-1.72a.75.75 0 0 0-1.06-1.06L10 8.94 8.28 7.22Z"
+                                                    clip-rule="evenodd" />
+                                            </svg>
+                                            {% endif %}
+                                            <span>{{ task[3] }}</span>
+                                        </li>
+                                        {% endfor %}
+                                    </ul>
+                                </div>
+                                {% else %}
+                                <p class="text-slate-500 text-center py-8">No College Planning history found.</p>
+                                {% endfor %}
+                            </div>
                         </div>
                     </div>
                 </section>
@@ -214,59 +250,160 @@
 
     <script>
         document.addEventListener('DOMContentLoaded', () => {
-            // --- DATA FROM FLASK ---
-            const stats = {{ stats| tojson
+            const statHistory = {{ stat_history| tojson
         }};
+        let satChartInstance;
+        let actChartInstance;
+        let collegeChartInstance;
 
-        // --- TEST PREP CHART ---
-        const testPrepCtx = document.getElementById('testPrepChart').getContext('2d');
-        const satHistory = stats.sat_history || [];
-        const actHistory = stats.act_history || [];
+        function renderSatChart(subject = 'total') {
+            const ctx = document.getElementById('satChart').getContext('2d');
+            let labels = [];
+            let data = [];
+            let label = 'SAT Total Score';
+            let yAxisMin = 400;
+            let yAxisMax = 1600;
 
-        new Chart(testPrepCtx, {
-            type: 'line',
-            data: {
-                labels: satHistory.map(item => new Date(item.date).toLocaleDateString()),
-                datasets: [{
-                    label: 'SAT Score',
-                    data: satHistory.map(item => item.score),
-                    borderColor: 'rgba(167, 139, 250, 1)',
-                    backgroundColor: 'rgba(167, 139, 250, 0.1)',
-                    fill: true,
-                    tension: 0.4
-                }, {
-                    label: 'ACT Score (scaled to SAT)',
-                    data: actHistory.map(item => (item.score / 36) * 1600),
-                    borderColor: 'rgba(99, 102, 241, 1)',
-                    backgroundColor: 'rgba(99, 102, 241, 0.1)',
-                    fill: true,
-                    tension: 0.4
-                }]
-            },
-            options: { maintainAspectRatio: false, responsive: true }
+            if (subject === 'total') {
+                const historyData = statHistory.sat_total || [];
+                historyData.forEach(item => {
+                    labels.push(new Date(item.date).toLocaleDateString());
+                    data.push(item.value);
+                });
+            } else {
+                yAxisMin = 200;
+                yAxisMax = 800;
+                const historyData = statHistory[subject] || [];
+                label = subject === 'sat_math' ? 'SAT Math Score' : 'SAT EBRW Score';
+                historyData.forEach(item => {
+                    labels.push(new Date(item.date).toLocaleDateString());
+                    data.push(item.value);
+                });
+            }
+
+            if (satChartInstance) satChartInstance.destroy();
+
+            satChartInstance = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: label,
+                        data: data,
+                        backgroundColor: 'rgba(167, 139, 250, 0.6)',
+                        borderColor: 'rgba(167, 139, 250, 1)',
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    maintainAspectRatio: false,
+                    responsive: true,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        y: {
+                            min: yAxisMin,
+                            max: yAxisMax
+                        }
+                    }
+                }
+            });
+        }
+
+        // FIX: This function now correctly handles 'composite'
+        function renderActChart(subject = 'composite') {
+            const ctx = document.getElementById('actChart').getContext('2d');
+            let labels = [];
+            let data = [];
+            let label;
+
+            const historyData = statHistory[subject] || [];
+            if (subject === 'composite') {
+                label = 'ACT Composite Score';
+            } else {
+                // Capitalize subject name for the label
+                const subjectName = subject.split('_')[1];
+                label = `ACT ${subjectName.charAt(0).toUpperCase() + subjectName.slice(1)} Score`;
+            }
+
+            historyData.forEach(item => {
+                labels.push(new Date(item.date).toLocaleDateString());
+                data.push(item.value);
+            });
+
+            if (actChartInstance) actChartInstance.destroy();
+
+            actChartInstance = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: label,
+                        data: data,
+                        backgroundColor: 'rgba(99, 102, 241, 0.6)',
+                        borderColor: 'rgba(99, 102, 241, 1)',
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    maintainAspectRatio: false,
+                    responsive: true,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        y: {
+                            min: 0,
+                            max: 36
+                        }
+                    }
+                }
+            });
+        }
+
+        function renderCollegeChart() {
+            const ctx = document.getElementById('collegeChart').getContext('2d');
+            const collegesResearched = statHistory.colleges_researched || [];
+            const appsSubmitted = statHistory.applications_submitted || [];
+            const essayProgress = statHistory.essay_progress || [];
+
+            const latestResearched = collegesResearched.length > 0 ? collegesResearched[collegesResearched.length - 1].value : 0;
+            const latestSubmitted = appsSubmitted.length > 0 ? appsSubmitted[appsSubmitted.length - 1].value : 0;
+            const latestEssay = essayProgress.length > 0 ? essayProgress[essayProgress.length - 1].value : 0;
+
+            const essayStatus = latestEssay === 1 ? 'Drafting' : (latestEssay === 2 ? 'Finalizing' : 'Not Started');
+
+            if (collegeChartInstance) collegeChartInstance.destroy();
+
+            collegeChartInstance = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: ['Colleges Researched', 'Applications Submitted'],
+                    datasets: [{
+                        label: 'Count',
+                        data: [latestResearched, latestSubmitted],
+                        backgroundColor: ['rgba(99, 102, 241, 0.6)', 'rgba(129, 140, 248, 0.6)'],
+                        borderColor: ['rgba(99, 102, 241, 1)', 'rgba(129, 140, 248, 1)'],
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    maintainAspectRatio: false,
+                    responsive: true,
+                    plugins: {
+                        legend: { display: false },
+                        title: { display: true, text: `Current Essay Status: ${essayStatus}` }
+                    },
+                    scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } }
+                }
+            });
+        }
+
+        document.getElementById('sat-subject-selector').addEventListener('change', (e) => renderSatChart(e.target.value));
+        document.getElementById('act-subject-selector').addEventListener('change', (e) => renderActChart(e.target.value));
+
+        // Initial chart renders
+        renderSatChart();
+        renderActChart();
+        renderCollegeChart();
         });
-
-        // --- COLLEGE PLANNING CHART ---
-        const collegeCtx = document.getElementById('collegeChart').getContext('2d');
-        new Chart(collegeCtx, {
-            type: 'bar',
-            data: {
-                labels: ['Colleges Researched', 'Applications Submitted', 'Colleges Accepted'],
-                datasets: [{
-                    label: 'Count',
-                    data: [
-                        stats.colleges_researched || 0,
-                        stats.applications_submitted || 0,
-                        stats.colleges_accepted || 0
-                    ],
-                    backgroundColor: ['rgba(99, 102, 241, 0.6)', 'rgba(129, 140, 248, 0.6)', 'rgba(165, 180, 252, 0.6)'],
-                    borderColor: ['rgba(99, 102, 241, 1)', 'rgba(129, 140, 248, 1)', 'rgba(165, 180, 252, 1)'],
-                    borderWidth: 1
-                }]
-            },
-            options: { maintainAspectRatio: false, responsive: true, plugins: { legend: { display: false } } }
-        });
-    });
     </script>
     <script src="https://unpkg.com/aos@2.3.1/dist/aos.js"></script>
     <script>AOS.init({ once: true, duration: 800 });</script>

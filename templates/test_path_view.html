@@ -422,14 +422,40 @@
 
         function openStatModal(task) {
             const statName = task.stat_to_update;
-            const friendlyName = {
-                "sat_math": "New SAT Math Score", "sat_ebrw": "New SAT EBRW Score",
-                "act_math": "New ACT Math Score", "act_reading": "New ACT Reading Score",
-                "act_science": "New ACT Science Score", "gpa": "New GPA"
-            }[statName] || "New Score";
-            document.getElementById('statModalLabel').textContent = friendlyName;
-            document.getElementById('statNameToUpdate').value = statName;
-            document.getElementById('statEntryModal').classList.remove('hidden');
+            const modal = document.getElementById('statEntryModal');
+            const modalTitle = document.getElementById('statModalTitle');
+            const modalLabel = document.getElementById('statModalLabel');
+            const statValueInput = document.getElementById('statValue');
+            const statNameToUpdate = document.getElementById('statNameToUpdate');
+            const p = modal.querySelector('p');
+
+            const statDetails = {
+                "sat_math": { name: "New SAT Math Score", placeholder: "Enter score (200-800)", min: 200, max: 800 },
+                "sat_ebrw": { name: "New SAT EBRW Score", placeholder: "Enter score (200-800)", min: 200, max: 800 },
+                "sat_total": { name: "Full SAT Practice Score", placeholder: "Enter total score (400-1600)", min: 400, max: 1600 },
+                "act_math": { name: "New ACT Math Score", placeholder: "Enter score (1-36)", min: 1, max: 36 },
+                "act_reading": { name: "New ACT Reading Score", placeholder: "Enter score (1-36)", min: 1, max: 36 },
+                "act_science": { name: "New ACT Science Score", placeholder: "Enter score (1-36)", min: 1, max: 36 },
+                "act_composite": { name: "Full ACT Practice Score", placeholder: "Enter composite score (1-36)", min: 1, max: 36 }
+            };
+
+            const details = statDetails[statName] || { name: "Update Score", placeholder: "Enter value" };
+
+            modalTitle.textContent = `Update: ${details.name}`;
+            modalLabel.textContent = details.name;
+            statValueInput.placeholder = details.placeholder;
+            statValueInput.min = details.min || "";
+            statValueInput.max = details.max || "";
+            statNameToUpdate.value = statName;
+            statValueInput.value = ""; // Clear previous input
+
+            if (statName === 'sat_total' || statName === 'act_composite') {
+                p.innerHTML = `This practice score will <strong>not</strong> be saved to your main Stats page. It will only be used on the <a href="/dashboard/tracker" class="text-purple-600 hover:underline font-semibold">Tracker</a> page to chart your progress and help improve future paths.`;
+            } else {
+                p.innerHTML = `Great job on this milestone! The score you enter will be saved to your <a href="/dashboard/stats" class="text-purple-600 hover:underline font-semibold">Stats</a> page and will help tailor your future test prep paths.`;
+            }
+
+            modal.classList.remove('hidden');
         }
 
         async function handleSaveStat() {
