@@ -3,110 +3,213 @@
 
 <head>
   <meta charset="UTF-8">
-  <title>Mentics | Unlock Your Potential</title>
+  <title>Mentics | Your Path to Success</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Lalezar&display=swap"
+    rel="stylesheet">
   <link href="https://unpkg.com/aos@2.3.1/dist/aos.css" rel="stylesheet">
-  <link href="https://fonts.googleapis.com/css2?family=Lalezar&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 
-<body class="bg-gray-50 text-gray-900 font-sans leading-relaxed scroll-smooth">
+<body class="bg-[#F8F7FF] font-sans text-slate-800 antialiased">
 
-  <!-- Navbar -->
-  <header class="fixed top-0 w-full z-50 bg-white/70 backdrop-blur-md shadow-sm">
-    <div class="max-w-7xl mx-auto flex flex-row justify-between items-center px-6 py-4">
-      <div class="flex-1">
-        <a href="/" class="text-xl font-bold text-purple-600 tracking-tight" style="font-family: 'Lalezar', cursive;">
-          MENTICS
-        </a>
-      </div>
-      <nav class="space-x-4 flex-1 text-right">
-        <a href="#features" class="text-gray-700 hover:text-purple-600">Features</a>
-        <a href="#about" class="text-gray-700 hover:text-purple-600">About</a>
+  <div class="background-wave-container">
+    <div class="wave-shape wave-1"></div>
+    <div class="wave-shape wave-2"></div>
+    <div class="wave-shape wave-3"></div>
+  </div>
+
+  <header class="fixed top-0 w-full z-50 bg-white/60 backdrop-blur-xl border-b border-white/20">
+    <div class="max-w-7xl mx-auto flex justify-between items-center px-6 py-4">
+      <a href="/" class="text-3xl font-bold text-purple-600 tracking-tight font-lalezar">MENTICS</a>
+      <nav class="space-x-6 hidden md:flex items-center">
+      </nav>
+      <div>
         {% if is_logged_in %}
         <a href="/dashboard"
-          class="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 transition">Dashboard</a>
+          class="bg-purple-600 text-white px-5 py-2.5 rounded-lg hover:bg-purple-700 transition font-semibold">Dashboard</a>
         {% else %}
-        <a href="/login" class="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 transition">Login</a>
+        <a href="/login" class="text-slate-600 hover:text-purple-600 transition font-medium mr-4">Login</a>
+        <a href="/signup"
+          class="bg-purple-600 text-white px-5 py-2.5 rounded-lg hover:bg-purple-700 transition font-semibold">Get
+          Started</a>
         {% endif %}
-      </nav>
+      </div>
     </div>
   </header>
 
-  <!-- Hero Section -->
-  <section
-    class="h-screen flex flex-col justify-center text-center bg-gradient-to-b from-violet-600 to-indigo-700 text-white px-4"
-    data-aos="fade-up">
-    <div class="max-w-3xl mx-auto space-y-6 mt-10">
-
-      <!-- Mentics in Lalezar -->
-      <h1 class="text-6xl md:text-7xl" style="font-family: 'Lalezar', cursive;" data-aos="fade-down">
+  <main class="relative">
+    <section class="min-h-screen flex flex-col justify-center items-center text-center pt-32 pb-12 px-4">
+      <h1 data-aos="fade-down"
+        class="font-lalezar text-8xl md:text-9xl lg:text-[10rem] font-bold text-transparent bg-clip-text bg-gradient-to-r from-purple-600 to-indigo-600">
         MENTICS
       </h1>
-
-      <!-- Tagline -->
-      <h2 class="text-4xl md:text-5xl font-bold" data-aos="fade-up" data-aos-delay="100">
-        The Path to Highschool Success
-      </h2>
-
-      <!-- Mission Statement -->
-      <p class="text-xl text-white/90" data-aos="fade-up" data-aos-delay="200">
-        Helping highschoolers acheive their college readiness goals.
+      <p data-aos="fade-up" data-aos-delay="100" class="text-xl md:text-2xl text-slate-600 max-w-2xl mx-auto mt-4">
+        Your ambition, clarified. Stop guessing, start achieving.
       </p>
-
-      <!-- Get Started Button -->
-      <div class="pt-4" data-aos="zoom-in" data-aos-delay="300">
+      <div data-aos="fade-up" data-aos-delay="200" class="mt-10">
         <a href="{% if is_logged_in %}/dashboard{% else %}/signup{% endif %}"
-          class="bg-white text-violet-700 px-6 py-3 rounded-xl text-lg font-semibold shadow hover:bg-gray-100 transition">
-          {% if is_logged_in %}Go to Dashboard{% else %}Get Started{% endif %}
+          class="bg-purple-600 text-white px-8 py-4 rounded-xl text-lg font-semibold shadow-lg shadow-purple-500/20 hover:bg-purple-700 transition transform hover:scale-105">
+          {% if is_logged_in %}Go to Dashboard{% else %}Build Your Path for Free{% endif %}
         </a>
       </div>
+    </section>
 
-    </div>
-  </section>
+    <section id="features" class="pb-24">
+      <div class="max-w-6xl mx-auto px-6 grid grid-cols-1 lg:grid-cols-2 gap-16 items-start">
+        <div class="w-full">
+          <div class="feature-text h-[80vh] flex flex-col justify-center">
+            <div data-aos="fade-right">
+              <h3 class="text-4xl font-bold text-purple-700 mb-6">AI-Powered Paths</h3>
+              <p class="text-slate-600 text-lg leading-relaxed">Your goals are unique. Our AI generates a personalized,
+                step-by-step plan that adapts to your progress, ensuring you’re always on the most efficient path to
+                success.</p>
+            </div>
+          </div>
+          <div class="feature-text h-[80vh] flex flex-col justify-center">
+            <div data-aos="fade-right">
+              <h3 class="text-4xl font-bold text-indigo-700 mb-6">Progress Visualization</h3>
+              <p class="text-slate-600 text-lg leading-relaxed">Don’t just feel your progress—see it. Interactive charts
+                and a detailed tracker show your growth over time, turning hard work into tangible, motivating results.
+              </p>
+            </div>
+          </div>
+          <div class="feature-text h-[80vh] flex flex-col justify-center">
+            <div data-aos="fade-right">
+              <h3 class="text-4xl font-bold text-purple-700 mb-6">Intelligent Mentorship</h3>
+              <p class="text-slate-600 text-lg leading-relaxed">Stuck or need a new strategy? Your AI assistant provides
+                guidance and can even regenerate your path on command. It’s like having a personal mentor, 24/7.</p>
+            </div>
+          </div>
+        </div>
 
-  <!-- Features Section -->
-  <section id="features" class="py-24 bg-white" data-aos="fade-up">
-    <div class="max-w-6xl mx-auto px-6">
-      <h3 class="text-4xl font-bold text-center mb-12">Features</h3>
-      <div class="grid grid-cols-1 md:grid-cols-3 gap-10">
-        <div class="bg-gray-50 p-6 rounded-xl shadow hover:shadow-lg transition" data-aos="zoom-in">
-          <h4 class="text-xl font-semibold mb-2 text-purple-600">Current Stats</h4>
-          <p>Stay organized with all of your info in one place.</p>
-        </div>
-        <div class="bg-gray-50 p-6 rounded-xl shadow hover:shadow-lg transition" data-aos="zoom-in"
-          data-aos-delay="100">
-          <h4 class="text-xl font-semibold mb-2 text-purple-600">Progress Dashboard</h4>
-          <p>Track growth, set milestones, and stay accountable on your path to success on standardized testing and
-            college readiness.</p>
-        </div>
-        <div class="bg-gray-50 p-6 rounded-xl shadow hover:shadow-lg transition" data-aos="zoom-in"
-          data-aos-delay="200">
-          <h4 class="text-xl font-semibold mb-2 text-purple-600">AI Consulting</h4>
-          <p> Improve your path with focused conversations.</p>
+        <div class="w-full h-screen sticky top-0 flex items-center">
+          <div class="relative w-full h-[70vh] max-h-[550px]">
+            <div id="visual-1" class="visual-content absolute inset-0 transition-all duration-500">
+              <div class="w-full h-full bg-white rounded-2xl shadow-[0_10px_40px_rgba(167,139,250,0.25)] p-4 flex">
+                <aside class="w-32 flex-shrink-0 bg-slate-50 rounded-lg p-3 flex flex-col">
+                  <h1 class="font-lalezar text-purple-600 text-xl mb-8">MENTICS</h1>
+                  <nav class="space-y-1"><a href="#"
+                      class="flex items-center gap-2 p-2 text-sm font-semibold bg-purple-100 text-purple-700 rounded-md"><svg
+                        xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" viewBox="0 0 20 20" fill="currentColor">
+                        <path
+                          d="M11.233 2.152a.75.75 0 00-1.012.308l-3 7.5a.75.75 0 00.934 1.012l7.5-3a.75.75 0 00-.308-1.012l-4.113-1.804a2.5 2.5 0 01-1.012-.64L11.233 2.152z" />
+                        <path d="M12.5 10a2.5 2.5 0 100-5 2.5 2.5 0 000 5z" />
+                        <path
+                          d="M9.25 4.5a.75.75 0 00-1.5 0v1.551a3.75 3.75 0 00-1.42 1.132l-1.1-1.1a.75.75 0 00-1.06 1.06l1.1 1.1A3.75 3.75 0 004.5 9.25H2.949a.75.75 0 000 1.5H4.5a3.75 3.75 0 001.132 1.42l-1.1 1.1a.75.75 0 101.06 1.06l1.1-1.1a3.75 3.75 0 001.42 1.132v1.551a.75.75 0 001.5 0v-1.551a3.75 3.75 0 001.42-1.132l1.1 1.1a.75.75 0 101.06-1.06l-1.1-1.1a3.75 3.75 0 001.132-1.42h1.551a.75.75 0 000-1.5H12.17a3.75 3.75 0 00-1.132-1.42l1.1-1.1a.75.75 0 00-1.06-1.06l-1.1 1.1A3.75 3.75 0 009.25 6.051V4.5z" />
+                      </svg>Path</a><a href="#"
+                      class="flex items-center gap-2 p-2 text-sm font-semibold text-slate-500 rounded-md hover:bg-slate-100"><svg
+                        xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" viewBox="0 0 20 20" fill="currentColor">
+                        <path fill-rule="evenodd"
+                          d="M1 5.25A2.25 2.25 0 013.25 3h13.5A2.25 2.25 0 0119 5.25v9.5A2.25 2.25 0 0116.75 17H3.25A2.25 2.25 0 011 14.75v-9.5zM2.5 4.75v10.5h15V4.75H2.5z"
+                          clip-rule="evenodd" />
+                      </svg>Stats</a></nav>
+                </aside>
+                <main class="flex-1 p-4 relative">
+                  <h1 class="text-xl font-bold text-slate-900">Test Prep Path</h1><svg
+                    class="absolute top-1/2 left-0 w-full h-full -translate-y-1/2" preserveAspectRatio="none">
+                    <line x1="25%" y1="25%" x2="50%" y2="50%" stroke="#d8b4fe" stroke-width="1.5" stroke-dasharray="4 4"
+                      stroke-linecap="round"></line>
+                    <line x1="50%" y1="50%" x2="75%" y2="75%" stroke="#d8b4fe" stroke-width="1.5" stroke-dasharray="4 4"
+                      stroke-linecap="round"></line>
+                  </svg>
+                  <div
+                    class="absolute top-[25%] left-[25%] -translate-x-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-green-500 text-white flex items-center justify-center z-10">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                    </svg></div>
+                  <div
+                    class="absolute top-[50%] left-[50%] -translate-x-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-purple-500 text-white flex items-center justify-center font-bold text-base z-10">
+                    2</div>
+                  <div
+                    class="absolute top-[75%] left-[75%] -translate-x-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-gray-300 text-gray-500 flex items-center justify-center z-10">
+                    <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                      <path fill-rule="evenodd"
+                        d="M10 1a4.5 4.5 0 00-4.5 4.5V9H5a2 2 0 00-2 2v6a2 2 0 002 2h10a2 2 0 002-2v-6a2 2 0 00-2-2h-.5V5.5A4.5 4.5 0 0010 1zM13 9V5.5a3 3 0 10-6 0V9h6z"
+                        clip-rule="evenodd"></path>
+                    </svg></div>
+                </main>
+              </div>
+            </div>
+            <div id="visual-2" class="visual-content absolute inset-0 opacity-0 transition-all duration-500">
+              <div
+                class="w-full h-full bg-white rounded-2xl shadow-[0_10px_40px_rgba(99,102,241,0.25)] p-6 flex flex-col">
+                <h3 class="font-bold text-slate-800">SAT Score Progression</h3>
+                <div class="flex-grow flex gap-4 mt-4">
+                  <div class="flex flex-col-reverse justify-between h-full text-xs text-slate-400 font-semibold">
+                    <p>400</p>
+                    <p>1600</p>
+                  </div>
+                  <div class="w-full h-full flex items-end gap-6 pt-4 border-l border-b border-slate-200 pl-4">
+                    <div class="chart-bar flex-1 bg-indigo-200 rounded-t" style="--bar-height: 70%;"></div>
+                    <div class="chart-bar flex-1 bg-indigo-200 rounded-t" style="--bar-height: 80%;"></div>
+                    <div class="chart-bar flex-1 bg-indigo-500 rounded-t" style="--bar-height: 90%;"></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div id="visual-3" class="visual-content absolute inset-0 opacity-0 transition-all duration-500">
+              <div
+                class="w-full h-full bg-white rounded-2xl shadow-[0_10px_40px_rgba(167,139,250,0.25)] p-6 flex flex-col">
+                <h2 class="text-xl font-bold text-slate-900 font-lalezar flex-shrink-0">AI Assistant</h2>
+                <div class="flex-grow space-y-3 mt-4 overflow-hidden p-1">
+                  <div class="p-3 rounded-lg bg-slate-100 max-w-[75%] text-sm text-slate-800">Hi there! What should we
+                    focus on?</div>
+                  <div class="flex justify-end">
+                    <div class="p-3 rounded-lg bg-purple-600 text-white max-w-[75%] text-sm">Let's work on my college
+                      essays.</div>
+                  </div>
+                </div>
+                <div class="mt-4 flex items-center gap-2 pt-4 border-t border-slate-200/80 flex-shrink-0"><input
+                    class="w-full bg-slate-100 border-slate-200 rounded-lg p-2 text-sm" disabled
+                    placeholder="Ask a question..."><button class="bg-purple-600 text-white p-2 rounded-lg"
+                    disabled><svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                      <path
+                        d="M3.478 2.404a.75.75 0 00-.926.941l2.432 7.905H13.5a.75.75 0 010 1.5H4.984l-2.432 7.905a.75.75 0 00.926.94 60.519 60.519 0 0018.445-8.986.75.75 0 000-1.218A60.517 60.517 0 003.478 2.404z">
+                      </path>
+                    </svg></button></div>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
-    </div>
-  </section>
+      </div>
+    </section>
+  </main>
 
-  <!-- About Section -->
-  <section id="about" class="py-24 bg-gray-100" data-aos="fade-up">
-    <div class="max-w-4xl mx-auto text-center px-6">
-      <h3 class="text-4xl font-bold mb-6">Why Mentics?</h3>
-      <p class="text-lg text-gray-700 mb-4">Because highschool should'nt be as chaotic as it is — with mentics you can
-        stay organized, set goals, and strive to achive them.</p>
-      <p class="text-lg text-gray-700">We’re reimagining how students grow — through tech that discovers the path to
-        sucess.
-  </section>
-
-  <!-- Footer -->
-  <footer class="bg-white py-10 text-center text-gray-500 text-sm border-t">
-    <p>&copy; 2025 Mentics. Crafted with clarity & care.</p>
+  <footer class="bg-transparent py-10 text-center text-slate-500 text-sm mt-12">
+    <p>&copy; 2025 Mentics. Your future, clarified.</p>
   </footer>
 
-  <!-- AOS Animation -->
   <script src="https://unpkg.com/aos@2.3.1/dist/aos.js"></script>
-  <script>AOS.init({ once: true, duration: 800 });</script>
+  <script>
+    AOS.init({ once: true, duration: 800, easing: 'ease-in-out', offset: 100 });
+
+    document.addEventListener('DOMContentLoaded', () => {
+      const featureTexts = document.querySelectorAll('.feature-text');
+      const visuals = document.querySelectorAll('.visual-content');
+
+      const observer = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+          if (entry.isIntersecting) {
+            const index = Array.from(featureTexts).indexOf(entry.target);
+            visuals.forEach((v, i) => {
+              const isActive = (i === index);
+              v.style.opacity = isActive ? '1' : '0';
+              v.style.transform = isActive ? 'scale(1)' : 'scale(0.95)';
+            });
+          }
+        });
+      }, {
+        root: null,
+        threshold: 0.5 // Triggers when 50% of the text panel is visible
+      });
+      featureTexts.forEach(text => observer.observe(text));
+    });
+  </script>
 </body>
 
 </html>
