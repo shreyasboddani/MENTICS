@@ -10,6 +10,7 @@ from dotenv import load_dotenv
 import random
 from pathlib import Path
 from datetime import datetime, timedelta
+from zoneinfo import ZoneInfo
 
 # Explicitly load the .env file from the correct path
 env_path = Path('.') / '.env'
@@ -78,6 +79,29 @@ def login_required(f):
             return redirect(url_for("login"))
         return f(*args, **kwargs)
     return decorated_function
+
+
+@app.template_filter('format_date')
+def format_date_filter(s):
+    """Jinja2 filter to parse a UTC timestamp string and convert it to the correct local date."""
+    if not s:
+        return ""
+    try:
+        # Parse the naive timestamp string from the database
+        naive_dt = datetime.strptime(s, '%Y-%m-%d %H:%M:%S')
+
+        # 1. Tell Python the timestamp is in UTC
+        utc_dt = naive_dt.replace(tzinfo=ZoneInfo("UTC"))
+
+        # 2. Convert it to the user's local time (Eastern Time)
+        eastern_dt = utc_dt.astimezone(ZoneInfo("America/New_York"))
+
+        # 3. Return the correctly formatted local date
+        return eastern_dt.strftime('%Y-%m-%d')
+    except (ValueError, TypeError):
+        # Fallback for any malformed dates
+        return s.split(' ')[0] if ' ' in s else s
+
 
 # --- AI HELPER FUNCTIONS ---
 
@@ -618,7 +642,10 @@ def tracker():
     all_tasks = db.select(
         "paths", where={"user_id": user_id}, order_by="created_at DESC")
     test_prep_generations, college_planning_generations = {}, {}
+
+    # This loop is now reverted to correctly separate generations
     for task in all_tasks:
+        # Use the full, unique timestamp for grouping
         generation_key, category = task[6], task[9]
         if category == 'Test Prep':
             if generation_key not in test_prep_generations:
@@ -628,11 +655,12 @@ def tracker():
             if generation_key not in college_planning_generations:
                 college_planning_generations[generation_key] = []
             college_planning_generations[generation_key].append(task)
+
     stat_history_processed = {
         "sat_math": [], "sat_ebrw": [], "act_math": [],
         "act_reading": [], "act_science": [], "colleges_researched": [],
         "applications_submitted": [], "essay_progress": [],
-        "sat_total": [], "act_composite": []  # Added keys for full tests
+        "sat_total": [], "act_composite": []
     }
     history_records = db.select(
         "stat_history", where={"user_id": user_id}, order_by="recorded_at ASC")

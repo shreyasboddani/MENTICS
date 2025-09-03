@@ -175,8 +175,8 @@
                             <div class="space-y-4 max-h-96 overflow-y-auto pr-2">
                                 {% for date, tasks in test_prep_generations.items() %}
                                 <div class="p-4 bg-purple-50/50 rounded-lg">
-                                    <p class="text-sm font-semibold text-purple-800">Generated: {{ date.split(' ')[0]
-                                        }}</p>
+                                    <p class="text-sm font-semibold text-purple-800">Generated: {{ date | format_date }}
+                                    </p>
                                     <ul class="mt-2 text-sm space-y-1">
                                         {% for task in tasks %}
                                         <li
@@ -211,8 +211,8 @@
                             <div class="space-y-4 max-h-96 overflow-y-auto pr-2">
                                 {% for date, tasks in college_planning_generations.items() %}
                                 <div class="p-4 bg-indigo-50/50 rounded-lg">
-                                    <p class="text-sm font-semibold text-indigo-800">Generated: {{ date.split(' ')[0]
-                                        }}</p>
+                                    <p class="text-sm font-semibold text-indigo-800">Generated: {{ date | format_date }}
+                                    </p>
                                     <ul class="mt-2 text-sm space-y-1">
                                         {% for task in tasks %}
                                         <li
