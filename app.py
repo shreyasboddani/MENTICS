@@ -10,7 +10,7 @@ from dotenv import load_dotenv
 import random
 from pathlib import Path
 from datetime import datetime, timedelta
-from zoneinfo import ZoneInfo
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 # Explicitly load the .env file from the correct path
 env_path = Path('.') / '.env'
@@ -98,6 +98,13 @@ def format_date_filter(s):
 
         # 3. Return the correctly formatted local date
         return eastern_dt.strftime('%Y-%m-%d')
+    except ZoneInfoNotFoundError:
+        app.logger.warning(
+            "Timezone data not found. Dates will be displayed in UTC. "
+            "To display local time, install the 'tzdata' package: pip install tzdata"
+        )
+        # Fallback to showing the date part of the UTC string
+        return s.split(' ')[0] if ' ' in s else s
     except (ValueError, TypeError):
         # Fallback for any malformed dates
         return s.split(' ')[0] if ' ' in s else s

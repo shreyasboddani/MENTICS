@@ -120,7 +120,7 @@
             </a>
         </aside>
 
-        <div class="flex-1 flex flex-col h-screen overflow-y-auto">
+        <div id="main-scroll-panel" class="flex-1 flex flex-col h-screen overflow-y-auto">
             <header class="sticky top-0 bg-[#F8F7FF]/60 backdrop-blur-xl z-10 border-b border-white/20">
                 <div class="flex justify-between items-center px-6 py-4">
                     <h1 class="text-xl font-bold text-slate-900">College Planning Path</h1>
@@ -162,19 +162,19 @@
                         </div>
                     </div>
 
-                    <div class="xl:col-span-3 bg-white/60 backdrop-blur-xl border border-white/20 rounded-2xl shadow-lg shadow-indigo-100/30 p-6 relative flex flex-col h-[85vh]"
+                    <div class="xl:col-span-3 bg-white/60 backdrop-blur-xl border border-white/20 rounded-2xl shadow-lg shadow-indigo-100/30 p-6 relative flex flex-col overflow-hidden"
                         data-aos="fade-left" data-aos-delay="100">
                         <h1 class="text-3xl font-bold font-lalezar text-indigo-700 mb-1">Your Personalized Path</h1>
                         <p class="text-slate-600 mb-6">Complete each task to move to the next step. Click a node for
                             details.</p>
 
-                        <div class="relative flex-grow">
+                        <div class="relative flex-grow mb-4 min-h-0 overflow-clip">
                             <svg id="path-svg" class="absolute top-0 left-0 w-full h-full z-0">
                                 <path id="connector-path" d="" stroke="#C7D2FE" stroke-width="3" fill="none"
                                     stroke-dasharray="2 8" stroke-linecap="round" />
                             </svg>
                             <div id="path-nodes-container"
-                                class="space-y-10 relative z-10 flex-grow h-full overflow-y-auto pr-4"></div>
+                            class="space-y-10 relative z-10 p-4"></div>
                         </div>
 
                         <div class="mt-auto pt-6 border-t border-slate-200/80 flex justify-end">
@@ -252,6 +252,7 @@
         </div>
     </div>
 
+    <script src="{{ url_for('static', filename='js/alert.js') }}"></script>
     <script>
         let currentTasks = [];
         let currentTaskId = null;
@@ -316,7 +317,7 @@
                 const isLocked = index > firstPendingIndex && firstPendingIndex !== -1;
                 const alignmentWrapper = document.createElement('div');
                 alignmentWrapper.className = 'flex';
-                const positions = ['justify-start pl-4', 'justify-center', 'justify-end pr-4'];
+                const positions = ['justify-start', 'justify-center', 'justify-end'];
                 alignmentWrapper.classList.add(...positions[index % 3].split(' '));
                 const taskButton = document.createElement('button');
                 taskButton.id = `task-node-${task.client_id}`;
@@ -580,6 +581,7 @@
         document.addEventListener('DOMContentLoaded', () => {
             fetchPath();
             loadChatHistory();
+            document.getElementById('main-scroll-panel').addEventListener('scroll', drawConnectors);
         });
         window.addEventListener('resize', () => drawConnectors());
         document.getElementById('send-btn').addEventListener('click', handleUserChat);
