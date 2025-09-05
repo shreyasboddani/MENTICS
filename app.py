@@ -142,20 +142,24 @@ def _get_test_prep_ai_tasks(strengths, weaknesses, user_stats={}, chat_history=[
     chat_history_str = "\n".join(
         [f"{msg['role'].capitalize()}: {msg['content']}" for msg in chat_history]) or "No conversation history yet."
 
-    days_left = "Not set"
+    test_date_info = "Not set by the student."
     test_date_str = user_stats.get("test_path", {}).get("test_date")
     if test_date_str:
         try:
-            delta = datetime.strptime(
-                test_date_str, '%Y-%m-%d') - datetime.now()
-            days_left = f"{delta.days} days remaining"
+            test_date = datetime.strptime(test_date_str, '%Y-%m-%d')
+            delta = test_date - datetime.now()
+            formatted_date = test_date.strftime('%B %d, %Y')
+            if delta.days >= 0:
+                test_date_info = f"on {formatted_date} ({delta.days} days remaining)"
+            else:
+                test_date_info = f"on {formatted_date} (this date has passed)"
         except ValueError:
-            days_left = "Invalid date format"
+            test_date_info = "in an invalid format."
 
     prompt = (
         f"# CONTEXT\n"
         f"You are an expert AI test prep (SAT & ACT) coach creating a study plan for a high school student.\n"
-        f"The student's test is in: {days_left}.\n\n"
+        f"The student's test is scheduled for: {test_date_info}.\n\n"
         f"# STUDENT PROFILE\n"
         f"- Strengths: {strengths}\n"
         f"- Weaknesses: {weaknesses}\n\n"
@@ -205,22 +209,27 @@ def _get_test_prep_ai_chat_response(history, user_stats):
     if not os.getenv("GEMINI_API_KEY"):
         return "I'm in testing mode, but I'm saving our conversation!"
 
-    days_left = "a future date"
+    test_date_info = "The student has not set a test date yet."
     test_date_str = user_stats.get("test_path", {}).get("test_date")
     if test_date_str:
         try:
             test_date = datetime.strptime(test_date_str, '%Y-%m-%d')
             delta = test_date - datetime.now()
-            days_left = f"{delta.days} days"
+            formatted_date = test_date.strftime('%B %d, %Y')
+            if delta.days >= 0:
+                test_date_info = f"The student's test is on {formatted_date} ({delta.days} days from now)."
+            else:
+                test_date_info = f"The student's test date was {formatted_date}, which has already passed."
         except ValueError:
-            pass
+            test_date_info = f"The student has set a test date, but it's in an invalid format: {test_date_str}."
 
     system_message = (
-        "You are a friendly and proactive study coach. Your student's test is in "
-        f"{days_left}. If the conversation history is empty, greet the user, "
-        "remind them of their test date, and ask what they'd like to focus on. "
+        "You are a friendly and proactive study coach. Here is the student's test date information: "
+        f"'{test_date_info}'. If the conversation history is empty, greet the user, "
+        "remind them of their test date if it's set and in the future, and ask what they'd like to focus on. "
         "Also, let them know they can say 'regenerate' or 'new path' to get an updated plan based on our chat. "
         "In subsequent messages, be an encouraging tutor. Acknowledge scores and struggles. "
+        "When a user says they are 'stuck' on a task, provide specific, actionable advice, break down the task into smaller steps, or offer alternative strategies. Do not immediately suggest regenerating the path unless they ask for it. "
         "If the user asks to change focus or regenerate their path, confirm that you will create a new path for them."
     )
 
@@ -375,7 +384,9 @@ def _get_college_planning_ai_chat_response(history, user_stats):
         f"grade {college_info.get('grade', 'N/A')} and is in the '{college_info.get('planning_stage', 'N/A')}' stage. "
         "If the conversation is just beginning, greet the user and ask what specific part of college planning they want to discuss (e.g., essays, applications, college lists). "
         "Also, let them know they can say 'regenerate' or 'new path' to get an updated plan based on our chat. "
-        "In subsequent messages, be an encouraging and helpful advisor. If the user asks to change their path, confirm you will regenerate it for them."
+        "In subsequent messages, be an encouraging and helpful advisor. "
+        "When a user says they are 'stuck' on a task, provide specific, actionable advice. Help them break down the task or find resources. Do not suggest regenerating the path unless they explicitly ask for it. "
+        "If the user asks to change their path, confirm you will regenerate it for them."
     )
     gemini_history = []
     for message in history:
@@ -758,29 +769,9 @@ def api_update_task_status():
     status = data.get("status")
     task_id = data.get("taskId")
 
-    if status == 'failed':
-        task_info = db.select(
-            "paths", where={"id": task_id, "user_id": user_id})
-        if not task_info:
-            return jsonify({"success": False, "error": "Task not found"}), 404
-        category = task_info[0][9]
-        stats = user.get_stats()
-        chat_record = db.select("chat_conversations", where={
-                                "user_id": user_id, "category": category})
-        chat_history = json.loads(chat_record[0][3]) if chat_record else []
-
-        if category == 'College Planning':
-            college_context = stats.get("college_path", {})
-            new_tasks = _generate_and_save_new_college_path(
-                user_id, college_context, chat_history)
-        else:
-            test_path_info = stats.get("test_path", {})
-            strengths = test_path_info.get("strengths", "general studying")
-            weaknesses = test_path_info.get("weaknesses", "test-taking skills")
-            new_tasks = _generate_and_save_new_test_path(
-                user_id, strengths, weaknesses, chat_history)
-        return jsonify({"success": True, "tasks": new_tasks})
-    elif status == 'complete' and task_id:
+    # The 'failed' status is now handled via chat interaction.
+    # This endpoint now only handles marking tasks as complete.
+    if status == 'complete' and task_id:
         db.update("paths", {"is_completed": True}, where={
                   "id": task_id, "user_id": user_id})
     return jsonify({"success": True})

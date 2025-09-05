@@ -69,6 +69,28 @@
         #chat-history {
             scroll-behavior: smooth;
         }
+
+        .task-node {
+            transform: scale(0);
+            opacity: 0;
+            transition: transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.3s ease;
+        }
+
+        .task-node.visible {
+            transform: scale(1);
+            opacity: 1;
+        }
+
+        .dash-segment {
+            opacity: 0;
+        }
+        .dash-segment.animate-in {
+            animation: pop-in 0.2s ease forwards;
+        }
+        @keyframes pop-in {
+            from { opacity: 0; transform: scale(0.5); }
+            to { opacity: 1; transform: scale(1); }
+        }
     </style>
 </head>
 
@@ -252,6 +274,7 @@
         </div>
     </div>
 
+    <script src="{{ url_for('static', filename='js/prompt.js') }}"></script>
     <script src="{{ url_for('static', filename='js/alert.js') }}"></script>
     <script>
         let currentTasks = [];
@@ -299,7 +322,7 @@
                 const tasks = await response.json();
                 if (Array.isArray(tasks) && tasks.length > 0) {
                     currentTasks = tasks.map((task, index) => ({ ...task, client_id: index + 1, status: task.is_completed ? 'complete' : 'pending' }));
-                    renderPathAndConnectors(currentTasks);
+                    renderPathAndConnectors(currentTasks, true); // Animate on fetch
                 } else { window.location.href = "{{ url_for('college_path_builder') }}"; }
             } catch (error) {
                 console.error('Error fetching path:', error);
@@ -307,21 +330,28 @@
             }
         }
 
-        function renderPathAndConnectors(tasks) {
+        async function renderPathAndConnectors(tasks, withAnimation = false) {
             const nodesContainer = document.getElementById('path-nodes-container');
+            const svgContainer = document.getElementById('path-svg');
             nodesContainer.innerHTML = '';
+            svgContainer.innerHTML = ''; // Clear old connectors
+
             const firstPendingIndex = tasks.findIndex(t => t.status === 'pending');
+
+            // Create all node elements first
             tasks.forEach((task, index) => {
                 const isCompleted = task.status === 'complete';
                 const isUnlocked = index === firstPendingIndex;
                 const isLocked = index > firstPendingIndex && firstPendingIndex !== -1;
+
                 const alignmentWrapper = document.createElement('div');
                 alignmentWrapper.className = 'flex';
                 const positions = ['justify-start', 'justify-center', 'justify-end'];
                 alignmentWrapper.classList.add(...positions[index % 3].split(' '));
+
                 const taskButton = document.createElement('button');
                 taskButton.id = `task-node-${task.client_id}`;
-                taskButton.className = 'w-28 h-28 rounded-full flex items-center justify-center font-bold text-4xl text-white transition-all duration-300 transform hover:scale-110 focus:outline-none focus-visible:ring-4 focus-visible:ring-offset-2 focus-visible:ring-indigo-400';
+                taskButton.className = 'task-node w-28 h-28 rounded-full flex items-center justify-center font-bold text-4xl text-white transition-all duration-300 transform hover:scale-110 focus:outline-none focus-visible:ring-4 focus-visible:ring-offset-2 focus-visible:ring-indigo-400';
                 taskButton.onclick = () => openTaskModal(task);
                 taskButton.disabled = isLocked;
 
@@ -329,29 +359,118 @@
                     taskButton.classList.add('bg-emerald-500', 'shadow-lg');
                     taskButton.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-10 h-10"><path fill-rule="evenodd" d="M19.916 4.626a.75.75 0 0 1 .208 1.04l-9 13.5a.75.75 0 0 1-1.154.114l-6-6a.75.75 0 0 1 1.06-1.06l5.353 5.353 8.493-12.74a.75.75 0 0 1 1.04-.207Z" clip-rule="evenodd" /></svg>`;
                 } else if (isUnlocked) {
-                    taskButton.classList.add('bg-indigo-500', 'animate-pulse', 'shadow-lg', 'shadow-indigo-400/50');
+                    taskButton.classList.add('bg-indigo-500', 'shadow-lg', 'shadow-indigo-400/50');
                     taskButton.textContent = task.client_id;
                 } else {
                     taskButton.classList.add('bg-slate-300', 'cursor-not-allowed');
                     taskButton.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-10 h-10 text-slate-500"><path fill-rule="evenodd" d="M12 1.5a5.25 5.25 0 0 0-5.25 5.25v3a3 3 0 0 0-3 3v6.75a3 3 0 0 0 3 3h10.5a3 3 0 0 0 3-3v-6.75a3 3 0 0 0-3-3v-3c0-2.9-2.35-5.25-5.25-5.25Zm3.75 8.25v-3a3.75 3.75 0 1 0-7.5 0v3h7.5Z" clip-rule="evenodd" /></svg>`;
                 }
+
+                if (!withAnimation) {
+                    taskButton.classList.add('visible');
+                    if (isUnlocked) taskButton.classList.add('animate-pulse');
+                }
+
                 alignmentWrapper.appendChild(taskButton);
                 nodesContainer.appendChild(alignmentWrapper);
             });
-            setTimeout(drawConnectors, 50);
+
+            if (withAnimation) {
+                const nodeElements = Array.from(nodesContainer.querySelectorAll('.task-node'));
+                for (let i = 0; i < nodeElements.length; i++) {
+                    const node = nodeElements[i];
+                    await new Promise(resolve => setTimeout(resolve, 100));
+                    node.classList.add('visible');
+                    if (node.classList.contains('bg-indigo-500')) {
+                        node.classList.add('animate-pulse');
+                    }
+                    await new Promise(resolve => setTimeout(resolve, 200));
+                    if (i < nodeElements.length - 1) {
+                        await drawAndAnimateConnector(nodeElements[i], nodeElements[i + 1]);
+                    }
+                }
+            } else {
+                redrawAllConnectors();
+            }
         }
 
-        function drawConnectors() {
-            const path = document.getElementById('connector-path');
-            const nodes = currentTasks.map(task => document.getElementById(`task-node-${task.client_id}`));
+        async function drawAndAnimateConnector(startNode, endNode) {
             const svg = document.getElementById('path-svg');
-            if (!svg || !path || nodes.some(n => !n)) return;
+            if (!svg || !startNode || !endNode) return;
+
             const containerRect = svg.getBoundingClientRect();
-            let pathData = "";
+            const startRect = startNode.getBoundingClientRect();
+            const endRect = endNode.getBoundingClientRect();
+
+            const startX = startRect.left + startRect.width / 2 - containerRect.left;
+            const startY = startRect.top + startRect.height / 2 - containerRect.top;
+            const endX = endRect.left + endRect.width / 2 - containerRect.left;
+            const endY = endRect.top + endRect.height / 2 - containerRect.top;
+
+            const controlX1 = startX + (endX - startX) * 0.2;
+            const controlY1 = startY + (endY - startY) * 0.8;
+            const controlX2 = startX + (endX - startX) * 0.8;
+            const controlY2 = startY + (endY - startY) * 0.2;
+
+            const pathData = `M ${startX} ${startY} C ${controlX1} ${controlY1}, ${controlX2} ${controlY2}, ${endX} ${endY}`;
+
+            // Create a temporary, invisible path to measure
+            const tempPath = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+            tempPath.setAttribute('d', pathData);
+            const totalLength = tempPath.getTotalLength();
+
+            const dashLength = 8;
+            const gapLength = 6;
+            const patternLength = dashLength + gapLength;
+            const dashSegments = [];
+
+            // Create individual line segments for each dash
+            for (let currentLength = 0; currentLength < totalLength; currentLength += patternLength) {
+                const start = tempPath.getPointAtLength(currentLength);
+                const end = tempPath.getPointAtLength(Math.min(currentLength + dashLength, totalLength));
+
+                const segment = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+                segment.setAttribute('x1', start.x);
+                segment.setAttribute('y1', start.y);
+                segment.setAttribute('x2', end.x);
+                segment.setAttribute('y2', end.y);
+                segment.setAttribute('stroke', '#C7D2FE');
+                segment.setAttribute('stroke-width', '3');
+                segment.setAttribute('stroke-linecap', 'round');
+                segment.classList.add('dash-segment');
+                segment.style.transformOrigin = `${(start.x + end.x) / 2}px ${(start.y + end.y) / 2}px`;
+
+                svg.appendChild(segment);
+                dashSegments.push(segment);
+            }
+
+            // Animate them in one by one
+            const delayBetweenDashes = 20; // ms
+            for (let i = 0; i < dashSegments.length; i++) {
+                const segment = dashSegments[i];
+                segment.style.animationDelay = `${i * delayBetweenDashes}ms`;
+                segment.classList.add('animate-in');
+            }
+            const totalAnimationTime = dashSegments.length * delayBetweenDashes + 200;
+            await new Promise(resolve => setTimeout(resolve, totalAnimationTime));
+        }
+
+        function redrawAllConnectors() {
+            const svg = document.getElementById('path-svg');
+            const nodes = Array.from(document.querySelectorAll('.task-node.visible'));
+            if (!svg || nodes.length < 2) return;
+
+            svg.innerHTML = '';
+            const containerRect = svg.getBoundingClientRect();
+
             for (let i = 0; i < nodes.length - 1; i++) {
-                const startNode = nodes[i]; const endNode = nodes[i + 1];
+                const startNode = nodes[i];
+                const endNode = nodes[i + 1];
                 if (!startNode || !endNode) continue;
-                const startRect = startNode.getBoundingClientRect(); const endRect = endNode.getBoundingClientRect();
+
+                const startRect = startNode.getBoundingClientRect();
+                const endRect = endNode.getBoundingClientRect();
+
                 const startX = startRect.left + startRect.width / 2 - containerRect.left;
                 const startY = startRect.top + startRect.height / 2 - containerRect.top;
                 const endX = endRect.left + endRect.width / 2 - containerRect.left;
@@ -362,10 +481,33 @@
                 const controlX2 = startX + (endX - startX) * 0.8;
                 const controlY2 = startY + (endY - startY) * 0.2;
 
-                if (pathData === "") pathData += `M ${startX} ${startY} `;
-                pathData += `C ${controlX1} ${controlY1}, ${controlX2} ${controlY2}, ${endX} ${endY} `;
+                const pathData = `M ${startX} ${startY} C ${controlX1} ${controlY1}, ${controlX2} ${controlY2}, ${endX} ${endY}`;
+
+                // Create a temporary, invisible path to measure
+                const tempPath = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+                tempPath.setAttribute('d', pathData);
+                const totalLength = tempPath.getTotalLength();
+
+                const dashLength = 8;
+                const gapLength = 6;
+                const patternLength = dashLength + gapLength;
+
+                // Create individual line segments for each dash
+                for (let currentLength = 0; currentLength < totalLength; currentLength += patternLength) {
+                    const start = tempPath.getPointAtLength(currentLength);
+                    const end = tempPath.getPointAtLength(Math.min(currentLength + dashLength, totalLength));
+
+                    const segment = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+                    segment.setAttribute('x1', start.x);
+                    segment.setAttribute('y1', start.y);
+                    segment.setAttribute('x2', end.x);
+                    segment.setAttribute('y2', end.y);
+                    segment.setAttribute('stroke', '#C7D2FE');
+                    segment.setAttribute('stroke-width', '3');
+                    segment.setAttribute('stroke-linecap', 'round');
+                    svg.appendChild(segment);
+                }
             }
-            path.setAttribute('d', pathData);
         }
 
         function openTaskModal(task) {
@@ -374,13 +516,26 @@
             document.getElementById('modalTitle').textContent = `Step ${task.client_id}: Your Task`;
             document.getElementById('modalDescription').textContent = task.description;
             document.getElementById('modal-actions').innerHTML = `
-                <button onclick="handleTaskAction('failed')" class="bg-red-500 hover:bg-red-600 text-white font-semibold py-2 px-4 rounded-lg transition">I'm Stuck</button>
+                <button onclick="handleImStuck()" class="bg-red-500 hover:bg-red-600 text-white font-semibold py-2 px-4 rounded-lg transition">I'm Stuck</button>
                 <button onclick="handleTaskAction('complete')" class="bg-emerald-500 hover:bg-emerald-600 text-white font-semibold py-2 px-4 rounded-lg transition">Mark as Complete</button>`;
             modal.classList.remove('hidden');
         }
 
         function closeTaskModal() { document.getElementById('taskModal').classList.add('hidden'); }
         function closeStatModal() { document.getElementById('statEntryModal').classList.add('hidden'); }
+
+        async function handleImStuck() {
+            const task = currentTasks.find(t => t.id === currentTaskId);
+            if (!task) return;
+            closeTaskModal();
+            const reason = await prompt(`You're working on the task:\n"${task.description}"`, '', 'What part is giving you trouble?');
+            if (reason && reason.trim() !== "") {
+                const chatInput = document.getElementById('userInput');
+                chatInput.value = `I'm having trouble with the task: "${task.description}". Specifically, my problem is: ${reason}`;
+                handleUserChat();
+                chatInput.focus();
+            }
+        }
 
         async function handleTaskAction(status) {
             const task = currentTasks.find(t => t.id === currentTaskId);
@@ -397,14 +552,10 @@
                 if (status === 'complete') {
                     const taskIndex = currentTasks.findIndex(t => t.id === currentTaskId);
                     if (taskIndex !== -1) currentTasks[taskIndex].status = 'complete';
-                    renderPathAndConnectors(currentTasks);
+                    renderPathAndConnectors(currentTasks, false); // No animation on complete
                     if (task.type === 'milestone' && task.stat_to_update) {
                         setTimeout(() => openStatModal(task), 500);
                     } else { await checkPathCompletion(); }
-                } else if (status === 'failed' && result.tasks) {
-                    alert("No worries! We'll generate a new path for you.");
-                    currentTasks = result.tasks.map((task, index) => ({ ...task, client_id: index + 1, status: task.is_completed ? 'complete' : 'pending' }));
-                    renderPathAndConnectors(currentTasks);
                 }
             } catch (error) {
                 console.error("Error updating task status:", error);
@@ -519,7 +670,7 @@
                     appendChatMessage("I've generated a new college planning path for you based on our conversation.", 'bot');
                     conversationHistory.push({ role: 'assistant', content: "I've generated a new college planning path for you based on our conversation." });
                     currentTasks = data.new_path.map((task, index) => ({ ...task, client_id: index + 1, status: task.is_completed ? 'complete' : 'pending' }));
-                    renderPathAndConnectors(currentTasks);
+                    renderPathAndConnectors(currentTasks, true);
                 } else {
                     const aiReply = data.reply;
                     appendChatMessage(aiReply, 'bot');
@@ -581,9 +732,9 @@
         document.addEventListener('DOMContentLoaded', () => {
             fetchPath();
             loadChatHistory();
-            document.getElementById('main-scroll-panel').addEventListener('scroll', drawConnectors);
+            document.getElementById('main-scroll-panel').addEventListener('scroll', redrawAllConnectors);
         });
-        window.addEventListener('resize', () => drawConnectors());
+        window.addEventListener('resize', () => redrawAllConnectors());
         document.getElementById('send-btn').addEventListener('click', handleUserChat);
         document.getElementById('userInput').addEventListener('keypress', (e) => { if (e.key === 'Enter') handleUserChat(); });
         document.getElementById('reset-chat-btn').addEventListener('click', handleResetChat);
