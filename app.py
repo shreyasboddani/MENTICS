@@ -262,8 +262,11 @@ def _generate_and_save_new_test_path(user_id, strengths, weaknesses, chat_histor
         "incomplete": [task for task in all_tasks if not task[4]]
     }
 
+    # --- START FIX ---
+    # This now ONLY deactivates the currently active path, preventing race conditions.
     db.update("paths", {"is_active": False}, where={
-              "user_id": user_id, "category": "Test Prep"})
+              "user_id": user_id, "category": "Test Prep", "is_active": True})
+    # --- END FIX ---
 
     tasks = _get_test_prep_ai_tasks(strengths, weaknesses,
                                     user_stats, chat_history, path_history)
@@ -421,8 +424,11 @@ def _generate_and_save_new_college_path(user_id, college_context, chat_history=[
             "incomplete": [task for task in all_college_tasks if not task[4]]
         }
 
+        # --- START FIX ---
+        # This now ONLY deactivates the currently active path, preventing race conditions.
         db.update("paths", {"is_active": False}, where={
-                  "user_id": user_id, "category": "College Planning"})
+                  "user_id": user_id, "category": "College Planning", "is_active": True})
+        # --- END FIX ---
 
         tasks = _get_college_planning_ai_tasks(
             college_context, user_stats, path_history, chat_history)
@@ -730,8 +736,31 @@ def api_tasks():
     stats = user.get_stats()
     category = request.args.get('category', 'Test Prep')
     try:
-        active_path = db.select(
-            "paths", where={"user_id": user_id, "is_active": True, "category": category})
+        # --- START REVISED FIX ---
+        # Find the timestamp of the single most recently created active task.
+        latest_task_query = """
+            SELECT created_at FROM paths 
+            WHERE user_id=? AND category=? AND is_active=True 
+            ORDER BY created_at DESC LIMIT 1
+        """
+        latest_task_timestamp_result = db.execute(
+            latest_task_query, (user_id, category))
+
+        active_path = []
+        if latest_task_timestamp_result:
+            # Now, select ALL active tasks that share that exact timestamp.
+            # This is the core of the race condition fix.
+            latest_timestamp = latest_task_timestamp_result[0][0]
+            active_path = db.select(
+                "paths", where={
+                    "user_id": user_id,
+                    "is_active": True,
+                    "category": category,
+                    "created_at": latest_timestamp
+                })
+        # --- END REVISED FIX ---
+
+        # Revert to the original, working control flow
         if request.method == "POST" or not active_path:
             chat_record = db.select("chat_conversations", where={
                                     "user_id": user_id, "category": category})
@@ -754,6 +783,7 @@ def api_tasks():
             tasks = [{"id": r[0], "description": r[3], "is_completed": bool(r[4]),
                       "type": r[7], "stat_to_update": r[8]} for r in active_path]
             return jsonify(tasks)
+
         return jsonify([])
     except Exception as e:
         print(f"API tasks error for category {category}: {e}")
