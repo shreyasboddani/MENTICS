@@ -1,12 +1,18 @@
 import sqlite3
 
 
+import sqlite3
+
+
 class DatabaseHandler:
     def __init__(self, db_name):
         self.db_name = db_name
 
     def execute(self, query, params=None):
-        conn = sqlite3.connect(self.db_name)
+        # The only change is adding the `timeout=10` parameter here.
+        # This tells SQLite to wait for up to 10 seconds if the database is locked
+        # by another process, which is usually enough to resolve the issue.
+        conn = sqlite3.connect(self.db_name, timeout=10)
         c = conn.cursor()
         if params:
             c.execute(query, params)
