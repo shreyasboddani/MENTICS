@@ -40,7 +40,4 @@
 ## 👥 Contributors
 
 * Shreyas Boddani
-* Naman Sinha
 * Brandon Potter
-* Abhishek Chattopadhya
-* Prithvi Veliyath
