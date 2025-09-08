@@ -11,69 +11,13 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Lalezar&display=swap"
     rel="stylesheet">
   <link href="https://unpkg.com/aos@2.3.1/dist/aos.css" rel="stylesheet">
-
-  <style>
-    .font-lalezar {
-      font-family: 'Lalezar', cursive;
-    }
-
-    .font-sans {
-      font-family: 'Inter', sans-serif;
-    }
-
-    body::before {
-      content: '';
-      position: fixed;
-      top: 0;
-      left: 0;
-      width: 100vw;
-      height: 100vh;
-      background: radial-gradient(circle at 10% 20%, rgba(167, 139, 250, 0.2), transparent 40%),
-        radial-gradient(circle at 80% 90%, rgba(127, 13, 239, 0.2), transparent 40%),
-        radial-gradient(circle at 50% 50%, rgba(196, 181, 253, 0.1), transparent 50%);
-      animation: aurora 20s infinite linear;
-      z-index: -1;
-    }
-
-    @keyframes aurora {
-      0% {
-        transform: rotate(0deg) scale(1.2);
-      }
-
-      50% {
-        transform: rotate(180deg) scale(1.5);
-      }
-
-      100% {
-        transform: rotate(360deg) scale(1.2);
-      }
-    }
-
-    ::-webkit-scrollbar {
-      width: 6px;
-    }
-
-    ::-webkit-scrollbar-track {
-      background: transparent;
-    }
-
-    ::-webkit-scrollbar-thumb {
-      background: rgba(129, 140, 248, 0.4);
-      border-radius: 3px;
-    }
-
-    ::-webkit-scrollbar-thumb:hover {
-      background: rgba(129, 140, 248, 0.6);
-    }
-  </style>
+  <link rel="stylesheet" href="{{ url_for('static', filename='dashboard.css') }}">
 </head>
 
 <body class="bg-[#F8F7FF] font-sans text-slate-800 antialiased">
   <div class="flex h-screen">
     <aside class="w-64 flex-shrink-0 bg-white/60 backdrop-blur-xl border-r border-white/20 p-6 flex-col hidden md:flex">
-      <a href="/" class="text-3xl font-bold text-purple-600 tracking-tight font-lalezar mb-12">
-        MENTICS
-      </a>
+      <a href="/" class="text-3xl font-bold text-purple-600 tracking-tight font-lalezar mb-12">MENTICS</a>
       <nav class="flex flex-col space-y-2">
         <a href="/dashboard"
           class="flex items-center gap-3 px-4 py-2 text-slate-600 font-semibold rounded-lg hover:bg-purple-50 hover:text-purple-700 transition-colors">
@@ -116,90 +60,82 @@
     </aside>
 
     <div class="flex-1 flex flex-col h-screen overflow-y-auto">
-      <header class="sticky top-0 bg-[#F8F7FF]/60 backdrop-blur-xl z-10 border-b border-white/20">
-        <div class="flex justify-between items-center px-6 py-4">
-          <h1 class="text-xl font-bold text-slate-900">Your Stats</h1>
+      <main class="flex-1 p-6 lg:p-8">
+        <div data-aos="fade-in">
+          <h1 class="main-header font-lalezar">Your Stats</h1>
+          <p class="text-lg text-slate-600">A snapshot of your academic achievements and progress.</p>
         </div>
-      </header>
 
-      <main class="flex-1 p-6">
-        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <div class="mt-8 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
 
-          <div
-            class="lg:col-span-2 bg-white/60 backdrop-blur-xl border border-white/20 rounded-2xl shadow-lg shadow-purple-100/30 p-6 flex flex-col justify-center items-center"
-            data-aos="fade-up">
-            <h2 class="text-lg font-bold text-slate-700 mb-2">Current GPA</h2>
-            {% if gpa %}
-            <p class="text-7xl lg:text-8xl font-bold text-purple-600">{{ gpa }}</p>
-            {% else %}
-            <p class="text-2xl font-semibold text-slate-400">Not Set</p>
-            {% endif %}
-          </div>
-
-          <div
-            class="lg:col-span-2 bg-white/60 backdrop-blur-xl border border-white/20 rounded-2xl shadow-lg shadow-purple-100/30 p-6"
+          <div class="stat-card md:col-span-2 lg:col-span-1 p-6 flex flex-col justify-center items-center text-center"
             data-aos="fade-up" data-aos-delay="100">
-            <h2 class="text-lg font-bold text-slate-700 mb-4">Test Scores</h2>
+            <div class="bg-purple-100 text-purple-600 rounded-full p-4 mb-4"><svg xmlns="http://www.w3.org/2000/svg"
+                viewBox="0 0 24 24" fill="currentColor" class="w-8 h-8">
+                <path
+                  d="M11.7 2.25c.513 0 1.02.194 1.414.586l8.25 8.25a2 2 0 0 1 0 2.828l-8.25 8.25a2 2 0 0 1-2.828 0l-8.25-8.25a2 2 0 0 1 0-2.828l8.25-8.25A2 2 0 0 1 11.7 2.25Zm0 2.53-6.836 6.836a.25.25 0 0 0 0 .354l6.836 6.836a.25.25 0 0 0 .354 0l6.836-6.836a.25.25 0 0 0 0-.354L12.053 4.78a.25.25 0 0 0-.354 0Z" />
+              </svg></div>
+            <h2 class="text-lg font-bold text-slate-700">Current GPA</h2>
+            <p class="text-6xl font-bold text-purple-600 mt-1">{{ gpa or "N/A" }}</p>
+          </div>
+
+          <div class="stat-card p-6" data-aos="fade-up" data-aos-delay="200">
+            <h2 class="text-lg font-bold text-purple-800 mb-4">SAT Scores</h2>
             <div class="space-y-4">
-              <div>
-                <h3 class="font-bold text-purple-800">SAT</h3>
-                <dl class="mt-2 grid grid-cols-3 gap-x-4 text-sm">
-                  <div class="text-slate-500">EBRW: <span class="font-semibold text-slate-700">{{ sat_ebrw or "—"
-                      }}</span></div>
-                  <div class="text-slate-500">Math: <span class="font-semibold text-slate-700">{{ sat_math or "—"
-                      }}</span></div>
-                  <div class="text-slate-500">Total: <span class="font-bold text-purple-700">{% if sat_ebrw and sat_math
-                      %}{{ sat_ebrw|int + sat_math|int }}{% else %}—{% endif %}</span></div>
-                </dl>
+              <div class="flex justify-between items-baseline">
+                <span class="text-slate-500">EBRW</span>
+                <span class="font-semibold text-2xl text-slate-700">{{ sat_ebrw or "—" }}</span>
               </div>
-              <div class="border-t border-slate-200/80"></div>
-              <div>
-                <h3 class="font-bold text-indigo-800">ACT</h3>
-                <dl class="mt-2 grid grid-cols-4 gap-x-4 text-sm">
-                  <div class="text-slate-500">Math: <span class="font-semibold text-slate-700">{{ act_math or "—"
-                      }}</span></div>
-                  <div class="text-slate-500">Reading: <span class="font-semibold text-slate-700">{{ act_reading or "—"
-                      }}</span></div>
-                  <div class="text-slate-500">Science: <span class="font-semibold text-slate-700">{{ act_science or "—"
-                      }}</span></div>
-                  <div class="text-slate-500">Avg: <span class="font-bold text-indigo-700">{% set act_scores = [] %}{%
-                      if act_math %}{% set _ = act_scores.append(act_math|int) %}{% endif %}{% if act_reading %}{% set _
-                      = act_scores.append(act_reading|int) %}{% endif %}{% if act_science %}{% set _ =
-                      act_scores.append(act_science|int) %}{% endif %}{% if act_scores|length > 0 %}{{ ((act_scores|sum)
-                      / (act_scores|length))|round|int }}{% else %}—{% endif %}</span></div>
-                </dl>
+              <div class="flex justify-between items-baseline">
+                <span class="text-slate-500">Math</span>
+                <span class="font-semibold text-2xl text-slate-700">{{ sat_math or "—" }}</span>
+              </div>
+              <div class="border-t border-slate-200/80 my-2"></div>
+              <div class="flex justify-between items-baseline">
+                <span class="font-bold text-purple-700">Total</span>
+                <span class="font-bold text-3xl text-purple-700">{% if sat_ebrw and sat_math %}{{ sat_ebrw|int +
+                  sat_math|int }}{% else %}—{% endif %}</span>
               </div>
             </div>
           </div>
 
-          <div
-            class="lg:col-span-2 bg-white/60 backdrop-blur-xl border border-white/20 rounded-2xl shadow-lg shadow-purple-100/30 p-6"
-            data-aos="fade-up" data-aos-delay="200">
-            <h2 class="text-lg font-bold text-slate-700 mb-4">Test Prep Milestones</h2>
-            <div class="grid grid-cols-2 gap-4 text-center">
-              <div>
-                <p class="text-4xl font-bold text-purple-600">{{ test_prep_completed }}</p>
-                <p class="text-sm text-slate-500">Completed (Current)</p>
+          <div class="stat-card p-6" data-aos="fade-up" data-aos-delay="300">
+            <h2 class="text-lg font-bold text-indigo-800 mb-4">ACT Scores</h2>
+            <div class="space-y-4">
+              <div class="flex justify-between items-baseline">
+                <span class="text-slate-500">Math</span>
+                <span class="font-semibold text-2xl text-slate-700">{{ act_math or "—" }}</span>
               </div>
-              <div>
-                <p class="text-4xl font-bold text-purple-600">{{ total_test_prep_completed }}</p>
-                <p class="text-sm text-slate-500">Total Completed</p>
+              <div class="flex justify-between items-baseline">
+                <span class="text-slate-500">Reading</span>
+                <span class="font-semibold text-2xl text-slate-700">{{ act_reading or "—" }}</span>
+              </div>
+              <div class="flex justify-between items-baseline">
+                <span class="text-slate-500">Science</span>
+                <span class="font-semibold text-2xl text-slate-700">{{ act_science or "—" }}</span>
+              </div>
+              <div class="border-t border-slate-200/80 my-2"></div>
+              <div class="flex justify-between items-baseline">
+                <span class="font-bold text-indigo-700">Average</span>
+                <span class="font-bold text-3xl text-indigo-700">{% set act_scores = [] %}{% if act_math %}{% set _ =
+                  act_scores.append(act_math|int) %}{% endif %}{% if act_reading %}{% set _ =
+                  act_scores.append(act_reading|int) %}{% endif %}{% if act_science %}{% set _ =
+                  act_scores.append(act_science|int) %}{% endif %}{% if act_scores|length > 0 %}{{ ((act_scores|sum) /
+                  (act_scores|length))|round|int }}{% else %}—{% endif %}</span>
               </div>
             </div>
           </div>
 
-          <div
-            class="lg:col-span-2 bg-white/60 backdrop-blur-xl border border-white/20 rounded-2xl shadow-lg shadow-purple-100/30 p-6"
-            data-aos="fade-up" data-aos-delay="300">
-            <h2 class="text-lg font-bold text-slate-700 mb-4">College Planning Milestones</h2>
-            <div class="grid grid-cols-2 gap-4 text-center">
-              <div>
-                <p class="text-4xl font-bold text-indigo-600">{{ college_planning_completed_current }}</p>
-                <p class="text-sm text-slate-500">Completed (Current)</p>
+          <div class="stat-card md:col-span-2 lg:col-span-3 p-6" data-aos="fade-up" data-aos-delay="400">
+            <h2 class="text-lg font-bold text-slate-700 mb-4">Path Milestones Completed</h2>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 text-center">
+              <div class="bg-purple-50/70 p-4 rounded-xl">
+                <p class="text-5xl font-bold text-purple-600">{{ total_test_prep_completed }}</p>
+                <p class="text-sm text-slate-500 mt-1">Total Test Prep Tasks</p>
               </div>
-              <div>
-                <p class="text-4xl font-bold text-indigo-600">{{ total_college_planning_completed }}</p>
-                <p class="text-sm text-slate-500">Total Completed</p>
+              <div class="bg-indigo-50/70 p-4 rounded-xl">
+                <p class="text-5xl font-bold text-indigo-600">{{ total_college_planning_completed }}</p>
+                <p class="text-sm text-slate-500 mt-1">Total College Planning Tasks</p>
               </div>
             </div>
           </div>

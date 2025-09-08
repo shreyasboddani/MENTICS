@@ -292,7 +292,8 @@
                         data: data,
                         backgroundColor: 'rgba(167, 139, 250, 0.6)',
                         borderColor: 'rgba(167, 139, 250, 1)',
-                        borderWidth: 1
+                        borderWidth: 1,
+                        borderRadius: 4
                     }]
                 },
                 options: {
@@ -302,8 +303,10 @@
                     scales: {
                         y: {
                             min: yAxisMin,
-                            max: yAxisMax
-                        }
+                            max: yAxisMax,
+                            grid: { color: '#e2e8f0' }
+                        },
+                        x: { grid: { display: false } }
                     }
                 }
             });
@@ -321,7 +324,6 @@
             if (subject === 'composite') {
                 label = 'ACT Composite Score';
             } else {
-                // Capitalize subject name for the label
                 const subjectName = subject.split('_')[1];
                 label = `ACT ${subjectName.charAt(0).toUpperCase() + subjectName.slice(1)} Score`;
             }
@@ -342,7 +344,8 @@
                         data: data,
                         backgroundColor: 'rgba(99, 102, 241, 0.6)',
                         borderColor: 'rgba(99, 102, 241, 1)',
-                        borderWidth: 1
+                        borderWidth: 1,
+                        borderRadius: 4
                     }]
                 },
                 options: {
@@ -352,8 +355,10 @@
                     scales: {
                         y: {
                             min: 0,
-                            max: 36
-                        }
+                            max: 36,
+                            grid: { color: '#e2e8f0' }
+                        },
+                        x: { grid: { display: false } }
                     }
                 }
             });
@@ -382,7 +387,8 @@
                         data: [latestResearched, latestSubmitted],
                         backgroundColor: ['rgba(99, 102, 241, 0.6)', 'rgba(129, 140, 248, 0.6)'],
                         borderColor: ['rgba(99, 102, 241, 1)', 'rgba(129, 140, 248, 1)'],
-                        borderWidth: 1
+                        borderWidth: 1,
+                        borderRadius: 4
                     }]
                 },
                 options: {
@@ -392,7 +398,7 @@
                         legend: { display: false },
                         title: { display: true, text: `Current Essay Status: ${essayStatus}` }
                     },
-                    scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } }
+                    scales: { y: { beginAtZero: true, ticks: { stepSize: 1 }, grid: { color: '#e2e8f0' } }, x: { grid: { display: false } } }
                 }
             });
         }
@@ -400,7 +406,6 @@
         document.getElementById('sat-subject-selector').addEventListener('change', (e) => renderSatChart(e.target.value));
         document.getElementById('act-subject-selector').addEventListener('change', (e) => renderActChart(e.target.value));
 
-        // Initial chart renders
         renderSatChart();
         renderActChart();
         renderCollegeChart();
