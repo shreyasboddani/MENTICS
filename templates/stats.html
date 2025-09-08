@@ -66,79 +66,82 @@
           <p class="text-lg text-slate-600">A snapshot of your academic achievements and progress.</p>
         </div>
 
-        <div class="mt-8 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div class="mt-8 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
 
-          <div class="stat-card md:col-span-2 lg:col-span-1 p-6 flex flex-col justify-center items-center text-center"
+          <div class="stat-card lg:col-span-2 p-6 flex flex-col justify-center items-center text-center"
             data-aos="fade-up" data-aos-delay="100">
-            <div class="bg-purple-100 text-purple-600 rounded-full p-4 mb-4"><svg xmlns="http://www.w3.org/2000/svg"
-                viewBox="0 0 24 24" fill="currentColor" class="w-8 h-8">
-                <path
-                  d="M11.7 2.25c.513 0 1.02.194 1.414.586l8.25 8.25a2 2 0 0 1 0 2.828l-8.25 8.25a2 2 0 0 1-2.828 0l-8.25-8.25a2 2 0 0 1 0-2.828l8.25-8.25A2 2 0 0 1 11.7 2.25Zm0 2.53-6.836 6.836a.25.25 0 0 0 0 .354l6.836 6.836a.25.25 0 0 0 .354 0l6.836-6.836a.25.25 0 0 0 0-.354L12.053 4.78a.25.25 0 0 0-.354 0Z" />
-              </svg></div>
             <h2 class="text-lg font-bold text-slate-700">Current GPA</h2>
-            <p class="text-6xl font-bold text-purple-600 mt-1">{{ gpa or "N/A" }}</p>
+            <p class="gpa-text text-purple-600">{{ gpa or "N/A" }}</p>
           </div>
 
-          <div class="stat-card p-6" data-aos="fade-up" data-aos-delay="200">
+          <div class="stat-card lg:col-span-2 p-6" data-aos="fade-up" data-aos-delay="200">
+            <h2 class="text-lg font-bold text-slate-700 mb-4">Path Milestones</h2>
+            <div class="space-y-4">
+              <div class="flex items-center gap-4">
+                <div class="stat-icon bg-purple-100 text-purple-600 !p-3 !mb-0"><svg xmlns="http://www.w3.org/2000/svg"
+                    class="h-6 w-6" viewBox="0 0 24 24" fill="currentColor">
+                    <path
+                      d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4zm-2 16l-4-4 1.41-1.41L10 14.17l6.59-6.59L18 9l-8 8z" />
+                  </svg></div>
+                <div>
+                  <p class="font-bold text-2xl text-purple-700">{{ total_test_prep_completed }}</p>
+                  <p class="text-sm text-slate-500">Test Prep Tasks Completed</p>
+                </div>
+              </div>
+              <div class="flex items-center gap-4">
+                <div class="stat-icon bg-indigo-100 text-indigo-600 !p-3 !mb-0"><svg xmlns="http://www.w3.org/2000/svg"
+                    class="h-6 w-6" viewBox="0 0 24 24" fill="currentColor">
+                    <path
+                      d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4zm-2 16l-4-4 1.41-1.41L10 14.17l6.59-6.59L18 9l-8 8z" />
+                  </svg></div>
+                <div>
+                  <p class="font-bold text-2xl text-indigo-700">{{ total_college_planning_completed }}</p>
+                  <p class="text-sm text-slate-500">College Planning Tasks</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="stat-card lg:col-span-2 p-6" data-aos="fade-up" data-aos-delay="300">
             <h2 class="text-lg font-bold text-purple-800 mb-4">SAT Scores</h2>
-            <div class="space-y-4">
-              <div class="flex justify-between items-baseline">
-                <span class="text-slate-500">EBRW</span>
-                <span class="font-semibold text-2xl text-slate-700">{{ sat_ebrw or "—" }}</span>
+            <div class="grid grid-cols-2 gap-x-6 gap-y-4">
+              <div>
+                <p class="text-sm text-slate-500">EBRW</p>
+                <p class="font-semibold text-3xl text-slate-700">{{ sat_ebrw or "—" }}</p>
               </div>
-              <div class="flex justify-between items-baseline">
-                <span class="text-slate-500">Math</span>
-                <span class="font-semibold text-2xl text-slate-700">{{ sat_math or "—" }}</span>
+              <div>
+                <p class="text-sm text-slate-500">Math</p>
+                <p class="font-semibold text-3xl text-slate-700">{{ sat_math or "—" }}</p>
               </div>
-              <div class="border-t border-slate-200/80 my-2"></div>
-              <div class="flex justify-between items-baseline">
-                <span class="font-bold text-purple-700">Total</span>
-                <span class="font-bold text-3xl text-purple-700">{% if sat_ebrw and sat_math %}{{ sat_ebrw|int +
-                  sat_math|int }}{% else %}—{% endif %}</span>
+              <div class="col-span-2 border-t border-slate-200/80 pt-4 mt-2 text-center">
+                <p class="text-sm font-bold text-purple-700">Total Score</p>
+                <p class="font-bold text-5xl text-purple-700">{{ sat_total or "—" }}</p>
               </div>
             </div>
           </div>
 
-          <div class="stat-card p-6" data-aos="fade-up" data-aos-delay="300">
+          <div class="stat-card lg:col-span-2 p-6" data-aos="fade-up" data-aos-delay="400">
             <h2 class="text-lg font-bold text-indigo-800 mb-4">ACT Scores</h2>
-            <div class="space-y-4">
-              <div class="flex justify-between items-baseline">
-                <span class="text-slate-500">Math</span>
-                <span class="font-semibold text-2xl text-slate-700">{{ act_math or "—" }}</span>
+            <div class="grid grid-cols-3 gap-x-4 gap-y-4">
+              <div class="text-center">
+                <p class="text-sm text-slate-500">Math</p>
+                <p class="font-semibold text-3xl text-slate-700">{{ act_math or "—" }}</p>
               </div>
-              <div class="flex justify-between items-baseline">
-                <span class="text-slate-500">Reading</span>
-                <span class="font-semibold text-2xl text-slate-700">{{ act_reading or "—" }}</span>
+              <div class="text-center">
+                <p class="text-sm text-slate-500">Reading</p>
+                <p class="font-semibold text-3xl text-slate-700">{{ act_reading or "—" }}</p>
               </div>
-              <div class="flex justify-between items-baseline">
-                <span class="text-slate-500">Science</span>
-                <span class="font-semibold text-2xl text-slate-700">{{ act_science or "—" }}</span>
+              <div class="text-center">
+                <p class="text-sm text-slate-500">Science</p>
+                <p class="font-semibold text-3xl text-slate-700">{{ act_science or "—" }}</p>
               </div>
-              <div class="border-t border-slate-200/80 my-2"></div>
-              <div class="flex justify-between items-baseline">
-                <span class="font-bold text-indigo-700">Average</span>
-                <span class="font-bold text-3xl text-indigo-700">{% set act_scores = [] %}{% if act_math %}{% set _ =
-                  act_scores.append(act_math|int) %}{% endif %}{% if act_reading %}{% set _ =
-                  act_scores.append(act_reading|int) %}{% endif %}{% if act_science %}{% set _ =
-                  act_scores.append(act_science|int) %}{% endif %}{% if act_scores|length > 0 %}{{ ((act_scores|sum) /
-                  (act_scores|length))|round|int }}{% else %}—{% endif %}</span>
+              <div class="col-span-3 border-t border-slate-200/80 pt-4 mt-2 text-center">
+                <p class="text-sm font-bold text-indigo-700">Average Score</p>
+                <p class="font-bold text-5xl text-indigo-700">{{ act_average or "—" }}</p>
               </div>
             </div>
           </div>
 
-          <div class="stat-card md:col-span-2 lg:col-span-3 p-6" data-aos="fade-up" data-aos-delay="400">
-            <h2 class="text-lg font-bold text-slate-700 mb-4">Path Milestones Completed</h2>
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 text-center">
-              <div class="bg-purple-50/70 p-4 rounded-xl">
-                <p class="text-5xl font-bold text-purple-600">{{ total_test_prep_completed }}</p>
-                <p class="text-sm text-slate-500 mt-1">Total Test Prep Tasks</p>
-              </div>
-              <div class="bg-indigo-50/70 p-4 rounded-xl">
-                <p class="text-5xl font-bold text-indigo-600">{{ total_college_planning_completed }}</p>
-                <p class="text-sm text-slate-500 mt-1">Total College Planning Tasks</p>
-              </div>
-            </div>
-          </div>
         </div>
       </main>
     </div>

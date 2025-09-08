@@ -20,7 +20,7 @@ app = Flask(__name__)
 app.secret_key = "supersecretkey"
 app.url_map.strict_slashes = False
 app.permanent_session_lifetime = timedelta(
-    minutes=10)  # Set session timeout to 10 minutes
+    minutes=10)
 
 db = DatabaseHandler("users.db")
 
@@ -56,7 +56,6 @@ def init_db():
         "stat_value": "TEXT NOT NULL",
         "recorded_at": "TIMESTAMP DEFAULT CURRENT_TIMESTAMP"
     })
-    # NEW: Table to store chat history
     db.create_table("chat_conversations", {
         "id": "INTEGER PRIMARY KEY AUTOINCREMENT",
         "user_id": "INTEGER NOT NULL",
@@ -64,8 +63,29 @@ def init_db():
         "history": "TEXT NOT NULL",
         "UNIQUE": "(user_id, category)"
     })
+    # NEW: Table to store recent user activities
+    db.create_table("activity_log", {
+        "id": "INTEGER PRIMARY KEY AUTOINCREMENT",
+        "user_id": "INTEGER NOT NULL",
+        # e.g., 'task_completed', 'path_generated', 'stat_updated'
+        "activity_type": "TEXT NOT NULL",
+        # JSON string with context like task name, stat name, etc.
+        "details": "TEXT",
+        "created_at": "TIMESTAMP DEFAULT CURRENT_TIMESTAMP"
+    })
 
-# --- DECORATORS ---
+# --- HELPER FUNCTIONS ---
+
+
+def log_activity(user_id, activity_type, details={}):
+    """Helper function to log user activities into the database."""
+    db.insert("activity_log", {
+        "user_id": user_id,
+        "activity_type": activity_type,
+        "details": json.dumps(details)
+    })
+
+# --- DECORATORS & FILTERS ---
 
 
 def login_required(f):
@@ -83,34 +103,45 @@ def login_required(f):
 
 @app.template_filter('format_date')
 def format_date_filter(s):
-    """Jinja2 filter to parse a UTC timestamp string and convert it to the correct local date."""
     if not s:
         return ""
     try:
-        # Parse the naive timestamp string from the database
         naive_dt = datetime.strptime(s, '%Y-%m-%d %H:%M:%S')
-
-        # 1. Tell Python the timestamp is in UTC
         utc_dt = naive_dt.replace(tzinfo=ZoneInfo("UTC"))
-
-        # 2. Convert it to the user's local time (Eastern Time)
         eastern_dt = utc_dt.astimezone(ZoneInfo("America/New_York"))
-
-        # 3. Return the correctly formatted local date
         return eastern_dt.strftime('%Y-%m-%d')
-    except ZoneInfoNotFoundError:
-        app.logger.warning(
-            "Timezone data not found. Dates will be displayed in UTC. "
-            "To display local time, install the 'tzdata' package: pip install tzdata"
-        )
-        # Fallback to showing the date part of the UTC string
-        return s.split(' ')[0] if ' ' in s else s
-    except (ValueError, TypeError):
-        # Fallback for any malformed dates
+    except (ZoneInfoNotFoundError, ValueError, TypeError):
         return s.split(' ')[0] if ' ' in s else s
 
+# NEW: Jinja2 filter to display relative time
 
-# --- AI HELPER FUNCTIONS ---
+
+@app.template_filter('time_ago')
+def time_ago_filter(s):
+    if not s:
+        return ""
+    try:
+        naive_dt = datetime.strptime(s, '%Y-%m-%d %H:%M:%S')
+        utc_dt = naive_dt.replace(tzinfo=ZoneInfo("UTC"))
+        now = datetime.now(ZoneInfo("UTC"))
+        diff = now - utc_dt
+
+        seconds = diff.total_seconds()
+        if seconds < 60:
+            return "just now"
+        minutes = seconds / 60
+        if minutes < 60:
+            return f"{int(minutes)}m ago"
+        hours = minutes / 60
+        if hours < 24:
+            return f"{int(hours)}h ago"
+        days = hours / 24
+        return f"{int(days)}d ago"
+    except (ZoneInfoNotFoundError, ValueError, TypeError):
+        return s.split(' ')[0]
+
+# --- AI HELPER FUNCTIONS (No changes here) ---
+# ... (all AI helper functions like _get_test_prep_ai_tasks remain the same) ...
 
 
 def _get_test_prep_ai_tasks(strengths, weaknesses, user_stats={}, chat_history=[], path_history={}):
@@ -268,38 +299,28 @@ def _generate_and_save_new_test_path(user_id, strengths, weaknesses, chat_histor
         "incomplete": [task for task in all_tasks if not task[4]]
     }
 
-    # --- START FIX ---
-    # This now ONLY deactivates the currently active path, preventing race conditions.
     db.update("paths", {"is_active": False}, where={
               "user_id": user_id, "category": "Test Prep", "is_active": True})
-    # --- END FIX ---
 
     tasks = _get_test_prep_ai_tasks(strengths, weaknesses,
                                     user_stats, chat_history, path_history)
-
-    # BUG FIX: Ensure exactly 5 tasks are saved
     tasks = tasks[:5]
 
     saved_tasks = []
     for i, task in enumerate(tasks):
         task_id = db.insert("paths", {
-            "user_id": user_id,
-            "task_order": i + 1,
-            "description": task.get("description"),
-            "type": task.get("type"),
-            "stat_to_update": task.get("stat_to_update"),
-            "category": "Test Prep",
-            "is_active": True,
-            "is_completed": False
+            "user_id": user_id, "task_order": i + 1, "description": task.get("description"),
+            "type": task.get("type"), "stat_to_update": task.get("stat_to_update"),
+            "category": "Test Prep", "is_active": True, "is_completed": False
         })
         new_task_data = db.select("paths", where={"id": task_id})[0]
         saved_tasks.append({
-            "id": new_task_data[0],
-            "description": new_task_data[3],
-            "type": new_task_data[7],
-            "stat_to_update": new_task_data[8],
+            "id": new_task_data[0], "description": new_task_data[3],
+            "type": new_task_data[7], "stat_to_update": new_task_data[8],
             "is_completed": False
         })
+    # LOGGING
+    log_activity(user_id, 'path_generated', {'category': 'Test Prep'})
     return saved_tasks
 
 
@@ -437,16 +458,12 @@ def _generate_and_save_new_college_path(user_id, college_context, chat_history=[
             "incomplete": [task for task in all_college_tasks if not task[4]]
         }
 
-        # --- START FIX ---
-        # This now ONLY deactivates the currently active path, preventing race conditions.
         db.update("paths", {"is_active": False}, where={
                   "user_id": user_id, "category": "College Planning", "is_active": True})
-        # --- END FIX ---
 
         tasks = _get_college_planning_ai_tasks(
             college_context, user_stats, path_history, chat_history)
 
-        # BUG FIX: Ensure exactly 5 tasks are saved
         tasks = tasks[:5]
 
         if not tasks or len(tasks) != 5:
@@ -456,24 +473,22 @@ def _generate_and_save_new_college_path(user_id, college_context, chat_history=[
         saved_tasks = []
         for i, task_data in enumerate(tasks):
             task_id = db.insert("paths", {
-                "user_id": user_id,
-                "task_order": i + 1,
-                "description": task_data.get("description"),
-                "type": task_data.get("type"),
-                "stat_to_update": task_data.get("stat_to_update"),
-                "category": "College Planning",
-                "is_active": True,
-                "is_completed": False
+                "user_id": user_id, "task_order": i + 1, "description": task_data.get("description"),
+                "type": task_data.get("type"), "stat_to_update": task_data.get("stat_to_update"),
+                "category": "College Planning", "is_active": True, "is_completed": False
             })
             saved_tasks.append(
                 {**task_data, "id": task_id, "is_completed": False})
 
+        # LOGGING
+        log_activity(user_id, 'path_generated', {
+                     'category': 'College Planning'})
         return saved_tasks
     except Exception as e:
         print(f"Error in _generate_and_save_new_college_path: {e}")
         return []
 
-# --- Standard Routes ---
+# --- Standard Routes (No changes here) ---
 
 
 @app.route("/")
@@ -489,8 +504,7 @@ def signup():
         password = generate_password_hash(request.form["password"])
         try:
             user_id = db.insert("users", {
-                "email": email,
-                "password": password,
+                "email": email, "password": password,
                 "stats": json.dumps({
                     "sat_ebrw": "", "sat_math": "", "act_math": "",
                     "act_reading": "", "act_science": "", "gpa": "", "milestones": 0
@@ -510,7 +524,6 @@ def signup():
 def login():
     if "user" in session:
         return redirect(url_for("dashboard"))
-
     if request.method == "POST":
         email = request.form["email"]
         password = request.form["password"]
@@ -530,7 +543,7 @@ def logout():
     session.clear()
     return redirect(url_for("home"))
 
-# --- Dashboard & Path Routes ---
+# --- Dashboard & Path Routes (UPDATED) ---
 
 
 @app.route("/dashboard")
@@ -553,14 +566,32 @@ def dashboard():
     total_college_planning_completed = sum(
         1 for t in all_tasks if t[4] and t[9] == 'College Planning')
 
+    # NEW: Fetch recent activities
+    recent_activities_raw = db.select(
+        "activity_log",
+        where={"user_id": user_id},
+        order_by="created_at DESC LIMIT 5"
+    )
+    recent_activities = []
+    for activity in recent_activities_raw:
+        details = json.loads(activity[3])
+        recent_activities.append({
+            "type": activity[2],
+            "details": details,
+            "timestamp": activity[4]
+        })
+
     return render_template(
         "dashboard.html",
         test_prep_completed=test_prep_completed_current,
         total_test_prep_completed=total_test_prep_completed,
         college_planning_completed=college_planning_completed_current,
         total_college_planning_completed=total_college_planning_completed,
-        gpa=stats.get("gpa", "")
+        gpa=stats.get("gpa", ""),
+        recent_activities=recent_activities  # Pass activities to template
     )
+
+# ... (test_path_builder, test_path_view, college_path_builder, college_path_view are unchanged) ...
 
 
 @app.route("/dashboard/test-path-builder", methods=["GET", "POST"])
@@ -614,8 +645,7 @@ def college_path_builder():
 @login_required
 def college_path_view():
     return render_template("college_path_view.html")
-
-# --- Stats & Tracker Routes ---
+# --- Stats & Tracker Routes (UPDATED) ---
 
 
 @app.route("/dashboard/stats", methods=["GET"])
@@ -623,26 +653,50 @@ def college_path_view():
 def stats():
     user = User.from_session(db, session)
     stats = user.get_stats()
-    all_tasks = db.select("paths", where={"user_id": user.data[0]})
-    active_test_tasks = [t for t in all_tasks if t[5] and t[9] == 'Test Prep']
-    test_prep_completed = sum(1 for t in active_test_tasks if t[4])
+    user_id = user.data[0]
+    all_tasks = db.select("paths", where={"user_id": user_id})
+
+    # --- SERVER-SIDE CALCULATION FIXES ---
+    # SAT Total
+    sat_ebrw = stats.get("sat_ebrw")
+    sat_math = stats.get("sat_math")
+    sat_total = None
+    if sat_ebrw and sat_math:
+        try:
+            sat_total = int(sat_ebrw) + int(sat_math)
+        except (ValueError, TypeError):
+            sat_total = None  # Handle case where values are not valid integers
+
+    # ACT Average
+    act_scores = []
+    if stats.get("act_math"):
+        act_scores.append(int(stats.get("act_math")))
+    if stats.get("act_reading"):
+        act_scores.append(int(stats.get("act_reading")))
+    if stats.get("act_science"):
+        act_scores.append(int(stats.get("act_science")))
+
+    act_average = None
+    if act_scores:
+        act_average = round(sum(act_scores) / len(act_scores))
+
     total_test_prep_completed = sum(
         1 for t in all_tasks if t[4] and t[9] == 'Test Prep')
-    active_college_tasks = [
-        t for t in all_tasks if t[5] and t[9] == 'College Planning']
-    college_planning_completed_current = sum(
-        1 for t in active_college_tasks if t[4])
     total_college_planning_completed = sum(
         1 for t in all_tasks if t[4] and t[9] == 'College Planning')
+
     return render_template(
         "stats.html",
-        test_prep_completed=test_prep_completed,
+        gpa=stats.get("gpa", ""),
+        sat_ebrw=sat_ebrw,
+        sat_math=sat_math,
+        sat_total=sat_total,
+        act_math=stats.get("act_math", ""),
+        act_reading=stats.get("act_reading", ""),
+        act_science=stats.get("act_science", ""),
+        act_average=act_average,
         total_test_prep_completed=total_test_prep_completed,
-        college_planning_completed_current=college_planning_completed_current,
-        total_college_planning_completed=total_college_planning_completed,
-        gpa=stats.get("gpa", ""), sat_ebrw=stats.get("sat_ebrw", ""),
-        sat_math=stats.get("sat_math", ""), act_math=stats.get("act_math", ""),
-        act_reading=stats.get("act_reading", ""), act_science=stats.get("act_science", "")
+        total_college_planning_completed=total_college_planning_completed
     )
 
 
@@ -652,37 +706,44 @@ def edit_stats():
     user = User.from_session(db, session)
     stats = user.get_stats()
     if request.method == "POST":
-        stats["sat_ebrw"] = request.form.get("sat_ebrw", "")
-        stats["sat_math"] = request.form.get("sat_math", "")
-        stats["act_math"] = request.form.get("act_math", "")
-        stats["act_reading"] = request.form.get("act_reading", "")
-        stats["act_science"] = request.form.get("act_science", "")
-        stats["gpa"] = request.form.get("gpa", "")
+        updated_stats = {
+            "gpa": request.form.get("gpa", ""),
+            "sat_ebrw": request.form.get("sat_ebrw", ""),
+            "sat_math": request.form.get("sat_math", ""),
+            "act_math": request.form.get("act_math", ""),
+            "act_reading": request.form.get("act_reading", ""),
+            "act_science": request.form.get("act_science", "")
+        }
+
+        for key, value in updated_stats.items():
+            # Log an activity only if the value has changed
+            if stats.get(key) != value and value:
+                stats[key] = value
+                log_activity(user.data[0], 'stat_updated', {
+                             'stat_name': key.upper(), 'stat_value': value})
+
         user.set_stats(stats)
         return redirect(url_for("stats"))
+
     return render_template(
         "edit_stats.html",
-        sat_ebrw=stats.get("sat_ebrw", ""),
-        sat_math=stats.get("sat_math", ""),
-        act_math=stats.get("act_math", ""),
-        act_reading=stats.get("act_reading", ""),
-        act_science=stats.get("act_science", ""),
-        gpa=stats.get("gpa", "")
+        sat_ebrw=stats.get("sat_ebrw", ""), sat_math=stats.get("sat_math", ""),
+        act_math=stats.get("act_math", ""), act_reading=stats.get("act_reading", ""),
+        act_science=stats.get("act_science", ""), gpa=stats.get("gpa", "")
     )
 
 
 @app.route("/dashboard/tracker")
 @login_required
 def tracker():
+    # ... (This route is unchanged) ...
     user = User.from_session(db, session)
     user_id = user.data[0]
     all_tasks = db.select(
         "paths", where={"user_id": user_id}, order_by="created_at DESC")
     test_prep_generations, college_planning_generations = {}, {}
 
-    # This loop is now reverted to correctly separate generations
     for task in all_tasks:
-        # Use the full, unique timestamp for grouping
         generation_key, category = task[6], task[9]
         if category == 'Test Prep':
             if generation_key not in test_prep_generations:
@@ -717,13 +778,13 @@ def tracker():
         test_prep_generations=test_prep_generations,
         college_planning_generations=college_planning_generations
     )
-
-# --- API ROUTES ---
+# --- API ROUTES (UPDATED) ---
 
 
 @app.route('/api/test-path-status')
 @login_required
 def test_path_status():
+    # ... (This route is unchanged) ...
     user = User.from_session(db, session)
     user_id = user.data[0]
     active_tasks = db.select(
@@ -734,6 +795,7 @@ def test_path_status():
 @app.route('/api/college-path-status')
 @login_required
 def college_path_status():
+    # ... (This route is unchanged) ...
     user = User.from_session(db, session)
     user_id = user.data[0]
     active_tasks = db.select(
@@ -744,13 +806,12 @@ def college_path_status():
 @app.route("/api/tasks", methods=['GET', 'POST'])
 @login_required
 def api_tasks():
+    # ... (This route is unchanged) ...
     user = User.from_session(db, session)
     user_id = user.data[0]
     stats = user.get_stats()
     category = request.args.get('category', 'Test Prep')
     try:
-        # --- START REVISED FIX ---
-        # Find the timestamp of the single most recently created active task.
         latest_task_query = """
             SELECT created_at FROM paths 
             WHERE user_id=? AND category=? AND is_active=True 
@@ -761,8 +822,6 @@ def api_tasks():
 
         active_path = []
         if latest_task_timestamp_result:
-            # Now, select ALL active tasks that share that exact timestamp.
-            # This is the core of the race condition fix.
             latest_timestamp = latest_task_timestamp_result[0][0]
             active_path = db.select(
                 "paths", where={
@@ -771,9 +830,7 @@ def api_tasks():
                     "category": category,
                     "created_at": latest_timestamp
                 })
-        # --- END REVISED FIX ---
 
-        # Revert to the original, working control flow
         if request.method == "POST" or not active_path:
             chat_record = db.select("chat_conversations", where={
                                     "user_id": user_id, "category": category})
@@ -812,12 +869,21 @@ def api_update_task_status():
     status = data.get("status")
     task_id = data.get("taskId")
 
-    # The 'failed' status is now handled via chat interaction.
-    # This endpoint now only handles marking tasks as complete.
     if status == 'complete' and task_id:
-        db.update("paths", {"is_completed": True}, where={
-                  "id": task_id, "user_id": user_id})
+        # Fetch task details before updating to log them
+        task_info = db.select(
+            "paths", where={"id": task_id, "user_id": user_id})
+        if task_info:
+            description = task_info[0][3]
+            category = task_info[0][9]
+            db.update("paths", {"is_completed": True}, where={
+                      "id": task_id, "user_id": user_id})
+            # LOGGING
+            log_activity(user_id, 'task_completed', {
+                         'description': description, 'category': category})
     return jsonify({"success": True})
+
+# ... (api_chat, get_chat_history, reset_chat_history are unchanged) ...
 
 
 @app.route("/api/chat", methods=['POST'])
@@ -925,22 +991,21 @@ def api_update_stats():
         return jsonify({"success": False, "error": "Missing stat name or value"}), 400
 
     try:
-        # These are practice scores and should only go to the tracker
         if stat_name in ["sat_total", "act_composite"]:
             db.insert("stat_history", {
-                "user_id": user.data[0],
-                "stat_name": stat_name,
-                "stat_value": stat_value
+                "user_id": user.data[0], "stat_name": stat_name, "stat_value": stat_value
             })
-        else:  # These are official scores/stats, update both
+        else:
             stats = user.get_stats()
             stats[stat_name] = stat_value
             user.set_stats(stats)
             db.insert("stat_history", {
-                "user_id": user.data[0],
-                "stat_name": stat_name,
-                "stat_value": stat_value
+                "user_id": user.data[0], "stat_name": stat_name, "stat_value": stat_value
             })
+            # LOGGING
+            log_activity(user.data[0], 'stat_updated', {
+                         'stat_name': stat_name.upper(), 'stat_value': stat_value})
+
         return jsonify({"success": True, "message": "Stats updated successfully"})
     except Exception as e:
         print(f"Error updating stats via API: {e}")

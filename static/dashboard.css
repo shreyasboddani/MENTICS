@@ -47,9 +47,10 @@ body::before {
     }
 }
 
-/* --- DASHBOARD-SPECIFIC STYLES --- */
+/* --- REFINED GLASSMORPHISM CARD STYLES --- */
+.stat-card,
 .metric-card {
-    background-color: rgba(255, 255, 255, 0.5);
+    background-color: rgba(255, 255, 255, 0.6);
     backdrop-filter: blur(20px);
     -webkit-backdrop-filter: blur(20px);
     border: 1px solid rgba(255, 255, 255, 0.2);
@@ -58,24 +59,85 @@ body::before {
     padding: 1.5rem;
     /* 24px */
     transition: transform 0.3s ease, box-shadow 0.3s ease;
-    box-shadow: 0 8px 32px rgba(139, 92, 246, 0.05);
+    box-shadow: 0 8px 32px rgba(139, 92, 246, 0.08);
 }
 
+.stat-card:hover,
 .metric-card:hover {
     transform: translateY(-8px);
-    box-shadow: 0 20px 40px rgba(139, 92, 246, 0.1);
+    box-shadow: 0 20px 40px rgba(139, 92, 246, 0.15);
 }
 
-.progress-circle {
-    transform: rotate(-90deg);
+/* STATS PAGE - NEW ICON STYLE */
+.stat-icon {
+    border-radius: 9999px;
+    /* rounded-full */
+    padding: 1rem;
+    /* p-4 */
+    margin-bottom: 1rem;
+    /* mb-4 */
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
 }
 
-.progress-circle-bar {
-    transition: stroke-dashoffset 0.8s ease-out;
+/* DASHBOARD PAGE STYLES */
+/* ... (Keep your other dashboard styles like .info-card, .activity-item, etc. here) ... */
+.info-card {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+}
+
+.activity-item {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.75rem;
+    border-radius: 0.75rem;
+    transition: background-color 0.2s ease;
+}
+
+.activity-item:hover {
+    background-color: rgba(243, 244, 246, 0.5);
+}
+
+.activity-icon {
+    flex-shrink: 0;
+    width: 2.25rem;
+    height: 2.25rem;
+    border-radius: 9999px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1rem;
+}
+
+.quick-action-card {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    cursor: pointer;
+}
+
+.quick-action-icon {
+    flex-shrink: 0;
+    width: 3.5rem;
+    height: 3.5rem;
+    border-radius: 1rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: transform 0.3s ease, background-color 0.3s ease;
+}
+
+.quick-action-card:hover .quick-action-icon {
+    transform: scale(1.1) rotate(-5deg);
 }
 
 
-/* --- PORTAL MODAL STYLES (NEW) --- */
+/* --- PORTAL MODAL STYLES (NO CHANGES) --- */
+/* ... (Keep all your existing portal modal styles here) ... */
 #pathModal {
     transition: opacity 0.3s ease-out;
     background: radial-gradient(circle at center, rgba(17, 24, 39, 0.7) 0%, rgba(0, 0, 0, 0.7) 100%);
@@ -83,7 +145,6 @@ body::before {
     -webkit-backdrop-filter: blur(8px);
 }
 
-/* Modal Entry Animation */
 #pathModal.modal-enter-active {
     opacity: 1;
 }
@@ -92,22 +153,21 @@ body::before {
     opacity: 0;
 }
 
-/* Header Text Animation */
-.modal-header-text {
-    opacity: 0;
-    transform: translateY(-20px);
-    animation: slide-in-top 0.6s cubic-bezier(0.25, 1, 0.5, 1) forwards;
-    animation-delay: 0.2s;
-}
-
+.modal-header-text,
 .modal-header-subtext {
     opacity: 0;
     transform: translateY(-20px);
     animation: slide-in-top 0.6s cubic-bezier(0.25, 1, 0.5, 1) forwards;
+}
+
+.modal-header-text {
+    animation-delay: 0.2s;
+}
+
+.modal-header-subtext {
     animation-delay: 0.3s;
 }
 
-/* Portal Button Animations */
 .portal-button {
     opacity: 0;
     transform: translateY(30px) scale(0.9);
@@ -141,7 +201,6 @@ body::before {
         transform: translateY(0) scale(1);
     }
 }
-
 
 .portal-button {
     width: 320px;
@@ -207,13 +266,11 @@ body::before {
 }
 
 .portal-icon {
-    width: 60px;
-    height: 60px;
+    font-size: 3rem;
     margin-bottom: 10px;
     filter: drop-shadow(0 4px 10px rgba(0, 0, 0, 0.6));
 }
 
-/* -- WARP OUT ANIMATION -- */
 .portal-button.warping {
     z-index: 100;
 }
@@ -239,8 +296,6 @@ body::before {
     transform: translateY(-20px) !important;
 }
 
-
-/* Keyframes */
 @keyframes portal-idle-rotate {
     from {
         transform: rotate(0deg);
@@ -269,21 +324,21 @@ body::before {
         filter: brightness(2.5) hue-rotate(90deg) saturate(2);
         opacity: 0;
     }
+}
 
-    .portal-icon-emoji {
-        display: inline-flex;
-        /* Treat the span as an inline element but its content as a flex item */
-        align-items: center;
-        /* Center the emoji vertically */
-        justify-content: center;
-        /* Center the emoji horizontally */
+/* ADD THIS STYLE TO THE END OF static/dashboard.css */
 
-        /* Set the exact size you want the icon to be */
-        width: 24px;
-        height: 24px;
-
-        /* Optional: Helps with slight alignment shifts next to text */
-        vertical-align: middle;
-    }
-
+/* STATS PAGE - NEW GPA TEXT STYLE */
+.gpa-text {
+    font-family: 'Courier New', monospace;
+    font-weight: 700;
+    font-size: 8rem;
+    /* 128px */
+    line-height: 1;
+    margin-top: 0.5rem;
+    /* 8px */
+    flex-grow: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
 }
