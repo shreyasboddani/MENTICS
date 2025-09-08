@@ -85,6 +85,27 @@ def log_activity(user_id, activity_type, details={}):
         "details": json.dumps(details)
     })
 
+# NEW: Helper to get tracker data for prompts
+
+
+def _get_stat_history_for_prompt(user_id):
+    """Fetches and formats a summary of the user's stat history for AI prompts."""
+    history_records = db.select(
+        "stat_history", where={"user_id": user_id}, order_by="recorded_at DESC LIMIT 20")
+    if not history_records:
+        return "No historical performance data available yet."
+
+    summary = []
+    for record in history_records:
+        stat_name, stat_value, recorded_at = record[2], record[3], record[4]
+        date = recorded_at.split(" ")[0]
+        # Make stat names more readable
+        readable_name = stat_name.replace('_', ' ').title()
+        summary.append(
+            f"- On {date}, their {readable_name} was recorded as {stat_value}.")
+    return "\n".join(summary)
+
+
 # --- DECORATORS & FILTERS ---
 
 
@@ -140,11 +161,10 @@ def time_ago_filter(s):
     except (ZoneInfoNotFoundError, ValueError, TypeError):
         return s.split(' ')[0]
 
-# --- AI HELPER FUNCTIONS (No changes here) ---
-# ... (all AI helper functions like _get_test_prep_ai_tasks remain the same) ...
+# --- AI HELPER FUNCTIONS (UPDATED) ---
 
 
-def _get_test_prep_ai_tasks(strengths, weaknesses, user_stats={}, chat_history=[], path_history={}):
+def _get_test_prep_ai_tasks(strengths, weaknesses, user_stats={}, chat_history=[], path_history={}, stat_history=""):
     """Generates test preparation tasks with a hyper-detailed prompt for maximum reliability."""
 
     def get_mock_tasks_reliably():
@@ -199,13 +219,14 @@ def _get_test_prep_ai_tasks(strengths, weaknesses, user_stats={}, chat_history=[
         f"This is critical context. The new plan MUST be a logical continuation of their journey.\n"
         f"- Recently Completed Tasks: {completed_tasks_str}\n"
         f"- Incomplete or Failed Tasks: {incomplete_tasks_str}\n"
-        f"- Recent Conversation: {chat_history_str}\n\n"
+        f"- Recent Conversation: {chat_history_str}\n"
+        f"- Historical Performance Data (from Tracker):\n{stat_history}\n\n"
         f"# YOUR TASK: GENERATE A NEW 5-STEP PLAN\n"
-        f"Based on your analysis, generate a new, 5-step study plan. The plan must be actionable and adapt to the student's recent conversation and performance. For example, if they struggled with a math concept in the chat, the new plan should include a task to address it.\n\n"
+        f"Based on your analysis, generate a new, 5-step study plan. The plan must be actionable and adapt to the student's recent conversation and performance. For example, if they struggled with a math concept in the chat or their tracker data shows low math scores, the new plan should include a task to address it.\n\n"
         f"# CRITICAL DIRECTIVES\n"
         f"1.  **JSON Output ONLY**: Your entire output MUST be a single, raw JSON object. Do not include any text before or after the JSON.\n"
         f"2.  **Exact Task Count**: The plan must contain EXACTLY 5 task objects in the `tasks` list.\n"
-        f"3.  **Adaptive Focus**: If the conversation indicates a clear preference for ONLY the SAT or ONLY the ACT, all 5 tasks MUST be for that specific test. Do not mix them.\n"
+        f"3.  **Adaptive Focus**: If the conversation or tracker data indicates a clear preference for ONLY the SAT or ONLY the ACT, all 5 tasks MUST be for that specific test. Do not mix them.\n"
         f"4.  **Meaningful Milestones**: Only use the 'milestone' type for significant achievements like a full practice test or section. Use 'standard' for drills, review, or concept learning. 'stat_to_update' must be null for 'standard' tasks.\n"
         f"5.  **Correct Stat Naming**: For milestones, `stat_to_update` must be one of the following: ['sat_math', 'sat_ebrw', 'sat_total', 'act_math', 'act_reading', 'act_science', 'act_composite'].\n"
         f"6.  **Avoid Repetition**: Do not generate tasks that are identical to recently completed or incomplete tasks. The plan must feel fresh and progressive.\n\n"
@@ -240,7 +261,7 @@ def _get_test_prep_ai_tasks(strengths, weaknesses, user_stats={}, chat_history=[
         return get_mock_tasks_reliably()
 
 
-def _get_test_prep_ai_chat_response(history, user_stats):
+def _get_test_prep_ai_chat_response(history, user_stats, stat_history=""):
     if not os.getenv("GEMINI_API_KEY"):
         return "I'm in testing mode, but I'm saving our conversation!"
 
@@ -261,13 +282,15 @@ def _get_test_prep_ai_chat_response(history, user_stats):
     system_message = (
         "You are a friendly, intelligent, and highly adaptive study coach. Your personality is encouraging and supportive. Here is the student's test date information: "
         f"'{test_date_info}'.\n\n"
+        f"## Student's Historical Performance Data (from Tracker):\n{stat_history}\n\n"
         f"## Your Core Directives:\n"
         f"1.  **Initial Greeting**: If the conversation is new, greet the user warmly. Remind them of their test date if it's set and ask what they want to focus on. Mention they can say 'new path' to get an updated plan based on our chat.\n"
-        f"2.  **Adaptive Response Length**: Your primary goal is to match the user's energy and communication style. \n"
+        f"2.  **Use Tracker Data**: If the user asks about their progress (e.g., 'how am I doing in math?'), use the historical data to give them an informed answer. Identify trends if possible.\n"
+        f"3.  **Adaptive Response Length**: Your primary goal is to match the user's energy and communication style. \n"
         f"    - If the user asks a simple, direct question (e.g., 'What's next?' or 'I'm done'), provide a SHORT, concise, and encouraging answer to keep the momentum going.\n"
         f"    - If the user expresses confusion, says they are 'stuck', or asks for a detailed explanation (e.g., 'How do I solve quadratic equations?' or 'I'm having trouble with the reading section'), provide a LONGER, more detailed response. Break down the problem into clear, actionable steps, offer strategies, and be a true teacher.\n"
-        f"3.  **Be a Proactive Tutor**: When a user is stuck, provide specific, actionable advice. Break down the task into smaller steps or offer alternative strategies. Do not just suggest regenerating the path unless they ask for it.\n"
-        f"4.  **Acknowledge & Regenerate**: If the user asks to change focus or get a new path, confirm their request and let them know you're building a new plan for them."
+        f"4.  **Be a Proactive Tutor**: When a user is stuck, provide specific, actionable advice. Break down the task into smaller steps or offer alternative strategies. Do not just suggest regenerating the path unless they ask for it.\n"
+        f"5.  **Acknowledge & Regenerate**: If the user asks to change focus or get a new path, confirm their request and let them know you're building a new plan for them."
     )
 
     gemini_history = []
@@ -299,11 +322,14 @@ def _generate_and_save_new_test_path(user_id, strengths, weaknesses, chat_histor
         "incomplete": [task for task in all_tasks if not task[4]]
     }
 
+    # Fetch tracker data
+    stat_history = _get_stat_history_for_prompt(user_id)
+
     db.update("paths", {"is_active": False}, where={
               "user_id": user_id, "category": "Test Prep", "is_active": True})
 
     tasks = _get_test_prep_ai_tasks(strengths, weaknesses,
-                                    user_stats, chat_history, path_history)
+                                    user_stats, chat_history, path_history, stat_history)
     tasks = tasks[:5]
 
     saved_tasks = []
@@ -324,7 +350,7 @@ def _generate_and_save_new_test_path(user_id, strengths, weaknesses, chat_histor
     return saved_tasks
 
 
-def _get_college_planning_ai_tasks(college_context, user_stats, path_history, chat_history=[]):
+def _get_college_planning_ai_tasks(college_context, user_stats, path_history, chat_history=[], stat_history=""):
     """Generates college planning tasks with a hyper-detailed prompt."""
 
     def get_mock_tasks_reliably():
@@ -367,9 +393,10 @@ def _get_college_planning_ai_tasks(college_context, user_stats, path_history, ch
         f"This is critical context. The new plan MUST be a logical continuation of their journey, adapting to their recent conversations and progress.\n"
         f"- Recently Completed Tasks: {completed_tasks_str}\n"
         f"- Incomplete or Failed Tasks: {incomplete_tasks_str}\n"
-        f"- Recent Conversation: {chat_history_str}\n\n"
+        f"- Recent Conversation: {chat_history_str}\n"
+        f"- Historical Performance Data (from Tracker):\n{stat_history}\n\n"
         f"# YOUR TASK: GENERATE A NEW 5-STEP ROADMAP\n"
-        f"Based on your analysis, generate a new, 5-step college planning roadmap. The plan must be actionable and highly relevant to the student's grade, stated goals, and recent conversation. For instance, if a 10th grader is just exploring, don't assign tasks about final application submission.\n\n"
+        f"Based on your analysis, generate a new, 5-step college planning roadmap. The plan must be actionable and highly relevant to the student's grade, stated goals, and recent conversation. For instance, if a 10th grader is just exploring, don't assign tasks about final application submission. If their tracker data shows they've already researched 10 colleges, create a task to narrow down that list.\n\n"
         f"# CRITICAL DIRECTIVES\n"
         f"1.  **JSON Output ONLY**: Your entire output MUST be a single, raw JSON object.\n"
         f"2.  **Exact Task Count**: The plan must contain EXACTLY 5 task objects.\n"
@@ -408,7 +435,7 @@ def _get_college_planning_ai_tasks(college_context, user_stats, path_history, ch
         return get_mock_tasks_reliably()
 
 
-def _get_college_planning_ai_chat_response(history, user_stats):
+def _get_college_planning_ai_chat_response(history, user_stats, stat_history=""):
     """Generates a proactive and context-aware chat response for college planning."""
     if not os.getenv("GEMINI_API_KEY"):
         return "I'm in testing mode, but I'm saving our conversation!"
@@ -417,13 +444,15 @@ def _get_college_planning_ai_chat_response(history, user_stats):
     system_message = (
         "You are a friendly, intelligent, and highly adaptive college planning advisor. Your personality is encouraging, knowledgeable, and supportive. The student is in "
         f"grade {college_info.get('grade', 'N/A')} and is in the '{college_info.get('planning_stage', 'N/A')}' stage.\n\n"
+        f"## Student's Historical Performance Data (from Tracker):\n{stat_history}\n\n"
         f"## Your Core Directives:\n"
         f"1.  **Initial Greeting**: If the conversation is new, greet the user warmly. Acknowledge their grade and planning stage to show you understand their context, and ask what they need help with (e.g., essays, college lists, deadlines). Mention they can say 'new path' to regenerate their plan.\n"
-        f"2.  **Adaptive Response Length**: Your primary goal is to match the user's communication style.\n"
+        f"2.  **Use Tracker Data**: If the user asks about their progress (e.g., 'how many colleges have I researched?'), use the historical data to give them an informed answer.\n"
+        f"3.  **Adaptive Response Length**: Your primary goal is to match the user's communication style.\n"
         f"    - If the user gives a short update or asks a simple question (e.g., 'I finished my research' or 'What's the next step?'), provide a SHORT, concise, and encouraging response to keep them moving.\n"
         f"    - If the user expresses confusion, says they are 'stuck' on a task, or asks a broad question (e.g., 'How do I even start my college essay?' or 'I don't know what schools to look at'), provide a LONGER, more detailed and structured response. Break down the problem, offer clear steps, provide examples, and act as a knowledgeable guide.\n"
-        f"3.  **Be a Proactive Advisor**: When a user is stuck, offer specific, actionable advice. Help them break the task down or find resources. Your goal is to empower them to overcome the hurdle.\n"
-        f"4.  **Acknowledge & Regenerate**: If the user asks to change their plan, confirm you will regenerate it for them based on the new information they've provided."
+        f"4.  **Be a Proactive Advisor**: When a user is stuck, offer specific, actionable advice. Help them break the task down or find resources. Your goal is to empower them to overcome the hurdle.\n"
+        f"5.  **Acknowledge & Regenerate**: If the user asks to change their plan, confirm you will regenerate it for them based on the new information they've provided."
     )
     gemini_history = []
     for message in history:
@@ -458,11 +487,14 @@ def _generate_and_save_new_college_path(user_id, college_context, chat_history=[
             "incomplete": [task for task in all_college_tasks if not task[4]]
         }
 
+        # Fetch tracker data
+        stat_history = _get_stat_history_for_prompt(user_id)
+
         db.update("paths", {"is_active": False}, where={
                   "user_id": user_id, "category": "College Planning", "is_active": True})
 
         tasks = _get_college_planning_ai_tasks(
-            college_context, user_stats, path_history, chat_history)
+            college_context, user_stats, path_history, chat_history, stat_history)
 
         tasks = tasks[:5]
 
@@ -488,7 +520,7 @@ def _generate_and_save_new_college_path(user_id, college_context, chat_history=[
         print(f"Error in _generate_and_save_new_college_path: {e}")
         return []
 
-# --- Standard Routes (No changes here) ---
+# --- Standard Routes ---
 
 
 @app.route("/")
@@ -543,7 +575,7 @@ def logout():
     session.clear()
     return redirect(url_for("home"))
 
-# --- Dashboard & Path Routes (UPDATED) ---
+# --- Dashboard & Path Routes ---
 
 
 @app.route("/dashboard")
@@ -590,8 +622,6 @@ def dashboard():
         gpa=stats.get("gpa", ""),
         recent_activities=recent_activities  # Pass activities to template
     )
-
-# ... (test_path_builder, test_path_view, college_path_builder, college_path_view are unchanged) ...
 
 
 @app.route("/dashboard/test-path-builder", methods=["GET", "POST"])
@@ -645,7 +675,8 @@ def college_path_builder():
 @login_required
 def college_path_view():
     return render_template("college_path_view.html")
-# --- Stats & Tracker Routes (UPDATED) ---
+
+# --- Stats & Tracker Routes ---
 
 
 @app.route("/dashboard/stats", methods=["GET"])
@@ -736,7 +767,6 @@ def edit_stats():
 @app.route("/dashboard/tracker")
 @login_required
 def tracker():
-    # ... (This route is unchanged) ...
     user = User.from_session(db, session)
     user_id = user.data[0]
     all_tasks = db.select(
@@ -778,13 +808,12 @@ def tracker():
         test_prep_generations=test_prep_generations,
         college_planning_generations=college_planning_generations
     )
-# --- API ROUTES (UPDATED) ---
+# --- API ROUTES ---
 
 
 @app.route('/api/test-path-status')
 @login_required
 def test_path_status():
-    # ... (This route is unchanged) ...
     user = User.from_session(db, session)
     user_id = user.data[0]
     active_tasks = db.select(
@@ -795,7 +824,6 @@ def test_path_status():
 @app.route('/api/college-path-status')
 @login_required
 def college_path_status():
-    # ... (This route is unchanged) ...
     user = User.from_session(db, session)
     user_id = user.data[0]
     active_tasks = db.select(
@@ -806,7 +834,6 @@ def college_path_status():
 @app.route("/api/tasks", methods=['GET', 'POST'])
 @login_required
 def api_tasks():
-    # ... (This route is unchanged) ...
     user = User.from_session(db, session)
     user_id = user.data[0]
     stats = user.get_stats()
@@ -883,8 +910,6 @@ def api_update_task_status():
                          'description': description, 'category': category})
     return jsonify({"success": True})
 
-# ... (api_chat, get_chat_history, reset_chat_history are unchanged) ...
-
 
 @app.route("/api/chat", methods=['POST'])
 @login_required
@@ -898,6 +923,9 @@ def api_chat():
 
     if not history or (len(history) == 1 and history[0]['role'] == 'user' and history[0]['content'] == 'INITIAL_MESSAGE'):
         history = []
+
+    # Fetch tracker data for chat context
+    stat_history = _get_stat_history_for_prompt(user_id)
 
     user_message = history[-1]['content'].lower() if history else ""
     if "regenerate" in user_message or "new path" in user_message or "change" in user_message:
@@ -928,9 +956,10 @@ def api_chat():
         return jsonify({"new_path": new_tasks})
 
     if category == 'College Planning':
-        reply = _get_college_planning_ai_chat_response(history, stats)
+        reply = _get_college_planning_ai_chat_response(
+            history, stats, stat_history)
     else:
-        reply = _get_test_prep_ai_chat_response(history, stats)
+        reply = _get_test_prep_ai_chat_response(history, stats, stat_history)
 
     history.append({"role": "assistant", "content": reply})
 
@@ -991,18 +1020,17 @@ def api_update_stats():
         return jsonify({"success": False, "error": "Missing stat name or value"}), 400
 
     try:
-        if stat_name in ["sat_total", "act_composite"]:
-            db.insert("stat_history", {
-                "user_id": user.data[0], "stat_name": stat_name, "stat_value": stat_value
-            })
-        else:
+        # Always record in history
+        db.insert("stat_history", {
+            "user_id": user.data[0], "stat_name": stat_name, "stat_value": stat_value
+        })
+
+        # Only update the main stats blob if it's not a temporary practice score
+        if stat_name not in ["sat_total", "act_composite"]:
             stats = user.get_stats()
             stats[stat_name] = stat_value
             user.set_stats(stats)
-            db.insert("stat_history", {
-                "user_id": user.data[0], "stat_name": stat_name, "stat_value": stat_value
-            })
-            # LOGGING
+            # LOGGING for main stats
             log_activity(user.data[0], 'stat_updated', {
                          'stat_name': stat_name.upper(), 'stat_value': stat_value})
 

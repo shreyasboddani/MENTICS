@@ -620,9 +620,30 @@
         }
 
         async function handleSaveStat() {
+            const statValueInput = document.getElementById('statValue');
             const stat_name = document.getElementById('statNameToUpdate').value;
-            const stat_value = document.getElementById('statValue').value;
-            if (!stat_value) { alert("Please enter a value."); return; }
+            const stat_value = statValueInput.value;
+
+            // --- START: VALIDATION LOGIC ---
+            if (!stat_value) {
+                alert("Please enter a value.");
+                return;
+            }
+
+            const valueNum = parseFloat(stat_value);
+            const min = parseFloat(statValueInput.min);
+            const max = parseFloat(statValueInput.max);
+
+            if (!isNaN(min) && valueNum < min) {
+                alert(`The score cannot be less than ${min}. Please enter a valid score.`);
+                return;
+            }
+            if (!isNaN(max) && valueNum > max) {
+                alert(`The score cannot be greater than ${max}. Please enter a valid score.`);
+                return;
+            }
+            // --- END: VALIDATION LOGIC ---
+
             try {
                 const response = await fetch('/api/update_stats', {
                     method: 'POST',
