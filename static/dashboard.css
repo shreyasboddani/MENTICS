@@ -38,10 +38,10 @@ body::before {
 
 /* --- CARD STYLES (WITH COLOR VARIATIONS) --- */
 .card {
-    background: rgba(255, 255, 255, 0.65);
-    backdrop-filter: blur(24px);
-    -webkit-backdrop-filter: blur(24px);
-    border: 1px solid rgba(255, 255, 255, 0.3);
+    background: rgba(255, 255, 255, 0.55);
+    backdrop-filter: blur(30px);
+    -webkit-backdrop-filter: blur(30px);
+    border: 1px solid rgba(255, 255, 255, 0.25);
     box-shadow: 0 8px 32px rgba(139, 92, 246, 0.1);
     border-radius: 1.5rem;
     padding: 1.5rem;
@@ -65,10 +65,10 @@ body::before {
 
 /* Sandy Beige / Orange Theme */
 .card-engagement {
-    background-color: #fef3c7;
-    /* amber-100 */
-    border: 1px solid #fde68a;
-    /* amber-200 */
+    background-color: rgba(254, 243, 199, 0.7);
+    /* amber-100 with opacity */
+    border: 1px solid rgba(253, 230, 138, 0.5);
+    /* amber-200 with opacity */
 }
 
 .card-engagement .card-header {
@@ -89,10 +89,10 @@ body::before {
 
 /* Blue Theme */
 .card-activity {
-    background-color: #e0f2fe;
-    /* sky-100 */
-    border: 1px solid #bae6fd;
-    /* sky-200 */
+    background-color: rgba(224, 242, 254, 0.7);
+    /* sky-100 with opacity */
+    border: 1px solid rgba(186, 230, 253, 0.5);
+    /* sky-200 with opacity */
 }
 
 .card-activity .card-header {
@@ -102,13 +102,14 @@ body::before {
 
 /* Dark Theme */
 .card-actions {
-    background-color: #1e293b;
-    /* slate-800 */
-    border: 1px solid #334155;
-    /* slate-700 */
+    background-color: rgba(30, 41, 59, 0.85);
+    /* slate-800 with opacity */
+    border: 1px solid rgba(51, 65, 85, 0.7);
+    /* slate-700 with opacity */
     color: #f8fafc;
     /* slate-50 */
 }
+
 
 .card-actions .card-header {
     color: #f8fafc;
