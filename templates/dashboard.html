@@ -62,12 +62,14 @@
                     <p class="text-lg text-slate-600">Here’s a snapshot of your journey to success.</p>
                 </div>
 
-                <div class="grid grid-cols-1 lg:grid-cols-5 gap-8 items-start">
-                    <div class="lg:col-span-3 space-y-8">
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
+
+                    <div class="lg:col-span-2 space-y-8">
+
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
-                            <div class="card card-performance" data-aos="fade-up" data-aos-delay="100">
-                                <h3 class="font-bold text-purple-800 text-lg mb-4">Test Prep Progress</h3>
-                                <div class="text-left my-4">
+                            <div class="card" data-aos="fade-up" data-aos-delay="100">
+                                <h3 class="card-header text-purple-800">Test Prep Progress</h3>
+                                <div class="text-center">
                                     <span class="progress-value text-purple-600">{{ test_prep_completed }}<span
                                             class="text-4xl text-slate-400">/5</span></span>
                                     <p class="text-sm font-medium text-slate-500 mt-1">Active Tasks Completed</p>
@@ -77,9 +79,9 @@
                                         style="width: {{ (test_prep_completed / 5) * 100 }}%"></div>
                                 </div>
                             </div>
-                            <div class="card card-performance" data-aos="fade-up" data-aos-delay="200">
-                                <h3 class="font-bold text-indigo-800 text-lg mb-4">College Planning</h3>
-                                <div class="text-left my-4">
+                            <div class="card" data-aos="fade-up" data-aos-delay="200">
+                                <h3 class="card-header text-indigo-800">College Planning</h3>
+                                <div class="text-center">
                                     <span class="progress-value text-indigo-600">{{ college_planning_completed }}<span
                                             class="text-4xl text-slate-400">/5</span></span>
                                     <p class="text-sm font-medium text-slate-500 mt-1">Active Tasks Completed</p>
@@ -91,29 +93,84 @@
                             </div>
                         </div>
 
-                        <div class="card card-recent-activity" data-aos="fade-up" data-aos-delay="300">
+                        <div class="card card-activity" data-aos="fade-up" data-aos-delay="300">
+                            <h3 class="card-header text-sky-800">Weekly Activity</h3>
+                            <div id="activityChart" class="w-full h-72"></div>
+                        </div>
+
+                    </div>
+
+                    <div class="lg:col-span-1 space-y-8">
+
+                        <div class="card card-actions flex flex-col items-center justify-center text-center cursor-pointer hover:scale-105 transition-transform duration-300"
+                            onclick="handlePathBuilderClick()" data-aos="fade-up" data-aos-delay="400">
+                            <div class="bg-gray-900 p-4 rounded-full mb-4">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-10 w-10 text-white" fill="none"
+                                    viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                    <path stroke-linecap="round" stroke-linejoin="round"
+                                        d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                                </svg>
+                            </div>
+                            <h3 class="text-2xl font-bold font-lalezar">Path Builder</h3>
+                            <p class="text-slate-300">Build or update your journey.</p>
+                        </div>
+
+                        <div class="card card-engagement" data-aos="fade-up" data-aos-delay="500">
+                            <h3 class="card-header">Key Metrics</h3>
+                            <div class="grid grid-cols-3 gap-4">
+                                <div class="metric-widget">
+                                    <p class="metric-widget-value text-slate-700">{{ gpa }}</p>
+                                    <p class="metric-widget-label text-slate-500">GPA</p>
+                                </div>
+                                <div class="metric-widget">
+                                    <p class="metric-widget-value text-orange">{{ sat_total }}</p>
+                                    <p class="metric-widget-label text-orange">SAT</p>
+                                </div>
+                                <div class="metric-widget">
+                                    <p class="metric-widget-value text-orange">{{ act_average }}</p>
+                                    <p class="metric-widget-label text-orange">ACT</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="card" data-aos="fade-up" data-aos-delay="600">
                             <h3 class="card-header">Recent Activity</h3>
-                            <div class="space-y-3">
+                            <div class="space-y-2">
                                 {% if recent_activities %}
                                 {% for activity in recent_activities %}
                                 <div class="activity-item">
                                     {% if activity.type == 'task_completed' %}
-                                    <span class="activity-icon bg-emerald-100 text-emerald-600">✅</span>
-                                    <p class="text-sm text-slate-600">You completed "{{ activity.details.description |
-                                        truncate(40) }}" for <span
-                                            class="font-semibold {% if activity.details.category == 'Test Prep' %}text-purple-700{% else %}text-indigo-700{% endif %}">{{
-                                            activity.details.category }}</span>.</p>
+                                    <span class="activity-icon bg-emerald-100 text-emerald-600"><svg
+                                            xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"
+                                            class="w-5 h-5">
+                                            <path fill-rule="evenodd"
+                                                d="M10 18a8 8 0 1 0 0-16 8 8 0 0 0 0 16Zm3.857-9.809a.75.75 0 0 0-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 1 0-1.06 1.061l2.5 2.5a.75.75 0 0 0 1.137-.089l4-5.5Z"
+                                                clip-rule="evenodd" />
+                                        </svg></span>
+                                    <p class="text-sm text-slate-700 flex-grow">Completed "{{
+                                        activity.details.description | truncate(40) }}"</p>
                                     {% elif activity.type == 'path_generated' %}
-                                    <span class="activity-icon bg-purple-100 text-purple-600">🧠</span>
-                                    <p class="text-sm text-slate-600">A new <span
-                                            class="font-semibold {% if activity.details.category == 'Test Prep' %}text-purple-700{% else %}text-indigo-700{% endif %}">{{
-                                            activity.details.category }}</span> path was generated.</p>
+                                    <span class="activity-icon bg-purple-100 text-purple-600"><svg
+                                            xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"
+                                            class="w-5 h-5">
+                                            <path
+                                                d="M10.75 4.75a.75.75 0 0 0-1.5 0v4.5h-4.5a.75.75 0 0 0 0 1.5h4.5v4.5a.75.75 0 0 0 1.5 0v-4.5h4.5a.75.75 0 0 0 0-1.5h-4.5v-4.5Z" />
+                                        </svg></span>
+                                    <p class="text-sm text-slate-700 flex-grow">New {{ activity.details.category }} path
+                                        generated.</p>
                                     {% elif activity.type == 'stat_updated' %}
-                                    <span class="activity-icon bg-slate-200 text-slate-600">📊</span>
-                                    <p class="text-sm text-slate-600">Your <span class="font-semibold text-slate-800">{{
-                                            activity.details.stat_name | replace('_', ' ') | title }}</span> was updated
-                                        to <span class="font-semibold text-slate-800">{{ activity.details.stat_value
-                                            }}</span>.</p>
+                                    <span class="activity-icon bg-slate-200 text-slate-600"><svg
+                                            xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"
+                                            class="w-5 h-5">
+                                            <path
+                                                d="M10 3.75a.75.75 0 0 1 .75.75v1.5h1.5a.75.75 0 0 1 0 1.5h-1.5v1.5a.75.75 0 0 1-1.5 0v-1.5h-1.5a.75.75 0 0 1 0-1.5h1.5v-1.5a.75.75 0 0 1 .75-.75Z" />
+                                            <path fill-rule="evenodd"
+                                                d="M10 18a8 8 0 1 0 0-16 8 8 0 0 0 0 16Zm.75-13.25a.75.75 0 0 0-1.5 0v6a.75.75 0 0 0 1.5 0v-6Z"
+                                                clip-rule="evenodd" />
+                                        </svg></span>
+                                    <p class="text-sm text-slate-700 flex-grow"><span class="font-semibold">{{
+                                            activity.details.stat_name | replace('_', ' ') | title }}</span> updated to
+                                        <span class="font-semibold">{{ activity.details.stat_value }}</span>.</p>
                                     {% endif %}
                                     <span class="text-xs text-slate-400 ml-auto flex-shrink-0">{{ activity.timestamp |
                                         time_ago }}</span>
@@ -124,69 +181,30 @@
                                     task to get started!</p>
                                 {% endif %}
                             </div>
-                        </div>
-
-                        <div class="card card-activity" data-aos="fade-up" data-aos-delay="400">
-                            <h3 class="card-header">Weekly Activity</h3>
-                            <div id="activityChart" class="w-full"></div>
-                        </div>
-                    </div>
-
-                    <div class="lg:col-span-2 space-y-8">
-                        <div class="card card-engagement" data-aos="fade-up" data-aos-delay="500">
-                            <h3 class="card-header">Engagement</h3>
-                            <div class="grid grid-cols-3 gap-4 mt-4">
-                                <div class="metric-widget">
-                                    <p class="metric-widget-value">{{ gpa }}</p>
-                                    <p class="metric-widget-label">GPA</p>
-                                </div>
-                                <div class="metric-widget">
-                                    <p class="metric-widget-value">{{ sat_total }}</p>
-                                    <p class="metric-widget-label">SAT</p>
-                                </div>
-                                <div class="metric-widget">
-                                    <p class="metric-widget-value">{{ act_average }}</p>
-                                    <p class="metric-widget-label">ACT</p>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="card card-actions" data-aos="fade-up" data-aos-delay="600">
-                            <h3 class="card-header text-slate-700">Quick Actions</h3>
-                            <div class="space-y-2 mt-4">
-                                <div class="quick-action-card group" onclick="handlePathBuilderClick()">
-                                    <div class="quick-action-icon bg-purple-100 text-purple-600"><svg
-                                            xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
-                                            stroke-width="1.5" stroke="currentColor" class="w-7 h-7">
-                                            <path stroke-linecap="round" stroke-linejoin="round"
-                                                d="M15.59 14.37a6 6 0 0 1-5.84 7.38v-4.82m5.84-2.56a17.96 17.96 0 0 0-5.84 2.56m0 0A17.965 17.965 0 0 1 2.18 9.18m9.62 5.19a17.965 17.965 0 0 1-5.841 2.56m5.841-2.56a6 6 0 0 1 6.386 5.84m-11.956-8.41a17.965 17.965 0 0 1 5.841 2.56m-5.841-2.56A17.965 17.965 0 0 1 8.25 4.5m5.841 2.56a6 6 0 0 1-5.841-2.56m0 0A17.965 17.965 0 0 1 2.18 9.18m11.956 5.19a17.965 17.965 0 0 1-5.841-2.56" />
-                                        </svg></div>
-                                    <div>
-                                        <h3 class="text-lg font-bold text-slate-900">Path Builder</h3>
-                                        <p class="text-slate-600 text-sm">Build or update your journey.</p>
-                                    </div>
-                                </div>
-                                <div class="quick-action-card group" onclick="handleStatsClick()">
-                                    <div class="quick-action-icon bg-indigo-100 text-indigo-600"><svg
-                                            xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
+                            <div class="border-t border-slate-200/60 pt-4 mt-4 space-y-2">
+                                <div class="quick-action-card" onclick="window.location.href='/dashboard/stats'">
+                                    <div class="quick-action-icon bg-indigo-100 text-indigo-600">
+                                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
                                             stroke-width="1.5" stroke="currentColor" class="w-7 h-7">
                                             <path stroke-linecap="round" stroke-linejoin="round"
                                                 d="M10.5 6a7.5 7.5 0 1 0 7.5 7.5h-7.5V6Z" />
                                             <path stroke-linecap="round" stroke-linejoin="round"
                                                 d="M13.5 10.5H21A7.5 7.5 0 0 0 13.5 3v7.5Z" />
-                                        </svg></div>
+                                        </svg>
+                                    </div>
                                     <div>
                                         <h3 class="text-lg font-bold text-slate-900">My Stats</h3>
                                         <p class="text-slate-600 text-sm">View your achievements.</p>
                                     </div>
                                 </div>
-                                <div class="quick-action-card group" onclick="handleProgressTrackerClick()">
-                                    <div class="quick-action-icon bg-purple-100 text-purple-600"><svg
-                                            xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
+                                <div class="quick-action-card" onclick="window.location.href='/dashboard/tracker'">
+                                    <div class="quick-action-icon bg-purple-100 text-purple-600">
+                                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
                                             stroke-width="1.5" stroke="currentColor" class="w-7 h-7">
                                             <path stroke-linecap="round" stroke-linejoin="round"
                                                 d="m3.75 13.5 10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75Z" />
-                                        </svg></div>
+                                        </svg>
+                                    </div>
                                     <div>
                                         <h3 class="text-lg font-bold text-slate-900">Progress Tracker</h3>
                                         <p class="text-slate-600 text-sm">Visualize your growth.</p>
@@ -194,6 +212,7 @@
                                 </div>
                             </div>
                         </div>
+
                     </div>
                 </div>
             </main>
@@ -275,63 +294,26 @@
     <script>
         AOS.init({ once: true, duration: 800, delay: 100 });
 
-        // --- NEW: ApexCharts Initialization ---
+        // --- ApexCharts Initialization ---
         document.addEventListener('DOMContentLoaded', function () {
             const activityData = JSON.parse('{{ activity_data | safe }}');
-
             var options = {
-                chart: {
-                    height: 280,
-                    type: 'area',
-                    toolbar: { show: false },
-                    fontFamily: 'Inter, sans-serif'
-                },
-                series: [{
-                    name: 'Activities',
-                    data: activityData.data
-                }],
-                xaxis: {
-                    categories: activityData.labels,
-                    labels: { style: { colors: '#64748b' } }, // slate-500
-                    axisBorder: { show: false },
-                    axisTicks: { show: false }
-                },
-                yaxis: {
-                    labels: {
-                        style: { colors: '#64748b' }, // slate-500
-                        formatter: (value) => { return Math.round(value) }
-                    },
-                    min: 0,
-                    tickAmount: 4
-                },
+                chart: { height: '100%', type: 'area', toolbar: { show: false }, fontFamily: 'Inter, sans-serif' },
+                series: [{ name: 'Activities', data: activityData.data }],
+                xaxis: { categories: activityData.labels, labels: { style: { colors: '#64748b' } }, axisBorder: { show: false }, axisTicks: { show: false } },
+                yaxis: { labels: { style: { colors: '#64748b' }, formatter: (value) => { return Math.round(value) } }, min: 0, tickAmount: 4 },
                 dataLabels: { enabled: false },
                 stroke: { curve: 'smooth', width: 3 },
-                fill: {
-                    type: 'gradient',
-                    gradient: {
-                        shadeIntensity: 1,
-                        opacityFrom: 0.7,
-                        opacityTo: 0.2,
-                        stops: [0, 100]
-                    }
-                },
-                grid: {
-                    borderColor: '#e2e8f0', // slate-200
-                    strokeDashArray: 4
-                },
+                fill: { type: 'gradient', gradient: { shadeIntensity: 1, opacityFrom: 0.7, opacityTo: 0.2, stops: [0, 100] } },
+                grid: { borderColor: '#e2e8f0', strokeDashArray: 4 },
                 colors: ['#0ea5e9'] // sky-500
             };
-
             var chart = new ApexCharts(document.querySelector("#activityChart"), options);
             chart.render();
         });
 
-        // --- Existing Navigation & Modal Logic ---
-        function handleStatsClick() { window.location.href = 'dashboard/stats'; }
-        function handleProgressTrackerClick() { window.location.href = 'dashboard/tracker'; }
-
+        // --- Modal Logic ---
         const modal = document.getElementById('pathModal');
-        // ... (rest of your existing modal JS) ...
         const modalContentWrapper = modal.querySelector('.modal-content-wrapper');
         const testPrepPortal = document.getElementById('test-prep-portal');
         const collegePortal = document.getElementById('college-portal');
