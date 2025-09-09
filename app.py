@@ -578,6 +578,10 @@ def logout():
 # --- Dashboard & Path Routes ---
 
 
+# In app.py
+
+# In app.py
+
 @app.route("/dashboard")
 @login_required
 def dashboard():
@@ -586,6 +590,7 @@ def dashboard():
     user_id = user.data[0]
     all_tasks = db.select("paths", where={"user_id": user_id})
 
+    # --- Progress Calculations ---
     active_test_tasks = [t for t in all_tasks if t[5] and t[9] == 'Test Prep']
     test_prep_completed_current = sum(1 for t in active_test_tasks if t[4])
     total_test_prep_completed = sum(
@@ -598,7 +603,28 @@ def dashboard():
     total_college_planning_completed = sum(
         1 for t in all_tasks if t[4] and t[9] == 'College Planning')
 
-    # NEW: Fetch recent activities
+    # --- Key Stat Calculations ---
+    sat_ebrw = stats.get("sat_ebrw")
+    sat_math = stats.get("sat_math")
+    sat_total = None
+    if sat_ebrw and sat_math:
+        try:
+            sat_total = int(sat_ebrw) + int(sat_math)
+        except (ValueError, TypeError):
+            sat_total = None
+
+    act_scores = []
+    if stats.get("act_math"):
+        act_scores.append(int(stats.get("act_math")))
+    if stats.get("act_reading"):
+        act_scores.append(int(stats.get("act_reading")))
+    if stats.get("act_science"):
+        act_scores.append(int(stats.get("act_science")))
+
+    act_average = round(sum(act_scores) / len(act_scores)
+                        ) if act_scores else None
+
+    # --- Recent Activity Fetch (for list) ---
     recent_activities_raw = db.select(
         "activity_log",
         where={"user_id": user_id},
@@ -613,14 +639,43 @@ def dashboard():
             "timestamp": activity[4]
         })
 
+    # --- NEW: Data for Activity Chart ---
+    today = datetime.now(ZoneInfo("UTC")).date()
+    seven_days_ago = today - timedelta(days=6)
+
+    # Create a dictionary to hold counts for the last 7 days
+    activity_counts = {(seven_days_ago + timedelta(days=i)
+                        ).strftime('%a'): 0 for i in range(7)}
+
+    # Fetch activities from the last 7 days
+    recent_logs = db.execute(
+        "SELECT created_at FROM activity_log WHERE user_id = ? AND date(created_at) >= ?",
+        (user_id, seven_days_ago.strftime('%Y-%m-%d'))
+    )
+
+    if recent_logs:
+        for log in recent_logs:
+            log_date = datetime.strptime(
+                log[0], '%Y-%m-%d %H:%M:%S').strftime('%a')
+            if log_date in activity_counts:
+                activity_counts[log_date] += 1
+
+    activity_data = {
+        "labels": list(activity_counts.keys()),
+        "data": list(activity_counts.values())
+    }
+
     return render_template(
         "dashboard.html",
         test_prep_completed=test_prep_completed_current,
         total_test_prep_completed=total_test_prep_completed,
         college_planning_completed=college_planning_completed_current,
         total_college_planning_completed=total_college_planning_completed,
-        gpa=stats.get("gpa", ""),
-        recent_activities=recent_activities  # Pass activities to template
+        gpa=stats.get("gpa") or "—",
+        sat_total=sat_total or "—",
+        act_average=act_average or "—",
+        recent_activities=recent_activities,
+        activity_data=json.dumps(activity_data)  # Pass data for the chart
     )
 
 
