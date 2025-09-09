@@ -114,6 +114,12 @@ body::before {
     color: #f8fafc;
 }
 
+/* This is the new hover effect for the path builder button */
+.card-actions:hover {
+    transform: translateY(-8px) scale(1.05);
+    box-shadow: 0 15px 45px rgba(139, 92, 246, 0.25);
+}
+
 
 /* --- DASHBOARD-SPECIFIC COMPONENTS --- */
 

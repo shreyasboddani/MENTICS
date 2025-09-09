@@ -15,6 +15,11 @@ class User:
         if user:
             self.data = user[0]
 
+    def get_name(self):
+        if self.data and len(self.data) > 4:
+            return self.data[4]
+        return None
+
     def get_stats(self):
         if self.data and len(self.data) >= 4:
             return json.loads(self.data[3])

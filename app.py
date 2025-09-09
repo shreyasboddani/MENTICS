@@ -1,3 +1,4 @@
+# app.py
 from flask import Flask, render_template, request, redirect, url_for, session, jsonify
 from werkzeug.security import generate_password_hash, check_password_hash
 from dbhelper import DatabaseHandler
@@ -37,6 +38,10 @@ def init_db():
         "password": "TEXT NOT NULL",
         "stats": "TEXT NOT NULL"
     })
+    try:
+        db.add_column("users", "name", "TEXT NOT NULL DEFAULT ''")
+    except:
+        pass  # Column likely already exists
     db.create_table("paths", {
         "id": "INTEGER PRIMARY KEY AUTOINCREMENT",
         "user_id": "INTEGER NOT NULL",
@@ -533,10 +538,11 @@ def home():
 def signup():
     if request.method == "POST":
         email = request.form["email"]
+        name = request.form["name"]
         password = generate_password_hash(request.form["password"])
         try:
             user_id = db.insert("users", {
-                "email": email, "password": password,
+                "email": email, "password": password, "name": name,
                 "stats": json.dumps({
                     "sat_ebrw": "", "sat_math": "", "act_math": "",
                     "act_reading": "", "act_science": "", "gpa": "", "milestones": 0
@@ -588,6 +594,7 @@ def dashboard():
     user = User.from_session(db, session)
     stats = user.get_stats()
     user_id = user.data[0]
+    name = user.get_name()
     all_tasks = db.select("paths", where={"user_id": user_id})
 
     # --- Progress Calculations ---
@@ -667,6 +674,7 @@ def dashboard():
 
     return render_template(
         "dashboard.html",
+        name=name,
         test_prep_completed=test_prep_completed_current,
         total_test_prep_completed=total_test_prep_completed,
         college_planning_completed=college_planning_completed_current,

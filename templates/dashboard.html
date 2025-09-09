@@ -57,17 +57,30 @@
             <main class="flex-1 p-6 lg:p-8">
                 <div data-aos="fade-in" class="mb-8">
                     <h1
-                        class="text-4xl md:text-5xl font-bold font-lalezar text-transparent bg-clip-text bg-gradient-to-r from-purple-600 to-indigo-600 mb-2">
-                        Welcome Back!</h1>
-                    <p class="text-lg text-slate-600">Here’s a snapshot of your journey to success.</p>
+                        class="font-lalezar text-7xl md:text-8xl lg:text-[9rem] font-bold text-transparent bg-clip-text bg-gradient-to-r from-purple-600 to-indigo-600 leading-none">
+                        Welcome Back, {{ name.split(' ')[0] }}!
+                    </h1>
                 </div>
 
                 <div class="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
 
                     <div class="lg:col-span-2 space-y-8">
 
+                        <div class="card card-actions flex flex-col items-center justify-center text-center cursor-pointer"
+                            onclick="handlePathBuilderClick()" data-aos="fade-up" data-aos-delay="100">
+                            <div class="bg-gray-900 p-4 rounded-full mb-4">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-10 w-10 text-white" fill="none"
+                                    viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                    <path stroke-linecap="round" stroke-linejoin="round"
+                                        d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                                </svg>
+                            </div>
+                            <h3 class="text-2xl font-bold font-lalezar">Path Builder</h3>
+                            <p class="text-slate-300">Build or update your journey.</p>
+                        </div>
+
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
-                            <div class="card" data-aos="fade-up" data-aos-delay="100">
+                            <div class="card" data-aos="fade-up" data-aos-delay="200">
                                 <h3 class="card-header text-purple-800">Test Prep Progress</h3>
                                 <div class="text-center">
                                     <span class="progress-value text-purple-600">{{ test_prep_completed }}<span
@@ -79,7 +92,7 @@
                                         style="width: {{ (test_prep_completed / 5) * 100 }}%"></div>
                                 </div>
                             </div>
-                            <div class="card" data-aos="fade-up" data-aos-delay="200">
+                            <div class="card" data-aos="fade-up" data-aos-delay="300">
                                 <h3 class="card-header text-indigo-800">College Planning</h3>
                                 <div class="text-center">
                                     <span class="progress-value text-indigo-600">{{ college_planning_completed }}<span
@@ -93,7 +106,7 @@
                             </div>
                         </div>
 
-                        <div class="card card-activity" data-aos="fade-up" data-aos-delay="300">
+                        <div class="card card-activity" data-aos="fade-up" data-aos-delay="400">
                             <h3 class="card-header text-sky-800">Weekly Activity</h3>
                             <div id="activityChart" class="w-full h-72"></div>
                         </div>
@@ -102,20 +115,41 @@
 
                     <div class="lg:col-span-1 space-y-8">
 
-                        <div class="card card-actions flex flex-col items-center justify-center text-center cursor-pointer hover:scale-105 transition-transform duration-300"
-                            onclick="handlePathBuilderClick()" data-aos="fade-up" data-aos-delay="400">
-                            <div class="bg-gray-900 p-4 rounded-full mb-4">
-                                <svg xmlns="http://www.w3.org/2000/svg" class="h-10 w-10 text-white" fill="none"
-                                    viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                                    <path stroke-linecap="round" stroke-linejoin="round"
-                                        d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-                                </svg>
+                        <div class="card" data-aos="fade-up" data-aos-delay="500">
+                            <h3 class="card-header">Other Actions</h3>
+                            <div class="space-y-2">
+                                <div class="quick-action-card" onclick="window.location.href='/dashboard/stats'">
+                                    <div class="quick-action-icon bg-indigo-100 text-indigo-600">
+                                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
+                                            stroke-width="1.5" stroke="currentColor" class="w-7 h-7">
+                                            <path stroke-linecap="round" stroke-linejoin="round"
+                                                d="M10.5 6a7.5 7.5 0 1 0 7.5 7.5h-7.5V6Z" />
+                                            <path stroke-linecap="round" stroke-linejoin="round"
+                                                d="M13.5 10.5H21A7.5 7.5 0 0 0 13.5 3v7.5Z" />
+                                        </svg>
+                                    </div>
+                                    <div>
+                                        <h3 class="text-lg font-bold text-slate-900">My Stats</h3>
+                                        <p class="text-slate-600 text-sm">View your achievements.</p>
+                                    </div>
+                                </div>
+                                <div class="quick-action-card" onclick="window.location.href='/dashboard/tracker'">
+                                    <div class="quick-action-icon bg-purple-100 text-purple-600">
+                                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
+                                            stroke-width="1.5" stroke="currentColor" class="w-7 h-7">
+                                            <path stroke-linecap="round" stroke-linejoin="round"
+                                                d="m3.75 13.5 10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75Z" />
+                                        </svg>
+                                    </div>
+                                    <div>
+                                        <h3 class="text-lg font-bold text-slate-900">Progress Tracker</h3>
+                                        <p class="text-slate-600 text-sm">Visualize your growth.</p>
+                                    </div>
+                                </div>
                             </div>
-                            <h3 class="text-2xl font-bold font-lalezar">Path Builder</h3>
-                            <p class="text-slate-300">Build or update your journey.</p>
                         </div>
 
-                        <div class="card card-engagement" data-aos="fade-up" data-aos-delay="500">
+                        <div class="card card-engagement" data-aos="fade-up" data-aos-delay="600">
                             <h3 class="card-header">Key Metrics</h3>
                             <div class="grid grid-cols-3 gap-4">
                                 <div class="metric-widget">
@@ -133,7 +167,7 @@
                             </div>
                         </div>
 
-                        <div class="card" data-aos="fade-up" data-aos-delay="600">
+                        <div class="card" data-aos="fade-up" data-aos-delay="700">
                             <h3 class="card-header">Recent Activity</h3>
                             <div class="space-y-2">
                                 {% if recent_activities %}
@@ -170,7 +204,8 @@
                                         </svg></span>
                                     <p class="text-sm text-slate-700 flex-grow"><span class="font-semibold">{{
                                             activity.details.stat_name | replace('_', ' ') | title }}</span> updated to
-                                        <span class="font-semibold">{{ activity.details.stat_value }}</span>.</p>
+                                        <span class="font-semibold">{{ activity.details.stat_value }}</span>.
+                                    </p>
                                     {% endif %}
                                     <span class="text-xs text-slate-400 ml-auto flex-shrink-0">{{ activity.timestamp |
                                         time_ago }}</span>
@@ -181,38 +216,7 @@
                                     task to get started!</p>
                                 {% endif %}
                             </div>
-                            <div class="border-t border-slate-200/60 pt-4 mt-4 space-y-2">
-                                <div class="quick-action-card" onclick="window.location.href='/dashboard/stats'">
-                                    <div class="quick-action-icon bg-indigo-100 text-indigo-600">
-                                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
-                                            stroke-width="1.5" stroke="currentColor" class="w-7 h-7">
-                                            <path stroke-linecap="round" stroke-linejoin="round"
-                                                d="M10.5 6a7.5 7.5 0 1 0 7.5 7.5h-7.5V6Z" />
-                                            <path stroke-linecap="round" stroke-linejoin="round"
-                                                d="M13.5 10.5H21A7.5 7.5 0 0 0 13.5 3v7.5Z" />
-                                        </svg>
-                                    </div>
-                                    <div>
-                                        <h3 class="text-lg font-bold text-slate-900">My Stats</h3>
-                                        <p class="text-slate-600 text-sm">View your achievements.</p>
-                                    </div>
-                                </div>
-                                <div class="quick-action-card" onclick="window.location.href='/dashboard/tracker'">
-                                    <div class="quick-action-icon bg-purple-100 text-purple-600">
-                                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
-                                            stroke-width="1.5" stroke="currentColor" class="w-7 h-7">
-                                            <path stroke-linecap="round" stroke-linejoin="round"
-                                                d="m3.75 13.5 10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75Z" />
-                                        </svg>
-                                    </div>
-                                    <div>
-                                        <h3 class="text-lg font-bold text-slate-900">Progress Tracker</h3>
-                                        <p class="text-slate-600 text-sm">Visualize your growth.</p>
-                                    </div>
-                                </div>
-                            </div>
                         </div>
-
                     </div>
                 </div>
             </main>
@@ -292,20 +296,74 @@
     <script src="{{ url_for('static', filename='js/alert.js') }}"></script>
     <script src="https://unpkg.com/aos@2.3.1/dist/aos.js"></script>
     <script>
-        AOS.init({ once: true, duration: 800, delay: 100 });
+        AOS.init({
+            once: true,
+            duration: 800,
+            delay: 100
+        });
 
         // --- ApexCharts Initialization ---
         document.addEventListener('DOMContentLoaded', function () {
             const activityData = JSON.parse('{{ activity_data | safe }}');
             var options = {
-                chart: { height: '100%', type: 'area', toolbar: { show: false }, fontFamily: 'Inter, sans-serif' },
-                series: [{ name: 'Activities', data: activityData.data }],
-                xaxis: { categories: activityData.labels, labels: { style: { colors: '#64748b' } }, axisBorder: { show: false }, axisTicks: { show: false } },
-                yaxis: { labels: { style: { colors: '#64748b' }, formatter: (value) => { return Math.round(value) } }, min: 0, tickAmount: 4 },
-                dataLabels: { enabled: false },
-                stroke: { curve: 'smooth', width: 3 },
-                fill: { type: 'gradient', gradient: { shadeIntensity: 1, opacityFrom: 0.7, opacityTo: 0.2, stops: [0, 100] } },
-                grid: { borderColor: '#e2e8f0', strokeDashArray: 4 },
+                chart: {
+                    height: '100%',
+                    type: 'area',
+                    toolbar: {
+                        show: false
+                    },
+                    fontFamily: 'Inter, sans-serif'
+                },
+                series: [{
+                    name: 'Activities',
+                    data: activityData.data
+                }],
+                xaxis: {
+                    categories: activityData.labels,
+                    labels: {
+                        style: {
+                            colors: '#64748b'
+                        }
+                    },
+                    axisBorder: {
+                        show: false
+                    },
+                    axisTicks: {
+                        show: false
+                    }
+                },
+                yaxis: {
+                    labels: {
+                        style: {
+                            colors: '#64748b'
+                        },
+                        formatter: (value) => {
+                            return Math.round(value)
+                        }
+                    },
+                    min: 0,
+                    tickAmount: 4
+                },
+                dataLabels: {
+                    enabled: false
+                },
+                stroke: {
+                    curve: 'smooth',
+                    width: 3
+                },
+                fill: {
+                    type: 'gradient',
+                    gradient: {
+                        shadeIntensity: 1,
+                        opacityFrom: 0.7,
+                        opacityTo: 0.2,
+                        stops: [0, 100]
+                    }
+                },
+                grid: {
+                    borderColor: '#e2e8f0',
+                    strokeDashArray: 4
+                },
                 colors: ['#0ea5e9'] // sky-500
             };
             var chart = new ApexCharts(document.querySelector("#activityChart"), options);
@@ -341,7 +399,9 @@
             if (portalElement.classList.contains('warping')) return;
             modalContentWrapper.classList.add('modal-content-fading-out');
             portalElement.classList.add('warping');
-            setTimeout(() => { window.location.href = url; }, 800);
+            setTimeout(() => {
+                window.location.href = url;
+            }, 800);
         }
 
         testPrepPortal.addEventListener('click', () => {
@@ -353,7 +413,8 @@
 
         collegePortal.addEventListener('click', () => {
             fetch('/api/college-path-status').then(res => res.json()).then(data => {
-                const url = data.has_path ? "{{ url_for('college_path_view') }}" : "{{ url_for('college_path_builder') }}";
+                const url = data.has_path ? "{{ url_for('college_path_view') }}" :
+                    "{{ url_for('college_path_builder') }}";
                 warpToPage(collegePortal, url);
             }).catch(() => warpToPage(collegePortal, "{{ url_for('college_path_builder') }}"));
         });

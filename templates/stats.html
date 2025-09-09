@@ -68,13 +68,13 @@
 
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
 
-          <div class="card card-actions lg:col-span-2 p-6 flex flex-col justify-center items-center text-center"
-            data-aos="fade-up" data-aos-delay="100">
+          <div class="card lg:col-span-2 p-6 flex flex-col justify-center items-center text-center" data-aos="fade-up"
+            data-aos-delay="100">
             <h2 class="card-header">Current GPA</h2>
             <p class="gpa-text text-orange-600">{{ gpa or "N/A" }}</p>
           </div>
 
-          <div class="card card-actions lg:col-span-2 p-6" data-aos="fade-up" data-aos-delay="200">
+          <div class="card lg:col-span-2 p-6" data-aos="fade-up" data-aos-delay="200">
             <h2 class="card-header">Path Milestones</h2>
             <div class="space-y-6 flex flex-col justify-center h-full">
               <div class="flex items-center gap-4">
@@ -163,7 +163,13 @@
   </div>
 
   <script src="https://unpkg.com/aos@2.3.1/dist/aos.js"></script>
-  <script>AOS.init({ once: true, duration: 800, delay: 100 });</script>
+  <script>
+    AOS.init({
+      once: true,
+      duration: 800,
+      delay: 100
+    });
+  </script>
 </body>
 
 </html>
