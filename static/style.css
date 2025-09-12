@@ -14,7 +14,7 @@ body {
     font-family: 'Lalezar', cursive;
 }
 
-/* --- WAVY BACKGROUND ANIMATION --- */
+/* --- WAVY BACKGROUND ANIMATION (Unified Colors) --- */
 .background-wave-container {
     position: fixed;
     top: 0;
@@ -37,6 +37,7 @@ body {
     width: 600px;
     height: 600px;
     background-color: rgba(167, 139, 250, 0.4);
+    /* Unified purple */
     top: -150px;
     left: -150px;
     animation: wave-move-1 25s infinite alternate ease-in-out;
@@ -46,6 +47,7 @@ body {
     width: 500px;
     height: 500px;
     background-color: rgba(99, 102, 241, 0.3);
+    /* Unified indigo */
     bottom: -100px;
     right: -100px;
     animation: wave-move-2 20s infinite alternate ease-in-out;
@@ -55,6 +57,7 @@ body {
     width: 400px;
     height: 400px;
     background-color: rgba(199, 210, 254, 0.4);
+    /* Unified light purple/blue */
     bottom: 25%;
     left: 20%;
     animation: wave-move-3 28s infinite alternate ease-in-out;
@@ -90,7 +93,7 @@ body {
     }
 }
 
-/* --- HEADER, BUTTONS, & INTERACTIVE CARDS --- */
+/* --- HEADER, BUTTONS, & INTERACTIVE CARDS (Unified Colors) --- */
 .nav-link {
     position: relative;
     font-size: 0.875rem;
@@ -101,6 +104,7 @@ body {
 
 .nav-link:hover {
     color: #8B5CF6;
+    /* Unified purple */
 }
 
 .nav-link::after {
@@ -112,6 +116,7 @@ body {
     bottom: -6px;
     left: 0;
     background-color: #8B5CF6;
+    /* Unified purple */
     transform-origin: bottom right;
     transition: transform 0.3s ease-out;
 }
@@ -124,6 +129,7 @@ body {
 .button-primary {
     display: inline-block;
     background-color: #8B5CF6;
+    /* Unified purple */
     color: white;
     font-weight: 600;
     padding: 0.6rem 1.25rem;
@@ -135,12 +141,14 @@ body {
 .button-primary:hover {
     transform: scale(1.05) translateY(-2px);
     background-color: #7C3AED;
+    /* Darker unified purple */
     box-shadow: 0 8px 25px rgba(139, 92, 246, 0.3);
 }
 
 .button-primary-large {
     display: inline-block;
     background-image: linear-gradient(to right, #8B5CF6, #6366F1);
+    /* Unified purple to indigo */
     color: white;
     padding: 1rem 2rem;
     border-radius: 0.75rem;
@@ -167,6 +175,7 @@ body {
 .process-step:hover {
     transform: translateY(-10px);
     box-shadow: 0 20px 40px rgba(139, 92, 246, 0.15);
+    /* Unified shadow */
 }
 
 .step-icon {
@@ -198,6 +207,7 @@ body {
     border: 1px solid rgba(255, 255, 255, 0.2);
     border-radius: 1.5rem;
     box-shadow: 0 20px 50px rgba(167, 139, 250, 0.2);
+    /* Unified shadow */
 }
 
 .chart-bar {
@@ -217,7 +227,7 @@ body {
     }
 }
 
-/* --- "WHY MENTICS?" SECTION (CLEANER CARDS, REVERTED LAYOUT) --- */
+/* --- "WHY MENTICS?" SECTION (Unified Colors) --- */
 .why-card {
     display: flex;
     align-items: center;
@@ -233,6 +243,7 @@ body {
 .why-card:hover {
     transform: translateY(-8px);
     box-shadow: 0 20px 40px rgba(99, 102, 241, 0.15);
+    /* Unified shadow */
 }
 
 .why-card-icon {

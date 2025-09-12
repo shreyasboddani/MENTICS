@@ -1,3 +1,4 @@
+/* static/dashboard.css */
 /* --- GLOBAL STYLING & UTILITIES --- */
 .font-lalezar {
     font-family: 'Lalezar', cursive;
@@ -7,42 +8,120 @@
     font-family: 'Inter', sans-serif;
 }
 
-/* --- BACKGROUND GRADIENT --- */
-body::before {
-    content: '';
+/* --- NEW: Glassmorphism Background --- */
+body {
+    background-color: #f8fafc;
+    /* slate-50 */
+}
+
+.background-shapes {
     position: fixed;
     top: 0;
     left: 0;
-    width: 100vw;
-    height: 100vh;
-    background: radial-gradient(circle at 10% 20%, rgba(167, 139, 250, 0.15), transparent 35%),
-        radial-gradient(circle at 85% 90%, rgba(127, 13, 239, 0.1), transparent 40%),
-        radial-gradient(circle at 50% 50%, rgba(196, 181, 253, 0.08), transparent 50%);
-    animation: aurora 20s infinite linear;
+    width: 100%;
+    height: 100%;
     z-index: -1;
+    overflow: hidden;
 }
 
-@keyframes aurora {
-    0% {
-        transform: rotate(0deg) scale(1.2);
+.shape-1,
+.shape-2 {
+    position: absolute;
+    border-radius: 50%;
+    filter: blur(150px);
+    opacity: 0.6;
+}
+
+.shape-1 {
+    width: 500px;
+    height: 500px;
+    background: #a855f7;
+    /* purple-500 */
+    top: -10%;
+    left: -10%;
+    animation: move-shape-1 20s infinite alternate;
+}
+
+.shape-2 {
+    width: 400px;
+    height: 400px;
+    background: #6366f1;
+    /* indigo-500 */
+    bottom: -10%;
+    right: -10%;
+    animation: move-shape-2 25s infinite alternate;
+}
+
+@keyframes move-shape-1 {
+    from {
+        transform: translate(-20%, -20%) rotate(0deg);
     }
 
-    50% {
-        transform: rotate(180deg) scale(1.5);
-    }
-
-    100% {
-        transform: rotate(360deg) scale(1.2);
+    to {
+        transform: translate(20%, 20%) rotate(180deg);
     }
 }
 
-/* --- CARD STYLES (WITH COLOR VARIATIONS) --- */
+@keyframes move-shape-2 {
+    from {
+        transform: translate(20%, 20%) rotate(0deg);
+    }
+
+    to {
+        transform: translate(-20%, -20%) rotate(180deg);
+    }
+}
+
+
+/* --- NEW: Glassmorphism Top Navigation Bar --- */
+.top-nav {
+    position: sticky;
+    top: 1rem;
+    z-index: 50;
+    margin: 0 1rem;
+    padding: 1rem 1.5rem;
+    border-radius: 1.5rem;
+
+    background: rgba(255, 255, 255, 0.6);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.1);
+}
+
+.nav-item {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 1rem;
+    border-radius: 0.75rem;
+    font-weight: 600;
+    color: #4b5563;
+    /* text-gray-600 */
+    transition: all 0.2s ease-in-out;
+}
+
+.nav-item:hover {
+    background-color: rgba(255, 255, 255, 0.5);
+    color: #1f2937;
+    /* text-gray-800 */
+}
+
+.nav-item.active {
+    background-color: #EDE9FE;
+    /* bg-purple-100 */
+    color: #8B5CF6;
+    /* text-purple-600 */
+}
+
+
+/* --- NEW: Glassmorphism Card Styles --- */
 .card {
-    background: rgba(255, 255, 255, 0.55);
+    background: rgba(255, 255, 255, 0.5);
     backdrop-filter: blur(30px);
     -webkit-backdrop-filter: blur(30px);
     border: 1px solid rgba(255, 255, 255, 0.25);
-    box-shadow: 0 8px 32px rgba(139, 92, 246, 0.1);
+    box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.1);
     border-radius: 1.5rem;
     padding: 1.5rem;
     transition: transform 0.3s ease, box-shadow 0.3s ease;
@@ -51,63 +130,23 @@ body::before {
 
 .card:hover {
     transform: translateY(-5px);
-    box-shadow: 0 12px 40px rgba(139, 92, 246, 0.15);
+    box-shadow: 0 12px 40px 0 rgba(31, 38, 135, 0.15);
 }
 
 .card-header {
     font-size: 1.25rem;
-    /* 20px */
     font-weight: 700;
     color: #1e293b;
-    /* slate-800 */
     margin-bottom: 1rem;
 }
 
-/* Sandy Beige / Orange Theme */
-.card-engagement {
-    background-color: rgba(254, 243, 199, 0.7);
-    /* amber-100 with opacity */
-    border: 1px solid rgba(253, 230, 138, 0.5);
-    /* amber-200 with opacity */
-}
-
-.card-engagement .card-header {
-    color: #b45309;
-    /* amber-800 */
-}
-
-.metric-widget-value.text-orange {
-    color: #9a3412;
-    /* orange-800 */
-}
-
-.metric-widget-label.text-orange {
-    color: #a16207;
-    /* amber-700 */
-}
-
-
-/* Blue Theme */
-.card-activity {
-    background-color: rgba(224, 242, 254, 0.7);
-    /* sky-100 with opacity */
-    border: 1px solid rgba(186, 230, 253, 0.5);
-    /* sky-200 with opacity */
-}
-
-.card-activity .card-header {
-    color: #0369a1;
-    /* sky-800 */
-}
-
-/* Dark Theme */
+/* Dark Theme Card */
 .card-actions {
-    background-color: rgba(30, 41, 59, 0.85);
-    /* slate-800 with opacity */
-    border: 1px solid rgba(51, 65, 85, 0.7);
-    /* slate-700 with opacity */
+    background-color: #1f2937;
+    /* slate-800 */
+    border: 1px solid #374151;
+    /* slate-700 */
     color: #f8fafc;
-    /* slate-50 */
 }
 
 
@@ -115,10 +154,9 @@ body::before {
     color: #f8fafc;
 }
 
-/* This is the new hover effect for the path builder button */
 .card-actions:hover {
-    transform: translateY(-8px) scale(1.05);
-    box-shadow: 0 15px 45px rgba(139, 92, 246, 0.25);
+    transform: translateY(-8px) scale(1.02);
+    box-shadow: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1);
 }
 
 
@@ -132,11 +170,9 @@ body::before {
 }
 
 .progress-bar-bg {
-    background-color: #e5e7eb;
-    /* cool-gray-200 */
+    background-color: rgba(0, 0, 0, 0.1);
     border-radius: 9999px;
     height: 0.5rem;
-    /* 8px */
     width: 100%;
     overflow: hidden;
     margin-top: 1rem;
@@ -175,7 +211,7 @@ body::before {
 }
 
 .activity-item:hover {
-    background-color: rgba(243, 244, 246, 0.6);
+    background-color: rgba(0, 0, 0, 0.05);
 }
 
 .activity-icon {
@@ -188,48 +224,70 @@ body::before {
     justify-content: center;
 }
 
-/* Quick Actions Buttons */
-.quick-action-card {
+/* --- Countdown Card --- */
+.countdown-card {
+    text-align: center;
+    background: linear-gradient(135deg, rgba(139, 92, 246, 0.8), rgba(99, 102, 241, 0.8));
+    color: white;
+}
+
+.countdown-card .card-header {
+    color: rgba(255, 255, 255, 0.9);
+}
+
+.countdown-value {
+    font-size: 4rem;
+    font-weight: 800;
+    line-height: 1;
+    text-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+}
+
+.countdown-label {
+    font-weight: 600;
+    font-size: 1.125rem;
+    margin-top: 0.25rem;
+}
+
+.countdown-date {
+    font-size: 0.875rem;
+    opacity: 0.8;
+    margin-top: 0.5rem;
+}
+
+/* --- Achievements List --- */
+.achievements-list {
+    max-height: 250px;
+    overflow-y: auto;
+    padding-right: 0.5rem;
+    /* For scrollbar */
+}
+
+.achievement-item {
     display: flex;
     align-items: center;
     gap: 1rem;
-    cursor: pointer;
-    padding: 1rem;
-    border-radius: 1rem;
-    background-color: rgba(255, 255, 255, 0.5);
-    transition: background-color 0.2s ease, transform 0.2s ease;
+    padding: 0.75rem 0;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.05);
 }
 
-.quick-action-card:hover {
-    background-color: rgba(255, 255, 255, 1);
-    transform: scale(1.03);
+.achievements-list .achievement-item:last-child {
+    border-bottom: none;
 }
 
-.quick-action-icon {
-    flex-shrink: 0;
-    width: 3.5rem;
-    height: 3.5rem;
-    border-radius: 1rem;
-    display: flex;
-    align-items: center;
-    justify-content: center;
+.achievement-icon {
+    font-size: 1.5rem;
 }
 
-
-/* --- STATS PAGE: GPA TEXT STYLE --- */
-.gpa-text {
-    font-family: 'Courier New', monospace;
-    font-weight: 700;
-    font-size: 8rem;
-    /* 128px */
-    line-height: 1;
-    margin-top: 0.5rem;
-    /* 8px */
-    flex-grow: 1;
-    display: flex;
-    align-items: center;
-    justify-content: center;
+.achievement-title {
+    font-weight: 600;
+    color: #1f2937;
 }
+
+.achievement-description {
+    font-size: 0.875rem;
+    color: #6b7280;
+}
+
 
 /* --- PORTAL MODAL STYLES (NO CHANGES) --- */
 #pathModal {

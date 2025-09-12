@@ -10,7 +10,7 @@ import os
 from dotenv import load_dotenv
 import random
 from pathlib import Path
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, date
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 # Explicitly load the .env file from the correct path
@@ -278,7 +278,7 @@ def _get_test_prep_ai_chat_response(history, user_stats, stat_history=""):
             delta = test_date - datetime.now()
             formatted_date = test_date.strftime('%B %d, %Y')
             if delta.days >= 0:
-                test_date_info = f"The student's test is on {formatted_date} ({delta.days} days from now)."
+                test_date_info = f"The student's test is on {formatted_date} ({delta.days} from now)."
             else:
                 test_date_info = f"The student's test date was {formatted_date}, which has already passed."
         except ValueError:
@@ -584,10 +584,6 @@ def logout():
 # --- Dashboard & Path Routes ---
 
 
-# In app.py
-
-# In app.py
-
 @app.route("/dashboard")
 @login_required
 def dashboard():
@@ -631,7 +627,7 @@ def dashboard():
     act_average = round(sum(act_scores) / len(act_scores)
                         ) if act_scores else None
 
-    # --- Recent Activity Fetch (for list) ---
+    # --- Recent Activity Fetch ---
     recent_activities_raw = db.select(
         "activity_log",
         where={"user_id": user_id},
@@ -646,31 +642,67 @@ def dashboard():
             "timestamp": activity[4]
         })
 
-    # --- NEW: Data for Activity Chart ---
+    # --- Data for Activity Chart ---
     today = datetime.now(ZoneInfo("UTC")).date()
     seven_days_ago = today - timedelta(days=6)
-
-    # Create a dictionary to hold counts for the last 7 days
     activity_counts = {(seven_days_ago + timedelta(days=i)
                         ).strftime('%a'): 0 for i in range(7)}
-
-    # Fetch activities from the last 7 days
     recent_logs = db.execute(
         "SELECT created_at FROM activity_log WHERE user_id = ? AND date(created_at) >= ?",
         (user_id, seven_days_ago.strftime('%Y-%m-%d'))
     )
-
     if recent_logs:
         for log in recent_logs:
             log_date = datetime.strptime(
                 log[0], '%Y-%m-%d %H:%M:%S').strftime('%a')
             if log_date in activity_counts:
                 activity_counts[log_date] += 1
-
     activity_data = {
         "labels": list(activity_counts.keys()),
         "data": list(activity_counts.values())
     }
+
+    # --- Upcoming Test Date Logic ---
+    test_date_info = {
+        "days_left": None,
+        "date_str": None,
+        "test_type": None
+    }
+    test_path_stats = stats.get("test_path", {})
+    if test_path_stats.get("test_date"):
+        try:
+            test_date = datetime.strptime(
+                test_path_stats["test_date"], '%Y-%m-%d').date()
+            days_left = (test_date - date.today()).days
+            if days_left >= 0:
+                test_date_info["days_left"] = days_left
+                test_date_info["date_str"] = test_date.strftime('%B %d, %Y')
+                if test_path_stats.get("desired_sat"):
+                    test_date_info["test_type"] = "SAT"
+                elif test_path_stats.get("desired_act"):
+                    test_date_info["test_type"] = "ACT"
+        except (ValueError, TypeError):
+            pass
+
+    # --- Achievements Logic ---
+    earned_achievements = []
+    all_completed_tasks = total_test_prep_completed + total_college_planning_completed
+
+    if any(t for t in all_tasks if t[9] == 'Test Prep'):
+        earned_achievements.append(
+            {"icon": "🚀", "title": "Test Prep Pioneer", "description": "Generated your first Test Prep path."})
+    if any(t for t in all_tasks if t[9] == 'College Planning'):
+        earned_achievements.append({"icon": "🏛️", "title": "College Planner",
+                                   "description": "Generated your first College Planning path."})
+    if all_completed_tasks >= 1:
+        earned_achievements.append(
+            {"icon": "✅", "title": "First Step", "description": "Completed your first task."})
+    if all_completed_tasks >= 10:
+        earned_achievements.append(
+            {"icon": "🔥", "title": "Task Master", "description": "Completed 10 tasks."})
+    if all_completed_tasks >= 25:
+        earned_achievements.append(
+            {"icon": "🏆", "title": "Pathfinder Pro", "description": "Completed 25 tasks."})
 
     return render_template(
         "dashboard.html",
@@ -683,7 +715,9 @@ def dashboard():
         sat_total=sat_total or "—",
         act_average=act_average or "—",
         recent_activities=recent_activities,
-        activity_data=json.dumps(activity_data)  # Pass data for the chart
+        activity_data=json.dumps(activity_data),
+        test_date_info=test_date_info,
+        earned_achievements=earned_achievements
     )
 
 
