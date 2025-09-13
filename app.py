@@ -231,33 +231,50 @@ def _get_test_prep_ai_tasks(strengths, weaknesses, user_stats={}, chat_history=[
 
     prompt = (
         f"# MISSION\n"
-        f"You are an expert AI test prep coach ( Digital SAT & ACT). Your mission is to create a personalized, 5-step study plan that is motivating, clear, and directly addresses the student's needs. You must function as a mentor, guiding the student toward measurable progress. \n\n"
+        f"You are an expert AI test prep coach (Digital SAT & ACT). Your mission is to generate a personalized, forward-looking 5-step study plan that is:\n"
+        f"- Motivating, clear, and tailored to the student’s strengths, weaknesses, and timeline.\n"
+        f"- Progress-oriented, always pushing the student forward instead of repeating old work.\n"
+        f"- Designed with mentorship in mind: every step should build confidence, skills, and strategy.\n\n"
+
         f"# STUDENT ANALYSIS\n"
         f"Analyze the following data to understand the student's current situation:\n"
         f"- Strengths: {strengths}\n"
         f"- Weaknesses: {weaknesses}\n"
         f"- Test Date: {test_date_info}\n\n"
+
         f"## STUDENT PERFORMANCE & CONVERSATION HISTORY\n"
-        f"This is critical context. The new plan MUST be a logical continuation of their journey.\n"
+        f"This is critical context. The new plan MUST be a logical continuation of their journey, reflecting their recent actions and struggles.\n"
         f"- Recently Completed Tasks: {completed_tasks_str}\n"
         f"- Incomplete or Failed Tasks: {incomplete_tasks_str}\n"
         f"- Recent Conversation: {chat_history_str}\n"
         f"- Historical Performance Data (from Tracker):\n{stat_history}\n\n"
+
         f"# YOUR TASK: GENERATE A NEW 5-STEP PLAN\n"
-        f"Based on your analysis, generate a new, 5-step study plan. The plan must be actionable and adapt to the student's recent conversation and performance. For example, if they struggled with a math concept in the chat or their tracker data shows low math scores, the new plan should include a task to address it. Aditionally, in each tasks MAKE SURE TO INCLUDE reputable resources proven to help students improve on tasks that involve studying (respective to the specific test).\n\n"
+        f"Based on your analysis, generate a new, 5-step study plan. Each task must:\n"
+        f"- Be specific, actionable, and stage-appropriate given their timeline until the test.\n"
+        f"- Directly address weaknesses, reinforce strengths, and incorporate insights from recent conversation and tracker data.\n"
+        f"- Include at least one **reputable, proven resource** (official College Board/ACT practice, Khan Academy, Princeton Review, etc.) for any study-focused task.\n"
+        f"- Push the student forward with fresh, progressive steps that build on past work. DO NOT REPEAT OLD TASKS — they must evolve and build off each other.\n\n"
+
         f"# CRITICAL DIRECTIVES\n"
-        f"1.  **JSON Output ONLY**: Your entire output MUST be a single, raw JSON object. Do not include any text before or after the JSON.\n"
+        f"1.  THE MOST MAJOR DIRECTIVE :**JSON Output ONLY**: Your entire output MUST be a single, raw JSON object. Do not include any text before or after the JSON.\n"
         f"2.  **Exact Task Count**: The plan must contain EXACTLY 5 task objects in the `tasks` list.\n"
-        f"3.  **Adaptive Focus**: If the conversation or tracker data indicates a clear preference for ONLY the SAT or ONLY the ACT, all 5 tasks MUST be for that specific test. Do not mix them.\n"
-        f"4.  **Meaningful Milestones**: Only use the 'milestone' type for significant achievements like a full practice test or section. Use 'standard' for drills, review, or concept learning. 'stat_to_update' must be null for 'standard' tasks.\n"
-        f"5.  **Correct Stat Naming**: For milestones, `stat_to_update` must be one of the following: ['sat_math', 'sat_ebrw', 'sat_total', 'act_math', 'act_reading', 'act_science', 'act_composite'].\n"
-        f"6.  **Avoid Repetition**: Do not generate tasks that are identical to recently completed or incomplete tasks. The plan must feel fresh and progressive.\n\n"
+        f"3.  **Adaptive Focus**: If the context shows a focus on SAT or ACT, all 5 tasks must target that test only. Never mix.\n"
+        f"4.  **Meaningful Milestones**: Use 'milestone' only for major achievements (e.g., completing a full-length practice test, finishing an entire section). Use 'standard' for drills, concept review, or smaller steps. 'stat_to_update' must be null for 'standard' tasks.\n"
+        f"5.  **Correct Stat Naming**: For milestones, `stat_to_update` must be one of: ['sat_math', 'sat_ebrw', 'sat_total', 'act_math', 'act_reading', 'act_science', 'act_composite'].\n"
+        f"6.  **Avoid Repetition**: Never assign a task that mirrors recently completed or incomplete ones. Each roadmap must feel fresh, progressive, and adapted to growth.\n"
+        f"7.  **Strength/Weakness Balance**: Always prioritize weaknesses in the tasks. At the same time, strategically leverage the student’s strengths to build confidence and maintain motivation. Example: if strong in Math but weak in Reading, focus more on Reading while still including a Math task to reinforce confidence.\n"
+        f"8.  **Full-Length Tests Rule**: Occasionally (not in every plan) include a milestone for a full-length, timed practice test to simulate real exam conditions. These should appear periodically to track endurance and pacing, not constantly BUT THESE SHOULD BE PRIORIRTIZED OVER SECTION TESTS BECAUSE OF LIMITED OFFICIAL TESTS.\n"
+        f"9.  **SAT Math Special Rule**: If weaknesses specifically show SAT Math struggles, at least one task MUST focus on Desmos as a skill-building tool (e.g., regressions, multi-equation regressions, graphing strategies).\n"
+        f"10. **No Duplicate Praise**: If the student has already been congratulated for a score in past conversation, do not congratulate them again. Focus instead on next actionable steps.\n"
+        f"11. **Mentorship Tone**: Write tasks as if you are a coach guiding the student — supportive, motivating, and focused on measurable progress.\n\n"
+
         f"# JSON OUTPUT SCHEMA\n"
         f"Your output must conform strictly to this structure:\n"
         f"{{\n"
         f'  "tasks": [\n'
         f'    {{\n'
-        f'      "description": "A specific, actionable, and encouraging task description.",\n'
+        f'      "description": "A specific, actionable, and encouraging task description that includes resources where applicable.",\n'
         f'      "type": "Either \'standard\' or \'milestone\'.",\n'
         f'      "stat_to_update": "A string from the list above ONLY if type is milestone, otherwise null.",\n'
         f'      "category": "This MUST be the string \'Test Prep\'."\n'
@@ -1143,15 +1160,13 @@ def api_chat():
         if history:
             history.append(
                 {"role": "assistant", "content": "I've generated a new path for you based on our conversation."})
-            history_json = json.dumps(history)
-            existing_chat = db.select("chat_conversations", where={
-                                      "user_id": user_id, "category": category})
-            if existing_chat:
-                db.update("chat_conversations", {"history": history_json}, where={
-                          "user_id": user_id, "category": category})
-            else:
-                db.insert("chat_conversations", {
-                          "user_id": user_id, "category": category, "history": history_json})
+
+            # UPDATED LOGIC: Use upsert for simplicity and reliability
+            db.upsert("chat_conversations", {
+                "user_id": user_id,
+                "category": category,
+                "history": json.dumps(history)
+            }, conflict_target=["user_id", "category"])
 
         return jsonify({"new_path": new_tasks})
 
@@ -1163,15 +1178,12 @@ def api_chat():
 
     history.append({"role": "assistant", "content": reply})
 
-    history_json = json.dumps(history)
-    existing_chat = db.select("chat_conversations", where={
-                              "user_id": user_id, "category": category})
-    if existing_chat:
-        db.update("chat_conversations", {"history": history_json}, where={
-                  "user_id": user_id, "category": category})
-    else:
-        db.insert("chat_conversations", {
-                  "user_id": user_id, "category": category, "history": history_json})
+    # UPDATED LOGIC: Use upsert for simplicity and reliability
+    db.upsert("chat_conversations", {
+        "user_id": user_id,
+        "category": category,
+        "history": json.dumps(history)
+    }, conflict_target=["user_id", "category"])
 
     return jsonify({"reply": reply})
 
