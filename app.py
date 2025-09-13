@@ -267,7 +267,8 @@ def _get_test_prep_ai_tasks(strengths, weaknesses, user_stats={}, chat_history=[
         f"8.  **Full-Length Tests Rule**: Occasionally (not in every plan) include a milestone for a full-length, timed practice test to simulate real exam conditions. These should appear periodically to track endurance and pacing, not constantly BUT THESE SHOULD BE PRIORIRTIZED OVER SECTION TESTS BECAUSE OF LIMITED OFFICIAL TESTS.\n"
         f"9.  **SAT Math Special Rule**: If weaknesses specifically show SAT Math struggles, at least one task MUST focus on Desmos as a skill-building tool (e.g., regressions, multi-equation regressions, graphing strategies).\n"
         f"10. **No Duplicate Praise**: If the student has already been congratulated for a score in past conversation, do not congratulate them again. Focus instead on next actionable steps.\n"
-        f"11. **Mentorship Tone**: Write tasks as if you are a coach guiding the student — supportive, motivating, and focused on measurable progress.\n\n"
+        f"11. **Mentorship Tone**: Write tasks as if you are a coach guiding the student — supportive, motivating, and focused on measurable progress.\n"
+        f"12. ANOTHER MAJOR ONE: ** FOCUS ON THE LATEST CHAT MESSAGE FROM THE USER WHEN REGENERATTING FOR CHANGES THAT IS ONE OF  THE MOST IMPORTANT THINGS TO HELP THE USERS.\n"
 
         f"# JSON OUTPUT SCHEMA\n"
         f"Your output must conform strictly to this structure:\n"
