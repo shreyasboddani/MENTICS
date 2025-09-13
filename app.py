@@ -12,22 +12,35 @@ import random
 from pathlib import Path
 from datetime import datetime, timedelta, date
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
+# NEW: Import for Google OAuth
+from authlib.integrations.flask_client import OAuth
+
 
 # Explicitly load the .env file from the correct path
 env_path = Path('.') / '.env'
 load_dotenv(dotenv_path=env_path)
 
 app = Flask(__name__)
-app.secret_key = "supersecretkey"
+app.secret_key = "supersecretkey"  # Replace with a real secret key in production
 app.url_map.strict_slashes = False
 app.permanent_session_lifetime = timedelta(
     minutes=10)
 
+# NEW: Initialize OAuth for Google Login
+oauth = OAuth(app)
+oauth.register(
+    name='google',
+    server_metadata_url='https://accounts.google.com/.well-known/openid-configuration',
+    client_id=os.getenv("GOOGLE_CLIENT_ID"),
+    client_secret=os.getenv("GOOGLE_CLIENT_SECRET"),
+    client_kwargs={
+        'scope': 'openid email profile'
+    }
+)
+
 db = DatabaseHandler("users.db")
 
-# Configure the Gemini API key
-genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
-
+# ... (keep all your existing functions like init_db, helpers, decorators, AI functions, etc.)
 # --- DATABASE INITIALIZATION ---
 
 
@@ -214,7 +227,7 @@ def _get_test_prep_ai_tasks(strengths, weaknesses, user_stats={}, chat_history=[
 
     prompt = (
         f"# MISSION\n"
-        f"You are an expert AI test prep coach (SAT & ACT). Your mission is to create a personalized, 5-step study plan that is motivating, clear, and directly addresses the student's needs. You must function as a mentor, guiding the student toward measurable progress.\n\n"
+        f"You are an expert AI test prep coach ( Digital SAT & ACT). Your mission is to create a personalized, 5-step study plan that is motivating, clear, and directly addresses the student's needs. You must function as a mentor, guiding the student toward measurable progress. \n\n"
         f"# STUDENT ANALYSIS\n"
         f"Analyze the following data to understand the student's current situation:\n"
         f"- Strengths: {strengths}\n"
@@ -227,7 +240,7 @@ def _get_test_prep_ai_tasks(strengths, weaknesses, user_stats={}, chat_history=[
         f"- Recent Conversation: {chat_history_str}\n"
         f"- Historical Performance Data (from Tracker):\n{stat_history}\n\n"
         f"# YOUR TASK: GENERATE A NEW 5-STEP PLAN\n"
-        f"Based on your analysis, generate a new, 5-step study plan. The plan must be actionable and adapt to the student's recent conversation and performance. For example, if they struggled with a math concept in the chat or their tracker data shows low math scores, the new plan should include a task to address it.\n\n"
+        f"Based on your analysis, generate a new, 5-step study plan. The plan must be actionable and adapt to the student's recent conversation and performance. For example, if they struggled with a math concept in the chat or their tracker data shows low math scores, the new plan should include a task to address it. Aditionally, in each tasks MAKE SURE TO INCLUDE reputable resources proven to help students improve on tasks that involve studying (respective to the specific test).\n\n"
         f"# CRITICAL DIRECTIVES\n"
         f"1.  **JSON Output ONLY**: Your entire output MUST be a single, raw JSON object. Do not include any text before or after the JSON.\n"
         f"2.  **Exact Task Count**: The plan must contain EXACTLY 5 task objects in the `tasks` list.\n"
@@ -575,11 +588,57 @@ def login():
             return render_template("login.html", error="Invalid credentials")
     return render_template("login.html")
 
+# NEW: Google Login Route
+
+
+@app.route('/google-login')
+def google_login():
+    redirect_uri = url_for('authorize', _external=True)
+    return oauth.google.authorize_redirect(redirect_uri)
+
+# NEW: Google Authorize Route (Callback) - UPDATED
+
+
+@app.route('/authorize')
+def authorize():
+    token = oauth.google.authorize_access_token()
+    # The 'nonce' is retrieved from the session and passed to the parse_id_token method
+    user_info = oauth.google.parse_id_token(token, nonce=session.get('nonce'))
+
+    # Check if user exists
+    user_record = db.select("users", where={"email": user_info['email']})
+
+    if user_record:
+        # User exists, log them in
+        session["user"] = user_record[0][1]
+        session["user_id"] = user_record[0][0]
+        session.permanent = True
+    else:
+        # New user, create an account
+        # We use a placeholder for the password hash as they'll log in via Google
+        password_hash = generate_password_hash(os.urandom(16).hex())
+        user_id = db.insert("users", {
+            "email": user_info['email'],
+            "name": user_info['name'],
+            "password": password_hash,
+            "stats": json.dumps({
+                "sat_ebrw": "", "sat_math": "", "act_math": "",
+                "act_reading": "", "act_science": "", "gpa": "", "milestones": 0
+            })
+        })
+        session["user"] = user_info['email']
+        session["user_id"] = user_id
+        session.permanent = True
+
+    return redirect(url_for("dashboard"))
+
 
 @app.route("/logout")
 def logout():
     session.clear()
     return redirect(url_for("home"))
+
+# ... (keep all your other routes: /dashboard, /dashboard/test-path-builder, etc.)
 
 # --- Dashboard & Path Routes ---
 

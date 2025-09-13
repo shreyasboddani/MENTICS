@@ -100,6 +100,8 @@ body {
     font-weight: 600;
     color: #475569;
     transition: color 0.3s ease;
+    padding-top: 0.5rem;
+    padding-bottom: 0.5rem;
 }
 
 .nav-link:hover {
@@ -125,6 +127,7 @@ body {
     transform: scaleX(1);
     transform-origin: bottom left;
 }
+
 
 .button-primary {
     display: inline-block;

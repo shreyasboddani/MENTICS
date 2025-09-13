@@ -11,44 +11,9 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Lalezar&display=swap"
         rel="stylesheet">
     <link href="https://unpkg.com/aos@2.3.1/dist/aos.css" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='dashboard.css') }}">
 
     <style>
-        .font-lalezar {
-            font-family: 'Lalezar', cursive;
-        }
-
-        .font-sans {
-            font-family: 'Inter', sans-serif;
-        }
-
-        body::before {
-            content: '';
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100vw;
-            height: 100vh;
-            background: radial-gradient(circle at 10% 20%, rgba(147, 197, 253, 0.2), transparent 40%),
-                radial-gradient(circle at 80% 90%, rgba(99, 102, 241, 0.2), transparent 40%),
-                radial-gradient(circle at 50% 50%, rgba(199, 210, 254, 0.1), transparent 50%);
-            animation: aurora 20s infinite linear;
-            z-index: -1;
-        }
-
-        @keyframes aurora {
-            0% {
-                transform: rotate(0deg) scale(1.2);
-            }
-
-            50% {
-                transform: rotate(180deg) scale(1.5);
-            }
-
-            100% {
-                transform: rotate(360deg) scale(1.2);
-            }
-        }
-
         ::-webkit-scrollbar {
             width: 6px;
         }
@@ -103,120 +68,106 @@
     </style>
 </head>
 
-<body class="bg-[#F8F7FF] font-sans text-slate-800 antialiased">
-    <div class="flex h-screen">
-        <aside
-            class="w-64 flex-shrink-0 bg-white/60 backdrop-blur-xl border-r border-white/20 p-6 flex-col hidden md:flex">
-            <a href="/" class="text-3xl font-bold text-purple-600 tracking-tight font-lalezar mb-12">
-                MENTICS
-            </a>
-            <nav class="flex flex-col space-y-2">
-                <a href="/dashboard"
-                    class="flex items-center gap-3 px-4 py-2 text-slate-600 font-semibold rounded-lg hover:bg-purple-50 hover:text-purple-700 transition-colors">
-                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-5 h-5">
+<body class="bg-slate-50 font-sans text-slate-800 antialiased">
+
+    <div class="background-shapes">
+        <div class="shape-1"></div>
+        <div class="shape-2"></div>
+    </div>
+
+    <header class="top-nav">
+        <div class="flex justify-between items-center">
+            <a href="/" class="text-3xl font-bold text-purple-600 tracking-tight font-lalezar">MENTICS</a>
+            <nav class="flex items-center space-x-2">
+                <a href="/dashboard" class="nav-item">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
                         <path
-                            d="M11.25 4.533A9.707 9.707 0 0 0 6 3a9.735 9.735 0 0 0-3.25.555.75.75 0 0 0-.5.707v14.522c0 .318.22.6.5.707a9.735 9.735 0 0 0 3.25.555 9.707 9.707 0 0 0 5.25-1.533v-1.37a.75.75 0 0 0-.56-0.723c-1.428-.344-2.285-.945-2.285-1.717s.857-1.373 2.285-1.717a.75.75 0 0 0 .56-.723v-1.37c0-.629-.444-1.21-1.141-1.423-1.02-.3-1.859-.933-1.859-1.828s.839-1.528 1.859-1.828c.697-.213 1.141-.794 1.141-1.423v-1.37ZM18 3a9.735 9.735 0 0 0-3.25.555.75.75 0 0 0-.5.707v14.522c0 .318.22.6.5.707a9.735 9.735 0 0 0 3.25.555 9.707 9.707 0 0 0 5.25-1.533v-1.37a.75.75 0 0 0-.56-.723c-1.428-.344-2.285-.945-2.285-1.717s.857-1.373 2.285-1.717a.75.75 0 0 0 .56-.723v-1.37c0-.629-.444-1.21-1.141-1.423-1.02-.3-1.859-.933-1.859-1.828s.839-1.528 1.859-1.828c.697-.213 1.141-.794 1.141-1.423v-1.37A9.707 9.707 0 0 0 18 3Z" />
+                            d="M10.707 2.293a1 1 0 00-1.414 0l-7 7a1 1 0 001.414 1.414L4 10.414V17a1 1 0 001 1h2a1 1 0 001-1v-2a1 1 0 011-1h2a1 1 0 011 1v2a1 1 0 001 1h2a1 1 0 001-1v-6.586l.293.293a1 1 0 001.414-1.414l-7-7z" />
                     </svg>
-                    Dashboard
+                    <span>Dashboard</span>
                 </a>
-                <a href="/dashboard/stats"
-                    class="flex items-center gap-3 px-4 py-2 text-slate-600 font-semibold rounded-lg hover:bg-purple-50 hover:text-purple-700 transition-colors">
-                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-5 h-5">
-                        <path fill-rule="evenodd"
-                            d="M2.25 13.5a8.25 8.25 0 0 1 8.25-8.25.75.75 0 0 1 .75.75v6.75H18a.75.75 0 0 1 .75.75 8.25 8.25 0 0 1-16.5 0Z"
-                            clip-rule="evenodd" />
-                        <path fill-rule="evenodd"
-                            d="M12.75 3a.75.75 0 0 1 .75-.75 8.25 8.25 0 0 1 8.25 8.25.75.75 0 0 1-.75.75h-7.5a.75.75 0 0 1-.75-.75V3Z"
-                            clip-rule="evenodd" />
+                <a href="/dashboard/stats" class="nav-item">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                        <path d="M2 10a8 8 0 018-8v8h8a8 8 0 11-16 0z" />
+                        <path d="M12 2.252A8.014 8.014 0 0117.748 8H12V2.252z" />
                     </svg>
-                    Stats
+                    <span>Stats</span>
                 </a>
-                <a href="/dashboard/tracker"
-                    class="flex items-center gap-3 px-4 py-2 text-slate-600 font-semibold rounded-lg hover:bg-purple-50 hover:text-purple-700 transition-colors">
-                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-5 h-5">
-                        <path
-                            d="m11.08 4.135.418-.21a.75.75 0 0 1 .864 1.22l-1.01 1.01a.75.75 0 0 1-1.06 0l-2.12-2.122a.75.75 0 0 1 1.06-1.06l1.85 1.85ZM12 5.25a.75.75 0 0 1 .75.75v.008l.008.008a.75.75 0 0 1 0 1.052l-.008.008a.75.75 0 0 1-1.052 0l-.008-.008a.75.75 0 0 1 .3-1.06Zm-2.71 4.46a.75.75 0 0 1 0 1.06l-1.01 1.01a.75.75 0 0 1-1.22-.864l.21-.418 1.85-1.85a.75.75 0 0 1 1.06 0Zm10.53-2.181a.75.75 0 0 0-1.06-1.06l-1.85 1.85-.21.418a.75.75 0 0 0 .865 1.22l1.01-1.01a.75.75 0 0 0 0-1.06ZM12 15.75a.75.75 0 0 1 .75.75v.008l.008.008a.75.75 0 0 1 0 1.052l-.008.008a.75.75 0 0 1-1.052 0l-.008-.008a.75.75 0 0 1 .3-1.06ZM9.29 16.03a.75.75 0 0 0 0 1.06l-1.01 1.01a.75.75 0 1 0 1.22.865l.418-.21 1.85-1.85a.75.75 0 0 0-1.06-1.06l-1.42 1.42Zm3.78-2.81a.75.75 0 0 1 1.06 0l2.12 2.121a.75.75 0 0 1-1.06 1.06l-1.85-1.85.418-.21a.75.75 0 0 1 .865 1.22l-1.01 1.01a.75.75 0 0 1-1.06 0l-2.12-2.122a.75.75 0 0 1 1.06-1.06Zm-3.78 2.81a.75.75 0 0 1 1.06 0l1.42-1.42 1.85 1.85.21.418a.75.75 0 0 1-.865 1.22l-1.01-1.01a.75.75 0 0 1 0-1.06ZM12 2.25a9.75 9.75 0 1 0 0 19.5 9.75 9.75 0 0 0 0-19.5Z" />
+                <a href="/dashboard/tracker" class="nav-item">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                        <path fill-rule="evenodd"
+                            d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V4a1 1 0 011-1zm10 8a1 1 0 011-1h3a1 1 0 011 1v4a1 1 0 01-1 1h-3a1 1 0 01-1-1v-4zm-7 1a1 1 0 011-1h2a1 1 0 011 1v3a1 1 0 01-1 1H8a1 1 0 01-1-1v-3z"
+                            clip-rule="evenodd" />
                     </svg>
-                    Tracker
+                    <span>Tracker</span>
                 </a>
             </nav>
-            <a href="/logout"
-                class="mt-auto flex items-center gap-3 px-4 py-2 text-slate-600 font-semibold rounded-lg hover:bg-red-50 hover:text-red-700 transition-colors">
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-5 h-5">
+            <a href="/logout" class="nav-item !text-red-500">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
                     <path fill-rule="evenodd"
-                        d="M7.5 3.75A1.5 1.5 0 0 0 6 5.25v13.5a1.5 1.5 0 0 0 1.5 1.5h6a1.5 1.5 0 0 0 1.5-1.5V15a.75.75 0 0 1 1.5 0v3.75a3 3 0 0 1-3 3h-6a3 3 0 0 1-3-3V5.25a3 3 0 0 1 3-3h6a3 3 0 0 1 3 3V9A.75.75 0 0 1 15 9V5.25a1.5 1.5 0 0 0-1.5-1.5h-6Zm10.72 4.72a.75.75 0 0 1 1.06 0l3 3a.75.75 0 0 1 0 1.06l-3 3a.75.75 0 1 1-1.06-1.06l1.72-1.72H9a.75.75 0 0 1 0-1.5h10.94l-1.72-1.72a.75.75 0 0 1 0-1.06Z"
+                        d="M3 3a1 1 0 00-1 1v12a1 1 0 102 0V4a1 1 0 00-1-1zm10.293 9.293a1 1 0 001.414 1.414l3-3a1 1 0 000-1.414l-3-3a1 1 0 10-1.414 1.414L14.586 9H7a1 1 0 100 2h7.586l-1.293 1.293z"
                         clip-rule="evenodd" />
                 </svg>
-                Logout
+                <span>Logout</span>
             </a>
-        </aside>
-
-        <div id="main-scroll-panel" class="flex-1 flex flex-col h-screen overflow-y-auto">
-            <header class="sticky top-0 bg-[#F8F7FF]/60 backdrop-blur-xl z-10 border-b border-white/20">
-                <div class="flex justify-between items-center px-6 py-4">
-                    <h1 class="text-xl font-bold text-slate-900">College Planning Path</h1>
-                </div>
-            </header>
-
-            <main class="flex-1 p-6">
-                <div class="grid grid-cols-1 xl:grid-cols-5 gap-6 h-full">
-
-                    <div class="xl:col-span-2 bg-white/60 backdrop-blur-xl border border-white/20 rounded-2xl shadow-lg shadow-indigo-100/30 p-6 flex flex-col h-[85vh]"
-                        data-aos="fade-right">
-                        <div class="flex justify-between items-center mb-4">
-                            <h2 class="text-xl font-bold text-slate-900 font-lalezar">AI Assistant</h2>
-                            <button id="reset-chat-btn" title="Reset Chat History"
-                                class="flex items-center gap-2 text-sm text-slate-500 font-semibold hover:text-red-600 transition-colors py-1 px-3 rounded-lg hover:bg-red-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-red-500">
-                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"
-                                    class="w-5 h-5">
-                                    <path fill-rule="evenodd"
-                                        d="M8.75 1A2.75 2.75 0 0 0 6 3.75v.443c-1.157.06-2.185.44-3.094 1.1a.75.75 0 0 0 .537 1.344C4.1 6.1 4.9 5.75 6 5.75v9.5c-1.1 0-1.9.35-2.557.89a.75.75 0 0 0 .537 1.344c.91-.66 1.936-1.034 3.094-1.1v.443A2.75 2.75 0 0 0 8.75 19h2.5A2.75 2.75 0 0 0 14 16.25v-12.5A2.75 2.75 0 0 0 11.25 1h-2.5ZM7.5 3.75a1.25 1.25 0 0 1 1.25-1.25h2.5a1.25 1.25 0 0 1 1.25 1.25v12.5a1.25 1.25 0 0 1-1.25-1.25h-2.5a1.25 1.25 0 0 1-1.25-1.25v-12.5Z"
-                                        clip-rule="evenodd" />
-                                </svg>
-                                Reset Chat
-                            </button>
-                        </div>
-                        <div id="chat-history" class="flex-grow overflow-y-auto space-y-4 pr-2 -mr-2"></div>
-                        <div class="mt-4 flex items-center gap-2 pt-4 border-t border-slate-200/80">
-                            <input type="text" id="userInput" placeholder="Ask a question..."
-                                class="w-full bg-white/50 border border-slate-300/70 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition disabled:bg-slate-100"
-                                disabled>
-                            <button id="send-btn"
-                                class="bg-indigo-600 text-white p-2.5 rounded-lg hover:bg-indigo-700 font-semibold transition disabled:bg-slate-400 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2"
-                                disabled>
-                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"
-                                    class="w-5 h-5">
-                                    <path
-                                        d="M3.478 2.404a.75.75 0 0 0-.926.941l2.432 7.905H13.5a.75.75 0 0 1 0 1.5H4.984l-2.432 7.905a.75.75 0 0 0 .926.94 60.519 60.519 0 0 0 18.445-8.986.75.75 0 0 0 0-1.218A60.517 60.517 0 0 0 3.478 2.404Z" />
-                                </svg>
-                            </button>
-                        </div>
-                    </div>
-
-                    <div class="xl:col-span-3 bg-white/60 backdrop-blur-xl border border-white/20 rounded-2xl shadow-lg shadow-indigo-100/30 p-6 relative flex flex-col overflow-hidden"
-                        data-aos="fade-left" data-aos-delay="100">
-                        <h1 class="text-3xl font-bold font-lalezar text-indigo-700 mb-1">Your Personalized Path</h1>
-                        <p class="text-slate-600 mb-6">Complete each task to move to the next step. Click a node for
-                            details.</p>
-
-                        <div class="relative flex-grow mb-4 min-h-0 overflow-clip">
-                            <svg id="path-svg" class="absolute top-0 left-0 w-full h-full z-0">
-                                <path id="connector-path" d="" stroke="#C7D2FE" stroke-width="3" fill="none"
-                                    stroke-dasharray="2 8" stroke-linecap="round" />
-                            </svg>
-                            <div id="path-nodes-container" class="space-y-10 relative z-10 p-4"></div>
-                        </div>
-
-                        <div class="mt-auto pt-6 border-t border-slate-200/80 flex justify-end">
-                            <a href="{{ url_for('college_path_builder') }}"
-                                class="bg-indigo-600 text-white px-5 py-2.5 rounded-lg hover:bg-indigo-700 font-semibold transition shadow-md hover:shadow-lg transform hover:-translate-y-0.5 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2">
-                                Edit Path Info
-                            </a>
-                        </div>
-                    </div>
-                </div>
-            </main>
         </div>
+    </header>
+
+    <main class="p-6 lg:p-8 w-full">
+        <div class="grid grid-cols-1 xl:grid-cols-5 gap-8 h-full">
+
+            <div class="xl:col-span-2 card p-6 flex flex-col h-[calc(100vh-120px)]" data-aos="fade-right">
+                <div class="flex justify-between items-center mb-4">
+                    <h2 class="text-xl font-bold text-slate-900 font-lalezar">AI Assistant</h2>
+                    <button id="reset-chat-btn" title="Reset Chat History"
+                        class="flex items-center gap-2 text-sm text-slate-500 font-semibold hover:text-red-600 transition-colors py-1 px-3 rounded-lg hover:bg-red-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-red-500">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5">
+                            <path fill-rule="evenodd"
+                                d="M8.75 1A2.75 2.75 0 0 0 6 3.75v.443c-1.157.06-2.185.44-3.094 1.1a.75.75 0 0 0 .537 1.344C4.1 6.1 4.9 5.75 6 5.75v9.5c-1.1 0-1.9.35-2.557.89a.75.75 0 0 0 .537 1.344c.91-.66 1.936-1.034 3.094-1.1v.443A2.75 2.75 0 0 0 8.75 19h2.5A2.75 2.75 0 0 0 14 16.25v-12.5A2.75 2.75 0 0 0 11.25 1h-2.5ZM7.5 3.75a1.25 1.25 0 0 1 1.25-1.25h2.5a1.25 1.25 0 0 1 1.25 1.25v12.5a1.25 1.25 0 0 1-1.25-1.25h-2.5a1.25 1.25 0 0 1-1.25-1.25v-12.5Z"
+                                clip-rule="evenodd" />
+                        </svg>
+                        Reset Chat
+                    </button>
+                </div>
+                <div id="chat-history" class="flex-grow overflow-y-auto space-y-4 pr-2 -mr-2"></div>
+                <div class="mt-4 flex items-center gap-2 pt-4 border-t border-slate-200/80">
+                    <input type="text" id="userInput" placeholder="Ask a question..."
+                        class="w-full bg-white/50 border border-slate-300/70 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition disabled:bg-slate-100"
+                        disabled>
+                    <button id="send-btn"
+                        class="bg-indigo-600 text-white p-2.5 rounded-lg hover:bg-indigo-700 font-semibold transition disabled:bg-slate-400 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2"
+                        disabled>
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-5 h-5">
+                            <path
+                                d="M3.478 2.404a.75.75 0 0 0-.926.941l2.432 7.905H13.5a.75.75 0 0 1 0 1.5H4.984l-2.432 7.905a.75.75 0 0 0 .926.94 60.519 60.519 0 0 0 18.445-8.986.75.75 0 0 0 0-1.218A60.517 60.517 0 0 0 3.478 2.404Z" />
+                        </svg>
+                    </button>
+                </div>
+            </div>
+
+            <div class="xl:col-span-3 card p-6 relative flex flex-col overflow-hidden h-[calc(100vh-120px)]"
+                data-aos="fade-left" data-aos-delay="100">
+                <h1 class="text-3xl font-bold font-lalezar text-indigo-700 mb-1">Your Personalized Path</h1>
+                <p class="text-slate-600 mb-6">Complete each task to move to the next step. Click a node for
+                    details.</p>
+
+                <div class="relative flex-grow mb-4 min-h-0 overflow-clip">
+                    <svg id="path-svg" class="absolute top-0 left-0 w-full h-full z-0">
+                        <path id="connector-path" d="" stroke="#C7D2FE" stroke-width="3" fill="none"
+                            stroke-dasharray="2 8" stroke-linecap="round" />
+                    </svg>
+                    <div id="path-nodes-container" class="space-y-10 relative z-10 p-4"></div>
+                </div>
+
+                <div class="mt-auto pt-6 border-t border-slate-200/80 flex justify-end">
+                    <a href="{{ url_for('college_path_builder') }}"
+                        class="bg-indigo-600 text-white px-5 py-2.5 rounded-lg hover:bg-indigo-700 font-semibold transition shadow-md hover:shadow-lg transform hover:-translate-y-0.5 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2">
+                        Edit Path Info
+                    </a>
+                </div>
+            </div>
+        </div>
+    </main>
     </div>
 
     <div id="taskModal"
@@ -317,7 +268,10 @@
 
         // Function to trigger the initial greeting from the bot
         function startInitialChat() {
-            conversationHistory.push({ role: 'user', content: 'INITIAL_MESSAGE' });
+            conversationHistory.push({
+                role: 'user',
+                content: 'INITIAL_MESSAGE'
+            });
             handleUserChat();
         }
 
@@ -325,13 +279,21 @@
             const nodesContainer = document.getElementById('path-nodes-container');
             nodesContainer.innerHTML = `<div class="text-center text-slate-500 p-8">${isRegeneration ? 'Generating new path...' : 'Loading your path...'}</div>`;
             try {
-                const response = await fetch(`/api/tasks?category=${chatCategory}`, { method: isRegeneration ? 'POST' : 'GET' });
+                const response = await fetch(`/api/tasks?category=${chatCategory}`, {
+                    method: isRegeneration ? 'POST' : 'GET'
+                });
                 if (!response.ok) throw new Error('Network response was not ok');
                 const tasks = await response.json();
                 if (Array.isArray(tasks) && tasks.length > 0) {
-                    currentTasks = tasks.map((task, index) => ({ ...task, client_id: index + 1, status: task.is_completed ? 'complete' : 'pending' }));
+                    currentTasks = tasks.map((task, index) => ({
+                        ...task,
+                        client_id: index + 1,
+                        status: task.is_completed ? 'complete' : 'pending'
+                    }));
                     renderPathAndConnectors(currentTasks, true); // Animate on fetch
-                } else { window.location.href = "{{ url_for('college_path_builder') }}"; }
+                } else {
+                    window.location.href = "{{ url_for('college_path_builder') }}";
+                }
             } catch (error) {
                 console.error('Error fetching path:', error);
                 nodesContainer.innerHTML = `<div class="text-center p-8"><p class="text-red-500 mb-4">Could not load path.</p><button onclick="fetchPath(true)" class="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700">Try Again</button></div>`;
@@ -529,17 +491,24 @@
             modal.classList.remove('hidden');
         }
 
-        function closeTaskModal() { document.getElementById('taskModal').classList.add('hidden'); }
-        function closeStatModal() { document.getElementById('statEntryModal').classList.add('hidden'); }
+        function closeTaskModal() {
+            document.getElementById('taskModal').classList.add('hidden');
+        }
+
+        function closeStatModal() {
+            document.getElementById('statEntryModal').classList.add('hidden');
+        }
 
         async function handleImStuck() {
             const task = currentTasks.find(t => t.id === currentTaskId);
             if (!task) return;
             closeTaskModal();
-            const reason = await prompt(`You're working on the task:\n"${task.description}"`, '', 'What part is giving you trouble?');
+            const reason = await prompt(`You're working on the task:\n"${task.description}"`, '',
+                'What part is giving you trouble?');
             if (reason && reason.trim() !== "") {
                 const chatInput = document.getElementById('userInput');
-                chatInput.value = `I'm having trouble with the task: "${task.description}". Specifically, my problem is: ${reason}`;
+                chatInput.value =
+                    `I'm having trouble with the task: "${task.description}". Specifically, my problem is: ${reason}`;
                 handleUserChat();
                 chatInput.focus();
             }
@@ -552,8 +521,13 @@
             try {
                 const response = await fetch('/api/update_task_status', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ taskId: task.id, status: status })
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        taskId: task.id,
+                        status: status
+                    })
                 });
                 if (!response.ok) throw new Error('Could not update task status');
                 const result = await response.json();
@@ -563,7 +537,9 @@
                     renderPathAndConnectors(currentTasks, false); // No animation on complete
                     if (task.type === 'milestone' && task.stat_to_update) {
                         setTimeout(() => openStatModal(task), 500);
-                    } else { await checkPathCompletion(); }
+                    } else {
+                        await checkPathCompletion();
+                    }
                 }
             } catch (error) {
                 console.error("Error updating task status:", error);
@@ -590,13 +566,34 @@
             const statNameToUpdate = document.getElementById('statNameToUpdate');
 
             const statDetails = {
-                "gpa": { name: "New GPA", placeholder: "Enter new GPA (e.g., 3.85)", min: 0, max: 5 },
-                "colleges_researched": { name: "Number of Colleges Researched", placeholder: "Enter a number", min: 0 },
-                "essay_progress": { name: "Essay Progress", placeholder: "1=Draft, 2=Final", min: 1, max: 2 },
-                "applications_submitted": { name: "Applications Submitted", placeholder: "Enter a number", min: 0 }
+                "gpa": {
+                    name: "New GPA",
+                    placeholder: "Enter new GPA (e.g., 3.85)",
+                    min: 0,
+                    max: 5
+                },
+                "colleges_researched": {
+                    name: "Number of Colleges Researched",
+                    placeholder: "Enter a number",
+                    min: 0
+                },
+                "essay_progress": {
+                    name: "Essay Progress",
+                    placeholder: "1=Draft, 2=Final",
+                    min: 1,
+                    max: 2
+                },
+                "applications_submitted": {
+                    name: "Applications Submitted",
+                    placeholder: "Enter a number",
+                    min: 0
+                }
             };
 
-            const details = statDetails[statName] || { name: "Update Progress", placeholder: "Enter value" };
+            const details = statDetails[statName] || {
+                name: "Update Progress",
+                placeholder: "Enter value"
+            };
 
             modalTitle.textContent = `Update: ${details.name}`;
             modalLabel.textContent = details.name;
@@ -609,7 +606,8 @@
 
             // Update the descriptive paragraph for clarity
             const p = modal.querySelector('p');
-            p.innerHTML = `Great job on this milestone! The information you enter will be saved to your <a href="/dashboard/stats" class="text-indigo-600 hover:underline font-semibold">Stats</a> page and will help tailor your future college planning paths.`;
+            p.innerHTML =
+                `Great job on this milestone! The information you enter will be saved to your <a href="/dashboard/stats" class="text-indigo-600 hover:underline font-semibold">Stats</a> page and will help tailor your future college planning paths.`;
 
             modal.classList.remove('hidden');
         }
@@ -642,8 +640,13 @@
             try {
                 const response = await fetch('/api/update_stats', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ stat_name, stat_value })
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        stat_name,
+                        stat_value
+                    })
                 });
                 if (!response.ok) throw new Error('Failed to save stats.');
                 const result = await response.json();
@@ -651,7 +654,9 @@
                     alert("Your stats have been updated!");
                     closeStatModal();
                     await checkPathCompletion();
-                } else { throw new Error(result.error || 'An unknown error occurred.'); }
+                } else {
+                    throw new Error(result.error || 'An unknown error occurred.');
+                }
             } catch (error) {
                 console.error("Error saving stat:", error);
                 alert("Could not save your stats. Please try again.");
@@ -662,7 +667,8 @@
             const chatInput = document.getElementById('userInput');
             const sendButton = document.getElementById('send-btn');
             let message = chatInput.value.trim();
-            const isInitialMessage = conversationHistory.length > 0 && conversationHistory[conversationHistory.length - 1].content === 'INITIAL_MESSAGE';
+            const isInitialMessage = conversationHistory.length > 0 && conversationHistory[conversationHistory
+                .length - 1].content === 'INITIAL_MESSAGE';
 
             if (isInitialMessage) {
                 chatInput.value = "";
@@ -672,7 +678,10 @@
 
             if (!isInitialMessage) {
                 appendChatMessage(message, 'user');
-                conversationHistory.push({ role: 'user', content: message });
+                conversationHistory.push({
+                    role: 'user',
+                    content: message
+                });
             }
 
             chatInput.value = "";
@@ -683,8 +692,12 @@
             try {
                 const response = await fetch(`/api/chat?category=${chatCategory}`, {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ history: conversationHistory })
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        history: conversationHistory
+                    })
                 });
                 if (!response.ok) throw new Error('AI response error.');
 
@@ -696,14 +709,25 @@
                 }
 
                 if (data.new_path) {
-                    appendChatMessage("I've generated a new college planning path for you based on our conversation.", 'bot');
-                    conversationHistory.push({ role: 'assistant', content: "I've generated a new college planning path for you based on our conversation." });
-                    currentTasks = data.new_path.map((task, index) => ({ ...task, client_id: index + 1, status: task.is_completed ? 'complete' : 'pending' }));
+                    appendChatMessage("I've generated a new college planning path for you based on our conversation.",
+                        'bot');
+                    conversationHistory.push({
+                        role: 'assistant',
+                        content: "I've generated a new college planning path for you based on our conversation."
+                    });
+                    currentTasks = data.new_path.map((task, index) => ({
+                        ...task,
+                        client_id: index + 1,
+                        status: task.is_completed ? 'complete' : 'pending'
+                    }));
                     renderPathAndConnectors(currentTasks, true);
                 } else {
                     const aiReply = data.reply;
                     appendChatMessage(aiReply, 'bot');
-                    conversationHistory.push({ role: 'assistant', content: aiReply });
+                    conversationHistory.push({
+                        role: 'assistant',
+                        content: aiReply
+                    });
                 }
 
             } catch (error) {
@@ -722,8 +746,12 @@
                 try {
                     const response = await fetch('/api/reset_chat', {
                         method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ category: chatCategory })
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            category: chatCategory
+                        })
                     });
                     if (!response.ok) throw new Error('Failed to reset chat.');
 
@@ -743,8 +771,9 @@
             messageWrapper.className = 'flex ' + (role === 'user' ? 'justify-end' : 'justify-start');
             const messageDiv = document.createElement('div');
             let cssClass = 'p-3 rounded-xl max-w-xs text-sm';
-            if (role === 'user') { cssClass += ' bg-indigo-600 text-white'; }
-            else {
+            if (role === 'user') {
+                cssClass += ' bg-indigo-600 text-white';
+            } else {
                 cssClass += ' bg-white/80 text-slate-700';
                 if (isTyping) cssClass += ' animate-pulse';
             }
@@ -765,11 +794,18 @@
         });
         window.addEventListener('resize', () => redrawAllConnectors());
         document.getElementById('send-btn').addEventListener('click', handleUserChat);
-        document.getElementById('userInput').addEventListener('keypress', (e) => { if (e.key === 'Enter') handleUserChat(); });
+        document.getElementById('userInput').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') handleUserChat();
+        });
         document.getElementById('reset-chat-btn').addEventListener('click', handleResetChat);
     </script>
     <script src="https://unpkg.com/aos@2.3.1/dist/aos.js"></script>
-    <script>AOS.init({ once: true, duration: 800 });</script>
+    <script>
+        AOS.init({
+            once: true,
+            duration: 800
+        });
+    </script>
 </body>
 
 </html>

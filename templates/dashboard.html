@@ -61,12 +61,14 @@
     </header>
 
     <main class="p-6 lg:p-8">
-        <div data-aos="fade-in" class="mb-8">
-            <h1
-                class="font-lalezar text-7xl md:text-8xl lg:text-[9rem] font-bold text-transparent bg-clip-text bg-gradient-to-r from-purple-600 to-indigo-600 leading-none">
-                Welcome Back, {{ name.split(' ')[0] }}!
-            </h1>
-        </div>
+        <center>
+            <div data-aos="fade-in" class="mb-8">
+                <h1
+                    class="font-lalezar text-7xl md:text-8xl lg:text-[9rem] font-bold text-transparent bg-clip-text bg-gradient-to-r from-purple-600 to-indigo-600 leading-none">
+                    Welcome Back, {{ name.split(' ')[0] }}!
+                </h1>
+            </div>
+        </center>
 
         <div class="grid grid-cols-1 lg:grid-cols-5 gap-8 items-start">
 
@@ -174,7 +176,7 @@
                 <div class="card countdown-card" data-aos="fade-up" data-aos-delay="500">
                     <h3 class="card-header">Upcoming Test</h3>
                     <div class="countdown-value">{{ test_date_info.days_left }}</div>
-                    <p class="countdown-label">days until your {{ test_date_info.test_type }}</p>
+                    <p class="countdown-label">days until your SAT/ACT</p>
                     <p class="countdown-date">{{ test_date_info.date_str }}</p>
                 </div>
                 {% endif %}

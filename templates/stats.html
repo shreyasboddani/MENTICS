@@ -12,6 +12,13 @@
     rel="stylesheet">
   <link href="https://unpkg.com/aos@2.3.1/dist/aos.css" rel="stylesheet">
   <link rel="stylesheet" href="{{ url_for('static', filename='dashboard.css') }}">
+  <style>
+    .gpa-text {
+      font-size: 6rem;
+      line-height: 1;
+      font-weight: 800;
+    }
+  </style>
 </head>
 
 <body class="bg-slate-50 font-sans text-slate-800 antialiased">
@@ -110,9 +117,9 @@
         </div>
       </div>
 
-      <div class="card lg:col-span-2 p-6" data-aos="fade-up" data-aos-delay="300">
+      <div class="card lg:col-span-2 p-8 flex flex-col" data-aos="fade-up" data-aos-delay="300">
         <h2 class="card-header text-purple-800">SAT Scores</h2>
-        <div class="grid grid-cols-2 gap-x-6 gap-y-4 h-full">
+        <div class="grid grid-cols-2 gap-x-6 gap-y-4 h-full flex-grow">
           <div class="flex flex-col justify-center">
             <p class="text-sm text-slate-500">EBRW</p>
             <p class="font-semibold text-3xl text-slate-700">{{ sat_ebrw or "—" }}</p>
@@ -121,16 +128,16 @@
             <p class="text-sm text-slate-500">Math</p>
             <p class="font-semibold text-3xl text-slate-700">{{ sat_math or "—" }}</p>
           </div>
-          <div class="col-span-2 border-t border-slate-200/80 pt-4 mt-2 text-center flex flex-col justify-center">
+          <div class="col-span-2 border-t border-slate-200/80 pt-4 mt-auto text-center flex flex-col justify-center">
             <p class="text-sm font-bold text-purple-700">Total Score</p>
             <p class="font-bold text-5xl text-purple-700">{{ sat_total or "—" }}</p>
           </div>
         </div>
       </div>
 
-      <div class="card lg:col-span-2 p-6" data-aos="fade-up" data-aos-delay="400">
+      <div class="card lg:col-span-2 p-8 flex flex-col" data-aos="fade-up" data-aos-delay="400">
         <h2 class="card-header text-indigo-800">ACT Scores</h2>
-        <div class="grid grid-cols-3 gap-x-4 gap-y-4 h-full">
+        <div class="grid grid-cols-3 gap-x-4 gap-y-4 h-full flex-grow">
           <div class="text-center flex flex-col justify-center">
             <p class="text-sm text-slate-500">Math</p>
             <p class="font-semibold text-3xl text-slate-700">{{ act_math or "—" }}</p>
@@ -143,7 +150,7 @@
             <p class="text-sm text-slate-500">Science</p>
             <p class="font-semibold text-3xl text-slate-700">{{ act_science or "—" }}</p>
           </div>
-          <div class="col-span-3 border-t border-slate-200/80 pt-4 mt-2 text-center flex flex-col justify-center">
+          <div class="col-span-3 border-t border-slate-200/80 pt-4 mt-auto text-center flex flex-col justify-center">
             <p class="text-sm font-bold text-indigo-700">Average Score</p>
             <p class="font-bold text-5xl text-indigo-700">{{ act_average or "—" }}</p>
           </div>

@@ -11,48 +11,16 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Lalezar&display=swap"
         rel="stylesheet">
     <link href="https://unpkg.com/aos@2.3.1/dist/aos.css" rel="stylesheet">
-
-    <style>
-        .font-lalezar {
-            font-family: 'Lalezar', cursive;
-        }
-
-        .font-sans {
-            font-family: 'Inter', sans-serif;
-        }
-
-        body::before {
-            content: '';
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100vw;
-            height: 100vh;
-            background: radial-gradient(circle at 10% 20%, rgba(167, 139, 250, 0.2), transparent 40%),
-                radial-gradient(circle at 80% 90%, rgba(127, 13, 239, 0.2), transparent 40%),
-                radial-gradient(circle at 50% 50%, rgba(196, 181, 253, 0.1), transparent 50%);
-            animation: aurora 20s infinite linear;
-            z-index: -1;
-        }
-
-        @keyframes aurora {
-            0% {
-                transform: rotate(0deg) scale(1.2);
-            }
-
-            50% {
-                transform: rotate(180deg) scale(1.5);
-            }
-
-            100% {
-                transform: rotate(360deg) scale(1.2);
-            }
-        }
-    </style>
+    <link rel="stylesheet" href="{{ url_for('static', filename='dashboard.css') }}">
 </head>
 
 <body
-    class="bg-[#F8F7FF] font-sans text-slate-800 antialiased min-h-screen flex flex-col items-center justify-center p-4">
+    class="bg-slate-50 font-sans text-slate-800 antialiased min-h-screen flex flex-col items-center justify-center p-4">
+
+    <div class="background-shapes">
+        <div class="shape-1"></div>
+        <div class="shape-2"></div>
+    </div>
 
     <header class="absolute top-0 left-0 w-full z-10">
         <div class="max-w-5xl mx-auto flex justify-between items-center px-6 py-4">
@@ -69,8 +37,7 @@
     </header>
 
     <main class="w-full max-w-2xl" data-aos="fade-up">
-        <div
-            class="bg-white/60 backdrop-blur-xl border border-white/20 rounded-2xl shadow-2xl shadow-purple-100/40 p-6 md:p-8">
+        <div class="card p-6 md:p-8">
             <div class="text-center mb-6">
                 <h1 class="text-3xl font-bold font-lalezar text-purple-700 mb-2">Test Prep Path Builder</h1>
                 <p class="text-slate-600">Tell us your goals to create a personalized test prep journey.</p>
@@ -139,7 +106,12 @@
         </div>
     </main>
     <script src="https://unpkg.com/aos@2.3.1/dist/aos.js"></script>
-    <script>AOS.init({ once: true, duration: 800 });</script>
+    <script>
+        AOS.init({
+            once: true,
+            duration: 800
+        });
+    </script>
 </body>
 
 </html>

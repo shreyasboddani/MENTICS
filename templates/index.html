@@ -12,6 +12,7 @@
     rel="stylesheet">
   <link href="https://unpkg.com/aos@2.3.1/dist/aos.css" rel="stylesheet">
   <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='dashboard.css') }}">
 </head>
 
 <body class="bg-[#F8F7FF] font-sans text-slate-800 antialiased">
@@ -22,19 +23,26 @@
     <div class="wave-shape wave-3"></div>
   </div>
 
-  <header class="fixed top-0 w-full z-50 bg-white/60 backdrop-blur-xl border-b border-slate-900/10">
-    <div class="max-w-7xl mx-auto flex justify-between items-center px-6 py-4">
+  <header class="top-nav">
+    <div class="flex justify-between items-center">
       <a href="/" class="text-3xl font-bold text-purple-600 tracking-tight font-lalezar">MENTICS</a>
-      <nav class="space-x-8 hidden md:flex items-center">
+      <nav class="hidden md:flex items-center space-x-8">
         <a href="#how-it-works" class="nav-link">How It Works</a>
         <a href="#features" class="nav-link">Features</a>
       </nav>
-      <div>
+      <div class="flex items-center space-x-2">
         {% if is_logged_in %}
-        <a href="/dashboard" class="button-primary">Dashboard</a>
+        <a href="/dashboard" class="nav-item active">
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+            <path
+              d="M10.707 2.293a1 1 0 00-1.414 0l-7 7a1 1 0 001.414 1.414L4 10.414V17a1 1 0 001 1h2a1 1 0 001-1v-2a1 1 0 011-1h2a1 1 0 011 1v2a1 1 0 001 1h2a1 1 0 001-1v-6.586l.293.293a1 1 0 001.414-1.414l-7-7z" />
+          </svg>
+          <span>Dashboard</span>
+        </a>
         {% else %}
-        <a href="/login" class="text-slate-600 hover:text-purple-600 transition font-medium mr-4">Login</a>
-        <a href="/signup" class="button-primary">Get
+        <a href="/login" class="nav-item">Login</a>
+        <a href="/signup"
+          class="bg-purple-600 text-white font-semibold px-4 py-2 rounded-lg hover:bg-purple-700 transition shadow-sm">Get
           Started</a>
         {% endif %}
       </div>
@@ -42,19 +50,18 @@
   </header>
 
   <main class="relative">
-    <section class="min-h-screen flex flex-col justify-center items-center text-center pt-32 pb-12 px-4">
+    <section class="min-h-screen flex flex-col justify-center items-center text-center px-4">
       <h1 data-aos="fade-down"
-        class="font-lalezar text-8xl md:text-9xl lg:text-[10rem] font-bold text-transparent bg-clip-text bg-gradient-to-r from-purple-600 to-indigo-600">
+        class="font-lalezar text-8xl md:text-9xl lg:text-[14rem] font-bold text-transparent bg-clip-text bg-gradient-to-r from-purple-600 to-indigo-600 leading-none">
         MENTICS
       </h1>
-      <p data-aos="fade-up" data-aos-delay="100" class="text-xl md:text-2xl text-slate-600 max-w-2xl mx-auto mt-4">
+      <p data-aos="fade-up" data-aos-delay="100" class="text-xl md:text-2xl text-slate-600 max-w-3xl mx-auto mt-4">
         Your highschool ambition, clarified. Stop guessing, start achieving.
       </p>
-      <div data-aos="fade-up" data-aos-delay="200" class="mt-10">
-        <a href="{% if is_logged_in %}/dashboard{% else %}/signup{% endif %}" class="button-primary-large">
-          {% if is_logged_in %}Go to Dashboard{% else %}Build Your Path for Free{% endif %}
-        </a>
-      </div>
+      <a href="{% if is_logged_in %}/dashboard{% else %}/signup{% endif %}" data-aos="fade-up" data-aos-delay="200"
+        class="button-primary-large mt-10">
+        {% if is_logged_in %}Go to Dashboard{% else %}Build Your Path for Free{% endif %}
+      </a>
     </section>
 
     <section id="how-it-works" class="py-24">
@@ -262,7 +269,12 @@
 
   <script src="https://unpkg.com/aos@2.3.1/dist/aos.js"></script>
   <script>
-    AOS.init({ once: true, duration: 800, easing: 'ease-in-out', offset: 100 });
+    AOS.init({
+      once: true,
+      duration: 800,
+      easing: 'ease-in-out',
+      offset: 100
+    });
 
     document.addEventListener('DOMContentLoaded', () => {
       const featureTexts = document.querySelectorAll('.feature-text');
