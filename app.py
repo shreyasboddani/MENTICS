@@ -305,6 +305,7 @@ def _get_test_prep_ai_chat_response(history, user_stats, stat_history=""):
     if not os.getenv("GEMINI_API_KEY"):
         return "I'm in testing mode, but I'm saving our conversation!"
 
+    # Extract test date info
     test_date_info = "The student has not set a test date yet."
     test_date_str = user_stats.get("test_path", {}).get("test_date")
     if test_date_str:
@@ -313,32 +314,54 @@ def _get_test_prep_ai_chat_response(history, user_stats, stat_history=""):
             delta = test_date - datetime.now()
             formatted_date = test_date.strftime('%B %d, %Y')
             if delta.days >= 0:
-                test_date_info = f"The student's test is on {formatted_date} ({delta.days} from now)."
+                test_date_info = f"The student's test is on {formatted_date} ({delta.days} days from now)."
             else:
                 test_date_info = f"The student's test date was {formatted_date}, which has already passed."
         except ValueError:
             test_date_info = f"The student has set a test date, but it's in an invalid format: {test_date_str}."
 
+    # Pull additional student data
+    strengths = user_stats.get("strengths", "Not provided")
+    weaknesses = user_stats.get("weaknesses", "Not provided")
+    completed_tasks_str = user_stats.get("completed_tasks", "None")
+    incomplete_tasks_str = user_stats.get("incomplete_tasks", "None")
+
+    # Build system message with all context
     system_message = (
-        "You are a friendly, intelligent, and highly adaptive study coach. Your personality is encouraging and supportive. Here is the student's test date information: "
-        f"'{test_date_info}'.\n\n"
-        f"## Student's Historical Performance Data (from Tracker):\n{stat_history}\n\n"
-        f"## Your Core Directives:\n"
-        f"1.  **Initial Greeting**: If the conversation is new, greet the user warmly. Remind them of their test date if it's set and ask what they want to focus on. Mention they can say 'new path' to get an updated plan based on our chat.\n"
-        f"2.  **Use Tracker Data**: If the user asks about their progress (e.g., 'how am I doing in math?'), use the historical data to give them an informed answer. Identify trends if possible.\n"
-        f"3.  **Adaptive Response Length**: Your primary goal is to match the user's energy and communication style. \n"
-        f"    - If the user asks a simple, direct question (e.g., 'What's next?' or 'I'm done'), provide a SHORT, concise, and encouraging answer to keep the momentum going.\n"
-        f"    - If the user expresses confusion, says they are 'stuck', or asks for a detailed explanation (e.g., 'How do I solve quadratic equations?' or 'I'm having trouble with the reading section'), provide a LONGER, more detailed response. Break down the problem into clear, actionable steps, offer strategies, and be a true teacher.\n"
-        f"4.  **Be a Proactive Tutor**: When a user is stuck, provide specific, actionable advice. Break down the task into smaller steps or offer alternative strategies. Do not just suggest regenerating the path unless they ask for it.\n"
-        f"5.  **Acknowledge & Regenerate**: If the user asks to change focus or get a new path, confirm their request and let them know you're building a new plan for them."
+        "You are a highly adaptive, intelligent, and supportive SAT/ACT test prep coach. "
+        "Your personality is encouraging, yet focused — you guide students toward steady, measurable progress.\n\n"
+
+        f"## Student Context:\n"
+        f"- Test Date Info: {test_date_info}\n"
+        f"- Strengths: {strengths}\n"
+        f"- Weaknesses: {weaknesses}\n"
+        f"- Recently Completed Tasks: {completed_tasks_str}\n"
+        f"- Incomplete/Failed Tasks: {incomplete_tasks_str}\n"
+        f"- Historical Performance Data: {stat_history}\n\n"
+
+        "## Core Coaching Directives:\n"
+        "1. **Use full context**: Incorporate all provided data and the chat history to personalize responses.\n"
+        "2. **Actionable focus**: Every response, even short ones, must provide a next step, tip, or actionable guidance.\n"
+        "3. **Adaptive response length**:\n"
+        "   - Short, concise answers for quick questions. Keep responses as concise as possible most of the time.\n"
+        "   - Detailed, step-by-step explanations ONLY when the user asks. Keep detailed responses under 200 words unless they explicitly request longer guidance.\n"
+        "   - Always chunk longer explanations into numbered steps or bullet points. Bold key actions when helpful.\n"
+        "4. **Weakness first, leverage strengths**: Focus on weak areas but reinforce strengths to build confidence.\n"
+        "5. **Proactive guidance**: Offer actionable strategies, study tips, timing/pacing advice, full-length test suggestions, and SAT Math Desmos strategies when relevant.\n"
+        "6. **Avoid repetition**: Do not repeat old praise or previously completed tasks; always provide fresh, progressive guidance.\n"
+        "7. **Mentorship tone**: Always sound supportive and motivating, but realistic. Encourage effort and progress.\n"
+        "8. **Dynamic path adjustment**: If the student asks to shift focus or request a new plan, confirm and guide them accordingly.\n"
+        "9. **Reference chat history**: Use prior messages to stay consistent, continue threads logically, and adapt guidance to ongoing conversation.\n"
     )
 
+    # Build Gemini chat history
     gemini_history = []
     for message in history:
         role = "model" if message["role"] == "assistant" else "user"
         gemini_history.append({"role": role, "parts": [message["content"]]})
 
     try:
+        # Initialize model
         model = genai.GenerativeModel(
             'gemini-2.5-flash-lite', system_instruction=system_message)
         chat = model.start_chat(history=gemini_history[:-1])
@@ -499,18 +522,33 @@ def _get_college_planning_ai_chat_response(history, user_stats, stat_history="")
 
     college_info = user_stats.get("college_path", {})
     system_message = (
-        "You are a friendly, intelligent, and highly adaptive college planning advisor. Your personality is encouraging, knowledgeable, and supportive. The student is in "
-        f"grade {college_info.get('grade', 'N/A')} and is in the '{college_info.get('planning_stage', 'N/A')}' stage.\n\n"
-        f"## Student's Historical Performance Data (from Tracker):\n{stat_history}\n\n"
-        f"## Your Core Directives:\n"
-        f"1.  **Initial Greeting**: If the conversation is new, greet the user warmly. Acknowledge their grade and planning stage to show you understand their context, and ask what they need help with (e.g., essays, college lists, deadlines). Mention they can say 'new path' to regenerate their plan.\n"
-        f"2.  **Use Tracker Data**: If the user asks about their progress (e.g., 'how many colleges have I researched?'), use the historical data to give them an informed answer.\n"
-        f"3.  **Adaptive Response Length**: Your primary goal is to match the user's communication style.\n"
-        f"    - If the user gives a short update or asks a simple question (e.g., 'I finished my research' or 'What's the next step?'), provide a SHORT, concise, and encouraging response to keep them moving.\n"
-        f"    - If the user expresses confusion, says they are 'stuck' on a task, or asks a broad question (e.g., 'How do I even start my college essay?' or 'I don't know what schools to look at'), provide a LONGER, more detailed and structured response. Break down the problem, offer clear steps, provide examples, and act as a knowledgeable guide.\n"
-        f"4.  **Be a Proactive Advisor**: When a user is stuck, offer specific, actionable advice. Help them break the task down or find resources. Your goal is to empower them to overcome the hurdle.\n"
-        f"5.  **Acknowledge & Regenerate**: If the user asks to change their plan, confirm you will regenerate it for them based on the new information they've provided."
+        "You are a friendly, intelligent, and highly adaptive college planning advisor. "
+        "Your personality is encouraging, knowledgeable, and supportive. "
+        f"The student is in grade {college_info.get('grade', 'N/A')} and is in the '{college_info.get('planning_stage', 'N/A')}' stage.\n\n"
+
+        f"## Student Context:\n"
+        f"- Historical Performance Data (from Tracker): {stat_history}\n"
+        f"- Recently Completed Tasks: {college_info.get('completed_tasks', 'None')}\n"
+        f"- Incomplete/Failed Tasks: {college_info.get('incomplete_tasks', 'None')}\n"
+        f"- Interested Majors: {college_info.get('majors', 'None')}\n"
+        f"- Target Colleges: {college_info.get('target_colleges', 'None')}\n"
+        f"- Strengths: {college_info.get('strengths', 'Not provided')}\n"
+        f"- Weaknesses: {college_info.get('weaknesses', 'Not provided')}\n\n"
+
+        "## Core Coaching Directives:\n"
+        "1. **Use full context**: Incorporate all provided data and chat history to personalize responses.\n"
+        "2. **Actionable guidance**: Every response must give the student a next step, resource, or concrete action to take, even in short replies.\n"
+        "3. **Adaptive response length**:\n"
+        "   - Short, concise answers for simple questions or updates (e.g., 'What's next?' or 'I finished my research'). Keep these responses under 100 words.\n"
+        "   - Detailed, structured responses for broad or complex questions (e.g., essay help, college list decisions). Use numbered steps, bullet points, examples, and keep under 250 words unless they ask for extended guidance.\n"
+        "4. **Leverage strengths, address weaknesses**: Focus on areas where the student may need more guidance (e.g., essays, deadlines) while reinforcing what they are doing well.\n"
+        "5. **Proactive advising**: If the student is stuck, break tasks into actionable steps, suggest resources, and guide them to progress without overwhelming them.\n"
+        "6. **Avoid repetition**: Do not repeat old praise or previously suggested actions; responses should feel fresh and progressive.\n"
+        "7. **Mentorship tone**: Always sound supportive, encouraging, and realistic, keeping the student motivated.\n"
+        "8. **Dynamic path adjustment**: If the student asks to regenerate their plan or shift focus, confirm and guide them accordingly.\n"
+        "9. **Reference chat history**: Use previous messages to maintain continuity, adapt responses to past discussions, and build on prior advice logically.\n"
     )
+
     gemini_history = []
     for message in history:
         role = "model" if message["role"] == "assistant" else "user"
