@@ -145,10 +145,14 @@ def format_date_filter(s):
     if not s:
         return ""
     try:
+        # UPDATED: Use the user's timezone from the session, with a fallback to UTC
+        user_tz_str = session.get('timezone', 'UTC')
+        user_tz = ZoneInfo(user_tz_str)
+
         naive_dt = datetime.strptime(s, '%Y-%m-%d %H:%M:%S')
         utc_dt = naive_dt.replace(tzinfo=ZoneInfo("UTC"))
-        eastern_dt = utc_dt.astimezone(ZoneInfo("America/New_York"))
-        return eastern_dt.strftime('%Y-%m-%d')
+        user_local_dt = utc_dt.astimezone(user_tz)
+        return user_local_dt.strftime('%Y-%m-%d')
     except (ZoneInfoNotFoundError, ValueError, TypeError):
         return s.split(' ')[0] if ' ' in s else s
 
@@ -638,7 +642,22 @@ def logout():
     session.clear()
     return redirect(url_for("home"))
 
-# ... (keep all your other routes: /dashboard, /dashboard/test-path-builder, etc.)
+# NEW: Add a route to set the user's timezone in the session
+
+
+@app.route('/set-timezone', methods=['POST'])
+def set_timezone():
+    data = request.get_json()
+    timezone = data.get('timezone')
+    if timezone:
+        try:
+            # Validate that it's a real timezone
+            ZoneInfo(timezone)
+            session['timezone'] = timezone
+            return jsonify({"success": True})
+        except ZoneInfoNotFoundError:
+            return jsonify({"success": False, "error": "Invalid timezone"}), 400
+    return jsonify({"success": False, "error": "Timezone not provided"}), 400
 
 # --- Dashboard & Path Routes ---
 
@@ -701,8 +720,14 @@ def dashboard():
             "timestamp": activity[4]
         })
 
-    # --- Data for Activity Chart ---
-    today = datetime.now(ZoneInfo("UTC")).date()
+    # --- Data for Activity Chart (UPDATED FOR TIMEZONE) ---
+    user_tz_str = session.get('timezone', 'UTC')
+    try:
+        user_tz = ZoneInfo(user_tz_str)
+    except ZoneInfoNotFoundError:
+        user_tz = ZoneInfo("UTC")
+
+    today = datetime.now(user_tz).date()
     seven_days_ago = today - timedelta(days=6)
     activity_counts = {(seven_days_ago + timedelta(days=i)
                         ).strftime('%a'): 0 for i in range(7)}
@@ -712,10 +737,12 @@ def dashboard():
     )
     if recent_logs:
         for log in recent_logs:
-            log_date = datetime.strptime(
-                log[0], '%Y-%m-%d %H:%M:%S').strftime('%a')
-            if log_date in activity_counts:
-                activity_counts[log_date] += 1
+            utc_dt = datetime.strptime(
+                log[0], '%Y-%m-%d %H:%M:%S').replace(tzinfo=ZoneInfo("UTC"))
+            user_local_dt = utc_dt.astimezone(user_tz)
+            log_date_str = user_local_dt.strftime('%a')
+            if log_date_str in activity_counts:
+                activity_counts[log_date_str] += 1
     activity_data = {
         "labels": list(activity_counts.keys()),
         "data": list(activity_counts.values())

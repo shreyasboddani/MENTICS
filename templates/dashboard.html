@@ -313,8 +313,32 @@
             delay: 100
         });
 
-        // --- ApexCharts Initialization ---
         document.addEventListener('DOMContentLoaded', function () {
+            // NEW: Add this block to detect and set the user's timezone
+            const userTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+            fetch('/set-timezone', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ timezone: userTimezone }),
+            })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        console.log('Timezone set successfully:', userTimezone);
+                        // The page will now use the correct timezone on subsequent loads.
+                        // For the initial load, we render the chart with potentially stale data,
+                        // but it will be correct on the next visit.
+                    } else {
+                        console.error('Failed to set timezone on the server.');
+                    }
+                })
+                .catch((error) => {
+                    console.error('Error sending timezone to server:', error);
+                });
+
+            // --- ApexCharts Initialization ---
             const activityData = JSON.parse('{{ activity_data | safe }}');
             var options = {
                 chart: {
@@ -381,7 +405,7 @@
             chart.render();
         });
 
-        // --- Modal Logic (remains the same) ---
+        // --- Modal Logic ---
         const modal = document.getElementById('pathModal');
         const modalContentWrapper = modal.querySelector('.modal-content-wrapper');
         const testPrepPortal = document.getElementById('test-prep-portal');

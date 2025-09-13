@@ -188,6 +188,9 @@
         document.addEventListener('DOMContentLoaded', () => {
             const statHistory = {{ stat_history| tojson
         }};
+        // Get the user's local timezone
+        const userTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+
         let satChartInstance;
         let actChartInstance;
         let collegeChartInstance;
@@ -200,21 +203,19 @@
             let yAxisMin = 400;
             let yAxisMax = 1600;
 
-            if (subject === 'total') {
-                const historyData = statHistory.sat_total || [];
-                historyData.forEach(item => {
-                    labels.push(new Date(item.date).toLocaleDateString());
-                    data.push(item.value);
-                });
-            } else {
+            const historyData = statHistory[subject === 'total' ? 'sat_total' : subject] || [];
+
+            historyData.forEach(item => {
+                // Use the user's timezone for consistent date formatting
+                const date = new Date(item.date + 'T00:00:00'); // Assume date is YYYY-MM-DD
+                labels.push(date.toLocaleDateString(undefined, { timeZone: userTimezone }));
+                data.push(item.value);
+            });
+
+            if (subject !== 'total') {
                 yAxisMin = 200;
                 yAxisMax = 800;
-                const historyData = statHistory[subject] || [];
                 label = subject === 'sat_math' ? 'SAT Math Score' : 'SAT EBRW Score';
-                historyData.forEach(item => {
-                    labels.push(new Date(item.date).toLocaleDateString());
-                    data.push(item.value);
-                });
             }
 
             if (satChartInstance) satChartInstance.destroy();
@@ -237,11 +238,7 @@
                     responsive: true,
                     plugins: { legend: { display: false } },
                     scales: {
-                        y: {
-                            min: yAxisMin,
-                            max: yAxisMax,
-                            grid: { color: '#e2e8f0' }
-                        },
+                        y: { min: yAxisMin, max: yAxisMax, grid: { color: '#e2e8f0' } },
                         x: { grid: { display: false } }
                     }
                 }
@@ -265,7 +262,9 @@
             }
 
             historyData.forEach(item => {
-                labels.push(new Date(item.date).toLocaleDateString());
+                // Use the user's timezone
+                const date = new Date(item.date + 'T00:00:00');
+                labels.push(date.toLocaleDateString(undefined, { timeZone: userTimezone }));
                 data.push(item.value);
             });
 
@@ -289,11 +288,7 @@
                     responsive: true,
                     plugins: { legend: { display: false } },
                     scales: {
-                        y: {
-                            min: 0,
-                            max: 36,
-                            grid: { color: '#e2e8f0' }
-                        },
+                        y: { min: 0, max: 36, grid: { color: '#e2e8f0' } },
                         x: { grid: { display: false } }
                     }
                 }
@@ -334,7 +329,10 @@
                         legend: { display: false },
                         title: { display: true, text: `Current Essay Status: ${essayStatus}` }
                     },
-                    scales: { y: { beginAtZero: true, ticks: { stepSize: 1 }, grid: { color: '#e2e8f0' } }, x: { grid: { display: false } } }
+                    scales: {
+                        y: { beginAtZero: true, ticks: { stepSize: 1 }, grid: { color: '#e2e8f0' } },
+                        x: { grid: { display: false } }
+                    }
                 }
             });
         }
