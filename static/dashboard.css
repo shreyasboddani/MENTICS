@@ -8,7 +8,7 @@
     font-family: 'Inter', sans-serif;
 }
 
-/* --- NEW: Glassmorphism Background --- */
+/* --- Glassmorphism Background --- */
 body {
     background-color: #f8fafc;
     /* slate-50 */
@@ -73,7 +73,7 @@ body {
 }
 
 
-/* --- NEW: Glassmorphism Top Navigation Bar --- */
+/* --- Glassmorphism Top Navigation Bar --- */
 .top-nav {
     position: sticky;
     top: 1rem;
@@ -115,7 +115,7 @@ body {
 }
 
 
-/* --- NEW: Glassmorphism Card Styles --- */
+/* --- Glassmorphism Card Styles --- */
 .card {
     background: rgba(255, 255, 255, 0.5);
     backdrop-filter: blur(30px);
@@ -140,21 +140,24 @@ body {
     margin-bottom: 1rem;
 }
 
-/* Dark Theme Card */
-.card-actions {
+/* Dark Theme "Path Builder" Card */
+/* By using .card.card-actions, we make this style more specific */
+.card.card-actions {
     background-color: #1f2937;
     /* slate-800 */
     border: 1px solid #374151;
     /* slate-700 */
     color: #f8fafc;
+    /* This transition is specifically for the bouncy effect */
+    transition: transform 0.3s cubic-bezier(0.25, 0.8, 0.25, 1), box-shadow 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
 }
 
-
-.card-actions .card-header {
+.card.card-actions .card-header {
     color: #f8fafc;
 }
 
-.card-actions:hover {
+/* This more specific selector ensures the bouncy hover effect is not overridden */
+.card.card-actions:hover {
     transform: translateY(-8px) scale(1.02);
     box-shadow: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1);
 }
@@ -289,7 +292,7 @@ body {
 }
 
 
-/* --- PORTAL MODAL STYLES (NO CHANGES) --- */
+/* --- PORTAL MODAL STYLES --- */
 #pathModal {
     transition: opacity 0.3s ease-out;
     background: radial-gradient(circle at center, rgba(17, 24, 39, 0.7) 0%, rgba(0, 0, 0, 0.7) 100%);
