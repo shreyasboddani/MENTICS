@@ -19,7 +19,7 @@ env_path = Path('.') / '.env'
 load_dotenv(dotenv_path=env_path)
 
 app = Flask(__name__)
-app.secret_key = "supersecretkey"  # Replace with a real secret key
+app.secret_key = "supersecretkey"
 # --- START: UPLOAD FOLDER CONFIGURATION ---
 app.config['UPLOAD_FOLDER'] = 'static/uploads'
 app.url_map.strict_slashes = False
@@ -40,9 +40,6 @@ oauth.register(
 )
 
 db = DatabaseHandler("users.db")
-
-# ... (keep all your existing functions like init_db, helpers, decorators, AI functions, etc.)
-# --- DATABASE INITIALIZATION ---
 
 
 def init_db():
@@ -981,9 +978,8 @@ def account(user):
 
         elif form_type == 'email':
             new_email = request.form.get('email')
-            # Add validation to ensure email is not already taken
             existing_user = db.select('users', where={'email': new_email})
-            if not existing_user:
+            if not existing_user or existing_user[0]['id'] == user.data['id']:
                 db.update('users', {'email': new_email},
                           {'id': user.data['id']})
                 session['user'] = new_email  # Update session
@@ -1002,14 +998,28 @@ def account(user):
             if 'pfp' in request.files:
                 file = request.files['pfp']
                 if file.filename != '':
+                    # --- START: DELETE OLD PFP LOGIC ---
+                    old_pfp_path = user.get_profile_picture()
+                    if old_pfp_path:
+                        # Construct the full path to the old file
+                        full_old_path = os.path.join(
+                            'static', old_pfp_path.lstrip('/'))
+                        if os.path.exists(full_old_path):
+                            os.remove(full_old_path)
+                    # --- END: DELETE OLD PFP LOGIC ---
+
                     filename = secure_filename(file.filename)
-                    # To make filenames unique
-                    unique_filename = f"{user.data['id']}_{filename}"
+                    # Create a unique filename using user ID and a timestamp to prevent browser caching issues
+                    timestamp = int(datetime.now().timestamp())
+                    unique_filename = f"{user.data['id']}_{timestamp}_{filename}"
                     filepath = os.path.join(
                         app.config['UPLOAD_FOLDER'], unique_filename)
                     file.save(filepath)
-                    db.update('users', {
-                              'profile_picture': f"/static/uploads/{unique_filename}"}, {'id': user.data['id']})
+
+                    # Store the relative path in the database
+                    db_filepath = f"/static/uploads/{unique_filename}"
+                    db.update('users', {'profile_picture': db_filepath}, {
+                              'id': user.data['id']})
 
     # Refresh user data after potential updates
     user.load_user()
