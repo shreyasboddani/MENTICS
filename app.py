@@ -998,30 +998,28 @@ def account(user):
             if 'pfp' in request.files:
                 file = request.files['pfp']
                 if file.filename != '':
-                    # --- START: DELETE OLD PFP LOGIC ---
+                    # --- START: DELETE OLD PFP LOGIC (Corrected) ---
                     old_pfp_path = user.get_profile_picture()
                     if old_pfp_path:
-                        # Construct the full path to the old file
+                        # Construct the absolute path from the app's root
+                        base_dir = os.path.abspath(os.path.dirname(__file__))
                         full_old_path = os.path.join(
-                            'static', old_pfp_path.lstrip('/'))
+                            base_dir, old_pfp_path.lstrip('/'))
                         if os.path.exists(full_old_path):
                             os.remove(full_old_path)
-                    # --- END: DELETE OLD PFP LOGIC ---
+                    # --- END: DELETE OLD PFP LOGIC (Corrected) ---
 
                     filename = secure_filename(file.filename)
-                    # Create a unique filename using user ID and a timestamp to prevent browser caching issues
                     timestamp = int(datetime.now().timestamp())
                     unique_filename = f"{user.data['id']}_{timestamp}_{filename}"
                     filepath = os.path.join(
                         app.config['UPLOAD_FOLDER'], unique_filename)
                     file.save(filepath)
 
-                    # Store the relative path in the database
-                    db_filepath = f"/static/uploads/{unique_filename}"
+                    db_filepath = f"/{app.config['UPLOAD_FOLDER']}/{unique_filename}"
                     db.update('users', {'profile_picture': db_filepath}, {
                               'id': user.data['id']})
 
-    # Refresh user data after potential updates
     user.load_user()
     return render_template('account.html', user=user, profile_picture=user.data.get('profile_picture'))
 
