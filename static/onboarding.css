@@ -1,0 +1,84 @@
+/* static/onboarding.css */
+.slides-container {
+    position: relative;
+    min-height: 250px;
+}
+
+.slide {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.3s ease-in-out, transform 0.3s ease-in-out;
+    transform: translateX(20px);
+}
+
+.slide.active {
+    opacity: 1;
+    visibility: visible;
+    transform: translateX(0);
+}
+
+.option-card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 1.5rem;
+    border: 2px solid #e2e8f0;
+    border-radius: 0.75rem;
+    cursor: pointer;
+    transition: all 0.2s ease-in-out;
+}
+
+.option-card:hover {
+    border-color: #a78bfa;
+    background-color: #f5f3ff;
+}
+
+.option-card.selected {
+    border-color: #8b5cf6;
+    background-color: #ede9fe;
+    box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.2);
+}
+
+.nav-btn {
+    background-color: #8b5cf6;
+    color: white;
+    padding: 0.75rem 1.5rem;
+    border-radius: 0.5rem;
+    font-weight: 600;
+    transition: background-color 0.2s;
+}
+
+.nav-btn:hover {
+    background-color: #7c3aed;
+}
+
+.nav-btn#prev-btn {
+    background-color: #e2e8f0;
+    color: #475569;
+}
+
+.nav-btn#prev-btn:hover {
+    background-color: #cbd5e1;
+}
+
+.progress-dots {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.dot {
+    width: 0.75rem;
+    height: 0.75rem;
+    background-color: #e2e8f0;
+    border-radius: 9999px;
+    transition: background-color 0.2s;
+}
+
+.dot.active {
+    background-color: #8b5cf6;
+}

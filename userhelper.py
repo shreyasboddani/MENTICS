@@ -11,18 +11,18 @@ class User:
             self.load_user()
 
     def load_user(self):
-        user = self.db.select("users", where={"email": self.email})
-        if user:
-            self.data = user[0]
+        user_list = self.db.select("users", where={"email": self.email})
+        if user_list:
+            self.data = user_list[0]
 
     def get_name(self):
-        if self.data and len(self.data) > 4:
-            return self.data[4]
-        return None
+        if self.data and self.data.get('name'):
+            return self.data['name']
+        return "User"  # Default value
 
     def get_stats(self):
-        if self.data and len(self.data) >= 4:
-            return json.loads(self.data[3])
+        if self.data and 'stats' in self.data:
+            return json.loads(self.data['stats'])
         return {"sat": "0", "act": "0", "gpa": "0.0"}
 
     def set_stats(self, stats):

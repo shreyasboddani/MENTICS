@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <title>Welcome to Mentics</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Lalezar&display=swap"
+        rel="stylesheet">
+    <link href="https://unpkg.com/aos@2.3.1/dist/aos.css" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='dashboard.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='onboarding.css') }}">
+</head>
+
+<body
+    class="bg-slate-50 font-sans text-slate-800 antialiased min-h-screen flex flex-col items-center justify-center p-4">
+
+    <div class="background-shapes">
+        <div class="shape-1"></div>
+        <div class="shape-2"></div>
+    </div>
+
+    <main class="w-full max-w-2xl" data-aos="fade-up">
+        <div class="card p-6 md:p-8">
+            <div class="text-center mb-6">
+                <h1 class="text-3xl font-bold font-lalezar text-purple-700 mb-2">Welcome to Mentics</h1>
+                <p class="text-slate-600">Let's get to know you better to personalize your experience.</p>
+            </div>
+
+            <form method="POST" id="onboarding-form">
+                <div class="slides-container">
+                    <div class="slide active">
+                        <h2 class="text-xl font-bold text-center mb-4">What's your primary goal?</h2>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <label class="option-card">
+                                <input type="radio" name="goal" value="test_prep" class="hidden">
+                                <span class="text-2xl">📖</span>
+                                <span class="font-semibold">Test Prep</span>
+                                <span class="text-sm text-slate-500">Ace the SAT/ACT</span>
+                            </label>
+                            <label class="option-card">
+                                <input type="radio" name="goal" value="college_planning" class="hidden">
+                                <span class="text-2xl">🎓</span>
+                                <span class="font-semibold">College Planning</span>
+                                <span class="text-sm text-slate-500">Get into your dream school</span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <div class="slide">
+                        <h2 class="text-xl font-bold text-center mb-4">How do you learn best?</h2>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <label class="option-card">
+                                <input type="radio" name="learning_style" value="visual" class="hidden">
+                                <span class="text-2xl">🎨</span>
+                                <span class="font-semibold">Visual</span>
+                                <span class="text-sm text-slate-500">I learn by seeing</span>
+                            </label>
+                            <label class="option-card">
+                                <input type="radio" name="learning_style" value="auditory" class="hidden">
+                                <span class="text-2xl">🎧</span>
+                                <span class="font-semibold">Auditory</span>
+                                <span class="text-sm text-slate-500">I learn by hearing</span>
+                            </label>
+                            <label class="option-card">
+                                <input type="radio" name="learning_style" value="reading_writing" class="hidden">
+                                <span class="text-2xl">📝</span>
+                                <span class="font-semibold">Reading/Writing</span>
+                                <span class="text-sm text-slate-500">I learn by reading and writing</span>
+                            </label>
+                            <label class="option-card">
+                                <input type="radio" name="learning_style" value="kinesthetic" class="hidden">
+                                <span class="text-2xl">🏃‍♂️</span>
+                                <span class="font-semibold">Kinesthetic</span>
+                                <span class="text-sm text-slate-500">I learn by doing</span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <div class="slide">
+                        <h2 class="text-xl font-bold text-center mb-4">What are you most anxious about?</h2>
+                        <textarea name="anxieties" rows="4"
+                            class="w-full bg-white/50 border border-slate-300/70 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition"
+                            placeholder="e.g., Not getting a good score, writing my college essay, managing my time..."></textarea>
+                    </div>
+                </div>
+
+                <div class="mt-8 pt-6 border-t border-slate-200/80 flex justify-between items-center">
+                    <button type="button" id="prev-btn" class="nav-btn hidden">
+                        &larr; Back
+                    </button>
+                    <div class="progress-dots">
+                        <span class="dot active"></span>
+                        <span class="dot"></span>
+                        <span class="dot"></span>
+                    </div>
+                    <button type="button" id="next-btn" class="nav-btn">
+                        Next &rarr;
+                    </button>
+                    <button type="submit" id="submit-btn" class="nav-btn hidden">
+                        Finish
+                    </button>
+                </div>
+            </form>
+        </div>
+    </main>
+    <script src="https://unpkg.com/aos@2.3.1/dist/aos.js"></script>
+    <script>
+        AOS.init({
+            once: true,
+            duration: 800
+        });
+
+        const slides = document.querySelectorAll('.slide');
+        const prevBtn = document.getElementById('prev-btn');
+        const nextBtn = document.getElementById('next-btn');
+        const submitBtn = document.getElementById('submit-btn');
+        const dots = document.querySelectorAll('.dot');
+        let currentSlide = 0;
+
+        function showSlide(n) {
+            slides.forEach(slide => slide.classList.remove('active'));
+            dots.forEach(dot => dot.classList.remove('active'));
+            slides[n].classList.add('active');
+            dots[n].classList.add('active');
+
+            prevBtn.classList.toggle('hidden', n === 0);
+            nextBtn.classList.toggle('hidden', n === slides.length - 1);
+            submitBtn.classList.toggle('hidden', n !== slides.length - 1);
+        }
+
+        nextBtn.addEventListener('click', () => {
+            if (currentSlide < slides.length - 1) {
+                currentSlide++;
+                showSlide(currentSlide);
+            }
+        });
+
+        prevBtn.addEventListener('click', () => {
+            if (currentSlide > 0) {
+                currentSlide--;
+                showSlide(currentSlide);
+            }
+        });
+
+        document.querySelectorAll('.option-card').forEach(card => {
+            card.addEventListener('click', () => {
+                const radio = card.querySelector('input[type="radio"]');
+                radio.checked = true;
+                // Remove selected class from all cards in the same group
+                document.querySelectorAll(`input[name="${radio.name}"]`).forEach(r => {
+                    r.closest('.option-card').classList.remove('selected');
+                });
+                card.classList.add('selected');
+            });
+        });
+
+    </script>
+</body>
+
+</html>

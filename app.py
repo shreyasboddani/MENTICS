@@ -45,16 +45,21 @@ db = DatabaseHandler("users.db")
 
 
 def init_db():
+    # Simplified init_db - it will create the table and add columns if they don't exist
     db.create_table("users", {
         "id": "INTEGER PRIMARY KEY AUTOINCREMENT",
         "email": "TEXT NOT NULL UNIQUE",
         "password": "TEXT NOT NULL",
-        "stats": "TEXT NOT NULL"
+        "stats": "TEXT NOT NULL",
+        "name": "TEXT NOT NULL DEFAULT ''",
+        "onboarding_completed": "BOOLEAN DEFAULT FALSE",
+        "onboarding_data": "TEXT"
     })
-    try:
-        db.add_column("users", "name", "TEXT NOT NULL DEFAULT ''")
-    except:
-        pass  # Column likely already exists
+    # Add columns safely - the function now handles "duplicate column" errors
+    db.add_column("users", "name", "TEXT NOT NULL DEFAULT ''")
+    db.add_column("users", "onboarding_completed", "BOOLEAN DEFAULT FALSE")
+    db.add_column("users", "onboarding_data", "TEXT")
+
     db.create_table("paths", {
         "id": "INTEGER PRIMARY KEY AUTOINCREMENT",
         "user_id": "INTEGER NOT NULL",
@@ -132,7 +137,7 @@ def _get_stat_history_for_prompt(user_id):
 
     summary = []
     for record in history_records:
-        stat_name, stat_value, recorded_at = record[2], record[3], record[4]
+        stat_name, stat_value, recorded_at = record['stat_name'], record['stat_value'], record['recorded_at']
         date = recorded_at.split(" ")[0]
         # Make stat names more readable
         readable_name = stat_name.replace('_', ' ').title()
@@ -153,6 +158,8 @@ def login_required(f):
         if user is None:
             session.clear()
             return redirect(url_for("login"))
+        # Pass the user object to the decorated function
+        kwargs['user'] = user
         return f(*args, **kwargs)
     return decorated_function
 
@@ -226,9 +233,9 @@ def _get_test_prep_ai_tasks(strengths, weaknesses, user_stats={}, chat_history=[
         return get_mock_tasks_reliably()
 
     completed_tasks_str = "\n".join(
-        [f"- {task[3]}" for task in path_history.get('completed', [])]) or "None."
+        [f"- {task['description']}" for task in path_history.get('completed', [])]) or "None."
     incomplete_tasks_str = "\n".join(
-        [f"- {task[3]}" for task in path_history.get('incomplete', [])]) or "None."
+        [f"- {task['description']}" for task in path_history.get('incomplete', [])]) or "None."
     chat_history_str = "\n".join(
         [f"{msg['role'].capitalize()}: {msg['content']}" for msg in chat_history]) or "No conversation history yet."
 
@@ -387,13 +394,13 @@ def _get_test_prep_ai_chat_response(history, user_stats, stat_history=""):
 
 def _generate_and_save_new_test_path(user_id, strengths, weaknesses, chat_history=[]):
     user_record = db.select("users", where={"id": user_id})
-    user_stats = json.loads(user_record[0][3]) if user_record else {}
+    user_stats = json.loads(user_record[0]['stats']) if user_record else {}
 
     all_tasks = db.select(
         "paths", where={"user_id": user_id, "category": "Test Prep"})
     path_history = {
-        "completed": [task for task in all_tasks if task[4]],
-        "incomplete": [task for task in all_tasks if not task[4]]
+        "completed": [task for task in all_tasks if task['is_completed']],
+        "incomplete": [task for task in all_tasks if not task['is_completed']]
     }
 
     # Fetch tracker data
@@ -415,8 +422,8 @@ def _generate_and_save_new_test_path(user_id, strengths, weaknesses, chat_histor
         })
         new_task_data = db.select("paths", where={"id": task_id})[0]
         saved_tasks.append({
-            "id": new_task_data[0], "description": new_task_data[3],
-            "type": new_task_data[7], "stat_to_update": new_task_data[8],
+            "id": new_task_data['id'], "description": new_task_data['description'],
+            "type": new_task_data['type'], "stat_to_update": new_task_data['stat_to_update'],
             "is_completed": False
         })
     # LOGGING
@@ -447,9 +454,9 @@ def _get_college_planning_ai_tasks(college_context, user_stats, path_history, ch
         return get_mock_tasks_reliably()
 
     completed_tasks_str = "\n".join(
-        [f"- {task[3]}" for task in path_history.get('completed', [])]) or "None."
+        [f"- {task['description']}" for task in path_history.get('completed', [])]) or "None."
     incomplete_tasks_str = "\n".join(
-        [f"- {task[3]}" for task in path_history.get('incomplete', [])]) or "None."
+        [f"- {task['description']}" for task in path_history.get('incomplete', [])]) or "None."
     chat_history_str = "\n".join(
         [f"{msg['role'].capitalize()}: {msg['content']}" for msg in chat_history]) or "No conversation history yet."
 
@@ -506,7 +513,7 @@ def _get_college_planning_ai_tasks(college_context, user_stats, path_history, ch
 
     try:
         model = genai.GenerativeModel(
-            'gemini-1.5-flash',
+            'gemini-2.5-flash',
             generation_config={"response_mime_type": "application/json"}
         )
         response = model.generate_content(prompt)
@@ -575,13 +582,13 @@ def _generate_and_save_new_college_path(user_id, college_context, chat_history=[
         user_record = db.select("users", where={"id": user_id})
         if not user_record:
             raise ValueError(f"User with ID {user_id} not found.")
-        user_stats = json.loads(user_record[0][3])
+        user_stats = json.loads(user_record[0]['stats'])
 
         all_college_tasks = db.select(
             "paths", where={"user_id": user_id, "category": "College Planning"})
         path_history = {
-            "completed": [task for task in all_college_tasks if task[4]],
-            "incomplete": [task for task in all_college_tasks if not task[4]]
+            "completed": [task for task in all_college_tasks if task['is_completed']],
+            "incomplete": [task for task in all_college_tasks if not task['is_completed']]
         }
 
         # Fetch tracker data
@@ -647,7 +654,7 @@ def signup():
             session["user"] = email
             session["user_id"] = user_id
             session.permanent = True
-            return redirect(url_for("dashboard"))
+            return redirect(url_for("onboarding"))
         except Exception as e:
             print(f"Signup error: {e}")
             return render_template("signup.html", error="Email already exists!")
@@ -661,15 +668,15 @@ def login():
     if request.method == "POST":
         email = request.form["email"]
         password = request.form["password"]
-        user_record = db.select("users", where={"email": email})
-        if user_record and check_password_hash(user_record[0][2], password):
-            session["user"] = user_record[0][1]
-            session["user_id"] = user_record[0][0]
-            session.permanent = True
-            return redirect(url_for("dashboard"))
-        else:
-            return render_template("login.html", error="Invalid credentials")
-    return render_template("login.html")
+        user_record_list = db.select("users", where={"email": email})
+        if user_record_list:
+            user_record = user_record_list[0]
+            if check_password_hash(user_record['password'], password):
+                session["user"] = user_record['email']
+                session["user_id"] = user_record['id']
+                session.permanent = True
+                return redirect(url_for("dashboard"))
+    return render_template("login.html", error="Invalid credentials")
 
 # NEW: Google Login Route
 
@@ -689,12 +696,13 @@ def authorize():
     user_info = oauth.google.parse_id_token(token, nonce=session.get('nonce'))
 
     # Check if user exists
-    user_record = db.select("users", where={"email": user_info['email']})
+    user_record_list = db.select("users", where={"email": user_info['email']})
 
-    if user_record:
+    if user_record_list:
         # User exists, log them in
-        session["user"] = user_record[0][1]
-        session["user_id"] = user_record[0][0]
+        user_record = user_record_list[0]
+        session["user"] = user_record['email']
+        session["user_id"] = user_record['id']
         session.permanent = True
     else:
         # New user, create an account
@@ -717,13 +725,34 @@ def authorize():
         session["user_id"] = user_id
         session.permanent = True
 
-    return redirect(url_for("dashboard"))
+    return redirect(url_for("onboarding"))
 
 
 @app.route("/logout")
 def logout():
     session.clear()
     return redirect(url_for("home"))
+
+
+@app.route('/onboarding', methods=['GET', 'POST'])
+@login_required
+def onboarding(user):
+    if user.data['onboarding_completed']:
+        return redirect(url_for('dashboard'))
+
+    if request.method == 'POST':
+        onboarding_data = {
+            'goal': request.form.get('goal'),
+            'learning_style': request.form.get('learning_style'),
+            'anxieties': request.form.get('anxieties')
+        }
+        db.update('users', {
+            'onboarding_data': json.dumps(onboarding_data),
+            'onboarding_completed': True
+        }, {'id': user.data['id']})
+        return redirect(url_for('dashboard'))
+
+    return render_template('onboarding.html')
 
 # NEW: Add a route to set the user's timezone in the session
 
@@ -747,40 +776,48 @@ def set_timezone():
 
 @app.route("/dashboard")
 @login_required
-def dashboard():
-    user = User.from_session(db, session)
+def dashboard(user):
+    if not user.data['onboarding_completed']:
+        return redirect(url_for('onboarding'))
     stats = user.get_stats()
-    user_id = user.data[0]
+    user_id = user.data['id']
     name = user.get_name()
     all_tasks = db.select("paths", where={"user_id": user_id})
 
+    # Get proactive suggestion
+    suggestion = _get_proactive_ai_suggestions(user)
+
     # --- Gamification Stats ---
-    gamification_stats = db.select(
+    gamification_stats_list = db.select(
         "gamification_stats", where={"user_id": user_id})
-    if not gamification_stats:
+    if not gamification_stats_list:
         # Fallback to create stats if they don't exist for some reason
         db.insert("gamification_stats", {
                   "user_id": user_id, "points": 0, "current_streak": 0})
-        gamification_stats = db.select(
+        gamification_stats_list = db.select(
             "gamification_stats", where={"user_id": user_id})
 
+    gamification_stats = gamification_stats_list[0]
+
     game_stats = {
-        "points": gamification_stats[0][1],
-        "streak": gamification_stats[0][2]
+        "points": gamification_stats['points'],
+        "streak": gamification_stats['current_streak']
     }
 
     # --- Progress Calculations ---
-    active_test_tasks = [t for t in all_tasks if t[5] and t[9] == 'Test Prep']
-    test_prep_completed_current = sum(1 for t in active_test_tasks if t[4])
+    active_test_tasks = [
+        t for t in all_tasks if t['is_active'] and t['category'] == 'Test Prep']
+    test_prep_completed_current = sum(
+        1 for t in active_test_tasks if t['is_completed'])
     total_test_prep_completed = sum(
-        1 for t in all_tasks if t[4] and t[9] == 'Test Prep')
+        1 for t in all_tasks if t['is_completed'] and t['category'] == 'Test Prep')
 
     active_college_tasks = [
-        t for t in all_tasks if t[5] and t[9] == 'College Planning']
+        t for t in all_tasks if t['is_active'] and t['category'] == 'College Planning']
     college_planning_completed_current = sum(
-        1 for t in active_college_tasks if t[4])
+        1 for t in active_college_tasks if t['is_completed'])
     total_college_planning_completed = sum(
-        1 for t in all_tasks if t[4] and t[9] == 'College Planning')
+        1 for t in all_tasks if t['is_completed'] and t['category'] == 'College Planning')
 
     # --- Key Stat Calculations ---
     sat_ebrw = stats.get("sat_ebrw")
@@ -811,11 +848,11 @@ def dashboard():
     )
     recent_activities = []
     for activity in recent_activities_raw:
-        details = json.loads(activity[3])
+        details = json.loads(activity['details'])
         recent_activities.append({
-            "type": activity[2],
+            "type": activity['activity_type'],
             "details": details,
-            "timestamp": activity[4]
+            "timestamp": activity['created_at']
         })
 
     # --- Data for Activity Chart (UPDATED FOR TIMEZONE) ---
@@ -836,7 +873,7 @@ def dashboard():
     if recent_logs:
         for log in recent_logs:
             utc_dt = datetime.strptime(
-                log[0], '%Y-%m-%d %H:%M:%S').replace(tzinfo=ZoneInfo("UTC"))
+                log['created_at'], '%Y-%m-%d %H:%M:%S').replace(tzinfo=ZoneInfo("UTC"))
             user_local_dt = utc_dt.astimezone(user_tz)
             log_date_str = user_local_dt.strftime('%a')
             if log_date_str in activity_counts:
@@ -893,9 +930,9 @@ def dashboard():
     all_completed_tasks = total_test_prep_completed + total_college_planning_completed
 
     # Check which achievements are earned
-    if any(t for t in all_tasks if t[9] == 'Test Prep'):
+    if any(t['category'] == 'Test Prep' for t in all_tasks):
         all_achievements[0]['is_earned'] = True
-    if any(t for t in all_tasks if t[9] == 'College Planning'):
+    if any(t['category'] == 'College Planning' for t in all_tasks):
         all_achievements[1]['is_earned'] = True
     if all_completed_tasks >= 1:
         all_achievements[2]['is_earned'] = True
@@ -926,14 +963,14 @@ def dashboard():
         activity_data=json.dumps(activity_data),
         test_date_info=test_date_info,
         earned_achievements=earned_achievements,
-        game_stats=game_stats
+        game_stats=game_stats,
+        suggestion=suggestion
     )
 
 
 @app.route("/dashboard/test-path-builder", methods=["GET", "POST"])
 @login_required
-def test_path_builder():
-    user = User.from_session(db, session)
+def test_path_builder(user):
     stats = user.get_stats()
     if request.method == "POST":
         test_path = {
@@ -947,21 +984,20 @@ def test_path_builder():
         stats["test_path"] = test_path
         user.set_stats(stats)
         _generate_and_save_new_test_path(
-            user.data[0], test_path['strengths'], test_path['weaknesses'])
+            user.data['id'], test_path['strengths'], test_path['weaknesses'])
         return redirect(url_for("test_path_view"))
     return render_template("test_path_builder.html", **stats.get("test_path", {}))
 
 
 @app.route("/dashboard/test-path-view")
 @login_required
-def test_path_view():
+def test_path_view(user):
     return render_template("test_path_view.html")
 
 
 @app.route("/dashboard/college-path-builder", methods=["GET", "POST"])
 @login_required
-def college_path_builder():
-    user = User.from_session(db, session)
+def college_path_builder(user):
     stats = user.get_stats()
     if request.method == "POST":
         college_context = {
@@ -972,14 +1008,14 @@ def college_path_builder():
         }
         stats['college_path'] = college_context
         user.set_stats(stats)
-        _generate_and_save_new_college_path(user.data[0], college_context)
+        _generate_and_save_new_college_path(user.data['id'], college_context)
         return redirect(url_for('college_path_view'))
     return render_template("college_path_builder.html", **stats.get('college_path', {}))
 
 
 @app.route('/dashboard/college-path-view')
 @login_required
-def college_path_view():
+def college_path_view(user):
     return render_template("college_path_view.html")
 
 # --- Stats & Tracker Routes ---
@@ -987,10 +1023,9 @@ def college_path_view():
 
 @app.route("/dashboard/stats", methods=["GET"])
 @login_required
-def stats():
-    user = User.from_session(db, session)
+def stats(user):
     stats = user.get_stats()
-    user_id = user.data[0]
+    user_id = user.data['id']
     all_tasks = db.select("paths", where={"user_id": user_id})
 
     # --- SERVER-SIDE CALCULATION FIXES ---
@@ -1018,9 +1053,9 @@ def stats():
         act_average = round(sum(act_scores) / len(act_scores))
 
     total_test_prep_completed = sum(
-        1 for t in all_tasks if t[4] and t[9] == 'Test Prep')
+        1 for t in all_tasks if t['is_completed'] and t['category'] == 'Test Prep')
     total_college_planning_completed = sum(
-        1 for t in all_tasks if t[4] and t[9] == 'College Planning')
+        1 for t in all_tasks if t['is_completed'] and t['category'] == 'College Planning')
 
     return render_template(
         "stats.html",
@@ -1039,8 +1074,7 @@ def stats():
 
 @app.route("/dashboard/stats/edit", methods=["GET", "POST"])
 @login_required
-def edit_stats():
-    user = User.from_session(db, session)
+def edit_stats(user):
     stats = user.get_stats()
     if request.method == "POST":
         updated_stats = {
@@ -1056,7 +1090,7 @@ def edit_stats():
             # Log an activity only if the value has changed
             if stats.get(key) != value and value:
                 stats[key] = value
-                log_activity(user.data[0], 'stat_updated', {
+                log_activity(user.data['id'], 'stat_updated', {
                              'stat_name': key.upper(), 'stat_value': value})
 
         user.set_stats(stats)
@@ -1072,15 +1106,14 @@ def edit_stats():
 
 @app.route("/dashboard/tracker")
 @login_required
-def tracker():
-    user = User.from_session(db, session)
-    user_id = user.data[0]
+def tracker(user):
+    user_id = user.data['id']
     all_tasks = db.select(
         "paths", where={"user_id": user_id}, order_by="created_at DESC")
     test_prep_generations, college_planning_generations = {}, {}
 
     for task in all_tasks:
-        generation_key, category = task[6], task[9]
+        generation_key, category = task['created_at'], task['category']
         if category == 'Test Prep':
             if generation_key not in test_prep_generations:
                 test_prep_generations[generation_key] = []
@@ -1099,7 +1132,7 @@ def tracker():
     history_records = db.select(
         "stat_history", where={"user_id": user_id}, order_by="recorded_at ASC")
     for record in history_records:
-        stat_name, stat_value, recorded_at = record[2], record[3], record[4]
+        stat_name, stat_value, recorded_at = record['stat_name'], record['stat_value'], record['recorded_at']
         if stat_name in stat_history_processed:
             try:
                 stat_history_processed[stat_name].append({
@@ -1121,9 +1154,8 @@ def tracker():
 
 @app.route('/api/test-path-status')
 @login_required
-def test_path_status():
-    user = User.from_session(db, session)
-    user_id = user.data[0]
+def test_path_status(user):
+    user_id = user.data['id']
     active_tasks = db.select(
         "paths", where={"user_id": user_id, "is_active": True, "category": "Test Prep"})
     return jsonify({"has_path": bool(active_tasks)})
@@ -1131,9 +1163,8 @@ def test_path_status():
 
 @app.route('/api/college-path-status')
 @login_required
-def college_path_status():
-    user = User.from_session(db, session)
-    user_id = user.data[0]
+def college_path_status(user):
+    user_id = user.data['id']
     active_tasks = db.select(
         "paths", where={"user_id": user_id, "is_active": True, "category": "College Planning"})
     return jsonify({"has_path": bool(active_tasks)})
@@ -1141,15 +1172,14 @@ def college_path_status():
 
 @app.route("/api/tasks", methods=['GET', 'POST'])
 @login_required
-def api_tasks():
-    user = User.from_session(db, session)
-    user_id = user.data[0]
+def api_tasks(user):
+    user_id = user.data['id']
     stats = user.get_stats()
     category = request.args.get('category', 'Test Prep')
     try:
         latest_task_query = """
-            SELECT created_at FROM paths 
-            WHERE user_id=? AND category=? AND is_active=True 
+            SELECT created_at FROM paths
+            WHERE user_id=? AND category=? AND is_active=True
             ORDER BY created_at DESC LIMIT 1
         """
         latest_task_timestamp_result = db.execute(
@@ -1157,7 +1187,7 @@ def api_tasks():
 
         active_path = []
         if latest_task_timestamp_result:
-            latest_timestamp = latest_task_timestamp_result[0][0]
+            latest_timestamp = latest_task_timestamp_result[0]['created_at']
             active_path = db.select(
                 "paths", where={
                     "user_id": user_id,
@@ -1167,9 +1197,10 @@ def api_tasks():
                 })
 
         if request.method == "POST" or not active_path:
-            chat_record = db.select("chat_conversations", where={
-                                    "user_id": user_id, "category": category})
-            chat_history = json.loads(chat_record[0][3]) if chat_record else []
+            chat_record_list = db.select("chat_conversations", where={
+                "user_id": user_id, "category": category})
+            chat_history = json.loads(
+                chat_record_list[0]['history']) if chat_record_list else []
             if category == 'College Planning':
                 college_context = stats.get("college_path", {})
                 tasks = _generate_and_save_new_college_path(
@@ -1184,23 +1215,23 @@ def api_tasks():
             return jsonify(tasks)
 
         if active_path:
-            active_path = sorted(active_path, key=lambda x: x[2])
+            active_path = sorted(active_path, key=lambda x: x['task_order'])
             tasks_with_subtasks = []
             for r in active_path:
-                task_id = r[0]
+                task_id = r['id']
                 subtasks_raw = db.select(
                     "subtasks", where={"parent_task_id": task_id})
-                subtasks = [{"id": s[0], "description": s[2],
-                             "is_completed": bool(s[3])} for s in subtasks_raw]
+                subtasks = [{"id": s['id'], "description": s['description'],
+                             "is_completed": bool(s['is_completed'])} for s in subtasks_raw]
 
                 tasks_with_subtasks.append({
                     "id": task_id,
-                    "description": r[3],
-                    "is_completed": bool(r[4]),
-                    "type": r[7],
-                    "stat_to_update": r[8],
-                    "due_date": r[10],
-                    "is_user_added": bool(r[11]),
+                    "description": r['description'],
+                    "is_completed": bool(r['is_completed']),
+                    "type": r['type'],
+                    "stat_to_update": r['stat_to_update'],
+                    "due_date": r['due_date'],
+                    "is_user_added": bool(r['is_user_added']),
                     "subtasks": subtasks
                 })
             return jsonify(tasks_with_subtasks)
@@ -1213,20 +1244,21 @@ def api_tasks():
 
 @app.route("/api/update_task_status", methods=['POST'])
 @login_required
-def api_update_task_status():
-    user = User.from_session(db, session)
-    user_id = user.data[0]
+def api_update_task_status(user):
+    user_id = user.data['id']
     data = request.get_json()
     status = data.get("status")
     task_id = data.get("taskId")
 
     if status == 'complete' and task_id:
-        task_info = db.select(
+        task_info_list = db.select(
             "paths", where={"id": task_id, "user_id": user_id})
-        if task_info and not task_info[0][4]:  # Check if not already completed
-            description = task_info[0][3]
-            category = task_info[0][9]
-            task_type = task_info[0][7]
+        # Check if not already completed
+        if task_info_list and not task_info_list[0]['is_completed']:
+            task_info = task_info_list[0]
+            description = task_info['description']
+            category = task_info['category']
+            task_type = task_info['type']
 
             db.update("paths", {"is_completed": True}, where={
                       "id": task_id, "user_id": user_id})
@@ -1237,11 +1269,11 @@ def api_update_task_status():
             points_to_add = 25 if task_type == 'milestone' else 10
 
             game_stats_row = db.select(
-                "gamification_stats", where={"user_id": user_id})
+                "gamification_stats", where={"user_id": user_id})[0]
             game_stats = {
-                "points": game_stats_row[0][1],
-                "streak": game_stats_row[0][2],
-                "last_date": game_stats_row[0][3]
+                "points": game_stats_row['points'],
+                "streak": game_stats_row['current_streak'],
+                "last_date": game_stats_row['last_completed_date']
             }
 
             today = date.today()
@@ -1273,9 +1305,8 @@ def api_update_task_status():
 
 @app.route("/api/chat", methods=['POST'])
 @login_required
-def api_chat():
-    user = User.from_session(db, session)
-    user_id = user.data[0]
+def api_chat(user):
+    user_id = user.data['id']
     stats = user.get_stats()
     data = request.get_json()
     history = data.get("history", [])
@@ -1333,23 +1364,21 @@ def api_chat():
 
 @app.route('/api/chat_history')
 @login_required
-def get_chat_history():
-    user = User.from_session(db, session)
-    user_id = user.data[0]
+def get_chat_history(user):
+    user_id = user.data['id']
     category = request.args.get('category')
-    chat_record = db.select("chat_conversations", where={
-                            "user_id": user_id, "category": category})
-    if chat_record:
-        history = json.loads(chat_record[0][3])
+    chat_record_list = db.select("chat_conversations", where={
+        "user_id": user_id, "category": category})
+    if chat_record_list:
+        history = json.loads(chat_record_list[0]['history'])
         return jsonify(history)
     return jsonify([])
 
 
 @app.route('/api/reset_chat', methods=['POST'])
 @login_required
-def reset_chat_history():
-    user = User.from_session(db, session)
-    user_id = user.data[0]
+def reset_chat_history(user):
+    user_id = user.data['id']
     data = request.get_json()
     category = data.get('category')
     if not category:
@@ -1365,8 +1394,7 @@ def reset_chat_history():
 
 @app.route("/api/update_stats", methods=['POST'])
 @login_required
-def api_update_stats():
-    user = User.from_session(db, session)
+def api_update_stats(user):
     data = request.get_json()
     stat_name = data.get("stat_name")
     stat_value = data.get("stat_value")
@@ -1377,7 +1405,7 @@ def api_update_stats():
     try:
         # Always record in history
         db.insert("stat_history", {
-            "user_id": user.data[0], "stat_name": stat_name, "stat_value": stat_value
+            "user_id": user.data['id'], "stat_name": stat_name, "stat_value": stat_value
         })
 
         # Only update the main stats blob if it's not a temporary practice score
@@ -1386,7 +1414,7 @@ def api_update_stats():
             stats[stat_name] = stat_value
             user.set_stats(stats)
             # LOGGING for main stats
-            log_activity(user.data[0], 'stat_updated', {
+            log_activity(user.data['id'], 'stat_updated', {
                          'stat_name': stat_name.upper(), 'stat_value': stat_value})
 
         return jsonify({"success": True, "message": "Stats updated successfully"})
@@ -1399,9 +1427,8 @@ def api_update_stats():
 
 @app.route('/api/add_task', methods=['POST'])
 @login_required
-def add_task():
-    user = User.from_session(db, session)
-    user_id = user.data[0]
+def add_task(user):
+    user_id = user.data['id']
     data = request.get_json()
     description = data.get('description')
     category = data.get('category')
@@ -1411,9 +1438,9 @@ def add_task():
         return jsonify({"success": False, "error": "Description and category are required"}), 400
 
     # Get the highest task order for the current active path
-    latest_task_query = "SELECT MAX(task_order) FROM paths WHERE user_id=? AND category=? AND is_active=True"
+    latest_task_query = "SELECT MAX(task_order) as max_order FROM paths WHERE user_id=? AND category=? AND is_active=True"
     max_order_result = db.execute(latest_task_query, (user_id, category))
-    new_order = (max_order_result[0][0] or 0) + 1
+    new_order = (max_order_result[0]['max_order'] or 0) + 1
 
     task_id = db.insert("paths", {
         "user_id": user_id,
@@ -1438,7 +1465,7 @@ def add_task():
 
 @app.route('/api/add_subtask', methods=['POST'])
 @login_required
-def add_subtask():
+def add_subtask(user):
     data = request.get_json()
     parent_task_id = data.get('parent_task_id')
     description = data.get('description')
@@ -1458,7 +1485,7 @@ def add_subtask():
 
 @app.route('/api/update_task_deadline', methods=['POST'])
 @login_required
-def update_task_deadline():
+def update_task_deadline(user):
     data = request.get_json()
     task_id = data.get('taskId')
     due_date = data.get('dueDate')  # Can be a date string or None
@@ -1469,7 +1496,7 @@ def update_task_deadline():
 
 @app.route('/api/update_subtask', methods=['POST'])
 @login_required
-def update_subtask():
+def update_subtask(user):
     data = request.get_json()
     subtask_id = data.get('subtaskId')
     is_completed = data.get('is_completed')
@@ -1478,12 +1505,12 @@ def update_subtask():
               where={"id": subtask_id})
     return jsonify({"success": True})
 
-# --- NEW ESSAY ANALYSIS ROUTE ---
+# --- NEW ESSAY ANALYSIS ROUTE (with more granular feedback) ---
 
 
 @app.route('/api/analyze_essay', methods=['POST'])
 @login_required
-def analyze_essay():
+def analyze_essay(user):
     data = request.get_json()
     essay_text = data.get('essay_text')
     essay_prompt = data.get(
@@ -1493,21 +1520,21 @@ def analyze_essay():
         return jsonify({"error": "Essay text is required."}), 400
 
     prompt = (
-        f"You are an expert college admissions essay coach. Your goal is to provide constructive, actionable feedback on a student's essay. "
+        f"You are an expert college admissions essay coach. Your goal is to provide constructive, actionable, and granular feedback on a student's essay. "
         f"Analyze the following essay written for the prompt: '{essay_prompt}'.\n\n"
         f"Essay Text:\n\"\"\"\n{essay_text}\n\"\"\"\n\n"
-        f"Provide feedback in the following structure, using markdown for formatting:\n\n"
+        f"Provide feedback in the following structure, using markdown for formatting. **Crucially, when you identify a strength or an area for improvement, you MUST include a short, direct quote from the essay to illustrate your point.**\n\n"
         f"### Overall Impression\n"
         f"A brief, encouraging summary of your initial thoughts on the essay.\n\n"
         f"### Strengths\n"
-        f"- **Clarity and Focus:** How well does the essay address the prompt? Is there a clear central theme?\n"
-        f"- **Voice and Tone:** Does the student's personality come through? Is the tone appropriate?\n"
-        f"- **Structure and Flow:** Is the essay well-organized with a logical progression of ideas?\n\n"
+        f"- **Clarity and Focus:** How well does the essay address the prompt? Is there a clear central theme? (Include a quote that demonstrates this strength.)\n"
+        f"- **Voice and Tone:** Does the student's personality come through? Is the tone appropriate? (Include a quote that demonstrates this strength.)\n"
+        f"- **Structure and Flow:** Is the essay well-organized with a logical progression of ideas? (Include a quote that demonstrates this strength.)\n\n"
         f"### Areas for Improvement\n"
-        f"- **Introduction:** Does the opening hook the reader effectively?\n"
-        f"- **Body Paragraphs:** Is there enough specific detail, reflection, and 'show, don't tell' examples? Are there areas that could be expanded or clarified?\n"
-        f"- **Conclusion:** Does the conclusion effectively summarize the main points and leave a lasting impression?\n"
-        f"- **Grammar and Mechanics:** Note any recurring grammatical errors, awkward phrasing, or typos, but do not rewrite the essay.\n\n"
+        f"- **Introduction:** Does the opening hook the reader effectively? (Include the opening sentence(s) and suggest how to make it more engaging.)\n"
+        f"- **Body Paragraphs:** Is there enough specific detail, reflection, and 'show, don't tell' examples? Are there areas that could be expanded or clarified? (Include a quote that could be improved.)\n"
+        f"- **Conclusion:** Does the conclusion effectively summarize the main points and leave a lasting impression? (Include the concluding sentence(s) and suggest how to make it more impactful.)\n"
+        f"- **Grammar and Mechanics:** Note any recurring grammatical errors, awkward phrasing, or typos, but do not rewrite the essay. (Include a quote with an error and explain the correction.)\n\n"
         f"### Actionable Next Steps\n"
         f"1.  Provide the student with 2-3 specific, concrete steps they can take to improve their next draft.\n"
         f"2.  Keep the feedback encouraging and constructive."
@@ -1520,6 +1547,60 @@ def analyze_essay():
     except Exception as e:
         print(f"Error in essay analysis: {e}")
         return jsonify({"error": "Failed to analyze the essay."}), 500
+
+
+def _get_proactive_ai_suggestions(user):
+    """Generates a proactive suggestion for the user based on their data."""
+    if not os.getenv("GEMINI_API_KEY"):
+        return "Welcome to Mentics! Complete some tasks to get personalized suggestions."
+
+    user_id = user.data['id']
+    stats = user.get_stats()
+    onboarding_data = json.loads(
+        user.data['onboarding_data']) if user.data['onboarding_data'] else {}
+    stat_history = _get_stat_history_for_prompt(user_id)
+
+    gamification_stats_list = db.select(
+        "gamification_stats", where={"user_id": user_id})
+    gamification_stats = gamification_stats_list[0] if gamification_stats_list else {
+    }
+
+    # Get last 5 completed tasks
+    completed_tasks_raw = db.select(
+        "activity_log",
+        where={"user_id": user_id, "activity_type": "task_completed"},
+        order_by="created_at DESC LIMIT 5"
+    )
+    completed_tasks = [json.loads(task['details'])['description']
+                       for task in completed_tasks_raw]
+
+    prompt = (
+        f"You are an AI mentor for a high school student, acting as a supportive coach. Your task is to provide one, single, non-task-based suggestion that serves as a progress check-in, a gentle reminder, or a mental state booster. Your tone should be encouraging, insightful, and focused on the student's overall well-being and journey, not just their immediate to-do list.\n\n"
+        f"Analyze the user's data to find a pattern or a key insight:\n"
+        f"- Onboarding Goal: {onboarding_data.get('goal', 'Not specified')}\n"
+        f"- Onboarding Anxieties: {onboarding_data.get('anxieties', 'Not specified')}\n"
+        f"- Current GPA: {stats.get('gpa', 'N/A')}\n"
+        f"- SAT Math: {stats.get('sat_math', 'N/A')}\n"
+        f"- SAT EBRW: {stats.get('sat_ebrw', 'N/A')}\n"
+        f"- ACT Composite: {stats.get('act_average', 'N/A')}\n"
+        f"- Day Streak: {gamification_stats.get('current_streak', 0)}\n"
+        f"- Last 5 Completed Tasks: {', '.join(completed_tasks) if completed_tasks else 'None'}\n"
+        f"- Stat History:\n{stat_history}\n\n"
+        f"Based on this data, provide one concise and encouraging insight. **Do not suggest a new task.** Instead, focus on motivation, strategy, and well-being. Here are some examples of the tone and style you should adopt:\n"
+        f"- (If streak is high): 'A {gamification_stats.get('current_streak', 0)}-day streak is amazing! That consistency is what builds success. Keep up the great momentum.'\n"
+        f"- (If a score dipped): 'I noticed your last SAT Math score was a little lower. That's a normal part of the process! It's a great opportunity to review your notes and see what you can learn from it.'\n"
+        f"- (If anxieties were about time management): 'Remember when you said you were worried about time management? You've been consistently completing tasks. That shows real progress in building good habits.'\n"
+        f"- (If no recent activity): 'Just checking in! Remember that even small steps forward are still steps. You've got this.'\n\n"
+        f"Your response must be a single, encouraging sentence or two."
+    )
+
+    try:
+        model = genai.GenerativeModel('gemini-2.5-flash-lite')
+        response = model.generate_content(prompt)
+        return response.text.strip()
+    except Exception as e:
+        print(f"Error in proactive suggestion generation: {e}")
+        return "Welcome to Mentics! Let's get started on your path to success."
 
 
 # --- MAIN EXECUTION ---

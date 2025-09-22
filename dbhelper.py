@@ -7,6 +7,7 @@ class DatabaseHandler:
 
     def execute(self, query, params=None):
         conn = sqlite3.connect(self.db_name, timeout=10)
+        conn.row_factory = sqlite3.Row  # This is the key change
         c = conn.cursor()
         if params:
             c.execute(query, params)
@@ -14,7 +15,8 @@ class DatabaseHandler:
             c.execute(query)
         verb = query.strip().lower().split()[0]
         if verb == "select":
-            result = c.fetchall()
+            result = [dict(row)
+                      for row in c.fetchall()]  # Return list of dicts
         elif verb == "insert":
             result = c.lastrowid
         else:
@@ -33,8 +35,14 @@ class DatabaseHandler:
         self.execute(query)
 
     def add_column(self, table_name, column_name, column_type):
-        query = f"ALTER TABLE {table_name} ADD COLUMN {column_name} {column_type}"
-        self.execute(query)
+        # This function might fail if the column already exists, which is fine.
+        try:
+            query = f"ALTER TABLE {table_name} ADD COLUMN {column_name} {column_type}"
+            self.execute(query)
+        except sqlite3.OperationalError as e:
+            # Ignore "duplicate column name" error
+            if "duplicate column name" not in str(e):
+                raise
 
     def insert(self, table_name, data):
         """
@@ -97,7 +105,7 @@ class DatabaseHandler:
         set_clause = ', '.join([f"{k}=excluded.{k}" for k in update_cols])
 
         query = f"""
-            INSERT INTO {table_name} ({cols}) 
+            INSERT INTO {table_name} ({cols})
             VALUES ({placeholders})
             ON CONFLICT({', '.join(conflict_target)}) DO UPDATE SET
             {set_clause}

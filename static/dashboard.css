@@ -480,3 +480,61 @@ body {
         opacity: 0;
     }
 }
+
+.proactive-alert {
+    background: linear-gradient(135deg, #f5f3ff, #eef2ff);
+    border: 1px solid #ddd6fe;
+    border-radius: 1rem;
+    padding: 1.5rem;
+    margin-bottom: 2rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.05), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+}
+
+.proactive-alert-content {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.proactive-alert-icon {
+    font-size: 1.5rem;
+}
+
+.proactive-alert-text {
+    color: #4338ca;
+    font-weight: 500;
+}
+
+.proactive-alert-action-btn {
+    background-color: #8b5cf6;
+    color: white;
+    padding: 0.5rem 1rem;
+    border-radius: 0.5rem;
+    font-weight: 600;
+    transition: background-color 0.2s;
+}
+
+.proactive-alert-action-btn:hover {
+    background-color: #7c3aed;
+}
+
+.proactive-alert-close-btn {
+    color: #a78bfa;
+    transition: color 0.2s;
+}
+
+.proactive-alert-close-btn:hover {
+    color: #8b5cf6;
+}
+
+.suggestion-card {
+    background: linear-gradient(135deg, #f5f3ff, #eef2ff);
+    border: 1px solid #ddd6fe;
+}
+
+.suggestion-card .card-header {
+    color: #6d28d9;
+}
