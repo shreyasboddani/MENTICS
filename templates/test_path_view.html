@@ -12,6 +12,8 @@
         rel="stylesheet">
     <link href="https://unpkg.com/aos@2.3.1/dist/aos.css" rel="stylesheet">
     <link rel="stylesheet" href="{{ url_for('static', filename='dashboard.css') }}">
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+
 
     <style>
         ::-webkit-scrollbar {
@@ -64,6 +66,13 @@
                 opacity: 1;
                 transform: scale(1);
             }
+        }
+
+        .subtask-item {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            padding: 0.5rem 0;
         }
     </style>
 </head>
@@ -158,7 +167,11 @@
                     <div id="path-nodes-container" class="space-y-10 relative z-10 p-4"></div>
                 </div>
 
-                <div class="mt-auto pt-6 border-t border-slate-200/80 flex justify-end">
+                <div class="mt-auto pt-6 border-t border-slate-200/80 flex justify-between items-center">
+                    <button onclick="openAddTaskModal()"
+                        class="bg-slate-200 text-slate-700 px-5 py-2.5 rounded-lg hover:bg-slate-300 font-semibold transition shadow-sm hover:shadow-md transform hover:-translate-y-0.5 focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 focus-visible:ring-offset-2">
+                        Add Custom Task
+                    </button>
                     <a href="{{ url_for('test_path_builder') }}"
                         class="bg-purple-600 text-white px-5 py-2.5 rounded-lg hover:bg-purple-700 font-semibold transition shadow-md hover:shadow-lg transform hover:-translate-y-0.5 focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-500 focus-visible:ring-offset-2">
                         Edit Path Goals
@@ -175,7 +188,10 @@
             class="bg-white/60 backdrop-blur-xl border border-white/20 w-full max-w-lg rounded-2xl shadow-2xl p-6 md:p-8"
             data-aos="zoom-in" data-aos-duration="400">
             <div class="flex justify-between items-start">
-                <h3 id="modalTitle" class="text-2xl font-bold font-lalezar text-purple-700 mb-4">Task Details</h3>
+                <div>
+                    <h3 id="modalTitle" class="text-2xl font-bold font-lalezar text-purple-700 mb-1">Task Details</h3>
+                    <p id="modalDueDate" class="text-sm font-semibold text-slate-500 mb-4"></p>
+                </div>
                 <button onclick="closeTaskModal()"
                     class="text-slate-400 hover:text-slate-600 transition-colors rounded-full p-1 -mt-2 -mr-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-500">
                     <span class="sr-only">Close</span>
@@ -186,8 +202,36 @@
                     </svg>
                 </button>
             </div>
-            <p id="modalDescription" class="text-slate-700 mb-6"></p>
-            <div id="modal-actions" class="flex justify-end gap-3"></div>
+            <div id="modalDescription" class="text-slate-700 mb-4 prose prose-sm"></div>
+
+            <div id="subtasks-container" class="mb-6 space-y-2">
+                <h4 class="text-sm font-bold text-slate-600">Sub-tasks</h4>
+                <div id="subtasks-list" class="space-y-1"></div>
+                <div class="flex items-center gap-2 mt-2">
+                    <input type="text" id="newSubtaskInput" placeholder="Add a new sub-task..."
+                        class="w-full bg-white/50 border border-slate-300/70 rounded-lg p-2 text-sm focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition">
+                    <button onclick="handleAddSubtask()"
+                        class="bg-purple-500 text-white p-2 rounded-lg hover:bg-purple-600 font-semibold transition text-sm">Add</button>
+                </div>
+            </div>
+
+            <div id="modal-actions" class="flex justify-between items-center gap-3 pt-4 border-t border-slate-200/80">
+                <div>
+                    <input type="date" id="task-deadline-picker"
+                        class="bg-white/50 border border-slate-300/70 rounded-lg p-2 text-sm focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition">
+                    <button onclick="handleSetDeadline()"
+                        class="text-sm bg-slate-200 text-slate-700 px-3 py-2 rounded-lg hover:bg-slate-300 font-semibold transition">Set
+                        Date</button>
+                </div>
+                <div class="flex gap-3">
+                    <button onclick="handleImStuck()"
+                        class="bg-red-500 hover:bg-red-600 text-white font-semibold py-2 px-4 rounded-lg transition">I'm
+                        Stuck</button>
+                    <button onclick="handleTaskAction('complete')"
+                        class="bg-emerald-500 hover:bg-emerald-600 text-white font-semibold py-2 px-4 rounded-lg transition">Mark
+                        as Complete</button>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -230,6 +274,37 @@
             </div>
         </div>
     </div>
+
+    <div id="addTaskModal"
+        class="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 hidden p-4">
+        <div class="bg-white/60 backdrop-blur-xl border border-white/20 w-full max-w-lg rounded-2xl shadow-2xl p-6 md:p-8"
+            data-aos="zoom-in" data-aos-duration="400">
+            <h3 class="text-2xl font-bold font-lalezar text-purple-700 mb-4">Add a Custom Task</h3>
+            <div class="space-y-4">
+                <div>
+                    <label for="customTaskDescription" class="block text-sm font-semibold text-slate-700 mb-1">Task
+                        Description</label>
+                    <textarea id="customTaskDescription" rows="3"
+                        class="w-full bg-white/50 border border-slate-300/70 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition"
+                        placeholder="e.g., Practice 20 vocabulary words..."></textarea>
+                </div>
+                <div>
+                    <label for="customTaskDueDate" class="block text-sm font-semibold text-slate-700 mb-1">Due Date
+                        (Optional)</label>
+                    <input type="date" id="customTaskDueDate"
+                        class="w-full bg-white/50 border border-slate-300/70 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition">
+                </div>
+                <div class="flex justify-end gap-3 pt-2">
+                    <button onclick="closeAddTaskModal()"
+                        class="text-slate-600 font-semibold px-4 py-2 rounded-lg hover:bg-slate-100 transition">Cancel</button>
+                    <button onclick="handleSaveCustomTask()"
+                        class="bg-purple-600 hover:bg-purple-700 text-white font-semibold py-2 px-4 rounded-lg transition">Add
+                        Task</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
 
     <script src="{{ url_for('static', filename='js/prompt.js') }}"></script>
     <script src="{{ url_for('static', filename='js/alert.js') }}"></script>
@@ -482,11 +557,87 @@
             currentTaskId = task.id;
             const modal = document.getElementById('taskModal');
             document.getElementById('modalTitle').textContent = `Step ${task.client_id}: Your Task`;
-            document.getElementById('modalDescription').textContent = task.description;
-            document.getElementById('modal-actions').innerHTML = `
-                <button onclick="handleImStuck()" class="bg-red-500 hover:bg-red-600 text-white font-semibold py-2 px-4 rounded-lg transition">I'm Stuck</button>
-                <button onclick="handleTaskAction('complete')" class="bg-emerald-500 hover:bg-emerald-600 text-white font-semibold py-2 px-4 rounded-lg transition">Mark as Complete</button>`;
+
+            // Use marked.js to render markdown links
+            document.getElementById('modalDescription').innerHTML = marked.parse(task.description);
+
+            const dueDateEl = document.getElementById('modalDueDate');
+            const deadlinePicker = document.getElementById('task-deadline-picker');
+            if (task.due_date) {
+                dueDateEl.textContent = `Due: ${new Date(task.due_date + 'T00:00:00').toLocaleDateString()}`;
+                deadlinePicker.value = task.due_date;
+            } else {
+                dueDateEl.textContent = 'No due date set';
+                deadlinePicker.value = '';
+            }
+
+            renderSubtasks(task.subtasks || []);
+
             modal.classList.remove('hidden');
+        }
+
+        function renderSubtasks(subtasks) {
+            const subtasksList = document.getElementById('subtasks-list');
+            subtasksList.innerHTML = '';
+            if (subtasks.length === 0) {
+                subtasksList.innerHTML = '<p class="text-sm text-slate-500">No sub-tasks yet.</p>';
+                return;
+            }
+            subtasks.forEach(subtask => {
+                const item = document.createElement('div');
+                item.className = 'subtask-item';
+                item.innerHTML = `
+                    <input type="checkbox" id="subtask-${subtask.id}" onchange="handleToggleSubtask(${subtask.id}, this.checked)" ${subtask.is_completed ? 'checked' : ''} class="w-4 h-4 text-purple-600 bg-gray-100 border-gray-300 rounded focus:ring-purple-500">
+                    <label for="subtask-${subtask.id}" class="text-sm text-slate-700 ${subtask.is_completed ? 'line-through text-slate-500' : ''}">${subtask.description}</label>
+                `;
+                subtasksList.appendChild(item);
+            });
+        }
+
+        async function handleAddSubtask() {
+            const input = document.getElementById('newSubtaskInput');
+            const description = input.value.trim();
+            if (!description) return;
+
+            const response = await fetch('/api/add_subtask', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ parent_task_id: currentTaskId, description })
+            });
+            const result = await response.json();
+            if (result.success) {
+                const task = currentTasks.find(t => t.id === currentTaskId);
+                if (!task.subtasks) task.subtasks = [];
+                task.subtasks.push(result.subtask);
+                renderSubtasks(task.subtasks);
+                input.value = '';
+            }
+        }
+
+        async function handleToggleSubtask(subtaskId, is_completed) {
+            await fetch('/api/update_subtask', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ subtaskId, is_completed })
+            });
+            const task = currentTasks.find(t => t.id === currentTaskId);
+            const subtask = task.subtasks.find(s => s.id === subtaskId);
+            subtask.is_completed = is_completed;
+            renderSubtasks(task.subtasks);
+        }
+
+        async function handleSetDeadline() {
+            const picker = document.getElementById('task-deadline-picker');
+            const dueDate = picker.value;
+            await fetch('/api/update_task_deadline', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ taskId: currentTaskId, dueDate })
+            });
+            const task = currentTasks.find(t => t.id === currentTaskId);
+            task.due_date = dueDate;
+            document.getElementById('modalDueDate').textContent = `Due: ${new Date(dueDate + 'T00:00:00').toLocaleDateString()}`;
+            alert('Deadline updated!');
         }
 
         function closeTaskModal() {
@@ -495,6 +646,39 @@
 
         function closeStatModal() {
             document.getElementById('statEntryModal').classList.add('hidden');
+        }
+
+        function openAddTaskModal() {
+            document.getElementById('addTaskModal').classList.remove('hidden');
+        }
+
+        function closeAddTaskModal() {
+            document.getElementById('addTaskModal').classList.add('hidden');
+            document.getElementById('customTaskDescription').value = '';
+            document.getElementById('customTaskDueDate').value = '';
+        }
+
+        async function handleSaveCustomTask() {
+            const description = document.getElementById('customTaskDescription').value.trim();
+            const dueDate = document.getElementById('customTaskDueDate').value;
+            if (!description) {
+                alert('Please enter a task description.');
+                return;
+            }
+
+            const response = await fetch('/api/add_task', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ description, category: chatCategory, due_date: dueDate })
+            });
+            const result = await response.json();
+            if (result.success) {
+                currentTasks.push(result.task);
+                renderPathAndConnectors(currentTasks, false);
+                closeAddTaskModal();
+            } else {
+                alert('Could not add task. Please try again.');
+            }
         }
 
         async function handleImStuck() {
@@ -791,7 +975,7 @@
             const messageWrapper = document.createElement('div');
             messageWrapper.className = 'flex ' + (role === 'user' ? 'justify-end' : 'justify-start');
             const messageDiv = document.createElement('div');
-            let cssClass = 'p-3 rounded-xl max-w-xs text-sm';
+            let cssClass = 'p-3 rounded-xl max-w-xs text-sm prose prose-sm';
             if (role === 'user') {
                 cssClass += ' bg-purple-600 text-white';
             } else {
@@ -799,9 +983,10 @@
                 if (isTyping) cssClass += ' animate-pulse';
             }
             messageDiv.className = cssClass;
-            // A simple markdown-to-HTML conversion
-            let formattedText = text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
-            messageDiv.innerHTML = `<p>${formattedText}</p>`;
+
+            // Use marked.js to render markdown links in chat
+            messageDiv.innerHTML = marked.parse(text);
+
             messageWrapper.appendChild(messageDiv);
             chatHistory.appendChild(messageWrapper);
             chatHistory.scrollTop = chatHistory.scrollHeight;

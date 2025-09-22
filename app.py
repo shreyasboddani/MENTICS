@@ -65,7 +65,16 @@ def init_db():
         "created_at": "TIMESTAMP DEFAULT CURRENT_TIMESTAMP",
         "type": "TEXT",
         "stat_to_update": "TEXT",
-        "category": "TEXT"
+        "category": "TEXT",
+        "due_date": "TEXT",
+        "is_user_added": "BOOLEAN DEFAULT FALSE"
+    })
+    db.create_table("subtasks", {
+        "id": "INTEGER PRIMARY KEY AUTOINCREMENT",
+        "parent_task_id": "INTEGER NOT NULL",
+        "description": "TEXT NOT NULL",
+        "is_completed": "BOOLEAN DEFAULT FALSE",
+        "FOREIGN KEY(parent_task_id)": "REFERENCES paths(id) ON DELETE CASCADE"
     })
     db.create_table("stat_history", {
         "id": "INTEGER PRIMARY KEY AUTOINCREMENT",
@@ -90,6 +99,14 @@ def init_db():
         # JSON string with context like task name, stat name, etc.
         "details": "TEXT",
         "created_at": "TIMESTAMP DEFAULT CURRENT_TIMESTAMP"
+    })
+    # NEW: Table for gamification stats
+    db.create_table("gamification_stats", {
+        "user_id": "INTEGER PRIMARY KEY",
+        "points": "INTEGER DEFAULT 0",
+        "current_streak": "INTEGER DEFAULT 0",
+        "last_completed_date": "TEXT",
+        "FOREIGN KEY(user_id)": "REFERENCES users(id) ON DELETE CASCADE"
     })
 
 # --- HELPER FUNCTIONS ---
@@ -234,7 +251,7 @@ def _get_test_prep_ai_tasks(strengths, weaknesses, user_stats={}, chat_history=[
         f"You are an expert AI test prep coach (Digital SAT & ACT). Your mission is to generate a personalized, forward-looking 5-step study plan that is:\n"
         f"- Motivating, clear, and tailored to the student’s strengths, weaknesses, and timeline.\n"
         f"- Progress-oriented, always pushing the student forward instead of repeating old work.\n"
-        f"- Designed with mentorship in mind: every step should build confidence, skills, and strategy.\n\n"
+        f"- Resource-rich: include markdown links to high-quality, free resources like Khan Academy, official practice test PDFs, or specific helpful YouTube videos.\n\n"
 
         f"# STUDENT ANALYSIS\n"
         f"Analyze the following data to understand the student's current situation:\n"
@@ -253,29 +270,27 @@ def _get_test_prep_ai_tasks(strengths, weaknesses, user_stats={}, chat_history=[
         f"Based on your analysis, generate a new, 5-step study plan. Each task must:\n"
         f"- Be specific, actionable, and stage-appropriate given their timeline until the test.\n"
         f"- Directly address weaknesses, reinforce strengths, and incorporate insights from recent conversation and tracker data.\n"
-        f"- Include at least one **reputable, proven resource** (official College Board/ACT practice, Khan Academy, Princeton Review, etc.) for any study-focused task.\n"
+        f"- Include at least one **reputable, proven resource** formatted as a markdown link (e.g., [Khan Academy](https://www.khanacademy.org/)).\n"
         f"- Push the student forward with fresh, progressive steps that build on past work. DO NOT REPEAT OLD TASKS — they must evolve and build off each other.\n\n"
 
         f"# CRITICAL DIRECTIVES\n"
-        f"1.  THE MOST MAJOR DIRECTIVE :**JSON Output ONLY**: Your entire output MUST be a single, raw JSON object. Do not include any text before or after the JSON.\n"
+        f"1.  **JSON Output ONLY**: Your entire output MUST be a single, raw JSON object. Do not include any text before or after the JSON.\n"
         f"2.  **Exact Task Count**: The plan must contain EXACTLY 5 task objects in the `tasks` list.\n"
         f"3.  **Adaptive Focus**: If the context shows a focus on SAT or ACT, all 5 tasks must target that test only. Never mix.\n"
         f"4.  **Meaningful Milestones**: Use 'milestone' only for major achievements (e.g., completing a full-length practice test, finishing an entire section). Use 'standard' for drills, concept review, or smaller steps. 'stat_to_update' must be null for 'standard' tasks.\n"
         f"5.  **Correct Stat Naming**: For milestones, `stat_to_update` must be one of: ['sat_math', 'sat_ebrw', 'sat_total', 'act_math', 'act_reading', 'act_science', 'act_composite'].\n"
         f"6.  **Avoid Repetition**: Never assign a task that mirrors recently completed or incomplete ones. Each roadmap must feel fresh, progressive, and adapted to growth.\n"
-        f"7.  **Strength/Weakness Balance**: Always prioritize weaknesses in the tasks. At the same time, strategically leverage the student’s strengths to build confidence and maintain motivation. Example: if strong in Math but weak in Reading, focus more on Reading while still including a Math task to reinforce confidence.\n"
-        f"8.  **Full-Length Tests Rule**: Occasionally (not in every plan) include a milestone for a full-length, timed practice test to simulate real exam conditions. These should appear periodically to track endurance and pacing, not constantly BUT THESE SHOULD BE PRIORIRTIZED OVER SECTION TESTS BECAUSE OF LIMITED OFFICIAL TESTS.\n"
-        f"9.  **SAT Math Special Rule**: If weaknesses specifically show SAT Math struggles, at least one task MUST focus on Desmos as a skill-building tool (e.g., regressions, multi-equation regressions, graphing strategies).\n"
-        f"10. **No Duplicate Praise**: If the student has already been congratulated for a score in past conversation, do not congratulate them again. Focus instead on next actionable steps.\n"
-        f"11. **Mentorship Tone**: Write tasks as if you are a coach guiding the student — supportive, motivating, and focused on measurable progress.\n"
-        f"12. ANOTHER MAJOR ONE: ** FOCUS ON THE LATEST CHAT MESSAGE FROM THE USER WHEN REGENERATTING FOR CHANGES THAT IS ONE OF  THE MOST IMPORTANT THINGS TO HELP THE USERS.\n"
+        f"7.  **Resource Integration**: For any study-focused task, embed a markdown link to a specific, relevant, and free resource. Example: 'Review quadratic equations using this [Khan Academy module](https://...)'\n"
+        f"8.  **SAT Math Special Rule**: If weaknesses specifically show SAT Math struggles, at least one task MUST focus on Desmos as a skill-building tool (e.g., regressions, multi-equation regressions, graphing strategies).\n"
+        f"9.  **Mentorship Tone**: Write tasks as if you are a coach guiding the student — supportive, motivating, and focused on measurable progress.\n"
+        f"10. **FOCUS ON THE LATEST CHAT MESSAGE FROM THE USER** when regenerating for changes.\n\n"
 
         f"# JSON OUTPUT SCHEMA\n"
         f"Your output must conform strictly to this structure:\n"
         f"{{\n"
         f'  "tasks": [\n'
         f'    {{\n'
-        f'      "description": "A specific, actionable, and encouraging task description that includes resources where applicable.",\n'
+        f'      "description": "A specific, actionable task including a markdown link like [this resource](https://example.com).",\n'
         f'      "type": "Either \'standard\' or \'milestone\'.",\n'
         f'      "stat_to_update": "A string from the list above ONLY if type is milestone, otherwise null.",\n'
         f'      "category": "This MUST be the string \'Test Prep\'."\n'
@@ -287,7 +302,7 @@ def _get_test_prep_ai_tasks(strengths, weaknesses, user_stats={}, chat_history=[
 
     try:
         model = genai.GenerativeModel(
-            'gemini-2.5-flash-lite',
+            'gemini-2.5-flash',
             generation_config={"response_mime_type": "application/json"}
         )
         response = model.generate_content(prompt)
@@ -340,18 +355,14 @@ def _get_test_prep_ai_chat_response(history, user_stats, stat_history=""):
         f"- Historical Performance Data: {stat_history}\n\n"
 
         "## Core Coaching Directives:\n"
-        "1. **Use full context**: Incorporate all provided data and the chat history to personalize responses.\n"
-        "2. **Actionable focus**: Every response, even short ones, must provide a next step, tip, or actionable guidance.\n"
+        "1. **Provide Resources**: When a student is stuck or asks for help, provide specific, high-quality, free resources using markdown links (e.g., [Khan Academy](https://...)).\n"
+        "2. **Actionable focus**: Every response must provide a next step, tip, or actionable guidance.\n"
         "3. **Adaptive response length**:\n"
-        "   - Short, concise answers for quick questions. Keep responses as concise as possible most of the time.\n"
-        "   - Detailed, step-by-step explanations ONLY when the user asks. Keep detailed responses under 200 words unless they explicitly request longer guidance.\n"
-        "   - Always chunk longer explanations into numbered steps or bullet points. Bold key actions when helpful.\n"
+        "   - Short, concise answers for quick questions. KEEP THESE ANSWERS UNDER 100 words.\n"
+        "   - Detailed, step-by-step explanations ONLY when the user asks. Use numbered steps or bullet points. KEEP THESE ANSWERS UNDER 250 words\n"
         "4. **Weakness first, leverage strengths**: Focus on weak areas but reinforce strengths to build confidence.\n"
-        "5. **Proactive guidance**: Offer actionable strategies, study tips, timing/pacing advice, full-length test suggestions, and SAT Math Desmos strategies when relevant.\n"
-        "6. **Avoid repetition**: Do not repeat old praise or previously completed tasks; always provide fresh, progressive guidance.\n"
-        "7. **Mentorship tone**: Always sound supportive and motivating, but realistic. Encourage effort and progress.\n"
-        "8. **Dynamic path adjustment**: If the student asks to shift focus or request a new plan, confirm and guide them accordingly.\n"
-        "9. **Reference chat history**: Use prior messages to stay consistent, continue threads logically, and adapt guidance to ongoing conversation.\n"
+        "5. **Proactive guidance**: Offer actionable strategies, study tips, and relevant resources when a user expresses difficulty.\n"
+        "6. **Mentorship tone**: Always sound supportive and motivating, but realistic. Encourage effort and progress.\n"
     )
 
     # Build Gemini chat history
@@ -363,7 +374,7 @@ def _get_test_prep_ai_chat_response(history, user_stats, stat_history=""):
     try:
         # Initialize model
         model = genai.GenerativeModel(
-            'gemini-2.5-flash-lite', system_instruction=system_message)
+            'gemini-2.5-flash', system_instruction=system_message)
         chat = model.start_chat(history=gemini_history[:-1])
         last_user_message = gemini_history[-1]['parts'][0] if gemini_history else "Hello"
         response = chat.send_message(last_user_message)
@@ -445,10 +456,9 @@ def _get_college_planning_ai_tasks(college_context, user_stats, path_history, ch
     prompt = (
         f"# MISSION\n"
         f"You are an expert AI college admissions counselor and mentor. Your mission is to generate a personalized, forward-looking 5-step roadmap that helps a high school student make measurable progress in the college planning process. Your guidance should:\n"
-        f"- Push the student forward without repeating what they’ve already done.\n"
+        f"- Be resource-rich, including markdown links to reputable sources like the Common App website, College Board, or insightful articles/videos.\n"
         f"- Build logically on their recent conversations, completed tasks, and current progress.\n"
-        f"- Stay aligned with their grade level, planning stage, and long-term goals.\n"
-        f"- Be specific, supportive, and actionable — not vague or generic.\n\n"
+        f"- Stay aligned with their grade level, planning stage, and long-term goals.\n\n"
 
         f"# STUDENT ANALYSIS\n"
         f"Analyze the following data to build a deep understanding of the student:\n"
@@ -459,10 +469,7 @@ def _get_college_planning_ai_tasks(college_context, user_stats, path_history, ch
         f"- Current GPA: {user_stats.get('gpa', 'N/A')}\n\n"
 
         f"## STUDENT PERFORMANCE & CONVERSATION HISTORY\n"
-        f"This is critical context. The new plan MUST:\n"
-        f"- Acknowledge their history and progress.\n"
-        f"- Avoid duplicating completed or failed tasks.\n"
-        f"- Create next-step tasks that extend their growth.\n\n"
+        f"This is critical context. The new plan MUST acknowledge their history and create next-step tasks that extend their growth.\n\n"
         f"- Recently Completed Tasks: {completed_tasks_str}\n"
         f"- Incomplete or Failed Tasks: {incomplete_tasks_str}\n"
         f"- Recent Conversation: {chat_history_str}\n"
@@ -473,22 +480,21 @@ def _get_college_planning_ai_tasks(college_context, user_stats, path_history, ch
         f"- Be actionable and motivational.\n"
         f"- Directly support their stage-appropriate goals.\n"
         f"- Introduce fresh, concrete next steps instead of repeating old ones.\n"
-        f"- Adapt in complexity and depth depending on their progress and grade.\n\n"
+        f"- Include at least one markdown link to a helpful, free resource in the description (e.g., 'Start your Common App essay using these [brainstorming tips](https://...)').\n\n"
 
         f"# CRITICAL DIRECTIVES\n"
         f"1.  **JSON Output ONLY**: Your entire output MUST be a single, raw JSON object.\n"
         f"2.  **Exact Task Count**: The plan must contain EXACTLY 5 task objects.\n"
         f"3.  **Stage-Appropriate Tasks**: Align difficulty and scope to grade and planning stage. (Example: 9th graders explore interests, 12th graders finalize applications.)\n"
         f"4.  **Novelty & Continuity**: Never repeat recent tasks. Every new roadmap should clearly extend or deepen their progress.\n"
-        f"5.  **Meaningful Milestones**: Use 'milestone' only for major achievements (essay draft, submitting applications, updating GPA). Use 'standard' for exploratory/research tasks. 'stat_to_update' must be null for 'standard' tasks. Never ask to update SAT in a milestone, they must update it themselves on the stats page\n"
-        f"6.  **Mentorship Focus**: Don’t just assign tasks — design them as steps that build skills, confidence, and clarity about their future.\n\n"
+        f"5.  **Meaningful Milestones**: Use 'milestone' only for major achievements (essay draft, submitting applications, updating GPA). Use 'standard' for exploratory/research tasks. 'stat_to_update' must be null for 'standard' tasks.\n\n"
 
         f"# JSON OUTPUT SCHEMA\n"
         f"Your output must conform strictly to this structure:\n"
         f"{{\n"
         f'  "tasks": [\n'
         f'    {{\n'
-        f'      "description": "A specific, actionable, and encouraging task description.",\n'
+        f'      "description": "A specific, actionable task including a markdown link like [this resource](https://example.com).",\n'
         f'      "type": "Either \'standard\' or \'milestone\'.",\n'
         f'      "stat_to_update": "A string (e.g., \'gpa\', \'essay_progress\', \'applications_submitted\') ONLY if type is milestone, otherwise null.",\n'
         f'      "category": "This MUST be the string \'College Planning\'."\n'
@@ -500,7 +506,7 @@ def _get_college_planning_ai_tasks(college_context, user_stats, path_history, ch
 
     try:
         model = genai.GenerativeModel(
-            'gemini-2.5-flash-lite',
+            'gemini-1.5-flash',
             generation_config={"response_mime_type": "application/json"}
         )
         response = model.generate_content(prompt)
@@ -536,17 +542,13 @@ def _get_college_planning_ai_chat_response(history, user_stats, stat_history="")
         f"- Weaknesses: {college_info.get('weaknesses', 'Not provided')}\n\n"
 
         "## Core Coaching Directives:\n"
-        "1. **Use full context**: Incorporate all provided data and chat history to personalize responses.\n"
-        "2. **Actionable guidance**: Every response must give the student a next step, resource, or concrete action to take, even in short replies.\n"
+        "1. **Provide Resources**: When a student is stuck or needs guidance, provide specific, high-quality, free resources using markdown links (e.g., links to the Common App, financial aid sites, or helpful articles).\n"
+        "2. **Actionable guidance**: Every response must give the student a next step, resource, or concrete action to take.\n"
         "3. **Adaptive response length**:\n"
-        "   - Short, concise answers for simple questions or updates (e.g., 'What's next?' or 'I finished my research'). Keep these responses under 100 words.\n"
-        "   - Detailed, structured responses for broad or complex questions (e.g., essay help, college list decisions). Use numbered steps, bullet points, examples, and keep under 250 words unless they ask for extended guidance.\n"
-        "4. **Leverage strengths, address weaknesses**: Focus on areas where the student may need more guidance (e.g., essays, deadlines) while reinforcing what they are doing well.\n"
-        "5. **Proactive advising**: If the student is stuck, break tasks into actionable steps, suggest resources, and guide them to progress without overwhelming them.\n"
-        "6. **Avoid repetition**: Do not repeat old praise or previously suggested actions; responses should feel fresh and progressive.\n"
-        "7. **Mentorship tone**: Always sound supportive, encouraging, and realistic, keeping the student motivated.\n"
-        "8. **Dynamic path adjustment**: If the student asks to regenerate their plan or shift focus, confirm and guide them accordingly.\n"
-        "9. **Reference chat history**: Use previous messages to maintain continuity, adapt responses to past discussions, and build on prior advice logically.\n"
+        "   - Short, concise answers for simple questions. KEEP THESE ANSWERS UNDER 100 words.\n"
+        "   - Detailed, structured responses for complex questions (e.g., essay help, college list decisions). Use numbered steps, bullet points, and KEEP THESE ANSWERS UNDER 250 words.\n"
+        "4. **Proactive advising**: If the student is stuck, break tasks into actionable steps and suggest relevant resources.\n"
+        "5. **Mentorship tone**: Always sound supportive, encouraging, and realistic, keeping the student motivated.\n"
     )
 
     gemini_history = []
@@ -556,7 +558,7 @@ def _get_college_planning_ai_chat_response(history, user_stats, stat_history="")
 
     try:
         model = genai.GenerativeModel(
-            'gemini-2.5-flash-lite', system_instruction=system_message)
+            'gemini-2.5-flash', system_instruction=system_message)
         chat = model.start_chat(history=gemini_history[:-1])
         last_user_message = gemini_history[-1]['parts'][0] if gemini_history else "Hello"
         response = chat.send_message(last_user_message)
@@ -638,6 +640,10 @@ def signup():
                     "act_reading": "", "act_science": "", "gpa": "", "milestones": 0
                 })
             })
+            # Initialize gamification stats for new user
+            db.insert("gamification_stats", {
+                      "user_id": user_id, "points": 0, "current_streak": 0})
+
             session["user"] = email
             session["user_id"] = user_id
             session.permanent = True
@@ -703,6 +709,10 @@ def authorize():
                 "act_reading": "", "act_science": "", "gpa": "", "milestones": 0
             })
         })
+        # Initialize gamification stats for new Google user
+        db.insert("gamification_stats", {
+                  "user_id": user_id, "points": 0, "current_streak": 0})
+
         session["user"] = user_info['email']
         session["user_id"] = user_id
         session.permanent = True
@@ -743,6 +753,21 @@ def dashboard():
     user_id = user.data[0]
     name = user.get_name()
     all_tasks = db.select("paths", where={"user_id": user_id})
+
+    # --- Gamification Stats ---
+    gamification_stats = db.select(
+        "gamification_stats", where={"user_id": user_id})
+    if not gamification_stats:
+        # Fallback to create stats if they don't exist for some reason
+        db.insert("gamification_stats", {
+                  "user_id": user_id, "points": 0, "current_streak": 0})
+        gamification_stats = db.select(
+            "gamification_stats", where={"user_id": user_id})
+
+    game_stats = {
+        "points": gamification_stats[0][1],
+        "streak": gamification_stats[0][2]
+    }
 
     # --- Progress Calculations ---
     active_test_tasks = [t for t in all_tasks if t[5] and t[9] == 'Test Prep']
@@ -843,40 +868,65 @@ def dashboard():
         except (ValueError, TypeError):
             pass
 
-    # --- Achievements Logic ---
-    earned_achievements = []
+    # --- EXPANDED Achievements Logic ---
+    all_achievements = [
+        {"id": "pioneer_test", "icon": "🚀", "title": "Test Prep Pioneer",
+            "description": "Generated your first Test Prep path.", "is_earned": False},
+        {"id": "planner_college", "icon": "🏛️", "title": "College Planner",
+            "description": "Generated your first College Planning path.", "is_earned": False},
+        {"id": "first_step", "icon": "✅", "title": "First Step",
+            "description": "Completed your first task.", "is_earned": False},
+        {"id": "task_master_10", "icon": "🔥", "title": "Task Master",
+            "description": "Completed 10 tasks.", "is_earned": False},
+        {"id": "pathfinder_pro_25", "icon": "🏆", "title": "Pathfinder Pro",
+            "description": "Completed 25 tasks.", "is_earned": False},
+        {"id": "streak_3", "icon": "⚡", "title": "On a Roll",
+            "description": "Maintained a 3-day streak.", "is_earned": False},
+        {"id": "streak_7", "icon": "🌟", "title": "Committed",
+            "description": "Maintained a 7-day streak.", "is_earned": False},
+        {"id": "points_100", "icon": "💯", "title": "Point Collector",
+            "description": "Earned 100 points.", "is_earned": False},
+        {"id": "points_500", "icon": "💎", "title": "Point Pro",
+            "description": "Earned 500 points.", "is_earned": False}
+    ]
+
     all_completed_tasks = total_test_prep_completed + total_college_planning_completed
 
+    # Check which achievements are earned
     if any(t for t in all_tasks if t[9] == 'Test Prep'):
-        earned_achievements.append(
-            {"icon": "🚀", "title": "Test Prep Pioneer", "description": "Generated your first Test Prep path."})
+        all_achievements[0]['is_earned'] = True
     if any(t for t in all_tasks if t[9] == 'College Planning'):
-        earned_achievements.append({"icon": "🏛️", "title": "College Planner",
-                                   "description": "Generated your first College Planning path."})
+        all_achievements[1]['is_earned'] = True
     if all_completed_tasks >= 1:
-        earned_achievements.append(
-            {"icon": "✅", "title": "First Step", "description": "Completed your first task."})
+        all_achievements[2]['is_earned'] = True
     if all_completed_tasks >= 10:
-        earned_achievements.append(
-            {"icon": "🔥", "title": "Task Master", "description": "Completed 10 tasks."})
+        all_achievements[3]['is_earned'] = True
     if all_completed_tasks >= 25:
-        earned_achievements.append(
-            {"icon": "🏆", "title": "Pathfinder Pro", "description": "Completed 25 tasks."})
+        all_achievements[4]['is_earned'] = True
+    if game_stats['streak'] >= 3:
+        all_achievements[5]['is_earned'] = True
+    if game_stats['streak'] >= 7:
+        all_achievements[6]['is_earned'] = True
+    if game_stats['points'] >= 100:
+        all_achievements[7]['is_earned'] = True
+    if game_stats['points'] >= 500:
+        all_achievements[8]['is_earned'] = True
+
+    earned_achievements = [a for a in all_achievements if a['is_earned']]
 
     return render_template(
         "dashboard.html",
         name=name,
         test_prep_completed=test_prep_completed_current,
-        total_test_prep_completed=total_test_prep_completed,
         college_planning_completed=college_planning_completed_current,
-        total_college_planning_completed=total_college_planning_completed,
         gpa=stats.get("gpa") or "—",
         sat_total=sat_total or "—",
         act_average=act_average or "—",
         recent_activities=recent_activities,
         activity_data=json.dumps(activity_data),
         test_date_info=test_date_info,
-        earned_achievements=earned_achievements
+        earned_achievements=earned_achievements,
+        game_stats=game_stats
     )
 
 
@@ -1066,6 +1116,8 @@ def tracker():
     )
 # --- API ROUTES ---
 
+# ... (Previous API routes are unchanged)
+
 
 @app.route('/api/test-path-status')
 @login_required
@@ -1133,9 +1185,25 @@ def api_tasks():
 
         if active_path:
             active_path = sorted(active_path, key=lambda x: x[2])
-            tasks = [{"id": r[0], "description": r[3], "is_completed": bool(r[4]),
-                      "type": r[7], "stat_to_update": r[8]} for r in active_path]
-            return jsonify(tasks)
+            tasks_with_subtasks = []
+            for r in active_path:
+                task_id = r[0]
+                subtasks_raw = db.select(
+                    "subtasks", where={"parent_task_id": task_id})
+                subtasks = [{"id": s[0], "description": s[2],
+                             "is_completed": bool(s[3])} for s in subtasks_raw]
+
+                tasks_with_subtasks.append({
+                    "id": task_id,
+                    "description": r[3],
+                    "is_completed": bool(r[4]),
+                    "type": r[7],
+                    "stat_to_update": r[8],
+                    "due_date": r[10],
+                    "is_user_added": bool(r[11]),
+                    "subtasks": subtasks
+                })
+            return jsonify(tasks_with_subtasks)
 
         return jsonify([])
     except Exception as e:
@@ -1153,17 +1221,53 @@ def api_update_task_status():
     task_id = data.get("taskId")
 
     if status == 'complete' and task_id:
-        # Fetch task details before updating to log them
         task_info = db.select(
             "paths", where={"id": task_id, "user_id": user_id})
-        if task_info:
+        if task_info and not task_info[0][4]:  # Check if not already completed
             description = task_info[0][3]
             category = task_info[0][9]
+            task_type = task_info[0][7]
+
             db.update("paths", {"is_completed": True}, where={
                       "id": task_id, "user_id": user_id})
-            # LOGGING
             log_activity(user_id, 'task_completed', {
                          'description': description, 'category': category})
+
+            # --- GAMIFICATION LOGIC ---
+            points_to_add = 25 if task_type == 'milestone' else 10
+
+            game_stats_row = db.select(
+                "gamification_stats", where={"user_id": user_id})
+            game_stats = {
+                "points": game_stats_row[0][1],
+                "streak": game_stats_row[0][2],
+                "last_date": game_stats_row[0][3]
+            }
+
+            today = date.today()
+            yesterday = today - timedelta(days=1)
+            last_completed_date = None
+            if game_stats['last_date']:
+                last_completed_date = date.fromisoformat(
+                    game_stats['last_date'])
+
+            new_streak = game_stats['streak']
+            if last_completed_date == today:
+                # Already completed a task today, just add points
+                new_streak = game_stats['streak']
+            elif last_completed_date == yesterday:
+                # Continuing a streak
+                new_streak += 1
+            else:
+                # Reset streak
+                new_streak = 1
+
+            db.update("gamification_stats", {
+                "points": game_stats['points'] + points_to_add,
+                "current_streak": new_streak,
+                "last_completed_date": today.isoformat()
+            }, where={"user_id": user_id})
+
     return jsonify({"success": True})
 
 
@@ -1289,6 +1393,133 @@ def api_update_stats():
     except Exception as e:
         print(f"Error updating stats via API: {e}")
         return jsonify({"success": False, "error": "Server error"}), 500
+
+# --- NEW TASK & SUBTASK MANAGEMENT API ROUTES ---
+
+
+@app.route('/api/add_task', methods=['POST'])
+@login_required
+def add_task():
+    user = User.from_session(db, session)
+    user_id = user.data[0]
+    data = request.get_json()
+    description = data.get('description')
+    category = data.get('category')
+    due_date = data.get('due_date')
+
+    if not description or not category:
+        return jsonify({"success": False, "error": "Description and category are required"}), 400
+
+    # Get the highest task order for the current active path
+    latest_task_query = "SELECT MAX(task_order) FROM paths WHERE user_id=? AND category=? AND is_active=True"
+    max_order_result = db.execute(latest_task_query, (user_id, category))
+    new_order = (max_order_result[0][0] or 0) + 1
+
+    task_id = db.insert("paths", {
+        "user_id": user_id,
+        "task_order": new_order,
+        "description": description,
+        "is_completed": False,
+        "is_active": True,
+        "type": "standard",  # User-added tasks are standard by default
+        "category": category,
+        "due_date": due_date,
+        "is_user_added": True
+    })
+
+    new_task = {
+        "id": task_id, "description": description, "is_completed": False, "type": "standard",
+        "stat_to_update": None, "due_date": due_date, "is_user_added": True, "subtasks": []
+    }
+    log_activity(user_id, 'task_added', {
+                 'description': description, 'category': category})
+    return jsonify({"success": True, "task": new_task})
+
+
+@app.route('/api/add_subtask', methods=['POST'])
+@login_required
+def add_subtask():
+    data = request.get_json()
+    parent_task_id = data.get('parent_task_id')
+    description = data.get('description')
+
+    if not parent_task_id or not description:
+        return jsonify({"success": False, "error": "Parent task ID and description are required"}), 400
+
+    subtask_id = db.insert("subtasks", {
+        "parent_task_id": parent_task_id,
+        "description": description,
+        "is_completed": False
+    })
+    new_subtask = {"id": subtask_id,
+                   "description": description, "is_completed": False}
+    return jsonify({"success": True, "subtask": new_subtask})
+
+
+@app.route('/api/update_task_deadline', methods=['POST'])
+@login_required
+def update_task_deadline():
+    data = request.get_json()
+    task_id = data.get('taskId')
+    due_date = data.get('dueDate')  # Can be a date string or None
+
+    db.update("paths", {"due_date": due_date}, where={"id": task_id})
+    return jsonify({"success": True})
+
+
+@app.route('/api/update_subtask', methods=['POST'])
+@login_required
+def update_subtask():
+    data = request.get_json()
+    subtask_id = data.get('subtaskId')
+    is_completed = data.get('is_completed')
+
+    db.update("subtasks", {"is_completed": is_completed},
+              where={"id": subtask_id})
+    return jsonify({"success": True})
+
+# --- NEW ESSAY ANALYSIS ROUTE ---
+
+
+@app.route('/api/analyze_essay', methods=['POST'])
+@login_required
+def analyze_essay():
+    data = request.get_json()
+    essay_text = data.get('essay_text')
+    essay_prompt = data.get(
+        'essay_prompt', 'a general college application essay')
+
+    if not essay_text:
+        return jsonify({"error": "Essay text is required."}), 400
+
+    prompt = (
+        f"You are an expert college admissions essay coach. Your goal is to provide constructive, actionable feedback on a student's essay. "
+        f"Analyze the following essay written for the prompt: '{essay_prompt}'.\n\n"
+        f"Essay Text:\n\"\"\"\n{essay_text}\n\"\"\"\n\n"
+        f"Provide feedback in the following structure, using markdown for formatting:\n\n"
+        f"### Overall Impression\n"
+        f"A brief, encouraging summary of your initial thoughts on the essay.\n\n"
+        f"### Strengths\n"
+        f"- **Clarity and Focus:** How well does the essay address the prompt? Is there a clear central theme?\n"
+        f"- **Voice and Tone:** Does the student's personality come through? Is the tone appropriate?\n"
+        f"- **Structure and Flow:** Is the essay well-organized with a logical progression of ideas?\n\n"
+        f"### Areas for Improvement\n"
+        f"- **Introduction:** Does the opening hook the reader effectively?\n"
+        f"- **Body Paragraphs:** Is there enough specific detail, reflection, and 'show, don't tell' examples? Are there areas that could be expanded or clarified?\n"
+        f"- **Conclusion:** Does the conclusion effectively summarize the main points and leave a lasting impression?\n"
+        f"- **Grammar and Mechanics:** Note any recurring grammatical errors, awkward phrasing, or typos, but do not rewrite the essay.\n\n"
+        f"### Actionable Next Steps\n"
+        f"1.  Provide the student with 2-3 specific, concrete steps they can take to improve their next draft.\n"
+        f"2.  Keep the feedback encouraging and constructive."
+    )
+
+    try:
+        model = genai.GenerativeModel('gemini-2.5-flash')
+        response = model.generate_content(prompt)
+        return jsonify({"feedback": response.text})
+    except Exception as e:
+        print(f"Error in essay analysis: {e}")
+        return jsonify({"error": "Failed to analyze the essay."}), 500
 
 
 # --- MAIN EXECUTION ---

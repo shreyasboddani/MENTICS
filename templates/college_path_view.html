@@ -12,6 +12,8 @@
         rel="stylesheet">
     <link href="https://unpkg.com/aos@2.3.1/dist/aos.css" rel="stylesheet">
     <link rel="stylesheet" href="{{ url_for('static', filename='dashboard.css') }}">
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+
 
     <style>
         ::-webkit-scrollbar {
@@ -64,6 +66,30 @@
                 opacity: 1;
                 transform: scale(1);
             }
+        }
+
+        .subtask-item {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            padding: 0.5rem 0;
+        }
+
+        #essayFeedbackOutput h3 {
+            font-size: 1.25rem;
+            font-weight: 700;
+            margin-top: 1rem;
+            margin-bottom: 0.5rem;
+        }
+
+        #essayFeedbackOutput ul {
+            list-style-type: disc;
+            padding-left: 1.5rem;
+        }
+
+        #essayFeedbackOutput ol {
+            list-style-type: decimal;
+            padding-left: 1.5rem;
         }
     </style>
 </head>
@@ -130,18 +156,32 @@
                     </button>
                 </div>
                 <div id="chat-history" class="flex-grow overflow-y-auto space-y-4 pr-2 -mr-2"></div>
-                <div class="mt-4 flex items-center gap-2 pt-4 border-t border-slate-200/80">
-                    <input type="text" id="userInput" placeholder="Ask a question..."
-                        class="w-full bg-white/50 border border-slate-300/70 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition disabled:bg-slate-100"
-                        disabled>
-                    <button id="send-btn"
-                        class="bg-indigo-600 text-white p-2.5 rounded-lg hover:bg-indigo-700 font-semibold transition disabled:bg-slate-400 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2"
-                        disabled>
-                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-5 h-5">
-                            <path
-                                d="M3.478 2.404a.75.75 0 0 0-.926.941l2.432 7.905H13.5a.75.75 0 0 1 0 1.5H4.984l-2.432 7.905a.75.75 0 0 0 .926.94 60.519 60.519 0 0 0 18.445-8.986.75.75 0 0 0 0-1.218A60.517 60.517 0 0 0 3.478 2.404Z" />
-                        </svg>
-                    </button>
+                <div class="mt-4 pt-4 border-t border-slate-200/80">
+                    <div class="flex items-center gap-2">
+                        <button onclick="openEssayModal()" title="Analyze Essay"
+                            class="bg-indigo-100 text-indigo-700 p-2.5 rounded-lg hover:bg-indigo-200 font-semibold transition focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20"
+                                fill="currentColor">
+                                <path
+                                    d="M17.414 2.586a2 2 0 00-2.828 0L7 10.172V13h2.828l7.586-7.586a2 2 0 000-2.828z" />
+                                <path fill-rule="evenodd"
+                                    d="M2 6a2 2 0 012-2h4a1 1 0 010 2H4v10h10v-4a1 1 0 112 0v4a2 2 0 01-2 2H4a2 2 0 01-2-2V6z"
+                                    clip-rule="evenodd" />
+                            </svg>
+                        </button>
+                        <input type="text" id="userInput" placeholder="Ask a question..."
+                            class="w-full bg-white/50 border border-slate-300/70 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition disabled:bg-slate-100"
+                            disabled>
+                        <button id="send-btn"
+                            class="bg-indigo-600 text-white p-2.5 rounded-lg hover:bg-indigo-700 font-semibold transition disabled:bg-slate-400 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2"
+                            disabled>
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"
+                                class="w-5 h-5">
+                                <path
+                                    d="M3.478 2.404a.75.75 0 0 0-.926.941l2.432 7.905H13.5a.75.75 0 0 1 0 1.5H4.984l-2.432 7.905a.75.75 0 0 0 .926.94 60.519 60.519 0 0 0 18.445-8.986.75.75 0 0 0 0-1.218A60.517 60.517 0 0 0 3.478 2.404Z" />
+                            </svg>
+                        </button>
+                    </div>
                 </div>
             </div>
 
@@ -159,7 +199,11 @@
                     <div id="path-nodes-container" class="space-y-10 relative z-10 p-4"></div>
                 </div>
 
-                <div class="mt-auto pt-6 border-t border-slate-200/80 flex justify-end">
+                <div class="mt-auto pt-6 border-t border-slate-200/80 flex justify-between items-center">
+                    <button onclick="openAddTaskModal()"
+                        class="bg-slate-200 text-slate-700 px-5 py-2.5 rounded-lg hover:bg-slate-300 font-semibold transition shadow-sm hover:shadow-md transform hover:-translate-y-0.5 focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 focus-visible:ring-offset-2">
+                        Add Custom Task
+                    </button>
                     <a href="{{ url_for('college_path_builder') }}"
                         class="bg-indigo-600 text-white px-5 py-2.5 rounded-lg hover:bg-indigo-700 font-semibold transition shadow-md hover:shadow-lg transform hover:-translate-y-0.5 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2">
                         Edit Path Info
@@ -177,7 +221,10 @@
             class="bg-white/60 backdrop-blur-xl border border-white/20 w-full max-w-lg rounded-2xl shadow-2xl p-6 md:p-8"
             data-aos="zoom-in" data-aos-duration="400">
             <div class="flex justify-between items-start">
-                <h3 id="modalTitle" class="text-2xl font-bold font-lalezar text-indigo-700 mb-4">Task Details</h3>
+                <div>
+                    <h3 id="modalTitle" class="text-2xl font-bold font-lalezar text-indigo-700 mb-1">Task Details</h3>
+                    <p id="modalDueDate" class="text-sm font-semibold text-slate-500 mb-4"></p>
+                </div>
                 <button onclick="closeTaskModal()"
                     class="text-slate-400 hover:text-slate-600 transition-colors rounded-full p-1 -mt-2 -mr-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500">
                     <span class="sr-only">Close</span>
@@ -188,8 +235,36 @@
                     </svg>
                 </button>
             </div>
-            <p id="modalDescription" class="text-slate-700 mb-6"></p>
-            <div id="modal-actions" class="flex justify-end gap-3"></div>
+            <div id="modalDescription" class="text-slate-700 mb-4 prose prose-sm"></div>
+
+            <div id="subtasks-container" class="mb-6 space-y-2">
+                <h4 class="text-sm font-bold text-slate-600">Sub-tasks</h4>
+                <div id="subtasks-list" class="space-y-1"></div>
+                <div class="flex items-center gap-2 mt-2">
+                    <input type="text" id="newSubtaskInput" placeholder="Add a new sub-task..."
+                        class="w-full bg-white/50 border border-slate-300/70 rounded-lg p-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition">
+                    <button onclick="handleAddSubtask()"
+                        class="bg-indigo-500 text-white p-2 rounded-lg hover:bg-indigo-600 font-semibold transition text-sm">Add</button>
+                </div>
+            </div>
+
+            <div id="modal-actions" class="flex justify-between items-center gap-3 pt-4 border-t border-slate-200/80">
+                <div>
+                    <input type="date" id="task-deadline-picker"
+                        class="bg-white/50 border border-slate-300/70 rounded-lg p-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition">
+                    <button onclick="handleSetDeadline()"
+                        class="text-sm bg-slate-200 text-slate-700 px-3 py-2 rounded-lg hover:bg-slate-300 font-semibold transition">Set
+                        Date</button>
+                </div>
+                <div class="flex gap-3">
+                    <button onclick="handleImStuck()"
+                        class="bg-red-500 hover:bg-red-600 text-white font-semibold py-2 px-4 rounded-lg transition">I'm
+                        Stuck</button>
+                    <button onclick="handleTaskAction('complete')"
+                        class="bg-emerald-500 hover:bg-emerald-600 text-white font-semibold py-2 px-4 rounded-lg transition">Mark
+                        as Complete</button>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -232,6 +307,81 @@
             </div>
         </div>
     </div>
+
+    <div id="addTaskModal"
+        class="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 hidden p-4">
+        <div class="bg-white/60 backdrop-blur-xl border border-white/20 w-full max-w-lg rounded-2xl shadow-2xl p-6 md:p-8"
+            data-aos="zoom-in" data-aos-duration="400">
+            <h3 class="text-2xl font-bold font-lalezar text-indigo-700 mb-4">Add a Custom Task</h3>
+            <div class="space-y-4">
+                <div>
+                    <label for="customTaskDescription" class="block text-sm font-semibold text-slate-700 mb-1">Task
+                        Description</label>
+                    <textarea id="customTaskDescription" rows="3"
+                        class="w-full bg-white/50 border border-slate-300/70 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition"
+                        placeholder="e.g., Schedule a campus tour..."></textarea>
+                </div>
+                <div>
+                    <label for="customTaskDueDate" class="block text-sm font-semibold text-slate-700 mb-1">Due Date
+                        (Optional)</label>
+                    <input type="date" id="customTaskDueDate"
+                        class="w-full bg-white/50 border border-slate-300/70 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition">
+                </div>
+                <div class="flex justify-end gap-3 pt-2">
+                    <button onclick="closeAddTaskModal()"
+                        class="text-slate-600 font-semibold px-4 py-2 rounded-lg hover:bg-slate-100 transition">Cancel</button>
+                    <button onclick="handleSaveCustomTask()"
+                        class="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2 px-4 rounded-lg transition">Add
+                        Task</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="essayModal"
+        class="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 hidden p-4">
+        <div class="bg-white/60 backdrop-blur-xl border border-white/20 w-full max-w-3xl rounded-2xl shadow-2xl p-6 md:p-8 flex flex-col h-[90vh]"
+            data-aos="zoom-in" data-aos-duration="400">
+            <div class="flex justify-between items-center flex-shrink-0">
+                <h3 class="text-2xl font-bold font-lalezar text-indigo-700">Essay Analysis</h3>
+                <button onclick="closeEssayModal()"
+                    class="text-slate-400 hover:text-slate-600 transition-colors rounded-full p-1 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500">
+                    <span class="sr-only">Close</span>
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-6 h-6">
+                        <path fill-rule="evenodd"
+                            d="M5.47 5.47a.75.75 0 0 1 1.06 0L12 10.94l5.47-5.47a.75.75 0 1 1 1.06 1.06L13.06 12l5.47 5.47a.75.75 0 1 1-1.06 1.06L12 13.06l-5.47 5.47a.75.75 0 0 1-1.06-1.06L10.94 12 5.47 6.53a.75.75 0 0 1 0-1.06Z"
+                            clip-rule="evenodd" />
+                    </svg>
+                </button>
+            </div>
+            <div class="flex-grow grid grid-cols-1 md:grid-cols-2 gap-6 mt-4 min-h-0">
+                <div class="flex flex-col min-h-0">
+                    <label for="essayPrompt" class="block text-sm font-semibold text-slate-700 mb-1">Essay
+                        Prompt</label>
+                    <input type="text" id="essayPrompt" placeholder="e.g., Common App Prompt #1"
+                        class="w-full bg-white/50 border border-slate-300/70 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition mb-4 flex-shrink-0">
+                    <label for="essayInput" class="block text-sm font-semibold text-slate-700 mb-1 flex-shrink-0">Paste
+                        Your Essay Below</label>
+                    <textarea id="essayInput"
+                        class="w-full h-full flex-grow bg-white/50 border border-slate-300/70 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition resize-none"
+                        placeholder="Your essay text here..."></textarea>
+                </div>
+                <div class="flex flex-col min-h-0">
+                    <label class="block text-sm font-semibold text-slate-700 mb-1 flex-shrink-0">AI Feedback</label>
+                    <div id="essayFeedbackOutput"
+                        class="prose prose-sm max-w-none w-full h-full flex-grow bg-slate-100/70 border border-slate-200/80 rounded-lg p-4 overflow-y-auto">
+                        <p class="text-slate-500">Your feedback will appear here...</p>
+                    </div>
+                </div>
+            </div>
+            <div class="mt-6 flex-shrink-0 flex justify-end">
+                <button id="analyzeEssayBtn" onclick="handleAnalyzeEssay()"
+                    class="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2 px-5 rounded-lg transition">Analyze
+                    Essay</button>
+            </div>
+        </div>
+    </div>
+
 
     <script src="{{ url_for('static', filename='js/prompt.js') }}"></script>
     <script src="{{ url_for('static', filename='js/alert.js') }}"></script>
@@ -484,11 +634,87 @@
             currentTaskId = task.id;
             const modal = document.getElementById('taskModal');
             document.getElementById('modalTitle').textContent = `Step ${task.client_id}: Your Task`;
-            document.getElementById('modalDescription').textContent = task.description;
-            document.getElementById('modal-actions').innerHTML = `
-                <button onclick="handleImStuck()" class="bg-red-500 hover:bg-red-600 text-white font-semibold py-2 px-4 rounded-lg transition">I'm Stuck</button>
-                <button onclick="handleTaskAction('complete')" class="bg-emerald-500 hover:bg-emerald-600 text-white font-semibold py-2 px-4 rounded-lg transition">Mark as Complete</button>`;
+
+            // Use marked.js to render markdown links
+            document.getElementById('modalDescription').innerHTML = marked.parse(task.description);
+
+            const dueDateEl = document.getElementById('modalDueDate');
+            const deadlinePicker = document.getElementById('task-deadline-picker');
+            if (task.due_date) {
+                dueDateEl.textContent = `Due: ${new Date(task.due_date + 'T00:00:00').toLocaleDateString()}`;
+                deadlinePicker.value = task.due_date;
+            } else {
+                dueDateEl.textContent = 'No due date set';
+                deadlinePicker.value = '';
+            }
+
+            renderSubtasks(task.subtasks || []);
+
             modal.classList.remove('hidden');
+        }
+
+        function renderSubtasks(subtasks) {
+            const subtasksList = document.getElementById('subtasks-list');
+            subtasksList.innerHTML = '';
+            if (subtasks.length === 0) {
+                subtasksList.innerHTML = '<p class="text-sm text-slate-500">No sub-tasks yet.</p>';
+                return;
+            }
+            subtasks.forEach(subtask => {
+                const item = document.createElement('div');
+                item.className = 'subtask-item';
+                item.innerHTML = `
+                    <input type="checkbox" id="subtask-${subtask.id}" onchange="handleToggleSubtask(${subtask.id}, this.checked)" ${subtask.is_completed ? 'checked' : ''} class="w-4 h-4 text-indigo-600 bg-gray-100 border-gray-300 rounded focus:ring-indigo-500">
+                    <label for="subtask-${subtask.id}" class="text-sm text-slate-700 ${subtask.is_completed ? 'line-through text-slate-500' : ''}">${subtask.description}</label>
+                `;
+                subtasksList.appendChild(item);
+            });
+        }
+
+        async function handleAddSubtask() {
+            const input = document.getElementById('newSubtaskInput');
+            const description = input.value.trim();
+            if (!description) return;
+
+            const response = await fetch('/api/add_subtask', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ parent_task_id: currentTaskId, description })
+            });
+            const result = await response.json();
+            if (result.success) {
+                const task = currentTasks.find(t => t.id === currentTaskId);
+                if (!task.subtasks) task.subtasks = [];
+                task.subtasks.push(result.subtask);
+                renderSubtasks(task.subtasks);
+                input.value = '';
+            }
+        }
+
+        async function handleToggleSubtask(subtaskId, is_completed) {
+            await fetch('/api/update_subtask', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ subtaskId, is_completed })
+            });
+            const task = currentTasks.find(t => t.id === currentTaskId);
+            const subtask = task.subtasks.find(s => s.id === subtaskId);
+            subtask.is_completed = is_completed;
+            renderSubtasks(task.subtasks);
+        }
+
+        async function handleSetDeadline() {
+            const picker = document.getElementById('task-deadline-picker');
+            const dueDate = picker.value;
+            await fetch('/api/update_task_deadline', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ taskId: currentTaskId, dueDate })
+            });
+            const task = currentTasks.find(t => t.id === currentTaskId);
+            task.due_date = dueDate;
+            document.getElementById('modalDueDate').textContent = `Due: ${new Date(dueDate + 'T00:00:00').toLocaleDateString()}`;
+            alert('Deadline updated!');
         }
 
         function closeTaskModal() {
@@ -498,6 +724,48 @@
         function closeStatModal() {
             document.getElementById('statEntryModal').classList.add('hidden');
         }
+
+        function openAddTaskModal() {
+            document.getElementById('addTaskModal').classList.remove('hidden');
+        }
+
+        function closeAddTaskModal() {
+            document.getElementById('addTaskModal').classList.add('hidden');
+            document.getElementById('customTaskDescription').value = '';
+            document.getElementById('customTaskDueDate').value = '';
+        }
+
+        function openEssayModal() {
+            document.getElementById('essayModal').classList.remove('hidden');
+        }
+
+        function closeEssayModal() {
+            document.getElementById('essayModal').classList.add('hidden');
+        }
+
+        async function handleSaveCustomTask() {
+            const description = document.getElementById('customTaskDescription').value.trim();
+            const dueDate = document.getElementById('customTaskDueDate').value;
+            if (!description) {
+                alert('Please enter a task description.');
+                return;
+            }
+
+            const response = await fetch('/api/add_task', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ description, category: chatCategory, due_date: dueDate })
+            });
+            const result = await response.json();
+            if (result.success) {
+                currentTasks.push(result.task);
+                renderPathAndConnectors(currentTasks, false);
+                closeAddTaskModal();
+            } else {
+                alert('Could not add task. Please try again.');
+            }
+        }
+
 
         async function handleImStuck() {
             const task = currentTasks.find(t => t.id === currentTaskId);
@@ -740,6 +1008,43 @@
             }
         }
 
+        async function handleAnalyzeEssay() {
+            const essayText = document.getElementById('essayInput').value;
+            const essayPrompt = document.getElementById('essayPrompt').value;
+            const feedbackOutput = document.getElementById('essayFeedbackOutput');
+            const analyzeBtn = document.getElementById('analyzeEssayBtn');
+
+            if (essayText.trim().length < 50) {
+                alert("Please enter a longer essay for a meaningful analysis.");
+                return;
+            }
+
+            feedbackOutput.innerHTML = '<p class="text-slate-500">Analyzing your essay... This may take a moment.</p>';
+            analyzeBtn.disabled = true;
+            analyzeBtn.textContent = 'Analyzing...';
+
+            try {
+                const response = await fetch('/api/analyze_essay', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ essay_text: essayText, essay_prompt: essayPrompt })
+                });
+
+                const result = await response.json();
+                if (response.ok) {
+                    feedbackOutput.innerHTML = marked.parse(result.feedback);
+                } else {
+                    throw new Error(result.error || 'An unknown error occurred.');
+                }
+            } catch (error) {
+                feedbackOutput.innerHTML = `<p class="text-red-500">Error: ${error.message}</p>`;
+            } finally {
+                analyzeBtn.disabled = false;
+                analyzeBtn.textContent = 'Analyze Essay';
+            }
+        }
+
+
         // NEW: Function to handle chat reset
         async function handleResetChat() {
             if (confirm("Are you sure you want to reset your chat history? This cannot be undone.")) {
@@ -770,7 +1075,7 @@
             const messageWrapper = document.createElement('div');
             messageWrapper.className = 'flex ' + (role === 'user' ? 'justify-end' : 'justify-start');
             const messageDiv = document.createElement('div');
-            let cssClass = 'p-3 rounded-xl max-w-xs text-sm';
+            let cssClass = 'p-3 rounded-xl max-w-xs text-sm prose prose-sm';
             if (role === 'user') {
                 cssClass += ' bg-indigo-600 text-white';
             } else {
@@ -778,9 +1083,8 @@
                 if (isTyping) cssClass += ' animate-pulse';
             }
             messageDiv.className = cssClass;
-            // A simple markdown-to-HTML conversion
-            let formattedText = text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
-            messageDiv.innerHTML = `<p>${formattedText}</p>`;
+            // Use marked.js to render markdown links in chat
+            messageDiv.innerHTML = marked.parse(text);
             messageWrapper.appendChild(messageDiv);
             chatHistory.appendChild(messageWrapper);
             chatHistory.scrollTop = chatHistory.scrollHeight;
@@ -790,7 +1094,6 @@
         document.addEventListener('DOMContentLoaded', () => {
             fetchPath();
             loadChatHistory();
-            document.getElementById('main-scroll-panel').addEventListener('scroll', redrawAllConnectors);
         });
         window.addEventListener('resize', () => redrawAllConnectors());
         document.getElementById('send-btn').addEventListener('click', handleUserChat);

@@ -194,7 +194,21 @@
                 </div>
                 {% endif %}
 
-                <div class="card" data-aos="fade-up" data-aos-delay="600">
+                <div class="grid grid-cols-2 gap-8">
+                    <div class="card text-center" data-aos="fade-up" data-aos-delay="550">
+                        <h3 class="card-header text-amber-800">Points</h3>
+                        <p class="text-5xl font-extrabold text-amber-600">{{ game_stats.points }}</p>
+                        <p class="text-sm font-medium text-slate-500 mt-1">Total Earned</p>
+                    </div>
+                    <div class="card text-center" data-aos="fade-up" data-aos-delay="600">
+                        <h3 class="card-header text-rose-800">Streak</h3>
+                        <p class="text-5xl font-extrabold text-rose-600">{{ game_stats.streak }}</p>
+                        <p class="text-sm font-medium text-slate-500 mt-1">Day Streak</p>
+                    </div>
+                </div>
+
+
+                <div class="card" data-aos="fade-up" data-aos-delay="650">
                     <h3 class="card-header">Achievements</h3>
                     <div class="achievements-list">
                         {% if earned_achievements %}
