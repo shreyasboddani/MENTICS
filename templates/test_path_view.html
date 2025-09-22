@@ -110,6 +110,20 @@
                     </svg>
                     <span>Tracker</span>
                 </a>
+                <a href="/leaderboard" class="nav-item">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                        <path fill-rule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z"
+                            clip-rule="evenodd" />
+                    </svg>
+                    <span>Leaderboard</span>
+                </a>
+                <a href="/forum" class="nav-item">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                        <path
+                            d="M2 5a2 2 0 012-2h12a2 2 0 012 2v10a2 2 0 01-2 2H4a2 2 0 01-2-2V5zm3.293 2.293a1 1 0 011.414 0L10 11.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" />
+                    </svg>
+                    <span>Forum</span>
+                </a>
                 <a href="/account" class="nav-item">
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
                         <path fill-rule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z"
@@ -210,6 +224,7 @@
                 </button>
             </div>
             <div id="modalDescription" class="text-slate-700 mb-4 prose prose-sm"></div>
+            <div id="modalReason" class="text-slate-700 mb-4 prose prose-sm"></div>
 
             <div id="subtasks-container" class="mb-6 space-y-2">
                 <h4 class="text-sm font-bold text-slate-600">Sub-tasks</h4>
@@ -393,6 +408,7 @@
                 const isCompleted = task.status === 'complete';
                 const isUnlocked = index === firstPendingIndex;
                 const isLocked = index > firstPendingIndex && firstPendingIndex !== -1;
+                const isBossBattle = task.description.toLowerCase().includes('boss battle');
 
                 const alignmentWrapper = document.createElement('div');
                 alignmentWrapper.className = 'flex';
@@ -405,7 +421,10 @@
                 taskButton.onclick = () => openTaskModal(task);
                 taskButton.disabled = isLocked;
 
-                if (isCompleted) {
+                if (isBossBattle) {
+                    taskButton.classList.add('bg-red-500', 'shadow-lg', 'shadow-red-400/50');
+                    taskButton.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" class="h-12 w-12" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM7 4a1 1 0 000 2h6a1 1 0 100-2H7z" clip-rule="evenodd" /></svg>`;
+                } else if (isCompleted) {
                     taskButton.classList.add('bg-emerald-500', 'shadow-lg');
                     taskButton.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-10 h-10"><path fill-rule="evenodd" d="M19.916 4.626a.75.75 0 0 1 .208 1.04l-9 13.5a.75.75 0 0 1-1.154.114l-6-6a.75.75 0 0 1 1.06-1.06l5.353 5.353 8.493-12.74a.75.75 0 0 1 1.04-.207Z" clip-rule="evenodd" /></svg>`;
                 } else if (isUnlocked) {
@@ -567,6 +586,8 @@
 
             // Use marked.js to render markdown links
             document.getElementById('modalDescription').innerHTML = marked.parse(task.description);
+            document.getElementById('modalReason').innerHTML = `<b>Why:</b> ${marked.parse(task.reason)}`;
+
 
             const dueDateEl = document.getElementById('modalDueDate');
             const deadlinePicker = document.getElementById('task-deadline-picker');

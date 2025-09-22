@@ -70,7 +70,8 @@ def init_db():
         "stat_to_update": "TEXT",
         "category": "TEXT",
         "due_date": "TEXT",
-        "is_user_added": "BOOLEAN DEFAULT FALSE"
+        "is_user_added": "BOOLEAN DEFAULT FALSE",
+        "reason": "TEXT"
     })
     db.create_table("subtasks", {
         "id": "INTEGER PRIMARY KEY AUTOINCREMENT",
@@ -111,6 +112,28 @@ def init_db():
         "last_completed_date": "TEXT",
         "FOREIGN KEY(user_id)": "REFERENCES users(id) ON DELETE CASCADE"
     })
+    # NEW: Table for forum posts (threads)
+    db.create_table("forum_posts", {
+        "id": "INTEGER PRIMARY KEY AUTOINCREMENT",
+        "user_id": "INTEGER NOT NULL",
+        "user_name": "TEXT NOT NULL",
+        "title": "TEXT NOT NULL",
+        "content": "TEXT NOT NULL",
+        "created_at": "TIMESTAMP DEFAULT CURRENT_TIMESTAMP",
+        "FOREIGN KEY(user_id)": "REFERENCES users(id) ON DELETE CASCADE"
+    })
+    # NEW: Table for forum replies
+    db.create_table("forum_replies", {
+        "id": "INTEGER PRIMARY KEY AUTOINCREMENT",
+        "post_id": "INTEGER NOT NULL",
+        "user_id": "INTEGER NOT NULL",
+        "user_name": "TEXT NOT NULL",
+        "content": "TEXT NOT NULL",
+        "created_at": "TIMESTAMP DEFAULT CURRENT_TIMESTAMP",
+        "FOREIGN KEY(post_id)": "REFERENCES forum_posts(id) ON DELETE CASCADE",
+        "FOREIGN KEY(user_id)": "REFERENCES users(id) ON DELETE CASCADE"
+    })
+
 
 # --- HELPER FUNCTIONS ---
 
@@ -214,15 +237,15 @@ def _get_test_prep_ai_tasks(strengths, weaknesses, user_stats={}, chat_history=[
     def get_mock_tasks_reliably():
         print("--- DEBUG: Running corrected Test Prep mock generator. ---")
         all_mock_tasks = [
-            {"description": "Take a full-length, timed SAT practice test.",
+            {"description": "Take a full-length, timed SAT practice test.", "reason": "This is a 'boss battle' to test your skills under pressure and identify areas for improvement.",
                 "type": "milestone", "stat_to_update": "sat_total", "category": "Test Prep"},
-            {"description": "Review algebra concepts from your SAT practice test.",
+            {"description": "Review algebra concepts from your SAT practice test.", "reason": "Understanding algebra is crucial for a high score on the math section.",
                 "type": "standard", "stat_to_update": None, "category": "Test Prep"},
-            {"description": "Practice 15 difficult vocabulary words.", "type": "standard",
-                "stat_to_update": None, "category": "Test Prep"},
-            {"description": "Take a timed ACT Science practice section.", "type": "milestone",
-                "stat_to_update": "act_science", "category": "Test Prep"},
-            {"description": "Work on time management strategies for the reading section.",
+            {"description": "Practice 15 difficult vocabulary words.", "reason": "A strong vocabulary will help you tackle the reading and writing sections with confidence.",
+                "type": "standard", "stat_to_update": None, "category": "Test Prep"},
+            {"description": "Take a timed ACT Science practice section.", "reason": "This will help you get used to the pace of the science section and improve your time management.",
+                "type": "milestone", "stat_to_update": "act_science", "category": "Test Prep"},
+            {"description": "Work on time management strategies for the reading section.", "reason": "Finishing the reading section on time is a common challenge. Practicing strategies will improve your score.",
                 "type": "standard", "stat_to_update": None, "category": "Test Prep"}
         ]
         return random.sample(all_mock_tasks, 5)
@@ -296,6 +319,7 @@ def _get_test_prep_ai_tasks(strengths, weaknesses, user_stats={}, chat_history=[
         f'  "tasks": [\n'
         f'    {{\n'
         f'      "description": "A specific, actionable task including a markdown link like [this resource](https://example.com).",\n'
+        f'      "reason": "A brief, motivating explanation of why this task is important for the user\'s goal.",\n'
         f'      "type": "Either \'standard\' or \'milestone\'.",\n'
         f'      "stat_to_update": "A string from the list above ONLY if type is milestone, otherwise null.",\n'
         f'      "category": "This MUST be the string \'Test Prep\'."\n'
@@ -411,18 +435,27 @@ def _generate_and_save_new_test_path(user_id, strengths, weaknesses, chat_histor
                                     user_stats, chat_history, path_history, stat_history)
     tasks = tasks[:5]
 
+    # Add a "boss battle" as the last task
+    tasks.append({
+        "description": "Boss Battle: Take a full-length, timed practice test to gauge your progress.",
+        "reason": "This is your chance to prove your skills and see how much you've improved!",
+        "type": "milestone",
+        "stat_to_update": "sat_total" if "sat" in strengths.lower() or "sat" in weaknesses.lower() else "act_composite",
+        "category": "Test Prep"
+    })
+
     saved_tasks = []
     for i, task in enumerate(tasks):
         task_id = db.insert("paths", {
             "user_id": user_id, "task_order": i + 1, "description": task.get("description"),
-            "type": task.get("type"), "stat_to_update": task.get("stat_to_update"),
+            "reason": task.get("reason"), "type": task.get("type"), "stat_to_update": task.get("stat_to_update"),
             "category": "Test Prep", "is_active": True, "is_completed": False
         })
         new_task_data = db.select("paths", where={"id": task_id})[0]
         saved_tasks.append({
             "id": new_task_data['id'], "description": new_task_data['description'],
-            "type": new_task_data['type'], "stat_to_update": new_task_data['stat_to_update'],
-            "is_completed": False
+            "reason": new_task_data['reason'], "type": new_task_data['type'],
+            "stat_to_update": new_task_data['stat_to_update'], "is_completed": False
         })
     # LOGGING
     log_activity(user_id, 'path_generated', {'category': 'Test Prep'})
@@ -435,15 +468,15 @@ def _get_college_planning_ai_tasks(college_context, user_stats, path_history, ch
     def get_mock_tasks_reliably():
         print("--- DEBUG: Running corrected College Planning mock generator. ---")
         all_mock_tasks = [
-            {"description": "Research 5 colleges that match your interests.", "type": "standard",
-                "stat_to_update": None, "category": "College Planning"},
-            {"description": "Write a rough draft of your Common App personal statement.",
-                "type": "milestone", "stat_to_update": "essay_progress", "category": "College Planning"},
-            {"description": "Update your GPA in your profile.", "type": "milestone",
-                "stat_to_update": "gpa", "category": "College Planning"},
-            {"description": "Request three letters of recommendation from teachers.",
+            {"description": "Research 5 colleges that match your interests.", "reason": "Finding the right fit is the first step to a successful college experience.",
                 "type": "standard", "stat_to_update": None, "category": "College Planning"},
-            {"description": "Create a spreadsheet to track application deadlines.",
+            {"description": "Write a rough draft of your Common App personal statement.", "reason": "This is your chance to tell your story and show admissions officers who you are.",
+                "type": "milestone", "stat_to_update": "essay_progress", "category": "College Planning"},
+            {"description": "Update your GPA in your profile.", "reason": "Keeping your academic information up-to-date is important for tracking your progress.",
+                "type": "milestone", "stat_to_update": "gpa", "category": "College Planning"},
+            {"description": "Request three letters of recommendation from teachers.", "reason": "Strong letters of recommendation can make a big difference in your application.",
+                "type": "standard", "stat_to_update": None, "category": "College Planning"},
+            {"description": "Create a spreadsheet to track application deadlines.", "reason": "Staying organized is key to a stress-free application season.",
                 "type": "standard", "stat_to_update": None, "category": "College Planning"}
         ]
         return random.sample(all_mock_tasks, 5)
@@ -500,6 +533,7 @@ def _get_college_planning_ai_tasks(college_context, user_stats, path_history, ch
         f'  "tasks": [\n'
         f'    {{\n'
         f'      "description": "A specific, actionable task including a markdown link like [this resource](https://example.com).",\n'
+        f'      "reason": "A brief, motivating explanation of why this task is important for the user\'s goal.",\n'
         f'      "type": "Either \'standard\' or \'milestone\'.",\n'
         f'      "stat_to_update": "A string (e.g., \'gpa\', \'essay_progress\', \'applications_submitted\') ONLY if type is milestone, otherwise null.",\n'
         f'      "category": "This MUST be the string \'College Planning\'."\n'
@@ -600,15 +634,24 @@ def _generate_and_save_new_college_path(user_id, college_context, chat_history=[
 
         tasks = tasks[:5]
 
-        if not tasks or len(tasks) != 5:
+        # Add a "boss battle" as the last task
+        tasks.append({
+            "description": "Boss Battle: Finalize and submit one of your college applications.",
+            "reason": "This is a major milestone! Completing this will bring you one step closer to your dream school.",
+            "type": "milestone",
+            "stat_to_update": "applications_submitted",
+            "category": "College Planning"
+        })
+
+        if not tasks or len(tasks) == 0:
             raise ValueError(
-                "AI task generation did not return the expected 5 tasks.")
+                "AI task generation did not return the expected tasks.")
 
         saved_tasks = []
         for i, task_data in enumerate(tasks):
             task_id = db.insert("paths", {
                 "user_id": user_id, "task_order": i + 1, "description": task_data.get("description"),
-                "type": task_data.get("type"), "stat_to_update": task_data.get("stat_to_update"),
+                "reason": task_data.get("reason"), "type": task_data.get("type"), "stat_to_update": task_data.get("stat_to_update"),
                 "category": "College Planning", "is_active": True, "is_completed": False
             })
             saved_tasks.append(
@@ -1283,6 +1326,7 @@ def api_tasks(user):
                 tasks_with_subtasks.append({
                     "id": task_id,
                     "description": r['description'],
+                    "reason": r['reason'],
                     "is_completed": bool(r['is_completed']),
                     "type": r['type'],
                     "stat_to_update": r['stat_to_update'],
@@ -1323,6 +1367,8 @@ def api_update_task_status(user):
 
             # --- GAMIFICATION LOGIC ---
             points_to_add = 25 if task_type == 'milestone' else 10
+            if "boss battle" in description.lower():
+                points_to_add = 100
 
             game_stats_row = db.select(
                 "gamification_stats", where={"user_id": user_id})[0]
@@ -1657,6 +1703,96 @@ def _get_proactive_ai_suggestions(user):
     except Exception as e:
         print(f"Error in proactive suggestion generation: {e}")
         return "Welcome to Mentics! Let's get started on your path to success."
+
+
+# --- NEW SOCIAL ROUTES ---
+@app.route('/leaderboard')
+@login_required
+def leaderboard(user):
+    # Fetch top 10 users by points
+    leaderboard_data = db.execute(
+        """
+        SELECT u.name, g.points
+        FROM gamification_stats g
+        JOIN users u ON g.user_id = u.id
+        ORDER BY g.points DESC
+        LIMIT 10
+        """
+    )
+    return render_template('leaderboard.html', leaderboard=leaderboard_data)
+
+
+@app.route('/forum')
+@app.route('/forum')
+@login_required
+def forum(user):
+    search_query = request.args.get('search', '')
+
+    # Base query for posts
+    post_query = "SELECT * FROM forum_posts"
+    params = []
+
+    if search_query:
+        post_query += " WHERE title LIKE ?"
+        params.append(f"%{search_query}%")
+
+    post_query += " ORDER BY created_at DESC"
+    posts_raw = db.execute(post_query, tuple(params))
+    posts = [dict(row) for row in posts_raw]
+
+    # Fetch replies for each post
+    posts_with_replies = []
+    for post in posts:
+        replies_raw = db.select("forum_replies", where={
+                                "post_id": post['id']}, order_by="created_at ASC")
+        post['replies'] = [dict(reply) for reply in replies_raw]
+        posts_with_replies.append(post)
+
+    # Fetch today's threads
+    today_str = date.today().strftime('%Y-%m-%d')
+    todays_threads_raw = db.execute(
+        "SELECT * FROM forum_posts WHERE date(created_at) = ? ORDER BY created_at DESC", (today_str,))
+    todays_threads = [dict(row) for row in todays_threads_raw]
+
+    return render_template('forum.html',
+                           posts=posts_with_replies,
+                           user_name=user.get_name(),
+                           todays_threads=todays_threads,
+                           search_query=search_query)
+
+
+@app.route('/api/posts', methods=['POST'])
+@login_required
+def create_post(user):
+    data = request.get_json()
+    title = data.get('title')
+    content = data.get('content')
+    if title and content:
+        db.insert('forum_posts', {
+            'user_id': user.data['id'],
+            'user_name': user.get_name(),
+            'title': title,
+            'content': content
+        })
+        return jsonify({'success': True})
+    return jsonify({'success': False, 'error': 'Title and content are required'}), 400
+
+
+@app.route('/api/replies', methods=['POST'])
+@login_required
+def create_reply(user):
+    data = request.get_json()
+    post_id = data.get('post_id')
+    content = data.get('content')
+    if post_id and content:
+        db.insert('forum_replies', {
+            'post_id': post_id,
+            'user_id': user.data['id'],
+            'user_name': user.get_name(),
+            'content': content
+        })
+        return jsonify({'success': True})
+    return jsonify({'success': False, 'error': 'Post ID and content are required'}), 400
 
 
 # --- MAIN EXECUTION ---
