@@ -20,6 +20,11 @@ class User:
             return self.data['name']
         return "User"  # Default value
 
+    def get_profile_picture(self):
+        if self.data and self.data.get('profile_picture'):
+            return self.data['profile_picture']
+        return None
+
     def get_stats(self):
         if self.data and 'stats' in self.data:
             return json.loads(self.data['stats'])

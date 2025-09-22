@@ -1,4 +1,3 @@
-# app.py
 from flask import Flask, render_template, request, redirect, url_for, session, jsonify
 from werkzeug.security import generate_password_hash, check_password_hash
 from dbhelper import DatabaseHandler
@@ -12,30 +11,32 @@ import random
 from pathlib import Path
 from datetime import datetime, timedelta, date
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
-# NEW: Import for Google OAuth
 from authlib.integrations.flask_client import OAuth
-
+from werkzeug.utils import secure_filename
 
 # Explicitly load the .env file from the correct path
 env_path = Path('.') / '.env'
 load_dotenv(dotenv_path=env_path)
 
 app = Flask(__name__)
-app.secret_key = "supersecretkey"  # Replace with a real secret key in production
+app.secret_key = "supersecretkey"  # Replace with a real secret key
+# --- START: UPLOAD FOLDER CONFIGURATION ---
+app.config['UPLOAD_FOLDER'] = 'static/uploads'
 app.url_map.strict_slashes = False
-app.permanent_session_lifetime = timedelta(
-    minutes=10)
+app.permanent_session_lifetime = timedelta(minutes=10)
 
-# NEW: Initialize OAuth for Google Login
+# Ensure the upload folder exists
+os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
+# --- END: UPLOAD FOLDER CONFIGURATION ---
+
+
 oauth = OAuth(app)
 oauth.register(
     name='google',
     server_metadata_url='https://accounts.google.com/.well-known/openid-configuration',
     client_id=os.getenv("GOOGLE_CLIENT_ID"),
     client_secret=os.getenv("GOOGLE_CLIENT_SECRET"),
-    client_kwargs={
-        'scope': 'openid email profile'
-    }
+    client_kwargs={'scope': 'openid email profile'}
 )
 
 db = DatabaseHandler("users.db")
@@ -45,7 +46,6 @@ db = DatabaseHandler("users.db")
 
 
 def init_db():
-    # Simplified init_db - it will create the table and add columns if they don't exist
     db.create_table("users", {
         "id": "INTEGER PRIMARY KEY AUTOINCREMENT",
         "email": "TEXT NOT NULL UNIQUE",
@@ -53,12 +53,13 @@ def init_db():
         "stats": "TEXT NOT NULL",
         "name": "TEXT NOT NULL DEFAULT ''",
         "onboarding_completed": "BOOLEAN DEFAULT FALSE",
-        "onboarding_data": "TEXT"
+        "onboarding_data": "TEXT",
+        "profile_picture": "TEXT"
     })
-    # Add columns safely - the function now handles "duplicate column" errors
     db.add_column("users", "name", "TEXT NOT NULL DEFAULT ''")
     db.add_column("users", "onboarding_completed", "BOOLEAN DEFAULT FALSE")
     db.add_column("users", "onboarding_data", "TEXT")
+    db.add_column("users", "profile_picture", "TEXT")
 
     db.create_table("paths", {
         "id": "INTEGER PRIMARY KEY AUTOINCREMENT",
@@ -966,6 +967,53 @@ def dashboard(user):
         game_stats=game_stats,
         suggestion=suggestion
     )
+
+
+@app.route('/account', methods=['GET', 'POST'])
+@login_required
+def account(user):
+    if request.method == 'POST':
+        form_type = request.form.get('form_type')
+
+        if form_type == 'name':
+            new_name = request.form.get('name')
+            db.update('users', {'name': new_name}, {'id': user.data['id']})
+
+        elif form_type == 'email':
+            new_email = request.form.get('email')
+            # Add validation to ensure email is not already taken
+            existing_user = db.select('users', where={'email': new_email})
+            if not existing_user:
+                db.update('users', {'email': new_email},
+                          {'id': user.data['id']})
+                session['user'] = new_email  # Update session
+
+        elif form_type == 'password':
+            current_password = request.form.get('current_password')
+            new_password = request.form.get('new_password')
+            confirm_password = request.form.get('confirm_password')
+
+            if check_password_hash(user.data['password'], current_password) and new_password == confirm_password:
+                hashed_password = generate_password_hash(new_password)
+                db.update('users', {'password': hashed_password}, {
+                          'id': user.data['id']})
+
+        elif form_type == 'pfp':
+            if 'pfp' in request.files:
+                file = request.files['pfp']
+                if file.filename != '':
+                    filename = secure_filename(file.filename)
+                    # To make filenames unique
+                    unique_filename = f"{user.data['id']}_{filename}"
+                    filepath = os.path.join(
+                        app.config['UPLOAD_FOLDER'], unique_filename)
+                    file.save(filepath)
+                    db.update('users', {
+                              'profile_picture': f"/static/uploads/{unique_filename}"}, {'id': user.data['id']})
+
+    # Refresh user data after potential updates
+    user.load_user()
+    return render_template('account.html', user=user, profile_picture=user.data.get('profile_picture'))
 
 
 @app.route("/dashboard/test-path-builder", methods=["GET", "POST"])
