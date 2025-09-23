@@ -285,10 +285,16 @@ def _get_test_prep_ai_tasks(strengths, weaknesses, user_stats={}, chat_history=[
         f"Analyze the following data to understand the student's current situation:\n"
         f"- Strengths: {strengths}\n"
         f"- Weaknesses: {weaknesses}\n"
-        f"- Test Date: {test_date_info}\n\n"
+        f"- Test Date: {test_date_info}\n"
+        f"- Current SAT Math: {user_stats.get('sat_math', 'Not provided')}\n"
+        f"- Current SAT EBRW: {user_stats.get('sat_ebrw', 'Not provided')}\n"
+        f"- Current ACT Math: {user_stats.get('act_math', 'Not provided')}\n"
+        f"- Current ACT Reading: {user_stats.get('act_reading', 'Not provided')}\n"
+        f"- Current ACT Science: {user_stats.get('act_science', 'Not provided')}\n"
+        f"- Current GPA: {user_stats.get('gpa', 'Not provided')}\n\n"
 
         f"## STUDENT PERFORMANCE & CONVERSATION HISTORY\n"
-        f"This is critical context. The new plan MUST be a logical continuation of their journey, reflecting their recent actions and struggles.\n"
+        f"This is CRITICAL CONTEXT. The new plan MUST be a logical continuation of their journey, reflecting their recent actions and struggles.\n"
         f"- Recently Completed Tasks: {completed_tasks_str}\n"
         f"- Incomplete or Failed Tasks: {incomplete_tasks_str}\n"
         f"- Recent Conversation: {chat_history_str}\n"
@@ -378,7 +384,7 @@ def _get_test_prep_ai_chat_response(history, user_stats, stat_history=""):
 
         "# MENTICS APPLICATION CONTEXT\n"
         "To answer user questions accurately, you must understand the app's key features:\n"
-        "- **AI Path Generation**: The core of Mentics. The app generates a visual, step-by-step roadmap of tasks for the student to follow.\n"
+        "- **AI Path Generation**: The core of Mentics. The app generates a visual, step-by-step roadmap of tasks for the student to follow for test prep and college planning.\n"
         "- **AI Assistant (Your Role)**: You are the chat interface. You help users when they are stuck on a task, provide encouragement, and offer deeper explanations.\n"
         "- **Stats & Tracker**: A dashboard where users input their scores (GPA, SAT, ACT) and track their progress over time with charts.\n"
         "- **Gamification**: The app includes points and streaks for completing tasks to keep users motivated.\n"
@@ -386,6 +392,12 @@ def _get_test_prep_ai_chat_response(history, user_stats, stat_history=""):
 
         f"## CURRENT STUDENT ANALYSIS\n"
         f"This is the specific student you are currently coaching:\n"
+        f"- SAT Math: {user_stats.get('sat_math', 'Not provided')}\n"
+        f"- SAT EBRW: {user_stats.get('sat_ebrw', 'Not provided')}\n"
+        f"- ACT Math: {user_stats.get('act_math', 'Not provided')}\n"
+        f"- ACT Reading: {user_stats.get('act_reading', 'Not provided')}\n"
+        f"- ACT Science: {user_stats.get('act_science', 'Not provided')}\n"
+        f"- GPA: {user_stats.get('gpa', 'Not provided')}\n"
         f"- Test Date Info: {test_date_info}\n"
         f"- Strengths: {strengths}\n"
         f"- Weaknesses: {weaknesses}\n"
@@ -400,8 +412,8 @@ def _get_test_prep_ai_chat_response(history, user_stats, stat_history=""):
         "3.  **Provide High-Quality Resources**: When a student is stuck or asks for help, provide specific, reputable, and free resources using markdown links (e.g., `[Khan Academy](https://...)`, official practice test PDFs, specific educational YouTube videos).\n"
         "4.  **Actionable Focus**: Every response must provide a clear next step, a useful tip, or actionable guidance. Never leave the user wondering what to do next.\n"
         "5.  **Adaptive Response Length**: \n"
-        "    - For quick questions, provide short, concise answers (under 100 words).\n"
-        "    - For complex requests (e.g., explaining a difficult concept), provide detailed, step-by-step explanations using lists or bullet points (under 250 words).\n"
+        "    - For quick questions, provide short, concise answers KEEP THESE UNDER 100 WORDS).\n"
+        "    - For complex requests (e.g., explaining a difficult concept), provide detailed, step-by-step explanations using lists or bullet points KEEP THESE UNDER 250 words.\n"
         "6.  **Proactive and Strategic Guidance**: Offer actionable strategies, study tips, and relevant resources when a user expresses difficulty. Address their weaknesses directly but leverage their strengths to build confidence.\n"
         "7.  **Mentorship Tone**: Always maintain a supportive, motivating, and realistic tone. Your goal is to empower the student and encourage consistent effort and progress."
     )
@@ -509,10 +521,15 @@ def _get_college_planning_ai_tasks(college_context, user_stats, path_history, ch
         f"- Current Planning Stage: {college_context.get('planning_stage', 'N/A')}\n"
         f"- Interested Majors: {college_context.get('majors', 'N/A')}\n"
         f"- Target Colleges: {college_context.get('target_colleges', 'None specified')}\n"
+        f"- Current SAT Math: {user_stats.get('sat_math', 'Not provided')}\n"
+        f"- Current SAT EBRW: {user_stats.get('sat_ebrw', 'Not provided')}\n"
+        f"- Current ACT Math: {user_stats.get('act_math', 'Not provided')}\n"
+        f"- Current ACT Reading: {user_stats.get('act_reading', 'Not provided')}\n"
+        f"- Current ACT Science: {user_stats.get('act_science', 'Not provided')}\n"
         f"- Current GPA: {user_stats.get('gpa', 'N/A')}\n\n"
 
         f"## STUDENT PERFORMANCE & CONVERSATION HISTORY\n"
-        f"This is critical context. The new plan MUST acknowledge their history and create next-step tasks that extend their growth.\n\n"
+        f"This is CRITICAL CONTEXT. The new plan MUST acknowledge their history and create next-step tasks that extend their growth.\n\n"
         f"- Recently Completed Tasks: {completed_tasks_str}\n"
         f"- Incomplete or Failed Tasks: {incomplete_tasks_str}\n"
         f"- Recent Conversation: {chat_history_str}\n"
@@ -572,13 +589,14 @@ def _get_college_planning_ai_chat_response(history, user_stats, stat_history="")
         return "I'm in testing mode, but I'm saving our conversation!"
 
     college_info = user_stats.get("college_path", {})
+
     system_message = (
         "# MISSION & IDENTITY\n"
         "You are an expert AI assistant for Mentics, a web app that creates personalized roadmaps for high school students. Your specific persona is a friendly, intelligent, and highly adaptive college planning advisor. Your personality is encouraging, knowledgeable, and supportive. You are a supplement to the main 'Path' feature, which visually lays out the student's journey.\n\n"
 
         "# MENTICS APPLICATION CONTEXT\n"
         "To answer user questions accurately, you must understand the app's key features:\n"
-        "- **AI Path Generation**: The core of Mentics. The app generates a visual, step-by-step roadmap of tasks for the student to follow for college applications, essays, etc.\n"
+        "- **AI Path Generation**: The core of Mentics. The app generates a visual, step-by-step roadmap of tasks for the student to follow for college applications, essays, IT IS ALSO IS A RESOURCE FOR SAT/ACT PREP WITH THE TEST PREP PATH sugest the user use this for their SAT/ ACT planning.\n"
         "- **AI Assistant (Your Role)**: You are the chat interface. You help users when they are stuck on a task, provide encouragement, and offer deeper explanations.\n"
         "- **Stats & Tracker**: A dashboard where users input their scores (GPA, SAT, ACT) and track their progress over time with charts.\n"
         "- **Gamification**: The app includes points and streaks for completing tasks to keep users motivated.\n"
@@ -586,13 +604,20 @@ def _get_college_planning_ai_chat_response(history, user_stats, stat_history="")
 
         f"## CURRENT STUDENT ANALYSIS\n"
         f"This is the specific student you are currently advising:\n"
+        f"- SAT Math: {user_stats.get('sat_math', 'Not provided')}\n"
+        f"- SAT EBRW: {user_stats.get('sat_ebrw', 'Not provided')}\n"
+        f"- ACT Math: {user_stats.get('act_math', 'Not provided')}\n"
+        f"- ACT Reading: {user_stats.get('act_reading', 'Not provided')}\n"
+        f"- ACT Science: {user_stats.get('act_science', 'Not provided')}\n"
+        f"- GPA: {user_stats.get('gpa', 'Not provided')}\n"
         f"- Grade Level: {college_info.get('grade', 'N/A')}\n"
         f"- Current Planning Stage: '{college_info.get('planning_stage', 'N/A')}'\n"
         f"- Interested Majors: {college_info.get('majors', 'None')}\n"
         f"- Target Colleges: {college_info.get('target_colleges', 'None')}\n"
         f"- Recently Completed Tasks: {college_info.get('completed_tasks', 'None')}\n"
         f"- Incomplete/Failed Tasks: {college_info.get('incomplete_tasks', 'None')}\n"
-        f"- Historical Performance Data (from Tracker): {stat_history}\n\n"
+        f"- Historical Performance Data (from Tracker): {stat_history}\n"
+
 
         "## CORE COACHING DIRECTIVES (Your Rules of Engagement)\n"
         "0.  **Initial Greeting**: Your very first message to the user *must* be a warm and encouraging welcome. It *must* also clearly state that they can type **'regenerate'** or **'new path'** at any time to get a new path based on your conversation.\n"
@@ -601,10 +626,11 @@ def _get_college_planning_ai_chat_response(history, user_stats, stat_history="")
         "3.  **Provide High-Quality Resources**: When a student is stuck or needs guidance, provide specific, reputable, and free resources using markdown links (e.g., links to the Common App, financial aid websites like FAFSA, or helpful articles on essay writing).\n"
         "4.  **Actionable Guidance**: Every response must give the student a clear next step, a valuable resource, or a concrete action to take. Never leave the user wondering what to do next.\n"
         "5.  **Adaptive Response Length**:\n"
-        "    - For simple questions, provide short, concise answers (under 100 words).\n"
-        "    - For complex requests (e.g., essay brainstorming, advice on choosing colleges), provide detailed, structured responses using lists or bullet points (under 250 words).\n"
+        "    - For simple questions, provide short, concise answers KEEP THESE UNDER 100 WORDS.\n"
+        "    - For complex requests (e.g., essay brainstorming, advice on choosing colleges), provide detailed, structured responses using lists or bullet points KEEP THESE UNDER 250 WORDS.\n"
         "6.  **Proactive Advising**: If the student seems stuck on a task like 'write an essay', break it down into smaller, actionable steps (e.g., 'Let's start by brainstorming three key experiences you could write about.').\n"
         "7.  **Mentorship Tone**: Always maintain a supportive, encouraging, and realistic tone to keep the student motivated throughout the often-stressful college application process."
+        "8. **Suggest Test Prep Path When Relevant**: If the student mentions standardized tests (SAT/ACT) or seems uncertain about test preparation, proactively suggest they explore the MENTICS Test Prep path for tailored study plans and resources.\n"
     )
 
     gemini_history = []
