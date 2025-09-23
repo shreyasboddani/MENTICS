@@ -311,14 +311,15 @@ def _get_test_prep_ai_tasks(strengths, weaknesses, user_stats={}, chat_history=[
         f"7.  **Resource Integration**: For any study-focused task, embed a markdown link to a specific, relevant, and free resource. Example: 'Review quadratic equations using this [Khan Academy module](https://...)'\n"
         f"8.  **SAT Math Special Rule**: If weaknesses specifically show SAT Math struggles, at least one task MUST focus on Desmos as a skill-building tool (e.g., regressions, multi-equation regressions, graphing strategies).\n"
         f"9.  **Mentorship Tone**: Write tasks as if you are a coach guiding the student — supportive, motivating, and focused on measurable progress.\n"
-        f"10. **FOCUS ON THE LATEST CHAT MESSAGE FROM THE USER** when regenerating for changes.\n\n"
+        f"10. **FOCUS ON THE LATEST CHAT MESSAGE FROM THE USER** when regenerating for changes.\n"
+        f"11. **Intelligent Boss Battles**: A 'Boss Battle' is a major milestone, like a full practice test. Do not include one in every path. However, you should aim to include one every 2-3 paths to ensure the student is consistently tested on their progress. If the user has completed many standard tasks since the last Boss Battle, it is a good time to add one. The description for such a task MUST begin with 'Boss Battle AND SHOULD ALMOST ALWAYS BE THE LAST TASK (TASK 5) UNLESS NEEDED FIRST FOR PREFORMANCE GAUGING:'.\n\n"
 
         f"# JSON OUTPUT SCHEMA\n"
         f"Your output must conform strictly to this structure:\n"
         f"{{\n"
         f'  "tasks": [\n'
         f'    {{\n'
-        f'      "description": "A specific, actionable task including a markdown link like [this resource](https://example.com).",\n'
+        f'      "description": "A specific, actionable task including a markdown link like [this resource](https://example.com). For major assessments, it must start with \'Boss Battle:\'.",\n'
         f'      "reason": "A brief, motivating explanation of why this task is important for the user\'s goal.",\n'
         f'      "type": "Either \'standard\' or \'milestone\'.",\n'
         f'      "stat_to_update": "A string from the list above ONLY if type is milestone, otherwise null.",\n'
@@ -414,9 +415,11 @@ def _get_test_prep_ai_chat_response(history, user_stats, stat_history=""):
         return "Sorry, I encountered an error connecting to the AI."
 
 
-def _generate_and_save_new_test_path(user_id, strengths, weaknesses, chat_history=[]):
+def _generate_and_save_new_test_path(user_id, test_path_info, chat_history=[]):
     user_record = db.select("users", where={"id": user_id})
     user_stats = json.loads(user_record[0]['stats']) if user_record else {}
+    strengths = test_path_info.get("strengths", "general studying")
+    weaknesses = test_path_info.get("weaknesses", "test-taking skills")
 
     all_tasks = db.select(
         "paths", where={"user_id": user_id, "category": "Test Prep"})
@@ -434,15 +437,6 @@ def _generate_and_save_new_test_path(user_id, strengths, weaknesses, chat_histor
     tasks = _get_test_prep_ai_tasks(strengths, weaknesses,
                                     user_stats, chat_history, path_history, stat_history)
     tasks = tasks[:5]
-
-    # Add a "boss battle" as the last task
-    tasks.append({
-        "description": "Boss Battle: Take a full-length, timed practice test to gauge your progress.",
-        "reason": "This is your chance to prove your skills and see how much you've improved!",
-        "type": "milestone",
-        "stat_to_update": "sat_total" if "sat" in strengths.lower() or "sat" in weaknesses.lower() else "act_composite",
-        "category": "Test Prep"
-    })
 
     saved_tasks = []
     for i, task in enumerate(tasks):
@@ -525,14 +519,15 @@ def _get_college_planning_ai_tasks(college_context, user_stats, path_history, ch
         f"2.  **Exact Task Count**: The plan must contain EXACTLY 5 task objects.\n"
         f"3.  **Stage-Appropriate Tasks**: Align difficulty and scope to grade and planning stage. (Example: 9th graders explore interests, 12th graders finalize applications.)\n"
         f"4.  **Novelty & Continuity**: Never repeat recent tasks. Every new roadmap should clearly extend or deepen their progress.\n"
-        f"5.  **Meaningful Milestones**: Use 'milestone' only for major achievements (essay draft, submitting applications, updating GPA). Use 'standard' for exploratory/research tasks. 'stat_to_update' must be null for 'standard' tasks.\n\n"
+        f"5.  **Meaningful Milestones**: Use 'milestone' only for major achievements (essay draft, submitting applications, updating GPA). Use 'standard' for exploratory/research tasks. 'stat_to_update' must be null for 'standard' tasks.\n"
+        f"6.  **Intelligent Boss Battles**: A 'Boss Battle' is a major milestone like submitting an application or finalizing an essay. You should include one every 2-3 paths to ensure the student is making significant progress. Base the timing on the student's grade and planning stage. The description for such a task MUST begin with 'Boss Battle AND SHOULD ALMOST ALWAYS BE THE LAST TASK (TASK 5) UNLESS NEEDED FIRST FOR PREFORMANCE GAUGING::'.\n\n"
 
         f"# JSON OUTPUT SCHEMA\n"
         f"Your output must conform strictly to this structure:\n"
         f"{{\n"
         f'  "tasks": [\n'
         f'    {{\n'
-        f'      "description": "A specific, actionable task including a markdown link like [this resource](https://example.com).",\n'
+        f'      "description": "A specific, actionable task including a markdown link. For major milestones, it must start with \'Boss Battle:\'.",\n'
         f'      "reason": "A brief, motivating explanation of why this task is important for the user\'s goal.",\n'
         f'      "type": "Either \'standard\' or \'milestone\'.",\n'
         f'      "stat_to_update": "A string (e.g., \'gpa\', \'essay_progress\', \'applications_submitted\') ONLY if type is milestone, otherwise null.",\n'
@@ -634,15 +629,6 @@ def _generate_and_save_new_college_path(user_id, college_context, chat_history=[
 
         tasks = tasks[:5]
 
-        # Add a "boss battle" as the last task
-        tasks.append({
-            "description": "Boss Battle: Finalize and submit one of your college applications.",
-            "reason": "This is a major milestone! Completing this will bring you one step closer to your dream school.",
-            "type": "milestone",
-            "stat_to_update": "applications_submitted",
-            "category": "College Planning"
-        })
-
         if not tasks or len(tasks) == 0:
             raise ValueError(
                 "AI task generation did not return the expected tasks.")
@@ -706,6 +692,7 @@ def signup():
 def login():
     if "user" in session:
         return redirect(url_for("dashboard"))
+    error = None
     if request.method == "POST":
         email = request.form["email"]
         password = request.form["password"]
@@ -717,7 +704,8 @@ def login():
                 session["user_id"] = user_record['id']
                 session.permanent = True
                 return redirect(url_for("dashboard"))
-    return render_template("login.html", error="Invalid credentials")
+        error = "Invalid credentials"
+    return render_template("login.html", error=error)
 
 # NEW: Google Login Route
 
@@ -1083,7 +1071,7 @@ def test_path_builder(user):
         stats["test_path"] = test_path
         user.set_stats(stats)
         _generate_and_save_new_test_path(
-            user.data['id'], test_path['strengths'], test_path['weaknesses'])
+            user.data['id'], test_path)
         return redirect(url_for("test_path_view"))
     return render_template("test_path_builder.html", **stats.get("test_path", {}))
 
@@ -1306,11 +1294,8 @@ def api_tasks(user):
                     user_id, college_context, chat_history)
             else:
                 test_path_info = stats.get("test_path", {})
-                strengths = test_path_info.get("strengths", "general studying")
-                weaknesses = test_path_info.get(
-                    "weaknesses", "test-taking skills")
                 tasks = _generate_and_save_new_test_path(
-                    user_id, strengths, weaknesses, chat_history)
+                    user_id, test_path_info, chat_history)
             return jsonify(tasks)
 
         if active_path:
@@ -1428,10 +1413,8 @@ def api_chat(user):
                 user_id, college_context, chat_history=history)
         else:
             test_path_info = stats.get("test_path", {})
-            strengths = test_path_info.get("strengths", "general studying")
-            weaknesses = test_path_info.get("weaknesses", "test-taking skills")
             new_tasks = _generate_and_save_new_test_path(
-                user_id, strengths, weaknesses, chat_history=history)
+                user_id, test_path_info, chat_history=history)
 
         if history:
             history.append(

@@ -1,1143 +1,1829 @@
-<!DOCTYPE html>
-<html lang="en">
-
-<head>
-    <meta charset="UTF-8" />
-    <title>Your College Planning Path – Mentics</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Lalezar&display=swap"
-        rel="stylesheet">
-    <link href="https://unpkg.com/aos@2.3.1/dist/aos.css" rel="stylesheet">
-    <link rel="stylesheet" href="{{ url_for('static', filename='dashboard.css') }}">
-    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
-
-
-    <style>
-        ::-webkit-scrollbar {
-            width: 6px;
-        }
-
-        ::-webkit-scrollbar-track {
-            background: transparent;
-        }
-
-        ::-webkit-scrollbar-thumb {
-            background: rgba(99, 102, 241, 0.4);
-            border-radius: 3px;
-        }
-
-        ::-webkit-scrollbar-thumb:hover {
-            background: rgba(99, 102, 241, 0.6);
-        }
-
-        #chat-history {
-            scroll-behavior: smooth;
-        }
-
-        .task-node {
-            transform: scale(0);
-            opacity: 0;
-            transition: transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.3s ease;
-        }
-
-        .task-node.visible {
-            transform: scale(1);
-            opacity: 1;
-        }
-
-        .dash-segment {
-            opacity: 0;
-        }
-
-        .dash-segment.animate-in {
-            animation: pop-in 0.2s ease forwards;
-        }
-
-        @keyframes pop-in {
-            from {
-                opacity: 0;
-                transform: scale(0.5);
-            }
-
-            to {
-                opacity: 1;
-                transform: scale(1);
-            }
-        }
-
-        .subtask-item {
-            display: flex;
-            align-items: center;
-            gap: 0.75rem;
-            padding: 0.5rem 0;
-        }
-
-        #essayFeedbackOutput h3 {
-            font-size: 1.25rem;
-            font-weight: 700;
-            margin-top: 1rem;
-            margin-bottom: 0.5rem;
-        }
-
-        #essayFeedbackOutput ul {
-            list-style-type: disc;
-            padding-left: 1.5rem;
-        }
-
-        #essayFeedbackOutput ol {
-            list-style-type: decimal;
-            padding-left: 1.5rem;
-        }
-    </style>
-</head>
-
-<body class="bg-slate-50 font-sans text-slate-800 antialiased">
-
-    <div class="background-shapes">
-        <div class="shape-1"></div>
-        <div class="shape-2"></div>
-    </div>
-
-    <header class="top-nav">
-        <div class="flex justify-between items-center">
-            <a href="/" class="text-3xl font-bold text-purple-600 tracking-tight font-lalezar">MENTICS</a>
-            <nav class="flex items-center space-x-2">
-                <a href="/dashboard" class="nav-item">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                        <path
-                            d="M10.707 2.293a1 1 0 00-1.414 0l-7 7a1 1 0 001.414 1.414L4 10.414V17a1 1 0 001 1h2a1 1 0 001-1v-2a1 1 0 011-1h2a1 1 0 011 1v2a1 1 0 001 1h2a1 1 0 001-1v-6.586l.293.293a1 1 0 001.414-1.414l-7-7z" />
-                    </svg>
-                    <span>Dashboard</span>
-                </a>
-                <a href="/dashboard/stats" class="nav-item">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                        <path d="M2 10a8 8 0 018-8v8h8a8 8 0 11-16 0z" />
-                        <path d="M12 2.252A8.014 8.014 0 0117.748 8H12V2.252z" />
-                    </svg>
-                    <span>Stats</span>
-                </a>
-                <a href="/dashboard/tracker" class="nav-item">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                        <path fill-rule="evenodd"
-                            d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V4a1 1 0 011-1zm10 8a1 1 0 011-1h3a1 1 0 011 1v4a1 1 0 01-1 1h-3a1 1 0 01-1-1v-4zm-7 1a1 1 0 011-1h2a1 1 0 011 1v3a1 1 0 01-1 1H8a1 1 0 01-1-1v-3z"
-                            clip-rule="evenodd" />
-                    </svg>
-                    <span>Tracker</span>
-                </a>
-                <a href="/leaderboard" class="nav-item">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                        <path fill-rule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z"
-                            clip-rule="evenodd" />
-                    </svg>
-                    <span>Leaderboard</span>
-                </a>
-                <a href="/forum" class="nav-item">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                        <path
-                            d="M2 5a2 2 0 012-2h12a2 2 0 012 2v10a2 2 0 01-2 2H4a2 2 0 01-2-2V5zm3.293 2.293a1 1 0 011.414 0L10 11.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" />
-                    </svg>
-                    <span>Forum</span>
-                </a>
-                <a href="/account" class="nav-item">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                        <path fill-rule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z"
-                            clip-rule="evenodd" />
-                    </svg>
-                    <span>Account</span>
-                </a>
-            </nav>
-            <a href="/logout" class="nav-item !text-red-500">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                    <path fill-rule="evenodd"
-                        d="M3 3a1 1 0 00-1 1v12a1 1 0 102 0V4a1 1 0 00-1-1zm10.293 9.293a1 1 0 001.414 1.414l3-3a1 1 0 000-1.414l-3-3a1 1 0 10-1.414 1.414L14.586 9H7a1 1 0 100 2h7.586l-1.293 1.293z"
-                        clip-rule="evenodd" />
-                </svg>
-                <span>Logout</span>
-            </a>
-        </div>
-    </header>
-
-    <main class="p-6 lg:p-8 w-full">
-        <div class="grid grid-cols-1 xl:grid-cols-5 gap-8 h-full">
-
-            <div class="xl:col-span-2 card p-6 flex flex-col h-[calc(100vh-120px)]" data-aos="fade-right">
-                <div class="flex justify-between items-center mb-4">
-                    <h2 class="text-xl font-bold text-slate-900 font-lalezar">AI Assistant</h2>
-                    <button id="reset-chat-btn" title="Reset Chat History"
-                        class="flex items-center gap-2 text-sm text-slate-500 font-semibold hover:text-red-600 transition-colors py-1 px-3 rounded-lg hover:bg-red-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-red-500">
-                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5">
-                            <path fill-rule="evenodd"
-                                d="M8.75 1A2.75 2.75 0 0 0 6 3.75v.443c-1.157.06-2.185.44-3.094 1.1a.75.75 0 0 0 .537 1.344C4.1 6.1 4.9 5.75 6 5.75v9.5c-1.1 0-1.9.35-2.557.89a.75.75 0 0 0 .537 1.344c.91-.66 1.936-1.034 3.094-1.1v.443A2.75 2.75 0 0 0 8.75 19h2.5A2.75 2.75 0 0 0 14 16.25v-12.5A2.75 2.75 0 0 0 11.25 1h-2.5ZM7.5 3.75a1.25 1.25 0 0 1 1.25-1.25h2.5a1.25 1.25 0 0 1 1.25 1.25v12.5a1.25 1.25 0 0 1-1.25-1.25h-2.5a1.25 1.25 0 0 1-1.25-1.25v-12.5Z"
-                                clip-rule="evenodd" />
-                        </svg>
-                        Reset Chat
-                    </button>
-                </div>
-                <div id="chat-history" class="flex-grow overflow-y-auto space-y-4 pr-2 -mr-2"></div>
-                <div class="mt-4 pt-4 border-t border-slate-200/80">
-                    <div class="flex items-center gap-2">
-                        <button onclick="openEssayModal()" title="Analyze Essay"
-                            class="bg-indigo-100 text-indigo-700 p-2.5 rounded-lg hover:bg-indigo-200 font-semibold transition focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20"
-                                fill="currentColor">
-                                <path
-                                    d="M17.414 2.586a2 2 0 00-2.828 0L7 10.172V13h2.828l7.586-7.586a2 2 0 000-2.828z" />
-                                <path fill-rule="evenodd"
-                                    d="M2 6a2 2 0 012-2h4a1 1 0 010 2H4v10h10v-4a1 1 0 112 0v4a2 2 0 01-2 2H4a2 2 0 01-2-2V6z"
-                                    clip-rule="evenodd" />
-                            </svg>
-                        </button>
-                        <input type="text" id="userInput" placeholder="Ask a question..."
-                            class="w-full bg-white/50 border border-slate-300/70 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition disabled:bg-slate-100"
-                            disabled>
-                        <button id="send-btn"
-                            class="bg-indigo-600 text-white p-2.5 rounded-lg hover:bg-indigo-700 font-semibold transition disabled:bg-slate-400 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2"
-                            disabled>
-                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"
-                                class="w-5 h-5">
-                                <path
-                                    d="M3.478 2.404a.75.75 0 0 0-.926.941l2.432 7.905H13.5a.75.75 0 0 1 0 1.5H4.984l-2.432 7.905a.75.75 0 0 0 .926.94 60.519 60.519 0 0 0 18.445-8.986.75.75 0 0 0 0-1.218A60.517 60.517 0 0 0 3.478 2.404Z" />
-                            </svg>
-                        </button>
-                    </div>
-                </div>
-            </div>
-
-            <div class="xl:col-span-3 card p-6 relative flex flex-col overflow-hidden h-[calc(100vh-120px)]"
-                data-aos="fade-left" data-aos-delay="100">
-                <h1 class="text-3xl font-bold font-lalezar text-indigo-700 mb-1">Your Personalized Path</h1>
-                <p class="text-slate-600 mb-6">Complete each task to move to the next step. Click a node for
-                    details.</p>
-
-                <div class="relative flex-grow mb-4 min-h-0 overflow-clip">
-                    <svg id="path-svg" class="absolute top-0 left-0 w-full h-full z-0">
-                        <path id="connector-path" d="" stroke="#C7D2FE" stroke-width="3" fill="none"
-                            stroke-dasharray="2 8" stroke-linecap="round" />
-                    </svg>
-                    <div id="path-nodes-container" class="space-y-10 relative z-10 p-4"></div>
-                </div>
-
-                <div class="mt-auto pt-6 border-t border-slate-200/80 flex justify-between items-center">
-                    <button onclick="openAddTaskModal()"
-                        class="bg-slate-200 text-slate-700 px-5 py-2.5 rounded-lg hover:bg-slate-300 font-semibold transition shadow-sm hover:shadow-md transform hover:-translate-y-0.5 focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 focus-visible:ring-offset-2">
-                        Add Custom Task
-                    </button>
-                    <a href="{{ url_for('college_path_builder') }}"
-                        class="bg-indigo-600 text-white px-5 py-2.5 rounded-lg hover:bg-indigo-700 font-semibold transition shadow-md hover:shadow-lg transform hover:-translate-y-0.5 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2">
-                        Edit Path Info
-                    </a>
-                </div>
-            </div>
-        </div>
-    </main>
-    </div>
-
-    <div id="taskModal"
-        class="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 hidden p-4"
-        aria-labelledby="modal-title-task" role="dialog" aria-modal="true">
-        <div id="modal-panel"
-            class="bg-white/60 backdrop-blur-xl border border-white/20 w-full max-w-lg rounded-2xl shadow-2xl p-6 md:p-8"
-            data-aos="zoom-in" data-aos-duration="400">
-            <div class="flex justify-between items-start">
-                <div>
-                    <h3 id="modalTitle" class="text-2xl font-bold font-lalezar text-indigo-700 mb-1">Task Details</h3>
-                    <p id="modalDueDate" class="text-sm font-semibold text-slate-500 mb-4"></p>
-                </div>
-                <button onclick="closeTaskModal()"
-                    class="text-slate-400 hover:text-slate-600 transition-colors rounded-full p-1 -mt-2 -mr-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500">
-                    <span class="sr-only">Close</span>
-                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-6 h-6">
-                        <path fill-rule="evenodd"
-                            d="M5.47 5.47a.75.75 0 0 1 1.06 0L12 10.94l5.47-5.47a.75.75 0 1 1 1.06 1.06L13.06 12l5.47 5.47a.75.75 0 1 1-1.06 1.06L12 13.06l-5.47 5.47a.75.75 0 0 1-1.06-1.06L10.94 12 5.47 6.53a.75.75 0 0 1 0-1.06Z"
-                            clip-rule="evenodd" />
-                    </svg>
-                </button>
-            </div>
-            <div id="modalDescription" class="text-slate-700 mb-4 prose prose-sm"></div>
-            <div id="modalReason" class="text-slate-700 mb-4 prose prose-sm"></div>
-
-            <div id="subtasks-container" class="mb-6 space-y-2">
-                <h4 class="text-sm font-bold text-slate-600">Sub-tasks</h4>
-                <div id="subtasks-list" class="space-y-1"></div>
-                <div class="flex items-center gap-2 mt-2">
-                    <input type="text" id="newSubtaskInput" placeholder="Add a new sub-task..."
-                        class="w-full bg-white/50 border border-slate-300/70 rounded-lg p-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition">
-                    <button onclick="handleAddSubtask()"
-                        class="bg-indigo-500 text-white p-2 rounded-lg hover:bg-indigo-600 font-semibold transition text-sm">Add</button>
-                </div>
-            </div>
-
-            <div id="modal-actions" class="flex justify-between items-center gap-3 pt-4 border-t border-slate-200/80">
-                <div>
-                    <input type="date" id="task-deadline-picker"
-                        class="bg-white/50 border border-slate-300/70 rounded-lg p-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition">
-                    <button onclick="handleSetDeadline()"
-                        class="text-sm bg-slate-200 text-slate-700 px-3 py-2 rounded-lg hover:bg-slate-300 font-semibold transition">Set
-                        Date</button>
-                </div>
-                <div class="flex gap-3">
-                    <button onclick="handleImStuck()"
-                        class="bg-red-500 hover:bg-red-600 text-white font-semibold py-2 px-4 rounded-lg transition">I'm
-                        Stuck</button>
-                    <button onclick="handleTaskAction('complete')"
-                        class="bg-emerald-500 hover:bg-emerald-600 text-white font-semibold py-2 px-4 rounded-lg transition">Mark
-                        as Complete</button>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <div id="statEntryModal"
-        class="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 hidden p-4"
-        aria-labelledby="modal-title-stat" role="dialog" aria-modal="true">
-        <div id="stat-modal-panel"
-            class="bg-white/60 backdrop-blur-xl border border-white/20 w-full max-w-lg rounded-2xl shadow-2xl p-6 md:p-8"
-            data-aos="zoom-in" data-aos-duration="400">
-            <div class="flex justify-between items-start">
-                <h3 id="statModalTitle" class="text-2xl font-bold font-lalezar text-indigo-700 mb-2">Update Your
-                    Progress</h3>
-                <button onclick="closeStatModal()"
-                    class="text-slate-400 hover:text-slate-600 transition-colors rounded-full p-1 -mt-2 -mr-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500">
-                    <span class="sr-only">Close</span>
-                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-6 h-6">
-                        <path fill-rule="evenodd"
-                            d="M5.47 5.47a.75.75 0 0 1 1.06 0L12 10.94l5.47-5.47a.75.75 0 1 1 1.06 1.06L13.06 12l5.47 5.47a.75.75 0 1 1-1.06 1.06L12 13.06l-5.47 5.47a.75.75 0 0 1-1.06-1.06L10.94 12 5.47 6.53a.75.75 0 0 1 0-1.06Z"
-                            clip-rule="evenodd" />
-                    </svg>
-                </button>
-            </div>
-            <p class="text-slate-600 mb-6">Great job on this milestone! Please enter your progress.</p>
-            <div class="space-y-4">
-                <div>
-                    <label id="statModalLabel" for="statValue"
-                        class="block text-sm font-semibold text-slate-700 mb-1">New Value</label>
-                    <input type="number" id="statValue" name="statValue"
-                        class="w-full bg-white/50 border border-slate-300/70 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition"
-                        placeholder="Enter value...">
-                    <input type="hidden" id="statNameToUpdate">
-                </div>
-                <div id="stat-modal-actions" class="flex justify-end gap-3 pt-2">
-                    <button onclick="closeStatModal()"
-                        class="text-slate-600 font-semibold px-4 py-2 rounded-lg hover:bg-slate-100 transition">Cancel</button>
-                    <button onclick="handleSaveStat()"
-                        class="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2 px-4 rounded-lg transition">Save
-                        Progress</button>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <div id="addTaskModal"
-        class="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 hidden p-4">
-        <div class="bg-white/60 backdrop-blur-xl border border-white/20 w-full max-w-lg rounded-2xl shadow-2xl p-6 md:p-8"
-            data-aos="zoom-in" data-aos-duration="400">
-            <h3 class="text-2xl font-bold font-lalezar text-indigo-700 mb-4">Add a Custom Task</h3>
-            <div class="space-y-4">
-                <div>
-                    <label for="customTaskDescription" class="block text-sm font-semibold text-slate-700 mb-1">Task
-                        Description</label>
-                    <textarea id="customTaskDescription" rows="3"
-                        class="w-full bg-white/50 border border-slate-300/70 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition"
-                        placeholder="e.g., Schedule a campus tour..."></textarea>
-                </div>
-                <div>
-                    <label for="customTaskDueDate" class="block text-sm font-semibold text-slate-700 mb-1">Due Date
-                        (Optional)</label>
-                    <input type="date" id="customTaskDueDate"
-                        class="w-full bg-white/50 border border-slate-300/70 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition">
-                </div>
-                <div class="flex justify-end gap-3 pt-2">
-                    <button onclick="closeAddTaskModal()"
-                        class="text-slate-600 font-semibold px-4 py-2 rounded-lg hover:bg-slate-100 transition">Cancel</button>
-                    <button onclick="handleSaveCustomTask()"
-                        class="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2 px-4 rounded-lg transition">Add
-                        Task</button>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <div id="essayModal"
-        class="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 hidden p-4">
-        <div class="bg-white/60 backdrop-blur-xl border border-white/20 w-full max-w-3xl rounded-2xl shadow-2xl p-6 md:p-8 flex flex-col h-[90vh]"
-            data-aos="zoom-in" data-aos-duration="400">
-            <div class="flex justify-between items-center flex-shrink-0">
-                <h3 class="text-2xl font-bold font-lalezar text-indigo-700">Essay Analysis</h3>
-                <button onclick="closeEssayModal()"
-                    class="text-slate-400 hover:text-slate-600 transition-colors rounded-full p-1 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500">
-                    <span class="sr-only">Close</span>
-                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-6 h-6">
-                        <path fill-rule="evenodd"
-                            d="M5.47 5.47a.75.75 0 0 1 1.06 0L12 10.94l5.47-5.47a.75.75 0 1 1 1.06 1.06L13.06 12l5.47 5.47a.75.75 0 1 1-1.06 1.06L12 13.06l-5.47 5.47a.75.75 0 0 1-1.06-1.06L10.94 12 5.47 6.53a.75.75 0 0 1 0-1.06Z"
-                            clip-rule="evenodd" />
-                    </svg>
-                </button>
-            </div>
-            <div class="flex-grow grid grid-cols-1 md:grid-cols-2 gap-6 mt-4 min-h-0">
-                <div class="flex flex-col min-h-0">
-                    <label for="essayPrompt" class="block text-sm font-semibold text-slate-700 mb-1">Essay
-                        Prompt</label>
-                    <input type="text" id="essayPrompt" placeholder="e.g., Common App Prompt #1"
-                        class="w-full bg-white/50 border border-slate-300/70 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition mb-4 flex-shrink-0">
-                    <label for="essayInput" class="block text-sm font-semibold text-slate-700 mb-1 flex-shrink-0">Paste
-                        Your Essay Below</label>
-                    <textarea id="essayInput"
-                        class="w-full h-full flex-grow bg-white/50 border border-slate-300/70 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition resize-none"
-                        placeholder="Your essay text here..."></textarea>
-                </div>
-                <div class="flex flex-col min-h-0">
-                    <label class="block text-sm font-semibold text-slate-700 mb-1 flex-shrink-0">AI Feedback</label>
-                    <div id="essayFeedbackOutput"
-                        class="prose prose-sm max-w-none w-full h-full flex-grow bg-slate-100/70 border border-slate-200/80 rounded-lg p-4 overflow-y-auto">
-                        <p class="text-slate-500">Your feedback will appear here...</p>
-                    </div>
-                </div>
-            </div>
-            <div class="mt-6 flex-shrink-0 flex justify-end">
-                <button id="analyzeEssayBtn" onclick="handleAnalyzeEssay()"
-                    class="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2 px-5 rounded-lg transition">Analyze
-                    Essay</button>
-            </div>
-        </div>
-    </div>
-
-
-    <script src="{{ url_for('static', filename='js/prompt.js') }}"></script>
-    <script src="{{ url_for('static', filename='js/alert.js') }}"></script>
-    <script>
-        let currentTasks = [];
-        let currentTaskId = null;
-        let conversationHistory = [];
-        const chatCategory = 'College Planning'; // Define category for this page
-
-        // Function to load chat history from the server
-        async function loadChatHistory() {
-            try {
-                const response = await fetch(`/api/chat_history?category=${chatCategory}`);
-                if (response.ok) {
-                    const history = await response.json();
-                    if (history && history.length > 0) {
-                        conversationHistory = history;
-                        const chatHistoryDiv = document.getElementById('chat-history');
-                        chatHistoryDiv.innerHTML = '';
-                        conversationHistory.forEach(msg => appendChatMessage(msg.content, msg.role));
-                        document.getElementById('userInput').disabled = false;
-                        document.getElementById('send-btn').disabled = false;
-                    } else {
-                        startInitialChat();
-                    }
-                } else {
-                    startInitialChat();
-                }
-            } catch (error) {
-                console.error("Could not load chat history:", error);
-                startInitialChat();
-            }
-        }
-
-        // Function to trigger the initial greeting from the bot
-        function startInitialChat() {
-            conversationHistory.push({
-                role: 'user',
-                content: 'INITIAL_MESSAGE'
-            });
-            handleUserChat();
-        }
-
-        async function fetchPath(isRegeneration = false) {
-            const nodesContainer = document.getElementById('path-nodes-container');
-            nodesContainer.innerHTML = `<div class="text-center text-slate-500 p-8">${isRegeneration ? 'Generating new path...' : 'Loading your path...'}</div>`;
-            try {
-                const response = await fetch(`/api/tasks?category=${chatCategory}`, {
-                    method: isRegeneration ? 'POST' : 'GET'
-                });
-                if (!response.ok) throw new Error('Network response was not ok');
-                const tasks = await response.json();
-                if (Array.isArray(tasks) && tasks.length > 0) {
-                    currentTasks = tasks.map((task, index) => ({
-                        ...task,
-                        client_id: index + 1,
-                        status: task.is_completed ? 'complete' : 'pending'
-                    }));
-                    renderPathAndConnectors(currentTasks, true); // Animate on fetch
-                } else {
-                    window.location.href = "{{ url_for('college_path_builder') }}";
-                }
-            } catch (error) {
-                console.error('Error fetching path:', error);
-                nodesContainer.innerHTML = `<div class="text-center p-8"><p class="text-red-500 mb-4">Could not load path.</p><button onclick="fetchPath(true)" class="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700">Try Again</button></div>`;
-            }
-        }
-
-        async function renderPathAndConnectors(tasks, withAnimation = false) {
-            const nodesContainer = document.getElementById('path-nodes-container');
-            const svgContainer = document.getElementById('path-svg');
-            nodesContainer.innerHTML = '';
-            svgContainer.innerHTML = ''; // Clear old connectors
-
-            const firstPendingIndex = tasks.findIndex(t => t.status === 'pending');
-
-            // Create all node elements first
-            tasks.forEach((task, index) => {
-                const isCompleted = task.status === 'complete';
-                const isUnlocked = index === firstPendingIndex;
-                const isLocked = index > firstPendingIndex && firstPendingIndex !== -1;
-                const isBossBattle = task.description.toLowerCase().includes('boss battle');
-
-
-                const alignmentWrapper = document.createElement('div');
-                alignmentWrapper.className = 'flex';
-                const positions = ['justify-start', 'justify-center', 'justify-end'];
-                alignmentWrapper.classList.add(...positions[index % 3].split(' '));
-
-                const taskButton = document.createElement('button');
-                taskButton.id = `task-node-${task.client_id}`;
-                taskButton.className = 'task-node w-28 h-28 rounded-full flex items-center justify-center font-bold text-4xl text-white transition-all duration-300 transform hover:scale-110 focus:outline-none focus-visible:ring-4 focus-visible:ring-offset-2 focus-visible:ring-indigo-400';
-                taskButton.onclick = () => openTaskModal(task);
-                taskButton.disabled = isLocked;
-
-                if (isBossBattle) {
-                    taskButton.classList.add('bg-red-500', 'shadow-lg', 'shadow-red-400/50');
-                    taskButton.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" class="h-12 w-12" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM7 4a1 1 0 000 2h6a1 1 0 100-2H7z" clip-rule="evenodd" /></svg>`;
-                } else if (isCompleted) {
-                    taskButton.classList.add('bg-emerald-500', 'shadow-lg');
-                    taskButton.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-10 h-10"><path fill-rule="evenodd" d="M19.916 4.626a.75.75 0 0 1 .208 1.04l-9 13.5a.75.75 0 0 1-1.154.114l-6-6a.75.75 0 0 1 1.06-1.06l5.353 5.353 8.493-12.74a.75.75 0 0 1 1.04-.207Z" clip-rule="evenodd" /></svg>`;
-                } else if (isUnlocked) {
-                    taskButton.classList.add('bg-indigo-500', 'shadow-lg', 'shadow-indigo-400/50');
-                    taskButton.textContent = task.client_id;
-                } else {
-                    taskButton.classList.add('bg-slate-300', 'cursor-not-allowed');
-                    taskButton.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-10 h-10 text-slate-500"><path fill-rule="evenodd" d="M12 1.5a5.25 5.25 0 0 0-5.25 5.25v3a3 3 0 0 0-3 3v6.75a3 3 0 0 0 3 3h10.5a3 3 0 0 0 3-3v-6.75a3 3 0 0 0-3-3v-3c0-2.9-2.35-5.25-5.25-5.25Zm3.75 8.25v-3a3.75 3.75 0 1 0-7.5 0v3h7.5Z" clip-rule="evenodd" /></svg>`;
-                }
-
-                if (!withAnimation) {
-                    taskButton.classList.add('visible');
-                    if (isUnlocked) taskButton.classList.add('animate-pulse');
-                }
-
-                alignmentWrapper.appendChild(taskButton);
-                nodesContainer.appendChild(alignmentWrapper);
-            });
-
-            if (withAnimation) {
-                const nodeElements = Array.from(nodesContainer.querySelectorAll('.task-node'));
-                for (let i = 0; i < nodeElements.length; i++) {
-                    const node = nodeElements[i];
-                    await new Promise(resolve => setTimeout(resolve, 100));
-                    node.classList.add('visible');
-                    if (node.classList.contains('bg-indigo-500')) {
-                        node.classList.add('animate-pulse');
-                    }
-                    await new Promise(resolve => setTimeout(resolve, 200));
-                    if (i < nodeElements.length - 1) {
-                        await drawAndAnimateConnector(nodeElements[i], nodeElements[i + 1]);
-                    }
-                }
-            } else {
-                redrawAllConnectors();
-            }
-        }
-
-        async function drawAndAnimateConnector(startNode, endNode) {
-            const svg = document.getElementById('path-svg');
-            if (!svg || !startNode || !endNode) return;
-
-            const containerRect = svg.getBoundingClientRect();
-            const startRect = startNode.getBoundingClientRect();
-            const endRect = endNode.getBoundingClientRect();
-
-            const startX = startRect.left + startRect.width / 2 - containerRect.left;
-            const startY = startRect.top + startRect.height / 2 - containerRect.top;
-            const endX = endRect.left + endRect.width / 2 - containerRect.left;
-            const endY = endRect.top + endRect.height / 2 - containerRect.top;
-
-            const controlX1 = startX + (endX - startX) * 0.2;
-            const controlY1 = startY + (endY - startY) * 0.8;
-            const controlX2 = startX + (endX - startX) * 0.8;
-            const controlY2 = startY + (endY - startY) * 0.2;
-
-            const pathData = `M ${startX} ${startY} C ${controlX1} ${controlY1}, ${controlX2} ${controlY2}, ${endX} ${endY}`;
-
-            // Create a temporary, invisible path to measure
-            const tempPath = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-            tempPath.setAttribute('d', pathData);
-            const totalLength = tempPath.getTotalLength();
-
-            const dashLength = 8;
-            const gapLength = 6;
-            const patternLength = dashLength + gapLength;
-            const dashSegments = [];
-
-            // Create individual line segments for each dash
-            for (let currentLength = 0; currentLength < totalLength; currentLength += patternLength) {
-                const start = tempPath.getPointAtLength(currentLength);
-                const end = tempPath.getPointAtLength(Math.min(currentLength + dashLength, totalLength));
-
-                const segment = document.createElementNS('http://www.w3.org/2000/svg', 'line');
-                segment.setAttribute('x1', start.x);
-                segment.setAttribute('y1', start.y);
-                segment.setAttribute('x2', end.x);
-                segment.setAttribute('y2', end.y);
-                segment.setAttribute('stroke', '#C7D2FE');
-                segment.setAttribute('stroke-width', '3');
-                segment.setAttribute('stroke-linecap', 'round');
-                segment.classList.add('dash-segment');
-                segment.style.transformOrigin = `${(start.x + end.x) / 2}px ${(start.y + end.y) / 2}px`;
-
-                svg.appendChild(segment);
-                dashSegments.push(segment);
-            }
-
-            // Animate them in one by one
-            const delayBetweenDashes = 20; // ms
-            for (let i = 0; i < dashSegments.length; i++) {
-                const segment = dashSegments[i];
-                segment.style.animationDelay = `${i * delayBetweenDashes}ms`;
-                segment.classList.add('animate-in');
-            }
-            const totalAnimationTime = dashSegments.length * delayBetweenDashes + 200;
-            await new Promise(resolve => setTimeout(resolve, totalAnimationTime));
-        }
-
-        function redrawAllConnectors() {
-            const svg = document.getElementById('path-svg');
-            const nodes = Array.from(document.querySelectorAll('.task-node.visible'));
-            if (!svg || nodes.length < 2) return;
-
-            svg.innerHTML = '';
-            const containerRect = svg.getBoundingClientRect();
-
-            for (let i = 0; i < nodes.length - 1; i++) {
-                const startNode = nodes[i];
-                const endNode = nodes[i + 1];
-                if (!startNode || !endNode) continue;
-
-                const startRect = startNode.getBoundingClientRect();
-                const endRect = endNode.getBoundingClientRect();
-
-                const startX = startRect.left + startRect.width / 2 - containerRect.left;
-                const startY = startRect.top + startRect.height / 2 - containerRect.top;
-                const endX = endRect.left + endRect.width / 2 - containerRect.left;
-                const endY = endRect.top + endRect.height / 2 - containerRect.top;
-
-                const controlX1 = startX + (endX - startX) * 0.2;
-                const controlY1 = startY + (endY - startY) * 0.8;
-                const controlX2 = startX + (endX - startX) * 0.8;
-                const controlY2 = startY + (endY - startY) * 0.2;
-
-                const pathData = `M ${startX} ${startY} C ${controlX1} ${controlY1}, ${controlX2} ${controlY2}, ${endX} ${endY}`;
-
-                // Create a temporary, invisible path to measure
-                const tempPath = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-                tempPath.setAttribute('d', pathData);
-                const totalLength = tempPath.getTotalLength();
-
-                const dashLength = 8;
-                const gapLength = 6;
-                const patternLength = dashLength + gapLength;
-
-                // Create individual line segments for each dash
-                for (let currentLength = 0; currentLength < totalLength; currentLength += patternLength) {
-                    const start = tempPath.getPointAtLength(currentLength);
-                    const end = tempPath.getPointAtLength(Math.min(currentLength + dashLength, totalLength));
-
-                    const segment = document.createElementNS('http://www.w3.org/2000/svg', 'line');
-                    segment.setAttribute('x1', start.x);
-                    segment.setAttribute('y1', start.y);
-                    segment.setAttribute('x2', end.x);
-                    segment.setAttribute('y2', end.y);
-                    segment.setAttribute('stroke', '#C7D2FE');
-                    segment.setAttribute('stroke-width', '3');
-                    segment.setAttribute('stroke-linecap', 'round');
-                    svg.appendChild(segment);
-                }
-            }
-        }
-
-        function openTaskModal(task) {
-            currentTaskId = task.id;
-            const modal = document.getElementById('taskModal');
-            document.getElementById('modalTitle').textContent = `Step ${task.client_id}: Your Task`;
-
-            // Use marked.js to render markdown links
-            document.getElementById('modalDescription').innerHTML = marked.parse(task.description);
-            document.getElementById('modalReason').innerHTML = `<b>Why:</b> ${marked.parse(task.reason)}`;
-
-
-            const dueDateEl = document.getElementById('modalDueDate');
-            const deadlinePicker = document.getElementById('task-deadline-picker');
-            if (task.due_date) {
-                dueDateEl.textContent = `Due: ${new Date(task.due_date + 'T00:00:00').toLocaleDateString()}`;
-                deadlinePicker.value = task.due_date;
-            } else {
-                dueDateEl.textContent = 'No due date set';
-                deadlinePicker.value = '';
-            }
-
-            renderSubtasks(task.subtasks || []);
-
-            modal.classList.remove('hidden');
-        }
-
-        function renderSubtasks(subtasks) {
-            const subtasksList = document.getElementById('subtasks-list');
-            subtasksList.innerHTML = '';
-            if (subtasks.length === 0) {
-                subtasksList.innerHTML = '<p class="text-sm text-slate-500">No sub-tasks yet.</p>';
-                return;
-            }
-            subtasks.forEach(subtask => {
-                const item = document.createElement('div');
-                item.className = 'subtask-item';
-                item.innerHTML = `
-                    <input type="checkbox" id="subtask-${subtask.id}" onchange="handleToggleSubtask(${subtask.id}, this.checked)" ${subtask.is_completed ? 'checked' : ''} class="w-4 h-4 text-indigo-600 bg-gray-100 border-gray-300 rounded focus:ring-indigo-500">
-                    <label for="subtask-${subtask.id}" class="text-sm text-slate-700 ${subtask.is_completed ? 'line-through text-slate-500' : ''}">${subtask.description}</label>
-                `;
-                subtasksList.appendChild(item);
-            });
-        }
-
-        async function handleAddSubtask() {
-            const input = document.getElementById('newSubtaskInput');
-            const description = input.value.trim();
-            if (!description) return;
-
-            const response = await fetch('/api/add_subtask', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ parent_task_id: currentTaskId, description })
-            });
-            const result = await response.json();
-            if (result.success) {
-                const task = currentTasks.find(t => t.id === currentTaskId);
-                if (!task.subtasks) task.subtasks = [];
-                task.subtasks.push(result.subtask);
-                renderSubtasks(task.subtasks);
-                input.value = '';
-            }
-        }
-
-        async function handleToggleSubtask(subtaskId, is_completed) {
-            await fetch('/api/update_subtask', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ subtaskId, is_completed })
-            });
-            const task = currentTasks.find(t => t.id === currentTaskId);
-            const subtask = task.subtasks.find(s => s.id === subtaskId);
-            subtask.is_completed = is_completed;
-            renderSubtasks(task.subtasks);
-        }
-
-        async function handleSetDeadline() {
-            const picker = document.getElementById('task-deadline-picker');
-            const dueDate = picker.value;
-            await fetch('/api/update_task_deadline', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ taskId: currentTaskId, dueDate })
-            });
-            const task = currentTasks.find(t => t.id === currentTaskId);
-            task.due_date = dueDate;
-            document.getElementById('modalDueDate').textContent = `Due: ${new Date(dueDate + 'T00:00:00').toLocaleDateString()}`;
-            alert('Deadline updated!');
-        }
-
-        function closeTaskModal() {
-            document.getElementById('taskModal').classList.add('hidden');
-        }
-
-        function closeStatModal() {
-            document.getElementById('statEntryModal').classList.add('hidden');
-        }
-
-        function openAddTaskModal() {
-            document.getElementById('addTaskModal').classList.remove('hidden');
-        }
-
-        function closeAddTaskModal() {
-            document.getElementById('addTaskModal').classList.add('hidden');
-            document.getElementById('customTaskDescription').value = '';
-            document.getElementById('customTaskDueDate').value = '';
-        }
-
-        function openEssayModal() {
-            document.getElementById('essayModal').classList.remove('hidden');
-        }
-
-        function closeEssayModal() {
-            document.getElementById('essayModal').classList.add('hidden');
-        }
-
-        async function handleSaveCustomTask() {
-            const description = document.getElementById('customTaskDescription').value.trim();
-            const dueDate = document.getElementById('customTaskDueDate').value;
-            if (!description) {
-                alert('Please enter a task description.');
-                return;
-            }
-
-            const response = await fetch('/api/add_task', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ description, category: chatCategory, due_date: dueDate })
-            });
-            const result = await response.json();
-            if (result.success) {
-                currentTasks.push(result.task);
-                renderPathAndConnectors(currentTasks, false);
-                closeAddTaskModal();
-            } else {
-                alert('Could not add task. Please try again.');
-            }
-        }
-
-
-        async function handleImStuck() {
-            const task = currentTasks.find(t => t.id === currentTaskId);
-            if (!task) return;
-            closeTaskModal();
-            const reason = await prompt(`You're working on the task:\n"${task.description}"`, '',
-                'What part is giving you trouble?');
-            if (reason && reason.trim() !== "") {
-                const chatInput = document.getElementById('userInput');
-                chatInput.value =
-                    `I'm having trouble with the task: "${task.description}". Specifically, my problem is: ${reason}`;
-                handleUserChat();
-                chatInput.focus();
-            }
-        }
-
-        async function handleTaskAction(status) {
-            const task = currentTasks.find(t => t.id === currentTaskId);
-            if (!task) return;
-            closeTaskModal();
-            try {
-                const response = await fetch('/api/update_task_status', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({
-                        taskId: task.id,
-                        status: status
-                    })
-                });
-                if (!response.ok) throw new Error('Could not update task status');
-                const result = await response.json();
-                if (status === 'complete') {
-                    const taskIndex = currentTasks.findIndex(t => t.id === currentTaskId);
-                    if (taskIndex !== -1) currentTasks[taskIndex].status = 'complete';
-                    renderPathAndConnectors(currentTasks, false); // No animation on complete
-                    if (task.type === 'milestone' && task.stat_to_update) {
-                        setTimeout(() => openStatModal(task), 500);
-                    } else {
-                        await checkPathCompletion();
-                    }
-                }
-            } catch (error) {
-                console.error("Error updating task status:", error);
-                alert("Could not update task. Please try again.");
-            }
-        }
-
-        async function checkPathCompletion() {
-            const allComplete = currentTasks.every(t => t.status === 'complete');
-            if (allComplete && currentTasks.length > 0) {
-                setTimeout(async () => {
-                    alert("Great job! Generating your next set of challenges.");
-                    await fetchPath(true);
-                }, 500);
-            }
-        }
-
-        function openStatModal(task) {
-            const statName = task.stat_to_update;
-            const modal = document.getElementById('statEntryModal');
-            const modalTitle = document.getElementById('statModalTitle');
-            const modalLabel = document.getElementById('statModalLabel');
-            const statValueInput = document.getElementById('statValue');
-            const statNameToUpdate = document.getElementById('statNameToUpdate');
-
-            const statDetails = {
-                "gpa": {
-                    name: "New GPA",
-                    placeholder: "Enter new GPA (e.g., 3.85)",
-                    min: 0,
-                    max: 5
-                },
-                "colleges_researched": {
-                    name: "Number of Colleges Researched",
-                    placeholder: "Enter a number",
-                    min: 0
-                },
-                "essay_progress": {
-                    name: "Essay Progress",
-                    placeholder: "1=Draft, 2=Final",
-                    min: 1,
-                    max: 2
-                },
-                "applications_submitted": {
-                    name: "Applications Submitted",
-                    placeholder: "Enter a number",
-                    min: 0
-                }
-            };
-
-            const details = statDetails[statName] || {
-                name: "Update Progress",
-                placeholder: "Enter value"
-            };
-
-            modalTitle.textContent = `Update: ${details.name}`;
-            modalLabel.textContent = details.name;
-            statValueInput.placeholder = details.placeholder;
-            statValueInput.min = details.min || "";
-            statValueInput.max = details.max || "";
-            statNameToUpdate.value = statName;
-
-            statValueInput.value = ""; // Clear previous input
-
-            // Update the descriptive paragraph for clarity
-            const p = modal.querySelector('p');
-            p.innerHTML =
-                `Great job on this milestone! The information you enter will be saved to your <a href="/dashboard/stats" class="text-indigo-600 hover:underline font-semibold">Stats</a> page and will help tailor your future college planning paths.`;
-
-            modal.classList.remove('hidden');
-        }
-
-        async function handleSaveStat() {
-            const statValueInput = document.getElementById('statValue');
-            const stat_name = document.getElementById('statNameToUpdate').value;
-            const stat_value = statValueInput.value;
-
-            // --- START: VALIDATION LOGIC ---
-            if (!stat_value) {
-                alert("Please enter a value.");
-                return;
-            }
-
-            const valueNum = parseFloat(stat_value);
-            const min = parseFloat(statValueInput.min);
-            const max = parseFloat(statValueInput.max);
-
-            if (!isNaN(min) && valueNum < min) {
-                alert(`The score cannot be less than ${min}. Please enter a valid score.`);
-                return;
-            }
-            if (!isNaN(max) && valueNum > max) {
-                alert(`The score cannot be greater than ${max}. Please enter a valid score.`);
-                return;
-            }
-            // --- END: VALIDATION LOGIC ---
-
-            try {
-                const response = await fetch('/api/update_stats', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({
-                        stat_name,
-                        stat_value
-                    })
-                });
-                if (!response.ok) throw new Error('Failed to save stats.');
-                const result = await response.json();
-                if (result.success) {
-                    alert("Your stats have been updated!");
-                    closeStatModal();
-                    await checkPathCompletion();
-                } else {
-                    throw new Error(result.error || 'An unknown error occurred.');
-                }
-            } catch (error) {
-                console.error("Error saving stat:", error);
-                alert("Could not save your stats. Please try again.");
-            }
-        }
-
-        async function handleUserChat() {
-            const chatInput = document.getElementById('userInput');
-            const sendButton = document.getElementById('send-btn');
-            let message = chatInput.value.trim();
-            const isInitialMessage = conversationHistory.length > 0 && conversationHistory[conversationHistory
-                .length - 1].content === 'INITIAL_MESSAGE';
-
-            if (isInitialMessage) {
-                chatInput.value = "";
-            } else if (message === "") {
-                return;
-            }
-
-            if (!isInitialMessage) {
-                appendChatMessage(message, 'user');
-                conversationHistory.push({
-                    role: 'user',
-                    content: message
-                });
-            }
-
-            chatInput.value = "";
-            chatInput.disabled = true;
-            sendButton.disabled = true;
-            const typingIndicator = appendChatMessage('...', 'bot', true);
-
-            try {
-                const response = await fetch(`/api/chat?category=${chatCategory}`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({
-                        history: conversationHistory
-                    })
-                });
-                if (!response.ok) throw new Error('AI response error.');
-
-                const data = await response.json();
-                typingIndicator.remove();
-
-                if (isInitialMessage) {
-                    conversationHistory = [];
-                }
-
-                if (data.new_path) {
-                    appendChatMessage("I've generated a new college planning path for you based on our conversation.",
-                        'bot');
-                    conversationHistory.push({
-                        role: 'assistant',
-                        content: "I've generated a new college planning path for you based on our conversation."
-                    });
-                    currentTasks = data.new_path.map((task, index) => ({
-                        ...task,
-                        client_id: index + 1,
-                        status: task.is_completed ? 'complete' : 'pending'
-                    }));
-                    renderPathAndConnectors(currentTasks, true);
-                } else {
-                    const aiReply = data.reply;
-                    appendChatMessage(aiReply, 'bot');
-                    conversationHistory.push({
-                        role: 'assistant',
-                        content: aiReply
-                    });
-                }
-
-            } catch (error) {
-                typingIndicator.querySelector('p').textContent = "Sorry, I'm having trouble connecting.";
-                console.error("Chat error:", error);
-            } finally {
-                chatInput.disabled = false;
-                sendButton.disabled = false;
-                chatInput.focus();
-            }
-        }
-
-        async function handleAnalyzeEssay() {
-            const essayText = document.getElementById('essayInput').value;
-            const essayPrompt = document.getElementById('essayPrompt').value;
-            const feedbackOutput = document.getElementById('essayFeedbackOutput');
-            const analyzeBtn = document.getElementById('analyzeEssayBtn');
-
-            if (essayText.trim().length < 50) {
-                alert("Please enter a longer essay for a meaningful analysis.");
-                return;
-            }
-
-            feedbackOutput.innerHTML = '<p class="text-slate-500">Analyzing your essay... This may take a moment.</p>';
-            analyzeBtn.disabled = true;
-            analyzeBtn.textContent = 'Analyzing...';
-
-            try {
-                const response = await fetch('/api/analyze_essay', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ essay_text: essayText, essay_prompt: essayPrompt })
-                });
-
-                const result = await response.json();
-                if (response.ok) {
-                    feedbackOutput.innerHTML = marked.parse(result.feedback);
-                } else {
-                    throw new Error(result.error || 'An unknown error occurred.');
-                }
-            } catch (error) {
-                feedbackOutput.innerHTML = `<p class="text-red-500">Error: ${error.message}</p>`;
-            } finally {
-                analyzeBtn.disabled = false;
-                analyzeBtn.textContent = 'Analyze Essay';
-            }
-        }
-
-
-        // NEW: Function to handle chat reset
-        async function handleResetChat() {
-            if (confirm("Are you sure you want to reset your chat history? This cannot be undone.")) {
-                try {
-                    const response = await fetch('/api/reset_chat', {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json'
-                        },
-                        body: JSON.stringify({
-                            category: chatCategory
-                        })
-                    });
-                    if (!response.ok) throw new Error('Failed to reset chat.');
-
-                    document.getElementById('chat-history').innerHTML = '';
-                    conversationHistory = [];
-                    startInitialChat(); // Get a fresh greeting from the bot
-                } catch (error) {
-                    console.error("Error resetting chat:", error);
-                    alert("Could not reset chat history. Please try again.");
-                }
-            }
-        }
-
-        function appendChatMessage(text, role, isTyping = false) {
-            const chatHistory = document.getElementById('chat-history');
-            const messageWrapper = document.createElement('div');
-            messageWrapper.className = 'flex ' + (role === 'user' ? 'justify-end' : 'justify-start');
-            const messageDiv = document.createElement('div');
-            let cssClass = 'p-3 rounded-xl max-w-xs text-sm prose prose-sm';
-            if (role === 'user') {
-                cssClass += ' bg-indigo-600 text-white';
-            } else {
-                cssClass += ' bg-white/80 text-slate-700';
-                if (isTyping) cssClass += ' animate-pulse';
-            }
-            messageDiv.className = cssClass;
-            // Use marked.js to render markdown links in chat
-            messageDiv.innerHTML = marked.parse(text);
-            messageWrapper.appendChild(messageDiv);
-            chatHistory.appendChild(messageWrapper);
-            chatHistory.scrollTop = chatHistory.scrollHeight;
-            return messageWrapper;
-        }
-
-        document.addEventListener('DOMContentLoaded', () => {
-            fetchPath();
-            loadChatHistory();
-        });
-        window.addEventListener('resize', () => redrawAllConnectors());
-        document.getElementById('send-btn').addEventListener('click', handleUserChat);
-        document.getElementById('userInput').addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') handleUserChat();
-        });
-        document.getElementById('reset-chat-btn').addEventListener('click', handleResetChat);
-    </script>
-    <script src="https://unpkg.com/aos@2.3.1/dist/aos.js"></script>
-    <script>
-        AOS.init({
-            once: true,
-            duration: 800
-        });
-    </script>
-</body>
-
-</html>
+from flask import Flask, render_template, request, redirect, url_for, session, jsonify
+from werkzeug.security import generate_password_hash, check_password_hash
+from dbhelper import DatabaseHandler
+from userhelper import User
+from functools import wraps
+import json
+import google.generativeai as genai
+import os
+from dotenv import load_dotenv
+import random
+from pathlib import Path
+from datetime import datetime, timedelta, date
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
+from authlib.integrations.flask_client import OAuth
+from werkzeug.utils import secure_filename
+
+# Explicitly load the .env file from the correct path
+env_path = Path('.') / '.env'
+load_dotenv(dotenv_path=env_path)
+
+app = Flask(__name__)
+app.secret_key = "supersecretkey"
+# --- START: UPLOAD FOLDER CONFIGURATION ---
+app.config['UPLOAD_FOLDER'] = 'static/uploads'
+app.url_map.strict_slashes = False
+app.permanent_session_lifetime = timedelta(minutes=10)
+
+# Ensure the upload folder exists
+os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
+# --- END: UPLOAD FOLDER CONFIGURATION ---
+
+
+oauth = OAuth(app)
+oauth.register(
+name='google',
+server_metadata_url='https://accounts.google.com/.well-known/openid-configuration',
+client_id=os.getenv("GOOGLE_CLIENT_ID"),
+client_secret=os.getenv("GOOGLE_CLIENT_SECRET"),
+client_kwargs={'scope': 'openid email profile'}
+)
+
+db = DatabaseHandler("users.db")
+
+
+def init_db():
+db.create_table("users", {
+"id": "INTEGER PRIMARY KEY AUTOINCREMENT",
+"email": "TEXT NOT NULL UNIQUE",
+"password": "TEXT NOT NULL",
+"stats": "TEXT NOT NULL",
+"name": "TEXT NOT NULL DEFAULT ''",
+"onboarding_completed": "BOOLEAN DEFAULT FALSE",
+"onboarding_data": "TEXT",
+"profile_picture": "TEXT"
+})
+db.add_column("users", "name", "TEXT NOT NULL DEFAULT ''")
+db.add_column("users", "onboarding_completed", "BOOLEAN DEFAULT FALSE")
+db.add_column("users", "onboarding_data", "TEXT")
+db.add_column("users", "profile_picture", "TEXT")
+
+db.create_table("paths", {
+"id": "INTEGER PRIMARY KEY AUTOINCREMENT",
+"user_id": "INTEGER NOT NULL",
+"task_order": "INTEGER NOT NULL",
+"description": "TEXT NOT NULL",
+"is_completed": "BOOLEAN DEFAULT FALSE",
+"is_active": "BOOLEAN DEFAULT TRUE",
+"created_at": "TIMESTAMP DEFAULT CURRENT_TIMESTAMP",
+"type": "TEXT",
+"stat_to_update": "TEXT",
+"category": "TEXT",
+"due_date": "TEXT",
+"is_user_added": "BOOLEAN DEFAULT FALSE",
+"reason": "TEXT"
+})
+db.create_table("subtasks", {
+"id": "INTEGER PRIMARY KEY AUTOINCREMENT",
+"parent_task_id": "INTEGER NOT NULL",
+"description": "TEXT NOT NULL",
+"is_completed": "BOOLEAN DEFAULT FALSE",
+"FOREIGN KEY(parent_task_id)": "REFERENCES paths(id) ON DELETE CASCADE"
+})
+db.create_table("stat_history", {
+"id": "INTEGER PRIMARY KEY AUTOINCREMENT",
+"user_id": "INTEGER NOT NULL",
+"stat_name": "TEXT NOT NULL",
+"stat_value": "TEXT NOT NULL",
+"recorded_at": "TIMESTAMP DEFAULT CURRENT_TIMESTAMP"
+})
+db.create_table("chat_conversations", {
+"id": "INTEGER PRIMARY KEY AUTOINCREMENT",
+"user_id": "INTEGER NOT NULL",
+"category": "TEXT NOT NULL",
+"history": "TEXT NOT NULL",
+"UNIQUE": "(user_id, category)"
+})
+# NEW: Table to store recent user activities
+db.create_table("activity_log", {
+"id": "INTEGER PRIMARY KEY AUTOINCREMENT",
+"user_id": "INTEGER NOT NULL",
+# e.g., 'task_completed', 'path_generated', 'stat_updated'
+"activity_type": "TEXT NOT NULL",
+# JSON string with context like task name, stat name, etc.
+"details": "TEXT",
+"created_at": "TIMESTAMP DEFAULT CURRENT_TIMESTAMP"
+})
+# NEW: Table for gamification stats
+db.create_table("gamification_stats", {
+"user_id": "INTEGER PRIMARY KEY",
+"points": "INTEGER DEFAULT 0",
+"current_streak": "INTEGER DEFAULT 0",
+"last_completed_date": "TEXT",
+"FOREIGN KEY(user_id)": "REFERENCES users(id) ON DELETE CASCADE"
+})
+# NEW: Table for forum posts (threads)
+db.create_table("forum_posts", {
+"id": "INTEGER PRIMARY KEY AUTOINCREMENT",
+"user_id": "INTEGER NOT NULL",
+"user_name": "TEXT NOT NULL",
+"title": "TEXT NOT NULL",
+"content": "TEXT NOT NULL",
+"created_at": "TIMESTAMP DEFAULT CURRENT_TIMESTAMP",
+"FOREIGN KEY(user_id)": "REFERENCES users(id) ON DELETE CASCADE"
+})
+# NEW: Table for forum replies
+db.create_table("forum_replies", {
+"id": "INTEGER PRIMARY KEY AUTOINCREMENT",
+"post_id": "INTEGER NOT NULL",
+"user_id": "INTEGER NOT NULL",
+"user_name": "TEXT NOT NULL",
+"content": "TEXT NOT NULL",
+"created_at": "TIMESTAMP DEFAULT CURRENT_TIMESTAMP",
+"FOREIGN KEY(post_id)": "REFERENCES forum_posts(id) ON DELETE CASCADE",
+"FOREIGN KEY(user_id)": "REFERENCES users(id) ON DELETE CASCADE"
+})
+
+
+# --- HELPER FUNCTIONS ---
+
+
+def log_activity(user_id, activity_type, details={}):
+"""Helper function to log user activities into the database."""
+db.insert("activity_log", {
+"user_id": user_id,
+"activity_type": activity_type,
+"details": json.dumps(details)
+})
+
+# NEW: Helper to get tracker data for prompts
+
+
+def _get_stat_history_for_prompt(user_id):
+"""Fetches and formats a summary of the user's stat history for AI prompts."""
+history_records = db.select(
+"stat_history", where={"user_id": user_id}, order_by="recorded_at DESC LIMIT 20")
+if not history_records:
+return "No historical performance data available yet."
+
+summary = []
+for record in history_records:
+stat_name, stat_value, recorded_at = record['stat_name'], record['stat_value'], record['recorded_at']
+date = recorded_at.split(" ")[0]
+# Make stat names more readable
+readable_name = stat_name.replace('_', ' ').title()
+summary.append(
+f"- On {date}, their {readable_name} was recorded as {stat_value}.")
+return "\n".join(summary)
+
+
+# --- DECORATORS & FILTERS ---
+
+
+def login_required(f):
+@wraps(f)
+def decorated_function(*args, **kwargs):
+if "user" not in session:
+return redirect(url_for("login"))
+user = User.from_session(db, session)
+if user is None:
+session.clear()
+return redirect(url_for("login"))
+# Pass the user object to the decorated function
+kwargs['user'] = user
+return f(*args, **kwargs)
+return decorated_function
+
+
+@app.template_filter('format_date')
+def format_date_filter(s):
+if not s:
+return ""
+try:
+# UPDATED: Use the user's timezone from the session, with a fallback to UTC
+user_tz_str = session.get('timezone', 'UTC')
+user_tz = ZoneInfo(user_tz_str)
+
+naive_dt = datetime.strptime(s, '%Y-%m-%d %H:%M:%S')
+utc_dt = naive_dt.replace(tzinfo=ZoneInfo("UTC"))
+user_local_dt = utc_dt.astimezone(user_tz)
+return user_local_dt.strftime('%Y-%m-%d')
+except (ZoneInfoNotFoundError, ValueError, TypeError):
+return s.split(' ')[0] if ' ' in s else s
+
+# NEW: Jinja2 filter to display relative time
+
+
+@app.template_filter('time_ago')
+def time_ago_filter(s):
+if not s:
+return ""
+try:
+naive_dt = datetime.strptime(s, '%Y-%m-%d %H:%M:%S')
+utc_dt = naive_dt.replace(tzinfo=ZoneInfo("UTC"))
+now = datetime.now(ZoneInfo("UTC"))
+diff = now - utc_dt
+
+seconds = diff.total_seconds()
+if seconds < 60: return "just now" minutes=seconds / 60 if minutes < 60: return f"{int(minutes)}m ago" hours=minutes /
+    60 if hours < 24: return f"{int(hours)}h ago" days=hours / 24 return f"{int(days)}d ago" except
+    (ZoneInfoNotFoundError, ValueError, TypeError): return s.split(' ')[0]
+
+# --- AI HELPER FUNCTIONS (UPDATED) ---
+
+
+def _get_test_prep_ai_tasks(strengths, weaknesses, user_stats={}, chat_history=[], path_history={}, stat_history=""):
+    """Generates test preparation tasks with a hyper-detailed prompt for maximum reliability."""
+
+    def get_mock_tasks_reliably():
+        print("--- DEBUG: Running corrected Test Prep mock generator. ---")
+        all_mock_tasks = [
+            {"description": "Take a full-length, timed SAT practice test.", "reason": "This is a ' boss battle' to test
+    your skills under pressure and identify areas for improvement.", "type" : "milestone" , "stat_to_update"
+    : "sat_total" , "category" : "Test Prep" }, {"description": "Review algebra concepts from your SAT practice test."
+    , "reason" : "Understanding algebra is crucial for a high score on the math section." , "type" : "standard"
+    , "stat_to_update" : None, "category" : "Test Prep" }, {"description": "Practice 15 difficult vocabulary words."
+    , "reason" : "A strong vocabulary will help you tackle the reading and writing sections with confidence." , "type"
+    : "standard" , "stat_to_update" : None, "category" : "Test Prep" },
+    {"description": "Take a timed ACT Science practice section." , "reason"
+    : "This will help you get used to the pace of the science section and improve your time management." , "type"
+    : "milestone" , "stat_to_update" : "act_science" , "category" : "Test Prep" },
+    {"description": "Work on time management strategies for the reading section." , "reason"
+    : "Finishing the reading section on time is a common challenge. Practicing strategies will improve your score."
+    , "type" : "standard" , "stat_to_update" : None, "category" : "Test Prep" } ] return random.sample(all_mock_tasks,
+    5) if not os.getenv("GEMINI_API_KEY"): return get_mock_tasks_reliably() completed_tasks_str="\n" .join( [f"-
+    {task['description']}" for task in path_history.get('completed', [])]) or "None." incomplete_tasks_str="\n" .join(
+    [f"- {task['description']}" for task in path_history.get('incomplete', [])]) or "None." chat_history_str="\n" .join(
+    [f"{msg['role'].capitalize()}: {msg['content']}" for msg in chat_history]) or "No conversation history yet."
+    test_date_info="Not set by the student." test_date_str=user_stats.get("test_path", {}).get("test_date") if
+    test_date_str: try: test_date=datetime.strptime(test_date_str, '%Y-%m-%d' ) delta=test_date - datetime.now()
+    formatted_date=test_date.strftime('%B %d, %Y') if delta.days>= 0:
+    test_date_info = f"on {formatted_date} ({delta.days} days remaining)"
+    else:
+    test_date_info = f"on {formatted_date} (this date has passed)"
+    except ValueError:
+    test_date_info = "in an invalid format."
+
+    prompt = (
+    f"# MISSION\n"
+    f"You are an expert AI test prep coach (Digital SAT & ACT). Your mission is to generate a personalized,
+    forward-looking 5-step study plan that is:\n"
+    f"- Motivating, clear, and tailored to the student’s strengths, weaknesses, and timeline.\n"
+    f"- Progress-oriented, always pushing the student forward instead of repeating old work.\n"
+    f"- Resource-rich: include markdown links to high-quality, free resources like Khan Academy, official practice test
+    PDFs, or specific helpful YouTube videos.\n\n"
+
+    f"# STUDENT ANALYSIS\n"
+    f"Analyze the following data to understand the student's current situation:\n"
+    f"- Strengths: {strengths}\n"
+    f"- Weaknesses: {weaknesses}\n"
+    f"- Test Date: {test_date_info}\n\n"
+
+    f"## STUDENT PERFORMANCE & CONVERSATION HISTORY\n"
+    f"This is critical context. The new plan MUST be a logical continuation of their journey, reflecting their recent
+    actions and struggles.\n"
+    f"- Recently Completed Tasks: {completed_tasks_str}\n"
+    f"- Incomplete or Failed Tasks: {incomplete_tasks_str}\n"
+    f"- Recent Conversation: {chat_history_str}\n"
+    f"- Historical Performance Data (from Tracker):\n{stat_history}\n\n"
+
+    f"# YOUR TASK: GENERATE A NEW 5-STEP PLAN\n"
+    f"Based on your analysis, generate a new, 5-step study plan. Each task must:\n"
+    f"- Be specific, actionable, and stage-appropriate given their timeline until the test.\n"
+    f"- Directly address weaknesses, reinforce strengths, and incorporate insights from recent conversation and tracker
+    data.\n"
+    f"- Include at least one **reputable, proven resource** formatted as a markdown link (e.g., [Khan
+    Academy](https://www.khanacademy.org/)).\n"
+    f"- Push the student forward with fresh, progressive steps that build on past work. DO NOT REPEAT OLD TASKS — they
+    must evolve and build off each other.\n\n"
+
+    f"# CRITICAL DIRECTIVES\n"
+    f"1. **JSON Output ONLY**: Your entire output MUST be a single, raw JSON object. Do not include any text before or
+    after the JSON.\n"
+    f"2. **Exact Task Count**: The plan must contain EXACTLY 5 task objects in the `tasks` list.\n"
+    f"3. **Adaptive Focus**: If the context shows a focus on SAT or ACT, all 5 tasks must target that test only. Never
+    mix.\n"
+    f"4. **Meaningful Milestones**: Use 'milestone' only for major achievements (e.g., completing a full-length practice
+    test, finishing an entire section). Use 'standard' for drills, concept review, or smaller steps. 'stat_to_update'
+    must be null for 'standard' tasks.\n"
+    f"5. **Correct Stat Naming**: For milestones, `stat_to_update` must be one of: ['sat_math', 'sat_ebrw', 'sat_total',
+    'act_math', 'act_reading', 'act_science', 'act_composite'].\n"
+    f"6. **Avoid Repetition**: Never assign a task that mirrors recently completed or incomplete ones. Each roadmap must
+    feel fresh, progressive, and adapted to growth.\n"
+    f"7. **Resource Integration**: For any study-focused task, embed a markdown link to a specific, relevant, and free
+    resource. Example: 'Review quadratic equations using this [Khan Academy module](https://...)'\n"
+    f"8. **SAT Math Special Rule**: If weaknesses specifically show SAT Math struggles, at least one task MUST focus on
+    Desmos as a skill-building tool (e.g., regressions, multi-equation regressions, graphing strategies).\n"
+    f"9. **Mentorship Tone**: Write tasks as if you are a coach guiding the student — supportive, motivating, and
+    focused on measurable progress.\n"
+    f"10. **FOCUS ON THE LATEST CHAT MESSAGE FROM THE USER** when regenerating for changes.\n"
+    f"11. **Intelligent Boss Battles**: A 'Boss Battle' is a major milestone, like a full practice test. Do not include
+    one in every path. However, you should aim to include one every 2-3 paths to ensure the student is consistently
+    tested on their progress. If the user has completed many standard tasks since the last Boss Battle, it is a good
+    time to add one. The description for such a task MUST begin with 'Boss Battle:'.\n\n"
+
+    f"# JSON OUTPUT SCHEMA\n"
+    f"Your output must conform strictly to this structure:\n"
+    f"{{\n"
+    f' "tasks": [\n'
+    f' {{\n'
+    f' "description": "A specific, actionable task including a markdown link like [this resource](https://example.com).
+    For major assessments, it must start with \'Boss Battle:\'.",\n'
+    f' "reason": "A brief, motivating explanation of why this task is important for the user\'s goal.",\n'
+    f' "type": "Either \'standard\' or \'milestone\'.",\n'
+    f' "stat_to_update": "A string from the list above ONLY if type is milestone, otherwise null.",\n'
+    f' "category": "This MUST be the string \'Test Prep\'."\n'
+    f' }}\n'
+    f' // ... (four more task objects)\n'
+    f' ]\n'
+    f'}}'
+    )
+
+    try:
+    model = genai.GenerativeModel(
+    'gemini-2.5-flash',
+    generation_config={"response_mime_type": "application/json"}
+    )
+    response = model.generate_content(prompt)
+    response_data = json.loads(response.text)
+    tasks = response_data.get("tasks", [])
+    if isinstance(tasks, list) and len(tasks) > 0:
+    return tasks
+    raise ValueError("Invalid format from AI")
+    except Exception as e:
+    print(f"\n--- GEMINI API ERROR IN _get_test_prep_ai_tasks: {e} ---\n")
+    return get_mock_tasks_reliably()
+
+
+    def _get_test_prep_ai_chat_response(history, user_stats, stat_history=""):
+    if not os.getenv("GEMINI_API_KEY"):
+    return "I'm in testing mode, but I'm saving our conversation!"
+
+    # Extract test date info
+    test_date_info = "The student has not set a test date yet."
+    test_date_str = user_stats.get("test_path", {}).get("test_date")
+    if test_date_str:
+    try:
+    test_date = datetime.strptime(test_date_str, '%Y-%m-%d')
+    delta = test_date - datetime.now()
+    formatted_date = test_date.strftime('%B %d, %Y')
+    if delta.days >= 0:
+    test_date_info = f"The student's test is on {formatted_date} ({delta.days} days from now)."
+    else:
+    test_date_info = f"The student's test date was {formatted_date}, which has already passed."
+    except ValueError:
+    test_date_info = f"The student has set a test date, but it's in an invalid format: {test_date_str}."
+
+    # Pull additional student data
+    strengths = user_stats.get("strengths", "Not provided")
+    weaknesses = user_stats.get("weaknesses", "Not provided")
+    completed_tasks_str = user_stats.get("completed_tasks", "None")
+    incomplete_tasks_str = user_stats.get("incomplete_tasks", "None")
+
+    # Build system message with all context
+    system_message = (
+    "You are a highly adaptive, intelligent, and supportive SAT/ACT test prep coach. "
+    "Your personality is encouraging, yet focused — you guide students toward steady, measurable progress.\n\n"
+
+    f"## Student Context:\n"
+    f"- Test Date Info: {test_date_info}\n"
+    f"- Strengths: {strengths}\n"
+    f"- Weaknesses: {weaknesses}\n"
+    f"- Recently Completed Tasks: {completed_tasks_str}\n"
+    f"- Incomplete/Failed Tasks: {incomplete_tasks_str}\n"
+    f"- Historical Performance Data: {stat_history}\n\n"
+
+    "## Core Coaching Directives:\n"
+    "1. **Provide Resources**: When a student is stuck or asks for help, provide specific, high-quality, free resources
+    using markdown links (e.g., [Khan Academy](https://...)).\n"
+    "2. **Actionable focus**: Every response must provide a next step, tip, or actionable guidance.\n"
+    "3. **Adaptive response length**:\n"
+    " - Short, concise answers for quick questions. KEEP THESE ANSWERS UNDER 100 words.\n"
+    " - Detailed, step-by-step explanations ONLY when the user asks. Use numbered steps or bullet points. KEEP THESE
+    ANSWERS UNDER 250 words\n"
+    "4. **Weakness first, leverage strengths**: Focus on weak areas but reinforce strengths to build confidence.\n"
+    "5. **Proactive guidance**: Offer actionable strategies, study tips, and relevant resources when a user expresses
+    difficulty.\n"
+    "6. **Mentorship tone**: Always sound supportive and motivating, but realistic. Encourage effort and progress.\n"
+    )
+
+    # Build Gemini chat history
+    gemini_history = []
+    for message in history:
+    role = "model" if message["role"] == "assistant" else "user"
+    gemini_history.append({"role": role, "parts": [message["content"]]})
+
+    try:
+    # Initialize model
+    model = genai.GenerativeModel(
+    'gemini-2.5-flash', system_instruction=system_message)
+    chat = model.start_chat(history=gemini_history[:-1])
+    last_user_message = gemini_history[-1]['parts'][0] if gemini_history else "Hello"
+    response = chat.send_message(last_user_message)
+    return response.text
+    except Exception as e:
+    print(
+    f"\n--- GEMINI API ERROR IN _get_test_prep_ai_chat_response: {e} ---\n")
+    return "Sorry, I encountered an error connecting to the AI."
+
+
+    def _generate_and_save_new_test_path(user_id, test_path_info, chat_history=[]):
+    user_record = db.select("users", where={"id": user_id})
+    user_stats = json.loads(user_record[0]['stats']) if user_record else {}
+    strengths = test_path_info.get("strengths", "general studying")
+    weaknesses = test_path_info.get("weaknesses", "test-taking skills")
+
+    all_tasks = db.select(
+    "paths", where={"user_id": user_id, "category": "Test Prep"})
+    path_history = {
+    "completed": [task for task in all_tasks if task['is_completed']],
+    "incomplete": [task for task in all_tasks if not task['is_completed']]
+    }
+
+    # Fetch tracker data
+    stat_history = _get_stat_history_for_prompt(user_id)
+
+    db.update("paths", {"is_active": False}, where={
+    "user_id": user_id, "category": "Test Prep", "is_active": True})
+
+    tasks = _get_test_prep_ai_tasks(strengths, weaknesses,
+    user_stats, chat_history, path_history, stat_history)
+    tasks = tasks[:5]
+
+    saved_tasks = []
+    for i, task in enumerate(tasks):
+    task_id = db.insert("paths", {
+    "user_id": user_id, "task_order": i + 1, "description": task.get("description"),
+    "reason": task.get("reason"), "type": task.get("type"), "stat_to_update": task.get("stat_to_update"),
+    "category": "Test Prep", "is_active": True, "is_completed": False
+    })
+    new_task_data = db.select("paths", where={"id": task_id})[0]
+    saved_tasks.append({
+    "id": new_task_data['id'], "description": new_task_data['description'],
+    "reason": new_task_data['reason'], "type": new_task_data['type'],
+    "stat_to_update": new_task_data['stat_to_update'], "is_completed": False
+    })
+    # LOGGING
+    log_activity(user_id, 'path_generated', {'category': 'Test Prep'})
+    return saved_tasks
+
+
+    def _get_college_planning_ai_tasks(college_context, user_stats, path_history, chat_history=[], stat_history=""):
+    """Generates college planning tasks with a hyper-detailed prompt."""
+
+    def get_mock_tasks_reliably():
+    print("--- DEBUG: Running corrected College Planning mock generator. ---")
+    all_mock_tasks = [
+    {"description": "Research 5 colleges that match your interests.", "reason": "Finding the right fit is the first step
+    to a successful college experience.",
+    "type": "standard", "stat_to_update": None, "category": "College Planning"},
+    {"description": "Write a rough draft of your Common App personal statement.", "reason": "This is your chance to tell
+    your story and show admissions officers who you are.",
+    "type": "milestone", "stat_to_update": "essay_progress", "category": "College Planning"},
+    {"description": "Update your GPA in your profile.", "reason": "Keeping your academic information up-to-date is
+    important for tracking your progress.",
+    "type": "milestone", "stat_to_update": "gpa", "category": "College Planning"},
+    {"description": "Request three letters of recommendation from teachers.", "reason": "Strong letters of
+    recommendation can make a big difference in your application.",
+    "type": "standard", "stat_to_update": None, "category": "College Planning"},
+    {"description": "Create a spreadsheet to track application deadlines.", "reason": "Staying organized is key to a
+    stress-free application season.",
+    "type": "standard", "stat_to_update": None, "category": "College Planning"}
+    ]
+    return random.sample(all_mock_tasks, 5)
+
+    if not os.getenv("GEMINI_API_KEY"):
+    return get_mock_tasks_reliably()
+
+    completed_tasks_str = "\n".join(
+    [f"- {task['description']}" for task in path_history.get('completed', [])]) or "None."
+    incomplete_tasks_str = "\n".join(
+    [f"- {task['description']}" for task in path_history.get('incomplete', [])]) or "None."
+    chat_history_str = "\n".join(
+    [f"{msg['role'].capitalize()}: {msg['content']}" for msg in chat_history]) or "No conversation history yet."
+
+    prompt = (
+    f"# MISSION\n"
+    f"You are an expert AI college admissions counselor and mentor. Your mission is to generate a personalized,
+    forward-looking 5-step roadmap that helps a high school student make measurable progress in the college planning
+    process. Your guidance should:\n"
+    f"- Be resource-rich, including markdown links to reputable sources like the Common App website, College Board, or
+    insightful articles/videos.\n"
+    f"- Build logically on their recent conversations, completed tasks, and current progress.\n"
+    f"- Stay aligned with their grade level, planning stage, and long-term goals.\n\n"
+
+    f"# STUDENT ANALYSIS\n"
+    f"Analyze the following data to build a deep understanding of the student:\n"
+    f"- Current Grade: {college_context.get('grade', 'N/A')}\n"
+    f"- Current Planning Stage: {college_context.get('planning_stage', 'N/A')}\n"
+    f"- Interested Majors: {college_context.get('majors', 'N/A')}\n"
+    f"- Target Colleges: {college_context.get('target_colleges', 'None specified')}\n"
+    f"- Current GPA: {user_stats.get('gpa', 'N/A')}\n\n"
+
+    f"## STUDENT PERFORMANCE & CONVERSATION HISTORY\n"
+    f"This is critical context. The new plan MUST acknowledge their history and create next-step tasks that extend their
+    growth.\n\n"
+    f"- Recently Completed Tasks: {completed_tasks_str}\n"
+    f"- Incomplete or Failed Tasks: {incomplete_tasks_str}\n"
+    f"- Recent Conversation: {chat_history_str}\n"
+    f"- Historical Performance Data (from Tracker):\n{stat_history}\n\n"
+
+    f"# YOUR TASK: GENERATE A NEW 5-STEP ROADMAP\n"
+    f"Based on your analysis, generate a new, 5-step roadmap. Each task must:\n"
+    f"- Be actionable and motivational.\n"
+    f"- Directly support their stage-appropriate goals.\n"
+    f"- Introduce fresh, concrete next steps instead of repeating old ones.\n"
+    f"- Include at least one markdown link to a helpful, free resource in the description (e.g., 'Start your Common App
+    essay using these [brainstorming tips](https://...)').\n\n"
+
+    f"# CRITICAL DIRECTIVES\n"
+    f"1. **JSON Output ONLY**: Your entire output MUST be a single, raw JSON object.\n"
+    f"2. **Exact Task Count**: The plan must contain EXACTLY 5 task objects.\n"
+    f"3. **Stage-Appropriate Tasks**: Align difficulty and scope to grade and planning stage. (Example: 9th graders
+    explore interests, 12th graders finalize applications.)\n"
+    f"4. **Novelty & Continuity**: Never repeat recent tasks. Every new roadmap should clearly extend or deepen their
+    progress.\n"
+    f"5. **Meaningful Milestones**: Use 'milestone' only for major achievements (essay draft, submitting applications,
+    updating GPA). Use 'standard' for exploratory/research tasks. 'stat_to_update' must be null for 'standard' tasks.\n"
+    f"6. **Intelligent Boss Battles**: A 'Boss Battle' is a major milestone like submitting an application or finalizing
+    an essay. You should include one every 2-3 paths to ensure the student is making significant progress. Base the
+    timing on the student's grade and planning stage. The description for such a task MUST begin with 'Boss
+    Battle:'.\n\n"
+
+    f"# JSON OUTPUT SCHEMA\n"
+    f"Your output must conform strictly to this structure:\n"
+    f"{{\n"
+    f' "tasks": [\n'
+    f' {{\n'
+    f' "description": "A specific, actionable task including a markdown link. For major milestones, it must start with
+    \'Boss Battle:\'.",\n'
+    f' "reason": "A brief, motivating explanation of why this task is important for the user\'s goal.",\n'
+    f' "type": "Either \'standard\' or \'milestone\'.",\n'
+    f' "stat_to_update": "A string (e.g., \'gpa\', \'essay_progress\', \'applications_submitted\') ONLY if type is
+    milestone, otherwise null.",\n'
+    f' "category": "This MUST be the string \'College Planning\'."\n'
+    f' }}\n'
+    f' // ... (four more task objects)\n'
+    f' ]\n'
+    f'}}'
+    )
+
+    try:
+    model = genai.GenerativeModel(
+    'gemini-2.5-flash',
+    generation_config={"response_mime_type": "application/json"}
+    )
+    response = model.generate_content(prompt)
+    response_data = json.loads(response.text)
+    tasks = response_data.get("tasks", [])
+    if isinstance(tasks, list) and len(tasks) > 0:
+    return tasks
+    raise ValueError("Invalid format from AI")
+    except Exception as e:
+    print(
+    f"\n--- GEMINI API ERROR IN _get_college_planning_ai_tasks: {e} ---\n")
+    return get_mock_tasks_reliably()
+
+
+    def _get_college_planning_ai_chat_response(history, user_stats, stat_history=""):
+    """Generates a proactive and context-aware chat response for college planning."""
+    if not os.getenv("GEMINI_API_KEY"):
+    return "I'm in testing mode, but I'm saving our conversation!"
+
+    college_info = user_stats.get("college_path", {})
+    system_message = (
+    "You are a friendly, intelligent, and highly adaptive college planning advisor. "
+    "Your personality is encouraging, knowledgeable, and supportive. "
+    f"The student is in grade {college_info.get('grade', 'N/A')} and is in the '{college_info.get('planning_stage',
+    'N/A')}' stage.\n\n"
+
+    f"## Student Context:\n"
+    f"- Historical Performance Data (from Tracker): {stat_history}\n"
+    f"- Recently Completed Tasks: {college_info.get('completed_tasks', 'None')}\n"
+    f"- Incomplete/Failed Tasks: {college_info.get('incomplete_tasks', 'None')}\n"
+    f"- Interested Majors: {college_info.get('majors', 'None')}\n"
+    f"- Target Colleges: {college_info.get('target_colleges', 'None')}\n"
+    f"- Strengths: {college_info.get('strengths', 'Not provided')}\n"
+    f"- Weaknesses: {college_info.get('weaknesses', 'Not provided')}\n\n"
+
+    "## Core Coaching Directives:\n"
+    "1. **Provide Resources**: When a student is stuck or needs guidance, provide specific, high-quality, free resources
+    using markdown links (e.g., links to the Common App, financial aid sites, or helpful articles).\n"
+    "2. **Actionable guidance**: Every response must give the student a next step, resource, or concrete action to
+    take.\n"
+    "3. **Adaptive response length**:\n"
+    " - Short, concise answers for simple questions. KEEP THESE ANSWERS UNDER 100 words.\n"
+    " - Detailed, structured responses for complex questions (e.g., essay help, college list decisions). Use numbered
+    steps, bullet points, and KEEP THESE ANSWERS UNDER 250 words.\n"
+    "4. **Proactive advising**: If the student is stuck, break tasks into actionable steps and suggest relevant
+    resources.\n"
+    "5. **Mentorship tone**: Always sound supportive, encouraging, and realistic, keeping the student motivated.\n"
+    )
+
+    gemini_history = []
+    for message in history:
+    role = "model" if message["role"] == "assistant" else "user"
+    gemini_history.append({"role": role, "parts": [message["content"]]})
+
+    try:
+    model = genai.GenerativeModel(
+    'gemini-2.5-flash', system_instruction=system_message)
+    chat = model.start_chat(history=gemini_history[:-1])
+    last_user_message = gemini_history[-1]['parts'][0] if gemini_history else "Hello"
+    response = chat.send_message(last_user_message)
+    return response.text
+    except Exception as e:
+    print(
+    f"\n--- GEMINI API ERROR IN _get_college_planning_ai_chat_response: {e} ---\n")
+    return "Sorry, I encountered an error connecting to the AI."
+
+
+    def _generate_and_save_new_college_path(user_id, college_context, chat_history=[]):
+    """Gathers all context, generates, and saves a new college planning path."""
+    try:
+    user_record = db.select("users", where={"id": user_id})
+    if not user_record:
+    raise ValueError(f"User with ID {user_id} not found.")
+    user_stats = json.loads(user_record[0]['stats'])
+
+    all_college_tasks = db.select(
+    "paths", where={"user_id": user_id, "category": "College Planning"})
+    path_history = {
+    "completed": [task for task in all_college_tasks if task['is_completed']],
+    "incomplete": [task for task in all_college_tasks if not task['is_completed']]
+    }
+
+    # Fetch tracker data
+    stat_history = _get_stat_history_for_prompt(user_id)
+
+    db.update("paths", {"is_active": False}, where={
+    "user_id": user_id, "category": "College Planning", "is_active": True})
+
+    tasks = _get_college_planning_ai_tasks(
+    college_context, user_stats, path_history, chat_history, stat_history)
+
+    tasks = tasks[:5]
+
+    if not tasks or len(tasks) == 0:
+    raise ValueError(
+    "AI task generation did not return the expected tasks.")
+
+    saved_tasks = []
+    for i, task_data in enumerate(tasks):
+    task_id = db.insert("paths", {
+    "user_id": user_id, "task_order": i + 1, "description": task_data.get("description"),
+    "reason": task_data.get("reason"), "type": task_data.get("type"), "stat_to_update": task_data.get("stat_to_update"),
+    "category": "College Planning", "is_active": True, "is_completed": False
+    })
+    saved_tasks.append(
+    {**task_data, "id": task_id, "is_completed": False})
+
+    # LOGGING
+    log_activity(user_id, 'path_generated', {
+    'category': 'College Planning'})
+    return saved_tasks
+    except Exception as e:
+    print(f"Error in _generate_and_save_new_college_path: {e}")
+    return []
+
+    # --- Standard Routes ---
+
+
+    @app.route("/")
+    def home():
+    is_logged_in = "user" in session
+    return render_template("index.html", is_logged_in=is_logged_in)
+
+
+    @app.route("/signup", methods=["GET", "POST"])
+    def signup():
+    if request.method == "POST":
+    email = request.form["email"]
+    name = request.form["name"]
+    password = generate_password_hash(request.form["password"])
+    try:
+    user_id = db.insert("users", {
+    "email": email, "password": password, "name": name,
+    "stats": json.dumps({
+    "sat_ebrw": "", "sat_math": "", "act_math": "",
+    "act_reading": "", "act_science": "", "gpa": "", "milestones": 0
+    })
+    })
+    # Initialize gamification stats for new user
+    db.insert("gamification_stats", {
+    "user_id": user_id, "points": 0, "current_streak": 0})
+
+    session["user"] = email
+    session["user_id"] = user_id
+    session.permanent = True
+    return redirect(url_for("onboarding"))
+    except Exception as e:
+    print(f"Signup error: {e}")
+    return render_template("signup.html", error="Email already exists!")
+    return render_template("signup.html")
+
+
+    @app.route("/login", methods=["GET", "POST"])
+    def login():
+    if "user" in session:
+    return redirect(url_for("dashboard"))
+    error = None
+    if request.method == "POST":
+    email = request.form["email"]
+    password = request.form["password"]
+    user_record_list = db.select("users", where={"email": email})
+    if user_record_list:
+    user_record = user_record_list[0]
+    if check_password_hash(user_record['password'], password):
+    session["user"] = user_record['email']
+    session["user_id"] = user_record['id']
+    session.permanent = True
+    return redirect(url_for("dashboard"))
+    error = "Invalid credentials"
+    return render_template("login.html", error=error)
+
+    # NEW: Google Login Route
+
+
+    @app.route('/google-login')
+    def google_login():
+    redirect_uri = url_for('authorize', _external=True)
+    return oauth.google.authorize_redirect(redirect_uri)
+
+    # NEW: Google Authorize Route (Callback) - UPDATED
+
+
+    @app.route('/authorize')
+    def authorize():
+    token = oauth.google.authorize_access_token()
+    # The 'nonce' is retrieved from the session and passed to the parse_id_token method
+    user_info = oauth.google.parse_id_token(token, nonce=session.get('nonce'))
+
+    # Check if user exists
+    user_record_list = db.select("users", where={"email": user_info['email']})
+
+    if user_record_list:
+    # User exists, log them in
+    user_record = user_record_list[0]
+    session["user"] = user_record['email']
+    session["user_id"] = user_record['id']
+    session.permanent = True
+    else:
+    # New user, create an account
+    # We use a placeholder for the password hash as they'll log in via Google
+    password_hash = generate_password_hash(os.urandom(16).hex())
+    user_id = db.insert("users", {
+    "email": user_info['email'],
+    "name": user_info['name'],
+    "password": password_hash,
+    "stats": json.dumps({
+    "sat_ebrw": "", "sat_math": "", "act_math": "",
+    "act_reading": "", "act_science": "", "gpa": "", "milestones": 0
+    })
+    })
+    # Initialize gamification stats for new Google user
+    db.insert("gamification_stats", {
+    "user_id": user_id, "points": 0, "current_streak": 0})
+
+    session["user"] = user_info['email']
+    session["user_id"] = user_id
+    session.permanent = True
+
+    return redirect(url_for("onboarding"))
+
+
+    @app.route("/logout")
+    def logout():
+    session.clear()
+    return redirect(url_for("home"))
+
+
+    @app.route('/onboarding', methods=['GET', 'POST'])
+    @login_required
+    def onboarding(user):
+    if user.data['onboarding_completed']:
+    return redirect(url_for('dashboard'))
+
+    if request.method == 'POST':
+    onboarding_data = {
+    'goal': request.form.get('goal'),
+    'learning_style': request.form.get('learning_style'),
+    'anxieties': request.form.get('anxieties')
+    }
+    db.update('users', {
+    'onboarding_data': json.dumps(onboarding_data),
+    'onboarding_completed': True
+    }, {'id': user.data['id']})
+    return redirect(url_for('dashboard'))
+
+    return render_template('onboarding.html')
+
+    # NEW: Add a route to set the user's timezone in the session
+
+
+    @app.route('/set-timezone', methods=['POST'])
+    def set_timezone():
+    data = request.get_json()
+    timezone = data.get('timezone')
+    if timezone:
+    try:
+    # Validate that it's a real timezone
+    ZoneInfo(timezone)
+    session['timezone'] = timezone
+    return jsonify({"success": True})
+    except ZoneInfoNotFoundError:
+    return jsonify({"success": False, "error": "Invalid timezone"}), 400
+    return jsonify({"success": False, "error": "Timezone not provided"}), 400
+
+    # --- Dashboard & Path Routes ---
+
+
+    @app.route("/dashboard")
+    @login_required
+    def dashboard(user):
+    if not user.data['onboarding_completed']:
+    return redirect(url_for('onboarding'))
+    stats = user.get_stats()
+    user_id = user.data['id']
+    name = user.get_name()
+    all_tasks = db.select("paths", where={"user_id": user_id})
+
+    # Get proactive suggestion
+    suggestion = _get_proactive_ai_suggestions(user)
+
+    # --- Gamification Stats ---
+    gamification_stats_list = db.select(
+    "gamification_stats", where={"user_id": user_id})
+    if not gamification_stats_list:
+    # Fallback to create stats if they don't exist for some reason
+    db.insert("gamification_stats", {
+    "user_id": user_id, "points": 0, "current_streak": 0})
+    gamification_stats_list = db.select(
+    "gamification_stats", where={"user_id": user_id})
+
+    gamification_stats = gamification_stats_list[0]
+
+    game_stats = {
+    "points": gamification_stats['points'],
+    "streak": gamification_stats['current_streak']
+    }
+
+    # --- Progress Calculations ---
+    active_test_tasks = [
+    t for t in all_tasks if t['is_active'] and t['category'] == 'Test Prep']
+    test_prep_completed_current = sum(
+    1 for t in active_test_tasks if t['is_completed'])
+    total_test_prep_completed = sum(
+    1 for t in all_tasks if t['is_completed'] and t['category'] == 'Test Prep')
+
+    active_college_tasks = [
+    t for t in all_tasks if t['is_active'] and t['category'] == 'College Planning']
+    college_planning_completed_current = sum(
+    1 for t in active_college_tasks if t['is_completed'])
+    total_college_planning_completed = sum(
+    1 for t in all_tasks if t['is_completed'] and t['category'] == 'College Planning')
+
+    # --- Key Stat Calculations ---
+    sat_ebrw = stats.get("sat_ebrw")
+    sat_math = stats.get("sat_math")
+    sat_total = None
+    if sat_ebrw and sat_math:
+    try:
+    sat_total = int(sat_ebrw) + int(sat_math)
+    except (ValueError, TypeError):
+    sat_total = None
+
+    act_scores = []
+    if stats.get("act_math"):
+    act_scores.append(int(stats.get("act_math")))
+    if stats.get("act_reading"):
+    act_scores.append(int(stats.get("act_reading")))
+    if stats.get("act_science"):
+    act_scores.append(int(stats.get("act_science")))
+
+    act_average = round(sum(act_scores) / len(act_scores)
+    ) if act_scores else None
+
+    # --- Recent Activity Fetch ---
+    recent_activities_raw = db.select(
+    "activity_log",
+    where={"user_id": user_id},
+    order_by="created_at DESC LIMIT 5"
+    )
+    recent_activities = []
+    for activity in recent_activities_raw:
+    details = json.loads(activity['details'])
+    recent_activities.append({
+    "type": activity['activity_type'],
+    "details": details,
+    "timestamp": activity['created_at']
+    })
+
+    # --- Data for Activity Chart (UPDATED FOR TIMEZONE) ---
+    user_tz_str = session.get('timezone', 'UTC')
+    try:
+    user_tz = ZoneInfo(user_tz_str)
+    except ZoneInfoNotFoundError:
+    user_tz = ZoneInfo("UTC")
+
+    today = datetime.now(user_tz).date()
+    seven_days_ago = today - timedelta(days=6)
+    activity_counts = {(seven_days_ago + timedelta(days=i)
+    ).strftime('%a'): 0 for i in range(7)}
+    recent_logs = db.execute(
+    "SELECT created_at FROM activity_log WHERE user_id = ? AND date(created_at) >= ?",
+    (user_id, seven_days_ago.strftime('%Y-%m-%d'))
+    )
+    if recent_logs:
+    for log in recent_logs:
+    utc_dt = datetime.strptime(
+    log['created_at'], '%Y-%m-%d %H:%M:%S').replace(tzinfo=ZoneInfo("UTC"))
+    user_local_dt = utc_dt.astimezone(user_tz)
+    log_date_str = user_local_dt.strftime('%a')
+    if log_date_str in activity_counts:
+    activity_counts[log_date_str] += 1
+    activity_data = {
+    "labels": list(activity_counts.keys()),
+    "data": list(activity_counts.values())
+    }
+
+    # --- Upcoming Test Date Logic ---
+    test_date_info = {
+    "days_left": None,
+    "date_str": None,
+    "test_type": None
+    }
+    test_path_stats = stats.get("test_path", {})
+    if test_path_stats.get("test_date"):
+    try:
+    test_date = datetime.strptime(
+    test_path_stats["test_date"], '%Y-%m-%d').date()
+    days_left = (test_date - date.today()).days
+    if days_left >= 0:
+    test_date_info["days_left"] = days_left
+    test_date_info["date_str"] = test_date.strftime('%B %d, %Y')
+    if test_path_stats.get("desired_sat"):
+    test_date_info["test_type"] = "SAT"
+    elif test_path_stats.get("desired_act"):
+    test_date_info["test_type"] = "ACT"
+    except (ValueError, TypeError):
+    pass
+
+    # --- EXPANDED Achievements Logic ---
+    all_achievements = [
+    {"id": "pioneer_test", "icon": "🚀", "title": "Test Prep Pioneer",
+    "description": "Generated your first Test Prep path.", "is_earned": False},
+    {"id": "planner_college", "icon": "🏛️", "title": "College Planner",
+    "description": "Generated your first College Planning path.", "is_earned": False},
+    {"id": "first_step", "icon": "✅", "title": "First Step",
+    "description": "Completed your first task.", "is_earned": False},
+    {"id": "task_master_10", "icon": "🔥", "title": "Task Master",
+    "description": "Completed 10 tasks.", "is_earned": False},
+    {"id": "pathfinder_pro_25", "icon": "🏆", "title": "Pathfinder Pro",
+    "description": "Completed 25 tasks.", "is_earned": False},
+    {"id": "streak_3", "icon": "⚡", "title": "On a Roll",
+    "description": "Maintained a 3-day streak.", "is_earned": False},
+    {"id": "streak_7", "icon": "🌟", "title": "Committed",
+    "description": "Maintained a 7-day streak.", "is_earned": False},
+    {"id": "points_100", "icon": "💯", "title": "Point Collector",
+    "description": "Earned 100 points.", "is_earned": False},
+    {"id": "points_500", "icon": "💎", "title": "Point Pro",
+    "description": "Earned 500 points.", "is_earned": False}
+    ]
+
+    all_completed_tasks = total_test_prep_completed + total_college_planning_completed
+
+    # Check which achievements are earned
+    if any(t['category'] == 'Test Prep' for t in all_tasks):
+    all_achievements[0]['is_earned'] = True
+    if any(t['category'] == 'College Planning' for t in all_tasks):
+    all_achievements[1]['is_earned'] = True
+    if all_completed_tasks >= 1:
+    all_achievements[2]['is_earned'] = True
+    if all_completed_tasks >= 10:
+    all_achievements[3]['is_earned'] = True
+    if all_completed_tasks >= 25:
+    all_achievements[4]['is_earned'] = True
+    if game_stats['streak'] >= 3:
+    all_achievements[5]['is_earned'] = True
+    if game_stats['streak'] >= 7:
+    all_achievements[6]['is_earned'] = True
+    if game_stats['points'] >= 100:
+    all_achievements[7]['is_earned'] = True
+    if game_stats['points'] >= 500:
+    all_achievements[8]['is_earned'] = True
+
+    earned_achievements = [a for a in all_achievements if a['is_earned']]
+
+    return render_template(
+    "dashboard.html",
+    name=name,
+    test_prep_completed=test_prep_completed_current,
+    college_planning_completed=college_planning_completed_current,
+    gpa=stats.get("gpa") or "—",
+    sat_total=sat_total or "—",
+    act_average=act_average or "—",
+    recent_activities=recent_activities,
+    activity_data=json.dumps(activity_data),
+    test_date_info=test_date_info,
+    earned_achievements=earned_achievements,
+    game_stats=game_stats,
+    suggestion=suggestion
+    )
+
+
+    @app.route('/account', methods=['GET', 'POST'])
+    @login_required
+    def account(user):
+    if request.method == 'POST':
+    form_type = request.form.get('form_type')
+
+    if form_type == 'name':
+    new_name = request.form.get('name')
+    db.update('users', {'name': new_name}, {'id': user.data['id']})
+
+    elif form_type == 'email':
+    new_email = request.form.get('email')
+    existing_user = db.select('users', where={'email': new_email})
+    if not existing_user or existing_user[0]['id'] == user.data['id']:
+    db.update('users', {'email': new_email},
+    {'id': user.data['id']})
+    session['user'] = new_email # Update session
+
+    elif form_type == 'password':
+    current_password = request.form.get('current_password')
+    new_password = request.form.get('new_password')
+    confirm_password = request.form.get('confirm_password')
+
+    if check_password_hash(user.data['password'], current_password) and new_password == confirm_password:
+    hashed_password = generate_password_hash(new_password)
+    db.update('users', {'password': hashed_password}, {
+    'id': user.data['id']})
+
+    elif form_type == 'pfp':
+    if 'pfp' in request.files:
+    file = request.files['pfp']
+    if file.filename != '':
+    # --- START: DELETE OLD PFP LOGIC (Corrected) ---
+    old_pfp_path = user.get_profile_picture()
+    if old_pfp_path:
+    # Construct the absolute path from the app's root
+    base_dir = os.path.abspath(os.path.dirname(__file__))
+    full_old_path = os.path.join(
+    base_dir, old_pfp_path.lstrip('/'))
+    if os.path.exists(full_old_path):
+    os.remove(full_old_path)
+    # --- END: DELETE OLD PFP LOGIC (Corrected) ---
+
+    filename = secure_filename(file.filename)
+    timestamp = int(datetime.now().timestamp())
+    unique_filename = f"{user.data['id']}_{timestamp}_{filename}"
+    filepath = os.path.join(
+    app.config['UPLOAD_FOLDER'], unique_filename)
+    file.save(filepath)
+
+    db_filepath = f"/{app.config['UPLOAD_FOLDER']}/{unique_filename}"
+    db.update('users', {'profile_picture': db_filepath}, {
+    'id': user.data['id']})
+
+    user.load_user()
+    return render_template('account.html', user=user, profile_picture=user.data.get('profile_picture'))
+
+
+    @app.route("/dashboard/test-path-builder", methods=["GET", "POST"])
+    @login_required
+    def test_path_builder(user):
+    stats = user.get_stats()
+    if request.method == "POST":
+    test_path = {
+    "desired_sat": request.form.get("desired_sat", ""),
+    "desired_act": request.form.get("desired_act", ""),
+    "test_date": request.form.get("test_date", ""),
+    "test_time": request.form.get("test_time", ""),
+    "strengths": request.form.get("strengths", ""),
+    "weaknesses": request.form.get("weaknesses", "")
+    }
+    stats["test_path"] = test_path
+    user.set_stats(stats)
+    _generate_and_save_new_test_path(
+    user.data['id'], test_path)
+    return redirect(url_for("test_path_view"))
+    return render_template("test_path_builder.html", **stats.get("test_path", {}))
+
+
+    @app.route("/dashboard/test-path-view")
+    @login_required
+    def test_path_view(user):
+    return render_template("test_path_view.html")
+
+
+    @app.route("/dashboard/college-path-builder", methods=["GET", "POST"])
+    @login_required
+    def college_path_builder(user):
+    stats = user.get_stats()
+    if request.method == "POST":
+    college_context = {
+    'grade': request.form.get('current_grade'),
+    'planning_stage': request.form.get('planning_stage'),
+    'majors': request.form.get('interested_majors'),
+    'target_colleges': request.form.get('target_colleges', '')
+    }
+    stats['college_path'] = college_context
+    user.set_stats(stats)
+    _generate_and_save_new_college_path(user.data['id'], college_context)
+    return redirect(url_for('college_path_view'))
+    return render_template("college_path_builder.html", **stats.get('college_path', {}))
+
+
+    @app.route('/dashboard/college-path-view')
+    @login_required
+    def college_path_view(user):
+    return render_template("college_path_view.html")
+
+    # --- Stats & Tracker Routes ---
+
+
+    @app.route("/dashboard/stats", methods=["GET"])
+    @login_required
+    def stats(user):
+    stats = user.get_stats()
+    user_id = user.data['id']
+    all_tasks = db.select("paths", where={"user_id": user_id})
+
+    # --- SERVER-SIDE CALCULATION FIXES ---
+    # SAT Total
+    sat_ebrw = stats.get("sat_ebrw")
+    sat_math = stats.get("sat_math")
+    sat_total = None
+    if sat_ebrw and sat_math:
+    try:
+    sat_total = int(sat_ebrw) + int(sat_math)
+    except (ValueError, TypeError):
+    sat_total = None # Handle case where values are not valid integers
+
+    # ACT Average
+    act_scores = []
+    if stats.get("act_math"):
+    act_scores.append(int(stats.get("act_math")))
+    if stats.get("act_reading"):
+    act_scores.append(int(stats.get("act_reading")))
+    if stats.get("act_science"):
+    act_scores.append(int(stats.get("act_science")))
+
+    act_average = None
+    if act_scores:
+    act_average = round(sum(act_scores) / len(act_scores))
+
+    total_test_prep_completed = sum(
+    1 for t in all_tasks if t['is_completed'] and t['category'] == 'Test Prep')
+    total_college_planning_completed = sum(
+    1 for t in all_tasks if t['is_completed'] and t['category'] == 'College Planning')
+
+    return render_template(
+    "stats.html",
+    gpa=stats.get("gpa", ""),
+    sat_ebrw=sat_ebrw,
+    sat_math=sat_math,
+    sat_total=sat_total,
+    act_math=stats.get("act_math", ""),
+    act_reading=stats.get("act_reading", ""),
+    act_science=stats.get("act_science", ""),
+    act_average=act_average,
+    total_test_prep_completed=total_test_prep_completed,
+    total_college_planning_completed=total_college_planning_completed
+    )
+
+
+    @app.route("/dashboard/stats/edit", methods=["GET", "POST"])
+    @login_required
+    def edit_stats(user):
+    stats = user.get_stats()
+    if request.method == "POST":
+    updated_stats = {
+    "gpa": request.form.get("gpa", ""),
+    "sat_ebrw": request.form.get("sat_ebrw", ""),
+    "sat_math": request.form.get("sat_math", ""),
+    "act_math": request.form.get("act_math", ""),
+    "act_reading": request.form.get("act_reading", ""),
+    "act_science": request.form.get("act_science", "")
+    }
+
+    for key, value in updated_stats.items():
+    # Log an activity only if the value has changed
+    if stats.get(key) != value and value:
+    stats[key] = value
+    log_activity(user.data['id'], 'stat_updated', {
+    'stat_name': key.upper(), 'stat_value': value})
+
+    user.set_stats(stats)
+    return redirect(url_for("stats"))
+
+    return render_template(
+    "edit_stats.html",
+    sat_ebrw=stats.get("sat_ebrw", ""), sat_math=stats.get("sat_math", ""),
+    act_math=stats.get("act_math", ""), act_reading=stats.get("act_reading", ""),
+    act_science=stats.get("act_science", ""), gpa=stats.get("gpa", "")
+    )
+
+
+    @app.route("/dashboard/tracker")
+    @login_required
+    def tracker(user):
+    user_id = user.data['id']
+    all_tasks = db.select(
+    "paths", where={"user_id": user_id}, order_by="created_at DESC")
+    test_prep_generations, college_planning_generations = {}, {}
+
+    for task in all_tasks:
+    generation_key, category = task['created_at'], task['category']
+    if category == 'Test Prep':
+    if generation_key not in test_prep_generations:
+    test_prep_generations[generation_key] = []
+    test_prep_generations[generation_key].append(task)
+    elif category == 'College Planning':
+    if generation_key not in college_planning_generations:
+    college_planning_generations[generation_key] = []
+    college_planning_generations[generation_key].append(task)
+
+    stat_history_processed = {
+    "sat_math": [], "sat_ebrw": [], "act_math": [],
+    "act_reading": [], "act_science": [], "colleges_researched": [],
+    "applications_submitted": [], "essay_progress": [],
+    "sat_total": [], "act_composite": []
+    }
+    history_records = db.select(
+    "stat_history", where={"user_id": user_id}, order_by="recorded_at ASC")
+    for record in history_records:
+    stat_name, stat_value, recorded_at = record['stat_name'], record['stat_value'], record['recorded_at']
+    if stat_name in stat_history_processed:
+    try:
+    stat_history_processed[stat_name].append({
+    "date": recorded_at.split(" ")[0],
+    "value": int(stat_value)
+    })
+    except (ValueError, TypeError):
+    continue
+    return render_template(
+    "tracker.html",
+    stat_history=stat_history_processed,
+    test_prep_generations=test_prep_generations,
+    college_planning_generations=college_planning_generations
+    )
+    # --- API ROUTES ---
+
+    # ... (Previous API routes are unchanged)
+
+
+    @app.route('/api/test-path-status')
+    @login_required
+    def test_path_status(user):
+    user_id = user.data['id']
+    active_tasks = db.select(
+    "paths", where={"user_id": user_id, "is_active": True, "category": "Test Prep"})
+    return jsonify({"has_path": bool(active_tasks)})
+
+
+    @app.route('/api/college-path-status')
+    @login_required
+    def college_path_status(user):
+    user_id = user.data['id']
+    active_tasks = db.select(
+    "paths", where={"user_id": user_id, "is_active": True, "category": "College Planning"})
+    return jsonify({"has_path": bool(active_tasks)})
+
+
+    @app.route("/api/tasks", methods=['GET', 'POST'])
+    @login_required
+    def api_tasks(user):
+    user_id = user.data['id']
+    stats = user.get_stats()
+    category = request.args.get('category', 'Test Prep')
+    try:
+    latest_task_query = """
+    SELECT created_at FROM paths
+    WHERE user_id=? AND category=? AND is_active=True
+    ORDER BY created_at DESC LIMIT 1
+    """
+    latest_task_timestamp_result = db.execute(
+    latest_task_query, (user_id, category))
+
+    active_path = []
+    if latest_task_timestamp_result:
+    latest_timestamp = latest_task_timestamp_result[0]['created_at']
+    active_path = db.select(
+    "paths", where={
+    "user_id": user_id,
+    "is_active": True,
+    "category": category,
+    "created_at": latest_timestamp
+    })
+
+    if request.method == "POST" or not active_path:
+    chat_record_list = db.select("chat_conversations", where={
+    "user_id": user_id, "category": category})
+    chat_history = json.loads(
+    chat_record_list[0]['history']) if chat_record_list else []
+    if category == 'College Planning':
+    college_context = stats.get("college_path", {})
+    tasks = _generate_and_save_new_college_path(
+    user_id, college_context, chat_history)
+    else:
+    test_path_info = stats.get("test_path", {})
+    tasks = _generate_and_save_new_test_path(
+    user_id, test_path_info, chat_history)
+    return jsonify(tasks)
+
+    if active_path:
+    active_path = sorted(active_path, key=lambda x: x['task_order'])
+    tasks_with_subtasks = []
+    for r in active_path:
+    task_id = r['id']
+    subtasks_raw = db.select(
+    "subtasks", where={"parent_task_id": task_id})
+    subtasks = [{"id": s['id'], "description": s['description'],
+    "is_completed": bool(s['is_completed'])} for s in subtasks_raw]
+
+    tasks_with_subtasks.append({
+    "id": task_id,
+    "description": r['description'],
+    "reason": r['reason'],
+    "is_completed": bool(r['is_completed']),
+    "type": r['type'],
+    "stat_to_update": r['stat_to_update'],
+    "due_date": r['due_date'],
+    "is_user_added": bool(r['is_user_added']),
+    "subtasks": subtasks
+    })
+    return jsonify(tasks_with_subtasks)
+
+    return jsonify([])
+    except Exception as e:
+    print(f"API tasks error for category {category}: {e}")
+    return jsonify({"error": "An error occurred"}), 500
+
+
+    @app.route("/api/update_task_status", methods=['POST'])
+    @login_required
+    def api_update_task_status(user):
+    user_id = user.data['id']
+    data = request.get_json()
+    status = data.get("status")
+    task_id = data.get("taskId")
+
+    if status == 'complete' and task_id:
+    task_info_list = db.select(
+    "paths", where={"id": task_id, "user_id": user_id})
+    # Check if not already completed
+    if task_info_list and not task_info_list[0]['is_completed']:
+    task_info = task_info_list[0]
+    description = task_info['description']
+    category = task_info['category']
+    task_type = task_info['type']
+
+    db.update("paths", {"is_completed": True}, where={
+    "id": task_id, "user_id": user_id})
+    log_activity(user_id, 'task_completed', {
+    'description': description, 'category': category})
+
+    # --- GAMIFICATION LOGIC ---
+    points_to_add = 25 if task_type == 'milestone' else 10
+    if "boss battle" in description.lower():
+    points_to_add = 100
+
+    game_stats_row = db.select(
+    "gamification_stats", where={"user_id": user_id})[0]
+    game_stats = {
+    "points": game_stats_row['points'],
+    "streak": game_stats_row['current_streak'],
+    "last_date": game_stats_row['last_completed_date']
+    }
+
+    today = date.today()
+    yesterday = today - timedelta(days=1)
+    last_completed_date = None
+    if game_stats['last_date']:
+    last_completed_date = date.fromisoformat(
+    game_stats['last_date'])
+
+    new_streak = game_stats['streak']
+    if last_completed_date == today:
+    # Already completed a task today, just add points
+    new_streak = game_stats['streak']
+    elif last_completed_date == yesterday:
+    # Continuing a streak
+    new_streak += 1
+    else:
+    # Reset streak
+    new_streak = 1
+
+    db.update("gamification_stats", {
+    "points": game_stats['points'] + points_to_add,
+    "current_streak": new_streak,
+    "last_completed_date": today.isoformat()
+    }, where={"user_id": user_id})
+
+    return jsonify({"success": True})
+
+
+    @app.route("/api/chat", methods=['POST'])
+    @login_required
+    def api_chat(user):
+    user_id = user.data['id']
+    stats = user.get_stats()
+    data = request.get_json()
+    history = data.get("history", [])
+    category = request.args.get('category', 'Test Prep')
+
+    if not history or (len(history) == 1 and history[0]['role'] == 'user' and history[0]['content'] ==
+    'INITIAL_MESSAGE'):
+    history = []
+
+    # Fetch tracker data for chat context
+    stat_history = _get_stat_history_for_prompt(user_id)
+
+    user_message = history[-1]['content'].lower() if history else ""
+    if "regenerate" in user_message or "new path" in user_message or "change" in user_message:
+    if category == 'College Planning':
+    college_context = stats.get("college_path", {})
+    new_tasks = _generate_and_save_new_college_path(
+    user_id, college_context, chat_history=history)
+    else:
+    test_path_info = stats.get("test_path", {})
+    new_tasks = _generate_and_save_new_test_path(
+    user_id, test_path_info, chat_history=history)
+
+    if history:
+    history.append(
+    {"role": "assistant", "content": "I've generated a new path for you based on our conversation."})
+
+    # UPDATED LOGIC: Use upsert for simplicity and reliability
+    db.upsert("chat_conversations", {
+    "user_id": user_id,
+    "category": category,
+    "history": json.dumps(history)
+    }, conflict_target=["user_id", "category"])
+
+    return jsonify({"new_path": new_tasks})
+
+    if category == 'College Planning':
+    reply = _get_college_planning_ai_chat_response(
+    history, stats, stat_history)
+    else:
+    reply = _get_test_prep_ai_chat_response(history, stats, stat_history)
+
+    history.append({"role": "assistant", "content": reply})
+
+    # UPDATED LOGIC: Use upsert for simplicity and reliability
+    db.upsert("chat_conversations", {
+    "user_id": user_id,
+    "category": category,
+    "history": json.dumps(history)
+    }, conflict_target=["user_id", "category"])
+
+    return jsonify({"reply": reply})
+
+
+    @app.route('/api/chat_history')
+    @login_required
+    def get_chat_history(user):
+    user_id = user.data['id']
+    category = request.args.get('category')
+    chat_record_list = db.select("chat_conversations", where={
+    "user_id": user_id, "category": category})
+    if chat_record_list:
+    history = json.loads(chat_record_list[0]['history'])
+    return jsonify(history)
+    return jsonify([])
+
+
+    @app.route('/api/reset_chat', methods=['POST'])
+    @login_required
+    def reset_chat_history(user):
+    user_id = user.data['id']
+    data = request.get_json()
+    category = data.get('category')
+    if not category:
+    return jsonify({"success": False, "error": "Category is required"}), 400
+    try:
+    db.delete("chat_conversations", where={
+    "user_id": user_id, "category": category})
+    return jsonify({"success": True})
+    except Exception as e:
+    print(f"Error resetting chat: {e}")
+    return jsonify({"success": False, "error": "Could not reset chat"}), 500
+
+
+    @app.route("/api/update_stats", methods=['POST'])
+    @login_required
+    def api_update_stats(user):
+    data = request.get_json()
+    stat_name = data.get("stat_name")
+    stat_value = data.get("stat_value")
+
+    if not stat_name or stat_value is None:
+    return jsonify({"success": False, "error": "Missing stat name or value"}), 400
+
+    try:
+    # Always record in history
+    db.insert("stat_history", {
+    "user_id": user.data['id'], "stat_name": stat_name, "stat_value": stat_value
+    })
+
+    # Only update the main stats blob if it's not a temporary practice score
+    if stat_name not in ["sat_total", "act_composite"]:
+    stats = user.get_stats()
+    stats[stat_name] = stat_value
+    user.set_stats(stats)
+    # LOGGING for main stats
+    log_activity(user.data['id'], 'stat_updated', {
+    'stat_name': stat_name.upper(), 'stat_value': stat_value})
+
+    return jsonify({"success": True, "message": "Stats updated successfully"})
+    except Exception as e:
+    print(f"Error updating stats via API: {e}")
+    return jsonify({"success": False, "error": "Server error"}), 500
+
+    # --- NEW TASK & SUBTASK MANAGEMENT API ROUTES ---
+
+
+    @app.route('/api/add_task', methods=['POST'])
+    @login_required
+    def add_task(user):
+    user_id = user.data['id']
+    data = request.get_json()
+    description = data.get('description')
+    category = data.get('category')
+    due_date = data.get('due_date')
+
+    if not description or not category:
+    return jsonify({"success": False, "error": "Description and category are required"}), 400
+
+    # Get the highest task order for the current active path
+    latest_task_query = "SELECT MAX(task_order) as max_order FROM paths WHERE user_id=? AND category=? AND
+    is_active=True"
+    max_order_result = db.execute(latest_task_query, (user_id, category))
+    new_order = (max_order_result[0]['max_order'] or 0) + 1
+
+    task_id = db.insert("paths", {
+    "user_id": user_id,
+    "task_order": new_order,
+    "description": description,
+    "is_completed": False,
+    "is_active": True,
+    "type": "standard", # User-added tasks are standard by default
+    "category": category,
+    "due_date": due_date,
+    "is_user_added": True
+    })
+
+    new_task = {
+    "id": task_id, "description": description, "is_completed": False, "type": "standard",
+    "stat_to_update": None, "due_date": due_date, "is_user_added": True, "subtasks": []
+    }
+    log_activity(user_id, 'task_added', {
+    'description': description, 'category': category})
+    return jsonify({"success": True, "task": new_task})
+
+
+    @app.route('/api/add_subtask', methods=['POST'])
+    @login_required
+    def add_subtask(user):
+    data = request.get_json()
+    parent_task_id = data.get('parent_task_id')
+    description = data.get('description')
+
+    if not parent_task_id or not description:
+    return jsonify({"success": False, "error": "Parent task ID and description are required"}), 400
+
+    subtask_id = db.insert("subtasks", {
+    "parent_task_id": parent_task_id,
+    "description": description,
+    "is_completed": False
+    })
+    new_subtask = {"id": subtask_id,
+    "description": description, "is_completed": False}
+    return jsonify({"success": True, "subtask": new_subtask})
+
+
+    @app.route('/api/update_task_deadline', methods=['POST'])
+    @login_required
+    def update_task_deadline(user):
+    data = request.get_json()
+    task_id = data.get('taskId')
+    due_date = data.get('dueDate') # Can be a date string or None
+
+    db.update("paths", {"due_date": due_date}, where={"id": task_id})
+    return jsonify({"success": True})
+
+
+    @app.route('/api/update_subtask', methods=['POST'])
+    @login_required
+    def update_subtask(user):
+    data = request.get_json()
+    subtask_id = data.get('subtaskId')
+    is_completed = data.get('is_completed')
+
+    db.update("subtasks", {"is_completed": is_completed},
+    where={"id": subtask_id})
+    return jsonify({"success": True})
+
+    # --- NEW ESSAY ANALYSIS ROUTE (with more granular feedback) ---
+
+
+    @app.route('/api/analyze_essay', methods=['POST'])
+    @login_required
+    def analyze_essay(user):
+    data = request.get_json()
+    essay_text = data.get('essay_text')
+    essay_prompt = data.get(
+    'essay_prompt', 'a general college application essay')
+
+    if not essay_text:
+    return jsonify({"error": "Essay text is required."}), 400
+
+    prompt = (
+    f"You are an expert college admissions essay coach. Your goal is to provide constructive, actionable, and granular
+    feedback on a student's essay. "
+    f"Analyze the following essay written for the prompt: '{essay_prompt}'.\n\n"
+    f"Essay Text:\n\"\"\"\n{essay_text}\n\"\"\"\n\n"
+    f"Provide feedback in the following structure, using markdown for formatting. **Crucially, when you identify a
+    strength or an area for improvement, you MUST include a short, direct quote from the essay to illustrate your
+    point.**\n\n"
+    f"### Overall Impression\n"
+    f"A brief, encouraging summary of your initial thoughts on the essay.\n\n"
+    f"### Strengths\n"
+    f"- **Clarity and Focus:** How well does the essay address the prompt? Is there a clear central theme? (Include a
+    quote that demonstrates this strength.)\n"
+    f"- **Voice and Tone:** Does the student's personality come through? Is the tone appropriate? (Include a quote that
+    demonstrates this strength.)\n"
+    f"- **Structure and Flow:** Is the essay well-organized with a logical progression of ideas? (Include a quote that
+    demonstrates this strength.)\n\n"
+    f"### Areas for Improvement\n"
+    f"- **Introduction:** Does the opening hook the reader effectively? (Include the opening sentence(s) and suggest how
+    to make it more engaging.)\n"
+    f"- **Body Paragraphs:** Is there enough specific detail, reflection, and 'show, don't tell' examples? Are there
+    areas that could be expanded or clarified? (Include a quote that could be improved.)\n"
+    f"- **Conclusion:** Does the conclusion effectively summarize the main points and leave a lasting impression?
+    (Include the concluding sentence(s) and suggest how to make it more impactful.)\n"
+    f"- **Grammar and Mechanics:** Note any recurring grammatical errors, awkward phrasing, or typos, but do not rewrite
+    the essay. (Include a quote with an error and explain the correction.)\n\n"
+    f"### Actionable Next Steps\n"
+    f"1. Provide the student with 2-3 specific, concrete steps they can take to improve their next draft.\n"
+    f"2. Keep the feedback encouraging and constructive."
+    )
+
+    try:
+    model = genai.GenerativeModel('gemini-2.5-flash')
+    response = model.generate_content(prompt)
+    return jsonify({"feedback": response.text})
+    except Exception as e:
+    print(f"Error in essay analysis: {e}")
+    return jsonify({"error": "Failed to analyze the essay."}), 500
+
+
+    def _get_proactive_ai_suggestions(user):
+    """Generates a proactive suggestion for the user based on their data."""
+    if not os.getenv("GEMINI_API_KEY"):
+    return "Welcome to Mentics! Complete some tasks to get personalized suggestions."
+
+    user_id = user.data['id']
+    stats = user.get_stats()
+    onboarding_data = json.loads(
+    user.data['onboarding_data']) if user.data['onboarding_data'] else {}
+    stat_history = _get_stat_history_for_prompt(user_id)
+
+    gamification_stats_list = db.select(
+    "gamification_stats", where={"user_id": user_id})
+    gamification_stats = gamification_stats_list[0] if gamification_stats_list else {
+    }
+
+    # Get last 5 completed tasks
+    completed_tasks_raw = db.select(
+    "activity_log",
+    where={"user_id": user_id, "activity_type": "task_completed"},
+    order_by="created_at DESC LIMIT 5"
+    )
+    completed_tasks = [json.loads(task['details'])['description']
+    for task in completed_tasks_raw]
+
+    prompt = (
+    f"You are an AI mentor for a high school student, acting as a supportive coach. Your task is to provide one, single,
+    non-task-based suggestion that serves as a progress check-in, a gentle reminder, or a mental state booster. Your
+    tone should be encouraging, insightful, and focused on the student's overall well-being and journey, not just their
+    immediate to-do list.\n\n"
+    f"Analyze the user's data to find a pattern or a key insight:\n"
+    f"- Onboarding Goal: {onboarding_data.get('goal', 'Not specified')}\n"
+    f"- Onboarding Anxieties: {onboarding_data.get('anxieties', 'Not specified')}\n"
+    f"- Current GPA: {stats.get('gpa', 'N/A')}\n"
+    f"- SAT Math: {stats.get('sat_math', 'N/A')}\n"
+    f"- SAT EBRW: {stats.get('sat_ebrw', 'N/A')}\n"
+    f"- ACT Composite: {stats.get('act_average', 'N/A')}\n"
+    f"- Day Streak: {gamification_stats.get('current_streak', 0)}\n"
+    f"- Last 5 Completed Tasks: {', '.join(completed_tasks) if completed_tasks else 'None'}\n"
+    f"- Stat History:\n{stat_history}\n\n"
+    f"Based on this data, provide one concise and encouraging insight. **Do not suggest a new task.** Instead, focus on
+    motivation, strategy, and well-being. Here are some examples of the tone and style you should adopt:\n"
+    f"- (If streak is high): 'A {gamification_stats.get('current_streak', 0)}-day streak is amazing! That consistency is
+    what builds success. Keep up the great momentum.'\n"
+    f"- (If a score dipped): 'I noticed your last SAT Math score was a little lower. That's a normal part of the
+    process! It's a great opportunity to review your notes and see what you can learn from it.'\n"
+    f"- (If anxieties were about time management): 'Remember when you said you were worried about time management?
+    You've been consistently completing tasks. That shows real progress in building good habits.'\n"
+    f"- (If no recent activity): 'Just checking in! Remember that even small steps forward are still steps. You've got
+    this.'\n\n"
+    f"Your response must be a single, encouraging sentence or two."
+    )
+
+    try:
+    model = genai.GenerativeModel('gemini-2.5-flash-lite')
+    response = model.generate_content(prompt)
+    return response.text.strip()
+    except Exception as e:
+    print(f"Error in proactive suggestion generation: {e}")
+    return "Welcome to Mentics! Let's get started on your path to success."
+
+
+    # --- NEW SOCIAL ROUTES ---
+    @app.route('/leaderboard')
+    @login_required
+    def leaderboard(user):
+    # Fetch top 10 users by points
+    leaderboard_data = db.execute(
+    """
+    SELECT u.name, g.points
+    FROM gamification_stats g
+    JOIN users u ON g.user_id = u.id
+    ORDER BY g.points DESC
+    LIMIT 10
+    """
+    )
+    return render_template('leaderboard.html', leaderboard=leaderboard_data)
+
+
+    @app.route('/forum')
+    @app.route('/forum')
+    @login_required
+    def forum(user):
+    search_query = request.args.get('search', '')
+
+    # Base query for posts
+    post_query = "SELECT * FROM forum_posts"
+    params = []
+
+    if search_query:
+    post_query += " WHERE title LIKE ?"
+    params.append(f"%{search_query}%")
+
+    post_query += " ORDER BY created_at DESC"
+    posts_raw = db.execute(post_query, tuple(params))
+    posts = [dict(row) for row in posts_raw]
+
+    # Fetch replies for each post
+    posts_with_replies = []
+    for post in posts:
+    replies_raw = db.select("forum_replies", where={
+    "post_id": post['id']}, order_by="created_at ASC")
+    post['replies'] = [dict(reply) for reply in replies_raw]
+    posts_with_replies.append(post)
+
+    # Fetch today's threads
+    today_str = date.today().strftime('%Y-%m-%d')
+    todays_threads_raw = db.execute(
+    "SELECT * FROM forum_posts WHERE date(created_at) = ? ORDER BY created_at DESC", (today_str,))
+    todays_threads = [dict(row) for row in todays_threads_raw]
+
+    return render_template('forum.html',
+    posts=posts_with_replies,
+    user_name=user.get_name(),
+    todays_threads=todays_threads,
+    search_query=search_query)
+
+
+    @app.route('/api/posts', methods=['POST'])
+    @login_required
+    def create_post(user):
+    data = request.get_json()
+    title = data.get('title')
+    content = data.get('content')
+    if title and content:
+    db.insert('forum_posts', {
+    'user_id': user.data['id'],
+    'user_name': user.get_name(),
+    'title': title,
+    'content': content
+    })
+    return jsonify({'success': True})
+    return jsonify({'success': False, 'error': 'Title and content are required'}), 400
+
+
+    @app.route('/api/replies', methods=['POST'])
+    @login_required
+    def create_reply(user):
+    data = request.get_json()
+    post_id = data.get('post_id')
+    content = data.get('content')
+    if post_id and content:
+    db.insert('forum_replies', {
+    'post_id': post_id,
+    'user_id': user.data['id'],
+    'user_name': user.get_name(),
+    'content': content
+    })
+    return jsonify({'success': True})
+    return jsonify({'success': False, 'error': 'Post ID and content are required'}), 400
+
+
+    # --- MAIN EXECUTION ---
+    if __name__ == "__main__":
+    init_db()
+    app.run(debug=True)

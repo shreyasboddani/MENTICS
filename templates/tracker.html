@@ -139,8 +139,9 @@
                                 </p>
                                 <ul class="mt-2 text-sm space-y-1">
                                     {% for task in tasks %}
-                                    <li class="flex items-center gap-2 {% if not task[4] %}text-slate-500{% endif %}">
-                                        {% if task[4] %}
+                                    <li
+                                        class="flex items-center gap-2 {% if not task['is_completed'] %}text-slate-500{% endif %}">
+                                        {% if task['is_completed'] %}
                                         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"
                                             class="w-5 h-5 text-emerald-500 flex-shrink-0">
                                             <path fill-rule="evenodd"
@@ -155,7 +156,7 @@
                                                 clip-rule="evenodd" />
                                         </svg>
                                         {% endif %}
-                                        <span>{{ task[3] }}</span>
+                                        <span>{{ task['description'] }}</span>
                                     </li>
                                     {% endfor %}
                                 </ul>
@@ -174,8 +175,9 @@
                                 </p>
                                 <ul class="mt-2 text-sm space-y-1">
                                     {% for task in tasks %}
-                                    <li class="flex items-center gap-2 {% if not task[4] %}text-slate-500{% endif %}">
-                                        {% if task[4] %}
+                                    <li
+                                        class="flex items-center gap-2 {% if not task['is_completed'] %}text-slate-500{% endif %}">
+                                        {% if task['is_completed'] %}
                                         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"
                                             class="w-5 h-5 text-emerald-500 flex-shrink-0">
                                             <path fill-rule="evenodd"
@@ -190,7 +192,7 @@
                                                 clip-rule="evenodd" />
                                         </svg>
                                         {% endif %}
-                                        <span>{{ task[3] }}</span>
+                                        <span>{{ task['description'] }}</span>
                                     </li>
                                     {% endfor %}
                                 </ul>

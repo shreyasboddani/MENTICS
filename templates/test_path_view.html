@@ -408,7 +408,7 @@
                 const isCompleted = task.status === 'complete';
                 const isUnlocked = index === firstPendingIndex;
                 const isLocked = index > firstPendingIndex && firstPendingIndex !== -1;
-                const isBossBattle = task.description.toLowerCase().includes('boss battle');
+                const isBossBattle = task.description.startsWith('Boss Battle:');
 
                 const alignmentWrapper = document.createElement('div');
                 alignmentWrapper.className = 'flex';
