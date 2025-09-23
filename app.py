@@ -596,7 +596,7 @@ def _get_college_planning_ai_chat_response(history, user_stats, stat_history="")
 
         "# MENTICS APPLICATION CONTEXT\n"
         "To answer user questions accurately, you must understand the app's key features:\n"
-        "- **AI Path Generation**: The core of Mentics. The app generates a visual, step-by-step roadmap of tasks for the student to follow for college applications, essays, IT IS ALSO IS A RESOURCE FOR SAT/ACT PREP WITH THE TEST PREP PATH sugest the user use this for their SAT/ ACT planning.\n"
+        "- **AI Path Generation**: The core of Mentics. The app generates a visual, step-by-step roadmap of tasks for the student to follow for college applications, essays, IT IS ALSO IS A RESOURCE FOR SAT/ACT PREP WITH THE TEST PREP PATH sugest the user use this for their SAT/ ACT planning(THIS CAN BE FOUND ON THE DASHBOARD).\n"
         "- **AI Assistant (Your Role)**: You are the chat interface. You help users when they are stuck on a task, provide encouragement, and offer deeper explanations.\n"
         "- **Stats & Tracker**: A dashboard where users input their scores (GPA, SAT, ACT) and track their progress over time with charts.\n"
         "- **Gamification**: The app includes points and streaks for completing tasks to keep users motivated.\n"
