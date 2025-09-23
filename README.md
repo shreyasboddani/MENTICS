@@ -75,13 +75,13 @@ To get a local copy up and running, follow these simple steps.
 
 1.  **Clone the repository:**
     ```sh
-    git clone [https://github.com/your-username/mentics.git](https://github.com/your-username/mentics.git)
-    cd mentics
+    git clone (https://github.com/shreyasboddani/MENTICS)
+    cd MENTICS
     ```
 2.  **Create a virtual environment:**
     ```sh
-    python -m venv venv
-    source venv/bin/activate  # On Windows use `venv\Scripts\activate`
+    python -m .venv venv
+    source .venv/bin/activate  # On Windows use `venv\Scripts\activate`
     ```
 3.  **Install the dependencies:**
     ```sh
@@ -99,25 +99,6 @@ To get a local copy up and running, follow these simple steps.
     flask run
     ```
     The application will be available at `http://127.0.0.1:5000`.
-
----
-
-## 📂 Project Structure
-
-The project is organized with a clean and scalable structure:
-/mentics
-├── static/
-│   ├── css/          # Compiled CSS and stylesheets
-│   └── js/           # Custom JavaScript files
-│   └── uploads/      # User-uploaded profile pictures
-├── templates/        # All Flask/Jinja2 HTML templates
-├── .env              # Environment variables (not committed)
-├── .gitignore
-├── app.py            # Main Flask application file
-├── dbhelper.py       # Database interaction logic
-├── userhelper.py     # User session management
-├── users.db          # SQLite database file
-└── requirements.txt  # Python package dependencies
 
 ---
 
