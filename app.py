@@ -231,6 +231,43 @@ def time_ago_filter(s):
 # --- AI HELPER FUNCTIONS (UPDATED) ---
 
 
+def _get_current_numbered_tasks(user_id, category):
+    """Helper function to get current active tasks with numbering for a specific category."""
+    latest_task_query = """
+        SELECT created_at FROM paths
+        WHERE user_id=? AND category=? AND is_active=True
+        ORDER BY created_at DESC LIMIT 1
+    """
+    latest_task_timestamp_result = db.execute(
+        latest_task_query, (user_id, category))
+
+    if not latest_task_timestamp_result:
+        return "No active tasks at the moment."
+
+    latest_timestamp = latest_task_timestamp_result[0]['created_at']
+    active_tasks = db.select(
+        "paths",
+        where={
+            "user_id": user_id,
+            "is_active": True,
+            "category": category,
+            "created_at": latest_timestamp
+        }
+    )
+
+    if not active_tasks:
+        return "No active tasks at the moment."
+
+    # Sort by task_order and create numbered list
+    active_tasks = sorted(active_tasks, key=lambda x: x['task_order'])
+    numbered_tasks = []
+    for i, task in enumerate(active_tasks, 1):
+        status = "✅ (Completed)" if task['is_completed'] else "⏳ (In Progress)"
+        numbered_tasks.append(f"Task {i}: {task['description']} - {status}")
+
+    return "\n".join(numbered_tasks)
+
+
 def _get_test_prep_ai_tasks(strengths, weaknesses, user_stats={}, chat_history=[], path_history={}, stat_history=""):
     """Generates test preparation tasks with a hyper-detailed prompt for maximum reliability."""
 
@@ -352,7 +389,7 @@ def _get_test_prep_ai_tasks(strengths, weaknesses, user_stats={}, chat_history=[
         return get_mock_tasks_reliably()
 
 
-def _get_test_prep_ai_chat_response(history, user_stats, stat_history=""):
+def _get_test_prep_ai_chat_response(history, user_stats, stat_history="", user_id=None):
     if not os.getenv("GEMINI_API_KEY"):
         return "I'm in testing mode, but I'm saving our conversation!"
 
@@ -371,13 +408,15 @@ def _get_test_prep_ai_chat_response(history, user_stats, stat_history=""):
         except ValueError:
             test_date_info = f"The student has set a test date, but it's in an invalid format: {test_date_str}."
 
-    # Pull additional student data
+        # Pull additional student data
     strengths = user_stats.get("strengths", "Not provided")
     weaknesses = user_stats.get("weaknesses", "Not provided")
     completed_tasks_str = user_stats.get("completed_tasks", "None")
     incomplete_tasks_str = user_stats.get("incomplete_tasks", "None")
 
-    # Build system message with all context
+    # Get current active tasks
+    current_tasks = "No tasks available." if user_id is None else _get_current_numbered_tasks(
+        user_id, "Test Prep")    # Build system message with all context
     system_message = (
         "# MISSION & IDENTITY\n"
         "You are an expert AI assistant for Mentics, a web app that creates personalized learning paths for high school students. Your specific persona is a highly adaptive, intelligent, and supportive SAT/ACT test prep coach. Your personality is encouraging yet focused, guiding students toward steady, measurable progress. You are a supplement to the main 'Path' feature, which visually lays out the student's learning journey.\n\n"
@@ -403,7 +442,8 @@ def _get_test_prep_ai_chat_response(history, user_stats, stat_history=""):
         f"- Weaknesses: {weaknesses}\n"
         f"- Recently Completed Tasks: {completed_tasks_str}\n"
         f"- Incomplete/Failed Tasks: {incomplete_tasks_str}\n"
-        f"- Historical Performance Data (from Tracker): {stat_history}\n\n"
+        f"- Historical Performance Data (from Tracker): {stat_history}\n"
+        f"- Current Active Tasks:\n{current_tasks}\n\n"
 
         "## CORE COACHING DIRECTIVES (Your Rules of Engagement)\n"
         "0.  **Initial Greeting**: Your very first message to the user *must* be a warm and encouraging welcome. It *must* also clearly state that they can type **'regenerate'** or **'new path'** at any time to get a new path based on your conversation.\n"
@@ -477,6 +517,43 @@ def _generate_and_save_new_test_path(user_id, test_path_info, chat_history=[]):
     # LOGGING
     log_activity(user_id, 'path_generated', {'category': 'Test Prep'})
     return saved_tasks
+
+
+def _get_current_numbered_tasks(user_id, category):
+    """Helper function to get current active tasks with numbering for a specific category."""
+    latest_task_query = """
+        SELECT created_at FROM paths
+        WHERE user_id=? AND category=? AND is_active=True
+        ORDER BY created_at DESC LIMIT 1
+    """
+    latest_task_timestamp_result = db.execute(
+        latest_task_query, (user_id, category))
+
+    if not latest_task_timestamp_result:
+        return "No active tasks at the moment."
+
+    latest_timestamp = latest_task_timestamp_result[0]['created_at']
+    active_tasks = db.select(
+        "paths",
+        where={
+            "user_id": user_id,
+            "is_active": True,
+            "category": category,
+            "created_at": latest_timestamp
+        }
+    )
+
+    if not active_tasks:
+        return "No active tasks at the moment."
+
+    # Sort by task_order and create numbered list
+    active_tasks = sorted(active_tasks, key=lambda x: x['task_order'])
+    numbered_tasks = []
+    for i, task in enumerate(active_tasks, 1):
+        status = "✅ (Completed)" if task['is_completed'] else "⏳ (In Progress)"
+        numbered_tasks.append(f"Task {i}: {task['description']} - {status}")
+
+    return "\n".join(numbered_tasks)
 
 
 def _get_college_planning_ai_tasks(college_context, user_stats, path_history, chat_history=[], stat_history=""):
@@ -583,12 +660,19 @@ def _get_college_planning_ai_tasks(college_context, user_stats, path_history, ch
         return get_mock_tasks_reliably()
 
 
-def _get_college_planning_ai_chat_response(history, user_stats, stat_history=""):
+def _get_college_planning_ai_chat_response(history, user_stats, stat_history="", user_id=None):
     """Generates a proactive and context-aware chat response for college planning."""
     if not os.getenv("GEMINI_API_KEY"):
         return "I'm in testing mode, but I'm saving our conversation!"
 
     college_info = user_stats.get("college_path", {})
+
+    # Get current active tasks
+    current_tasks = "No tasks available." if user_id is None else _get_current_numbered_tasks(
+        user_id, "College Planning")
+
+    # Get current active tasks
+    current_tasks = _get_current_numbered_tasks(user_id, "College Planning")
 
     system_message = (
         "# MISSION & IDENTITY\n"
@@ -617,6 +701,8 @@ def _get_college_planning_ai_chat_response(history, user_stats, stat_history="")
         f"- Recently Completed Tasks: {college_info.get('completed_tasks', 'None')}\n"
         f"- Incomplete/Failed Tasks: {college_info.get('incomplete_tasks', 'None')}\n"
         f"- Historical Performance Data (from Tracker): {stat_history}\n"
+        f"- Current Active Tasks (numbered for reference):\n{current_tasks}\n"
+        f"- Current Active Tasks:\n{current_tasks}\n"
 
 
         "## CORE COACHING DIRECTIVES (Your Rules of Engagement)\n"
@@ -1479,9 +1565,10 @@ def api_chat(user):
 
     if category == 'College Planning':
         reply = _get_college_planning_ai_chat_response(
-            history, stats, stat_history)
+            history, stats, stat_history, user_id)
     else:
-        reply = _get_test_prep_ai_chat_response(history, stats, stat_history)
+        reply = _get_test_prep_ai_chat_response(
+            history, stats, stat_history, user_id)
 
     history.append({"role": "assistant", "content": reply})
 
