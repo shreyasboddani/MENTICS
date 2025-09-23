@@ -312,7 +312,7 @@ def _get_test_prep_ai_tasks(strengths, weaknesses, user_stats={}, chat_history=[
         f"8.  **SAT Math Special Rule**: If weaknesses specifically show SAT Math struggles, at least one task MUST focus on Desmos as a skill-building tool (e.g., regressions, multi-equation regressions, graphing strategies).\n"
         f"9.  **Mentorship Tone**: Write tasks as if you are a coach guiding the student — supportive, motivating, and focused on measurable progress.\n"
         f"10. **FOCUS ON THE LATEST CHAT MESSAGE FROM THE USER** when regenerating for changes.\n"
-        f"11. **Intelligent Boss Battles**: A 'Boss Battle' is a major milestone, like a full practice test. Do not include one in every path. However, you should aim to include one every 2-3 paths to ensure the student is consistently tested on their progress. If the user has completed many standard tasks since the last Boss Battle, it is a good time to add one. The description for such a task MUST begin with 'Boss Battle AND SHOULD ALMOST ALWAYS BE THE LAST TASK (TASK 5) UNLESS NEEDED FIRST FOR PREFORMANCE GAUGING:'.\n\n"
+        f"11. **Intelligent Boss Battles**: A 'Boss Battle' is a major milestone, like a full practice test. Do not include one in every path. However, you should aim to ONLY include ONE every 2-3 paths to ensure the student is consistently tested on their progress. If the user has completed many standard tasks since the last Boss Battle, it is a good time to add one. The description for such a task MUST begin with 'Boss Battle AND SHOULD ALWAYS BE THE LAST TASK (TASK 5):'.\n\n"
 
         f"# JSON OUTPUT SCHEMA\n"
         f"Your output must conform strictly to this structure:\n"
@@ -520,14 +520,14 @@ def _get_college_planning_ai_tasks(college_context, user_stats, path_history, ch
         f"3.  **Stage-Appropriate Tasks**: Align difficulty and scope to grade and planning stage. (Example: 9th graders explore interests, 12th graders finalize applications.)\n"
         f"4.  **Novelty & Continuity**: Never repeat recent tasks. Every new roadmap should clearly extend or deepen their progress.\n"
         f"5.  **Meaningful Milestones**: Use 'milestone' only for major achievements (essay draft, submitting applications, updating GPA). Use 'standard' for exploratory/research tasks. 'stat_to_update' must be null for 'standard' tasks.\n"
-        f"6.  **Intelligent Boss Battles**: A 'Boss Battle' is a major milestone like submitting an application or finalizing an essay. You should include one every 2-3 paths to ensure the student is making significant progress. Base the timing on the student's grade and planning stage. The description for such a task MUST begin with 'Boss Battle AND SHOULD ALMOST ALWAYS BE THE LAST TASK (TASK 5) UNLESS NEEDED FIRST FOR PREFORMANCE GAUGING::'.\n\n"
+        f"6.  **Intelligent Boss Battles**: A 'Boss Battle' is a major milestone like submitting an application or finalizing an essay. You should ONLY include one every 2-3 paths to ensure the student is making significant progress. Base the timing on the student's grade and planning stage. The description for such a task MUST begin with 'Boss Battle AND SHOULD ALWAYS BE THE LAST TASK (TASK 5) ::'.\n\n"
 
         f"# JSON OUTPUT SCHEMA\n"
         f"Your output must conform strictly to this structure:\n"
         f"{{\n"
         f'  "tasks": [\n'
         f'    {{\n'
-        f'      "description": "A specific, actionable task including a markdown link. For major milestones, it must start with \'Boss Battle:\'.",\n'
+        f'      "description": "A specific, actionable task including a markdown link. (IF IT IS A MAJOR MILESTONE , it must start with \'Boss Battle:\').",\n'
         f'      "reason": "A brief, motivating explanation of why this task is important for the user\'s goal.",\n'
         f'      "type": "Either \'standard\' or \'milestone\'.",\n'
         f'      "stat_to_update": "A string (e.g., \'gpa\', \'essay_progress\', \'applications_submitted\') ONLY if type is milestone, otherwise null.",\n'

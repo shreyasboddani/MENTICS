@@ -43,7 +43,7 @@
                 <p class="text-slate-600">Tell us about your goals to create a personalized plan.</p>
             </div>
 
-            <form method="POST">
+            <form id="path-builder-form" method="POST">
                 <div class="space-y-5">
 
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -103,11 +103,23 @@
             </form>
         </div>
     </main>
+
+    <div id="builder-loader-overlay">
+        <div class="pulsing-loader"></div>
+        <p class="text-indigo-700 font-semibold text-lg mt-6">Crafting your college plan...</p>
+    </div>
+
     <script src="https://unpkg.com/aos@2.3.1/dist/aos.js"></script>
     <script>
         AOS.init({
             once: true,
             duration: 800
+        });
+
+        document.getElementById('path-builder-form').addEventListener('submit', function () {
+            const loader = document.getElementById('builder-loader-overlay');
+            loader.style.display = 'flex';
+            setTimeout(() => loader.classList.add('visible'), 10);
         });
     </script>
 </body>
