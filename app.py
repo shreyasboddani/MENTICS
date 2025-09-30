@@ -1914,4 +1914,8 @@ def create_reply(user):
     return jsonify({'success': False, 'error': 'Post ID and content are required'}), 400
 
 
-# --- MAIN EXECUTION ---
+@app.cli.command("init-db")
+def init_db_command():
+    """Create new tables in the database."""
+    init_db()
+    print("Initialized the database.")
