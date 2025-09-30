@@ -1,12 +1,22 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256">
   <defs>
-    <linearGradient id="mentics-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" style="stop-color:#a855f7" />
-      <stop offset="100%" style="stop-color:#6366f1" />
+    <!-- Gradient for the M -->
+    <linearGradient id="grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#ff2ea6"/>
+      <stop offset="100%" stop-color="#1e3aff"/>
+    </linearGradient>
+
+    <!-- Background gradient for glass effect -->
+    <linearGradient id="glass-bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="white" stop-opacity="0.4"/>
+      <stop offset="100%" stop-color="white" stop-opacity="0.1"/>
     </linearGradient>
   </defs>
+
+  <!-- Glass background circle -->
+  <circle cx="128" cy="128" r="124" fill="url(#glass-bg)" stroke="white" stroke-opacity="0.4" stroke-width="2"/>
   
-  <circle cx="50" cy="50" r="48" fill="rgba(255, 255, 255, 0.5)" stroke="rgba(255, 255, 255, 0.25)" stroke-width="2"/>
-  
-  <path d="M25 75 L40 35 L50 55 L60 35 L75 75" fill="none" stroke="url(#mentics-gradient)" stroke-width="12" stroke-linecap="round" stroke-linejoin="round"/>
+  <!-- M path -->
+  <path d="M64 192V64h32l32 48 32-48h32v128h-32v-64l-32 48-32-48v64H64z"
+        fill="none" stroke="url(#grad)" stroke-width="20" stroke-linejoin="round"/>
 </svg>
