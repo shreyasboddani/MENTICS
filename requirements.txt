@@ -50,7 +50,6 @@ Pygments
 pyparsing
 python-dateutil
 python-dotenv
-pywin32
 pyzmq
 six
 sniffio
