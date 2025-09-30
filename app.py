@@ -19,7 +19,7 @@ env_path = Path('.') / '.env'
 load_dotenv(dotenv_path=env_path)
 
 app = Flask(__name__)
-app.secret_key = "supersecretkey"
+app.secret_key = os.getenv("SECRET_KEY")
 # --- START: UPLOAD FOLDER CONFIGURATION ---
 app.config['UPLOAD_FOLDER'] = 'static/uploads'
 app.url_map.strict_slashes = False
