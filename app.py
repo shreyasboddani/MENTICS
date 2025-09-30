@@ -39,7 +39,8 @@ oauth.register(
     client_kwargs={'scope': 'openid email profile'}
 )
 
-db = DatabaseHandler("users.db")
+DB_PATH = os.path.join(os.environ.get('RENDER_DISK_PATH', '.'), 'users.db')
+db = DatabaseHandler(DB_PATH)
 
 
 def init_db():
