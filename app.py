@@ -1914,6 +1914,3 @@ def create_reply(user):
 
 
 # --- MAIN EXECUTION ---
-if __name__ == "__main__":
-    init_db()
-    app.run(debug=True)

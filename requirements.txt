@@ -64,3 +64,4 @@ typing_extensions==4.14.1
 wcwidth==0.2.13
 Werkzeug==3.1.3
 Authlib
+gunicorn
