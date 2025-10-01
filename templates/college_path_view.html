@@ -577,6 +577,10 @@
             const svg = document.getElementById('path-svg');
             if (!svg || !startNode || !endNode) return;
 
+            // Determine line color based on the page/path type
+            const isCollegePath = window.location.pathname.includes('college');
+            const strokeColor = isCollegePath ? '#C7D2FE' : '#C7B8F9';
+
             const containerRect = svg.getBoundingClientRect();
             const startRect = startNode.getBoundingClientRect();
             const endRect = endNode.getBoundingClientRect();
@@ -603,8 +607,12 @@
             const patternLength = dashLength + gapLength;
             const dashSegments = [];
 
+            // *** FIX APPLIED HERE ***
+            // Ensure the loop runs at least once to draw a line even if it's very short.
+            const loopUntil = Math.max(totalLength, patternLength);
+
             // Create individual line segments for each dash
-            for (let currentLength = 0; currentLength < totalLength; currentLength += patternLength) {
+            for (let currentLength = 0; currentLength < loopUntil; currentLength += patternLength) {
                 const start = tempPath.getPointAtLength(currentLength);
                 const end = tempPath.getPointAtLength(Math.min(currentLength + dashLength, totalLength));
 
@@ -613,7 +621,7 @@
                 segment.setAttribute('y1', start.y);
                 segment.setAttribute('x2', end.x);
                 segment.setAttribute('y2', end.y);
-                segment.setAttribute('stroke', '#C7D2FE');
+                segment.setAttribute('stroke', strokeColor);
                 segment.setAttribute('stroke-width', '3');
                 segment.setAttribute('stroke-linecap', 'round');
                 segment.classList.add('dash-segment');
@@ -624,7 +632,7 @@
             }
 
             // Animate them in one by one
-            const delayBetweenDashes = 20; // ms
+            const delayBetweenDashes = 12; // ms
             for (let i = 0; i < dashSegments.length; i++) {
                 const segment = dashSegments[i];
                 segment.style.animationDelay = `${i * delayBetweenDashes}ms`;
@@ -638,6 +646,10 @@
             const svg = document.getElementById('path-svg');
             const nodes = Array.from(document.querySelectorAll('.task-node.visible'));
             if (!svg || nodes.length < 2) return;
+
+            // Determine line color based on the page/path type
+            const isCollegePath = window.location.pathname.includes('college');
+            const strokeColor = isCollegePath ? '#C7D2FE' : '#C7B8F9';
 
             svg.innerHTML = '';
             const containerRect = svg.getBoundingClientRect();
@@ -671,8 +683,12 @@
                 const gapLength = 6;
                 const patternLength = dashLength + gapLength;
 
+                // *** FIX APPLIED HERE ***
+                // Ensure the loop runs at least once to draw a line even if it's very short.
+                const loopUntil = Math.max(totalLength, patternLength);
+
                 // Create individual line segments for each dash
-                for (let currentLength = 0; currentLength < totalLength; currentLength += patternLength) {
+                for (let currentLength = 0; currentLength < loopUntil; currentLength += patternLength) {
                     const start = tempPath.getPointAtLength(currentLength);
                     const end = tempPath.getPointAtLength(Math.min(currentLength + dashLength, totalLength));
 
@@ -681,7 +697,7 @@
                     segment.setAttribute('y1', start.y);
                     segment.setAttribute('x2', end.x);
                     segment.setAttribute('y2', end.y);
-                    segment.setAttribute('stroke', '#C7D2FE');
+                    segment.setAttribute('stroke', strokeColor);
                     segment.setAttribute('stroke-width', '3');
                     segment.setAttribute('stroke-linecap', 'round');
                     svg.appendChild(segment);
