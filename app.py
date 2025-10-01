@@ -39,34 +39,6 @@ oauth.register(
     client_kwargs={'scope': 'openid email profile'}
 )
 
-# Determine the database path based on the environment
-if 'RENDER' in os.environ:
-    # On Render, use the persistent disk path provided.
-    # The 'RENDER_DISK_PATH' environment variable is set in your Render dashboard.
-    db_dir = os.environ.get('RENDER_DISK_PATH', '/data')
-    DB_PATH = os.path.join(db_dir, 'users.db')
-else:
-    # For local development, use the instance folder.
-    # This is a standard Flask practice and is ignored by Git.
-    os.makedirs(app.instance_path, exist_ok=True)
-    DB_PATH = os.path.join(app.instance_path, 'users.db')
-
-# Initialize the database handler with the correct path
-db = DatabaseHandler(DB_PATH)
-# --- Auto-Create Database on Startup ---
-# This block checks if the database file exists and creates it if not.
-# It runs within the Flask application context to ensure all parts of the app,
-# including the init_db function, are available.
-with app.app_context():
-    if not os.path.exists(DB_PATH):
-        print(f"Database not found at {DB_PATH}. Initializing a new one...")
-        try:
-            init_db()
-            print("Database initialized successfully.")
-        except Exception as e:
-            print(f"!!! CRITICAL: FAILED TO INITIALIZE DATABASE: {e}")
-# --- End of Auto-Create Block ---
-
 
 def init_db():
     db.create_table("users", {
@@ -1944,3 +1916,32 @@ def init_db_command():
     """Create new tables in the database."""
     init_db()
     print("Initialized the database.")
+
+
+# Determine the database path based on the environment
+if 'RENDER' in os.environ:
+    # On Render, use the persistent disk path provided.
+    # The 'RENDER_DISK_PATH' environment variable is set in your Render dashboard.
+    db_dir = os.environ.get('RENDER_DISK_PATH', '/data')
+    DB_PATH = os.path.join(db_dir, 'users.db')
+else:
+    # For local development, use the instance folder.
+    # This is a standard Flask practice and is ignored by Git.
+    os.makedirs(app.instance_path, exist_ok=True)
+    DB_PATH = os.path.join(app.instance_path, 'users.db')
+
+# Initialize the database handler with the correct path
+db = DatabaseHandler(DB_PATH)
+# --- Auto-Create Database on Startup ---
+# This block checks if the database file exists and creates it if not.
+# It runs within the Flask application context to ensure all parts of the app,
+# including the init_db function, are available.
+with app.app_context():
+    if not os.path.exists(DB_PATH):
+        print(f"Database not found at {DB_PATH}. Initializing a new one...")
+        try:
+            init_db()
+            print("Database initialized successfully.")
+        except Exception as e:
+            print(f"!!! CRITICAL: FAILED TO INITIALIZE DATABASE: {e}")
+# --- End of Auto-Create Block ---
