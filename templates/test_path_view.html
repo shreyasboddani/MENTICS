@@ -500,8 +500,9 @@
             const svg = document.getElementById('path-svg');
             if (!svg || !startNode || !endNode) return;
 
+            // Determine line color based on the page/path type
             const isCollegePath = window.location.pathname.includes('college');
-            const strokeColor = isCollegePath ? '#C7D2FE' : '#C7B8F9'; // Indigo-200 or Purple-200
+            const strokeColor = isCollegePath ? '#C7D2FE' : '#C7B8F9';
 
             const containerRect = svg.getBoundingClientRect();
             const startRect = startNode.getBoundingClientRect();
@@ -512,36 +513,56 @@
             const endX = endRect.left + endRect.width / 2 - containerRect.left;
             const endY = endRect.top + endRect.height / 2 - containerRect.top;
 
-            // Using a quadratic curve for a simpler, more consistent arc
-            const controlX = (startX + endX) / 2;
-            const controlY = (startY + endY) / 2 + (startX % 2 === 0 ? 30 : -30); // alternate curve direction
+            const controlX1 = startX + (endX - startX) * 0.2;
+            const controlY1 = startY + (endY - startY) * 0.8;
+            const controlX2 = startX + (endX - startX) * 0.8;
+            const controlY2 = startY + (endY - startY) * 0.2;
 
-            const pathData = `M ${startX} ${startY} Q ${controlX} ${controlY}, ${endX} ${endY}`;
+            const pathData = `M ${startX} ${startY} C ${controlX1} ${controlY1}, ${controlX2} ${controlY2}, ${endX} ${endY}`;
 
-            const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-            path.setAttribute('d', pathData);
-            path.setAttribute('stroke', strokeColor);
-            path.setAttribute('stroke-width', '3');
-            path.setAttribute('fill', 'none');
-            path.setAttribute('stroke-linecap', 'round');
+            // Create a temporary, invisible path to measure
+            const tempPath = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+            tempPath.setAttribute('d', pathData);
+            const totalLength = tempPath.getTotalLength();
 
-            const totalLength = path.getTotalLength();
+            const dashLength = 8;
+            const gapLength = 6;
+            const patternLength = dashLength + gapLength;
+            const dashSegments = [];
 
-            path.setAttribute('stroke-dasharray', `8 6`); // 8px dash, 6px gap
-            path.setAttribute('stroke-dashoffset', totalLength);
+            // *** FIX APPLIED HERE ***
+            // Ensure the loop runs at least once to draw a line even if it's very short.
+            const loopUntil = Math.max(totalLength, patternLength);
 
-            svg.appendChild(path);
+            // Create individual line segments for each dash
+            for (let currentLength = 0; currentLength < loopUntil; currentLength += patternLength) {
+                const start = tempPath.getPointAtLength(currentLength);
+                const end = tempPath.getPointAtLength(Math.min(currentLength + dashLength, totalLength));
 
-            // Animate the path drawing
-            path.style.transition = 'stroke-dashoffset 0.5s ease-out';
+                const segment = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+                segment.setAttribute('x1', start.x);
+                segment.setAttribute('y1', start.y);
+                segment.setAttribute('x2', end.x);
+                segment.setAttribute('y2', end.y);
+                segment.setAttribute('stroke', strokeColor);
+                segment.setAttribute('stroke-width', '3');
+                segment.setAttribute('stroke-linecap', 'round');
+                segment.classList.add('dash-segment');
+                segment.style.transformOrigin = `${(start.x + end.x) / 2}px ${(start.y + end.y) / 2}px`;
 
-            // We need a short delay to ensure the transition is applied
-            await new Promise(resolve => setTimeout(resolve, 50));
+                svg.appendChild(segment);
+                dashSegments.push(segment);
+            }
 
-            path.setAttribute('stroke-dashoffset', '0');
-
-            // Wait for the animation to finish
-            await new Promise(resolve => setTimeout(resolve, 500));
+            // Animate them in one by one
+            const delayBetweenDashes = 12; // ms
+            for (let i = 0; i < dashSegments.length; i++) {
+                const segment = dashSegments[i];
+                segment.style.animationDelay = `${i * delayBetweenDashes}ms`;
+                segment.classList.add('animate-in');
+            }
+            const totalAnimationTime = dashSegments.length * delayBetweenDashes + 200;
+            await new Promise(resolve => setTimeout(resolve, totalAnimationTime));
         }
 
         function redrawAllConnectors() {
@@ -549,10 +570,11 @@
             const nodes = Array.from(document.querySelectorAll('.task-node.visible'));
             if (!svg || nodes.length < 2) return;
 
+            // Determine line color based on the page/path type
             const isCollegePath = window.location.pathname.includes('college');
             const strokeColor = isCollegePath ? '#C7D2FE' : '#C7B8F9';
 
-            svg.innerHTML = ''; // Clear previous connectors
+            svg.innerHTML = '';
             const containerRect = svg.getBoundingClientRect();
 
             for (let i = 0; i < nodes.length - 1; i++) {
@@ -568,20 +590,41 @@
                 const endX = endRect.left + endRect.width / 2 - containerRect.left;
                 const endY = endRect.top + endRect.height / 2 - containerRect.top;
 
-                const controlX = (startX + endX) / 2;
-                const controlY = (startY + endY) / 2 + (i % 2 === 0 ? 30 : -30);
+                const controlX1 = startX + (endX - startX) * 0.2;
+                const controlY1 = startY + (endY - startY) * 0.8;
+                const controlX2 = startX + (endX - startX) * 0.8;
+                const controlY2 = startY + (endY - startY) * 0.2;
 
-                const pathData = `M ${startX} ${startY} Q ${controlX} ${controlY}, ${endX} ${endY}`;
+                const pathData = `M ${startX} ${startY} C ${controlX1} ${controlY1}, ${controlX2} ${controlY2}, ${endX} ${endY}`;
 
-                const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-                path.setAttribute('d', pathData);
-                path.setAttribute('stroke', strokeColor);
-                path.setAttribute('stroke-width', '3');
-                path.setAttribute('fill', 'none');
-                path.setAttribute('stroke-linecap', 'round');
-                path.setAttribute('stroke-dasharray', `8 6`);
+                // Create a temporary, invisible path to measure
+                const tempPath = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+                tempPath.setAttribute('d', pathData);
+                const totalLength = tempPath.getTotalLength();
 
-                svg.appendChild(path);
+                const dashLength = 8;
+                const gapLength = 6;
+                const patternLength = dashLength + gapLength;
+
+                // *** FIX APPLIED HERE ***
+                // Ensure the loop runs at least once to draw a line even if it's very short.
+                const loopUntil = Math.max(totalLength, patternLength);
+
+                // Create individual line segments for each dash
+                for (let currentLength = 0; currentLength < loopUntil; currentLength += patternLength) {
+                    const start = tempPath.getPointAtLength(currentLength);
+                    const end = tempPath.getPointAtLength(Math.min(currentLength + dashLength, totalLength));
+
+                    const segment = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+                    segment.setAttribute('x1', start.x);
+                    segment.setAttribute('y1', start.y);
+                    segment.setAttribute('x2', end.x);
+                    segment.setAttribute('y2', end.y);
+                    segment.setAttribute('stroke', strokeColor);
+                    segment.setAttribute('stroke-width', '3');
+                    segment.setAttribute('stroke-linecap', 'round');
+                    svg.appendChild(segment);
+                }
             }
         }
         function openTaskModal(task) {
