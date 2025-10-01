@@ -39,7 +39,19 @@ oauth.register(
     client_kwargs={'scope': 'openid email profile'}
 )
 
-DB_PATH = os.path.join(os.environ.get('RENDER_DISK_PATH', '.'), 'users.db')
+# Determine the database path based on the environment
+if 'RENDER' in os.environ:
+    # On Render, use the persistent disk path provided.
+    # The 'RENDER_DISK_PATH' environment variable is set in your Render dashboard.
+    db_dir = os.environ.get('RENDER_DISK_PATH', '/data')
+    DB_PATH = os.path.join(db_dir, 'users.db')
+else:
+    # For local development, use the instance folder.
+    # This is a standard Flask practice and is ignored by Git.
+    os.makedirs(app.instance_path, exist_ok=True)
+    DB_PATH = os.path.join(app.instance_path, 'users.db')
+
+# Initialize the database handler with the correct path
 db = DatabaseHandler(DB_PATH)
 
 
