@@ -10,14 +10,10 @@ pip install -r requirements.txt
 DISK_PATH="/data"
 DB_FILE="$DISK_PATH/users.db"
 
-# Create the directory if it doesn't exist to ensure the check below works
-mkdir -p "$DISK_PATH"
-
-# Check if the database file exists on the persistent disk
+# Check if the database file exists on the persistent disk.
+# We no longer need to create the directory, as Render does this for us.
 if [ ! -f "$DB_FILE" ]; then
   echo "Database not found at $DB_FILE. Initializing..."
-  # Your app.py will use the RENDER_DISK_PATH environment variable
-  # to create the database in this persistent location.
   flask init-db
 else
   echo "Database already exists at $DB_FILE. Skipping initialization."
