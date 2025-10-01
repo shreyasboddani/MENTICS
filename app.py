@@ -53,6 +53,18 @@ else:
 
 # Initialize the database handler with the correct path
 db = DatabaseHandler(DB_PATH)
+# --- Auto-Create Database on Startup ---
+# This block checks if the database file exists at the path determined above.
+# If it doesn't exist, it calls the init_db() function to create the tables.
+# This ensures the database is always present when the app is running.
+if not os.path.exists(DB_PATH):
+    print(f"Database not found at {DB_PATH}. Initializing a new one...")
+    try:
+        init_db()
+        print("Database initialized successfully.")
+    except Exception as e:
+        print(f"!!! CRITICAL: FAILED TO INITIALIZE DATABASE: {e}")
+# --- End of Auto-Create Block ---
 
 
 def init_db():
