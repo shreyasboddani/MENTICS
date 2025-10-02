@@ -188,16 +188,17 @@ def format_date_filter(s):
     if not s:
         return ""
     try:
-        # UPDATED: Use the user's timezone from the session, with a fallback to UTC
+        # Use the user's timezone from the session, with a fallback to UTC
         user_tz_str = session.get('timezone', 'UTC')
         user_tz = ZoneInfo(user_tz_str)
 
         naive_dt = datetime.strptime(s, '%Y-%m-%d %H:%M:%S')
         utc_dt = naive_dt.replace(tzinfo=ZoneInfo("UTC"))
         user_local_dt = utc_dt.astimezone(user_tz)
-        return user_local_dt.strftime('%Y-%m-%d')
+        return user_local_dt.strftime('%b %d, %Y') # More readable format e.g., Jan 01, 2024
     except (ZoneInfoNotFoundError, ValueError, TypeError):
-        return s.split(' ')[0] if ' ' in s else s
+        # Fallback for just the date part if parsing fails
+        return s.split(' ')[0]
 
 # NEW: Jinja2 filter to display relative time
 
@@ -299,8 +300,15 @@ def _get_test_prep_ai_tasks(strengths, weaknesses, user_stats={}, chat_history=[
     test_date_str = user_stats.get("test_path", {}).get("test_date")
     if test_date_str:
         try:
+            # Use user's timezone for 'now' to get accurate days remaining
+            user_tz_str = session.get('timezone', 'UTC')
+            try:
+                user_tz = ZoneInfo(user_tz_str)
+            except ZoneInfoNotFoundError:
+                user_tz = ZoneInfo("UTC")
+
             test_date = datetime.strptime(test_date_str, '%Y-%m-%d')
-            delta = test_date - datetime.now()
+            delta = test_date.replace(tzinfo=user_tz) - datetime.now(user_tz)
             formatted_date = test_date.strftime('%B %d, %Y')
             if delta.days >= 0:
                 test_date_info = f"on {formatted_date} ({delta.days} days remaining)"
@@ -396,8 +404,15 @@ def _get_test_prep_ai_chat_response(history, user_stats, stat_history="", user_i
     test_date_str = user_stats.get("test_path", {}).get("test_date")
     if test_date_str:
         try:
+            # Use user's timezone for 'now' to get accurate days remaining
+            user_tz_str = session.get('timezone', 'UTC')
+            try:
+                user_tz = ZoneInfo(user_tz_str)
+            except ZoneInfoNotFoundError:
+                user_tz = ZoneInfo("UTC")
+
             test_date = datetime.strptime(test_date_str, '%Y-%m-%d')
-            delta = test_date - datetime.now()
+            delta = test_date.replace(tzinfo=user_tz) - datetime.now(user_tz)
             formatted_date = test_date.strftime('%B %d, %Y')
             if delta.days >= 0:
                 test_date_info = f"The student's test is on {formatted_date} ({delta.days} days from now)."
@@ -1055,7 +1070,13 @@ def dashboard(user):
         try:
             test_date = datetime.strptime(
                 test_path_stats["test_date"], '%Y-%m-%d').date()
-            days_left = (test_date - date.today()).days
+            # Use user's timezone for 'today' to ensure accurate countdown
+            try:
+                user_tz_str = session.get('timezone', 'UTC')
+                user_today = datetime.now(ZoneInfo(user_tz_str)).date()
+            except ZoneInfoNotFoundError:
+                user_today = date.today() # Fallback to server date
+            days_left = (test_date - user_today).days
             if days_left >= 0:
                 test_date_info["days_left"] = days_left
                 test_date_info["date_str"] = test_date.strftime('%B %d, %Y')
@@ -1355,7 +1376,7 @@ def tracker(user):
         if stat_name in stat_history_processed:
             try:
                 stat_history_processed[stat_name].append({
-                    "date": recorded_at.split(" ")[0],
+                    "date": recorded_at.split(" ")[0],  # Keep as YYYY-MM-DD for JS
                     "value": int(stat_value)
                 })
             except (ValueError, TypeError):

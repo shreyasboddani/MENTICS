@@ -211,9 +211,9 @@
     <script>
         document.addEventListener('DOMContentLoaded', () => {
             const statHistory = {{ stat_history| tojson
-        }};
-        // Get the user's local timezone
-        const userTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+            }};
+            // Get the user's local timezone
+            const userTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
 
         let satChartInstance;
         let actChartInstance;
@@ -231,8 +231,8 @@
 
             historyData.forEach(item => {
                 // Use the user's timezone for consistent date formatting
-                const date = new Date(item.date + 'T00:00:00'); // Assume date is YYYY-MM-DD
-                labels.push(date.toLocaleDateString(undefined, { timeZone: userTimezone }));
+                const date = new Date(item.date + 'T00:00:00'); // Assume date is YYYY-MM-DD from server
+                labels.push(date.toLocaleDateString(undefined, { timeZone: userTimezone, month: 'short', day: 'numeric' }));
                 data.push(item.value);
             });
 
@@ -287,8 +287,8 @@
 
             historyData.forEach(item => {
                 // Use the user's timezone
-                const date = new Date(item.date + 'T00:00:00');
-                labels.push(date.toLocaleDateString(undefined, { timeZone: userTimezone }));
+                const date = new Date(item.date + 'T00:00:00'); // Assume date is YYYY-MM-DD from server
+                labels.push(date.toLocaleDateString(undefined, { timeZone: userTimezone, month: 'short', day: 'numeric' }));
                 data.push(item.value);
             });
 
