@@ -1945,3 +1945,5 @@ with app.app_context():
         except Exception as e:
             print(f"!!! CRITICAL: FAILED TO INITIALIZE DATABASE: {e}")
 # --- End of Auto-Create Block ---
+if __name__ == "__main__":
+    app.run(debug=True)
