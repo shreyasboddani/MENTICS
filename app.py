@@ -195,7 +195,8 @@ def format_date_filter(s):
         naive_dt = datetime.strptime(s, '%Y-%m-%d %H:%M:%S')
         utc_dt = naive_dt.replace(tzinfo=ZoneInfo("UTC"))
         user_local_dt = utc_dt.astimezone(user_tz)
-        return user_local_dt.strftime('%b %d, %Y') # More readable format e.g., Jan 01, 2024
+        # More readable format e.g., Jan 01, 2024
+        return user_local_dt.strftime('%b %d, %Y')
     except (ZoneInfoNotFoundError, ValueError, TypeError):
         # Fallback for just the date part if parsing fails
         return s.split(' ')[0]
@@ -268,21 +269,21 @@ def _get_current_numbered_tasks(user_id, category):
 
 
 def _get_test_prep_ai_tasks(strengths, weaknesses, user_stats={}, chat_history=[], path_history={}, stat_history=""):
-    """Generates test preparation tasks with a hyper-detailed prompt for maximum reliability."""
+    """Generates hyper-intelligent, adaptive test prep tasks with a detailed, gamified prompt."""
 
     def get_mock_tasks_reliably():
         print("--- DEBUG: Running corrected Test Prep mock generator. ---")
         all_mock_tasks = [
             {"description": "Take a full-length, timed SAT practice test.", "reason": "This is a 'boss battle' to test your skills under pressure and identify areas for improvement.",
-                "type": "milestone", "stat_to_update": "sat_total", "category": "Test Prep"},
+                "type": "milestone", "stat_to_update": "sat_total", "category": "Test Prep", "difficulty": "hard"},
             {"description": "Review algebra concepts from your SAT practice test.", "reason": "Understanding algebra is crucial for a high score on the math section.",
-                "type": "standard", "stat_to_update": None, "category": "Test Prep"},
+                "type": "standard", "stat_to_update": None, "category": "Test Prep", "difficulty": "medium"},
             {"description": "Practice 15 difficult vocabulary words.", "reason": "A strong vocabulary will help you tackle the reading and writing sections with confidence.",
-                "type": "standard", "stat_to_update": None, "category": "Test Prep"},
+                "type": "standard", "stat_to_update": None, "category": "Test Prep", "difficulty": "easy"},
             {"description": "Take a timed ACT Science practice section.", "reason": "This will help you get used to the pace of the science section and improve your time management.",
-                "type": "milestone", "stat_to_update": "act_science", "category": "Test Prep"},
+                "type": "milestone", "stat_to_update": "act_science", "category": "Test Prep", "difficulty": "hard"},
             {"description": "Work on time management strategies for the reading section.", "reason": "Finishing the reading section on time is a common challenge. Practicing strategies will improve your score.",
-                "type": "standard", "stat_to_update": None, "category": "Test Prep"}
+                "type": "standard", "stat_to_update": None, "category": "Test Prep", "difficulty": "medium"}
         ]
         return random.sample(all_mock_tasks, 5)
 
@@ -295,12 +296,13 @@ def _get_test_prep_ai_tasks(strengths, weaknesses, user_stats={}, chat_history=[
         [f"- {task['description']}" for task in path_history.get('incomplete', [])]) or "None."
     chat_history_str = "\n".join(
         [f"{msg['role'].capitalize()}: {msg['content']}" for msg in chat_history]) or "No conversation history yet."
+    latest_user_message = next((msg['content'] for msg in reversed(
+        chat_history) if msg['role'] == 'user'), "N/A")
 
     test_date_info = "Not set by the student."
     test_date_str = user_stats.get("test_path", {}).get("test_date")
     if test_date_str:
         try:
-            # Use user's timezone for 'now' to get accurate days remaining
             user_tz_str = session.get('timezone', 'UTC')
             try:
                 user_tz = ZoneInfo(user_tz_str)
@@ -319,66 +321,58 @@ def _get_test_prep_ai_tasks(strengths, weaknesses, user_stats={}, chat_history=[
 
     prompt = (
         f"# MISSION\n"
-        f"You are an expert AI test prep coach (Digital SAT & ACT). Your mission is to generate a personalized, forward-looking 5-step study plan that is:\n"
-        f"- Motivating, clear, and tailored to the student’s strengths, weaknesses, and timeline.\n"
-        f"- Progress-oriented, always pushing the student forward instead of repeating old work.\n"
-        f"- Resource-rich: include markdown links to high-quality, free resources like Khan Academy, official practice test PDFs, or specific helpful YouTube videos.\n\n"
+        f"You are an elite AI test prep coach for the Mentics platform. Your mission is to generate an intelligent, 5-step study plan that is precisely tailored to the student's evolving needs. The plan must be a logical continuation of their journey, demonstrating a deep understanding of their history and current context.\n\n"
 
-        f"# STUDENT ANALYSIS\n"
-        f"Analyze the following data to understand the student's current situation:\n"
+        f"## CRITICAL SCENARIO ANALYSIS (ACTION REQUIRED)\n"
+        f"First, determine the student's current situation and choose your generation strategy:\n"
+        f"1.  **Regeneration Request:** If the most recent user message (see below) contains keywords like 'regenerate', 'new path', 'change', or expresses a desire for a different approach (e.g., 'the test is tomorrow!'), your **highest priority** is to generate a path that directly addresses that immediate request. The new plan MUST reflect the specific needs mentioned in that message.\n"
+        f"2.  **Post-Path Continuation:** If the student has just completed all tasks in their previous path, the new plan MUST be a logical next step. For example, if they just finished a pre-test path, the new path should focus on analyzing their scores, identifying new weaknesses from the test, and planning long-term improvements. DO NOT simply assign more practice.\n"
+        f"3.  **Standard Generation:** If neither of the above applies, generate a standard path that builds upon their history and addresses their stated goals.\n\n"
+
+        f"# STUDENT ANALYSIS DATA\n"
         f"- Strengths: {strengths}\n"
         f"- Weaknesses: {weaknesses}\n"
         f"- Test Date: {test_date_info}\n"
-        f"- Current SAT Math: {user_stats.get('sat_math', 'Not provided')}\n"
-        f"- Current SAT EBRW: {user_stats.get('sat_ebrw', 'Not provided')}\n"
-        f"- Current ACT Math: {user_stats.get('act_math', 'Not provided')}\n"
-        f"- Current ACT Reading: {user_stats.get('act_reading', 'Not provided')}\n"
-        f"- Current ACT Science: {user_stats.get('act_science', 'Not provided')}\n"
-        f"- Current GPA: {user_stats.get('gpa', 'Not provided')}\n\n"
+        f"- Current SAT Scores: Math {user_stats.get('sat_math', 'N/A')}, EBRW {user_stats.get('sat_ebrw', 'N/A')}\n"
+        f"- Current ACT Scores: Math {user_stats.get('act_math', 'N/A')}, Reading {user_stats.get('act_reading', 'N/A')}, Science {user_stats.get('act_science', 'N/A')}\n\n"
 
-        f"## STUDENT PERFORMANCE & CONVERSATION HISTORY\n"
-        f"This is CRITICAL CONTEXT. The new plan MUST be a logical continuation of their journey, reflecting their recent actions and struggles.\n"
+        f"## HISTORICAL & CONVERSATIONAL CONTEXT\n"
+        f"This is CRITICAL for creating an intelligent, continuous learning journey.\n"
+        f"- **Most Recent User Request:** '{latest_user_message}' <== **If this is a regeneration request, it takes precedence over all other data.**\n"
         f"- Recently Completed Tasks: {completed_tasks_str}\n"
-        f"- Incomplete or Failed Tasks: {incomplete_tasks_str}\n"
-        f"- Recent Conversation: {chat_history_str}\n"
-        f"- Historical Performance Data (from Tracker):\n{stat_history}\n\n"
+        f"- Incomplete Tasks from Previous Path: {incomplete_tasks_str}\n"
+        f"- Full Conversation History: {chat_history_str}\n"
+        f"- Historical Performance Data (Tracker):\n{stat_history}\n\n"
 
-        f"# YOUR TASK: GENERATE A NEW 5-STEP PLAN\n"
-        f"Based on your analysis, generate a new, 5-step study plan. Each task must:\n"
-        f"- Be specific, actionable, and stage-appropriate given their timeline until the test.\n"
-        f"- Directly address weaknesses, reinforce strengths, and incorporate insights from recent conversation and tracker data.\n"
-        f"- Include at least one **reputable, proven resource** formatted as a markdown link (e.g., [Khan Academy](https://www.khanacademy.org/)).\n"
-        f"- Push the student forward with fresh, progressive steps that build on past work. DO NOT REPEAT OLD TASKS — they must evolve and build off each other.\n\n"
+        f"# YOUR TASK: GENERATE THE NEW 5-STEP PLAN\n"
+        f"Based on your scenario analysis and all student data, generate a new 5-step study plan. Each task must:\n"
+        f"- Be specific, actionable, and include a markdown link to a high-quality, free resource (Khan Academy, official practice tests, specific YouTube tutorials).\n"
+        f"- Include a mix of task types: at least one **Resource Task** (e.g., 'Watch a video'), one **Practice Task** (e.g., 'Complete a quiz'), and one **Strategic Task** (e.g., 'Develop a new timing strategy').\n"
+        f"- Have an assigned difficulty for gamification purposes.\n\n"
 
-        f"# CRITICAL DIRECTIVES\n"
-        f"1.  **JSON Output ONLY**: Your entire output MUST be a single, raw JSON object. Do not include any text before or after the JSON.\n"
-        f"2.  **Exact Task Count**: The plan must contain EXACTLY 5 task objects in the `tasks` list.\n"
-        f"3.  **Adaptive Focus**: If the context shows a focus on SAT or ACT, all 5 tasks must target that test only. Never mix.\n"
-        f"4.  **Meaningful Milestones**: Use 'milestone' only for major achievements (e.g., completing a full-length practice test, finishing an entire section). Use 'standard' for drills, concept review, or smaller steps. 'stat_to_update' must be null for 'standard' tasks.\n"
-        f"5.  **Correct Stat Naming**: For milestones, `stat_to_update` must be one of: ['sat_math', 'sat_ebrw', 'sat_total', 'act_math', 'act_reading', 'act_science', 'act_composite'].\n"
-        f"6.  **Avoid Repetition**: Never assign a task that mirrors recently completed or incomplete ones. Each roadmap must feel fresh, progressive, and adapted to growth.\n"
-        f"7.  **Resource Integration**: For any study-focused task, embed a markdown link to a specific, relevant, and free resource. Example: 'Review quadratic equations using this [Khan Academy module](https://...)'\n"
-        f"8.  **SAT Math Special Rule**: If weaknesses specifically show SAT Math struggles, at least one task MUST focus on Desmos as a skill-building tool (e.g., regressions, multi-equation regressions, graphing strategies).\n"
-        f"9.  **Mentorship Tone**: Write tasks as if you are a coach guiding the student — supportive, motivating, and focused on measurable progress.\n"
-        f"10. **FOCUS ON THE LATEST CHAT MESSAGE FROM THE USER** when regenerating for changes.\n"
-        f"11. **Intelligent Boss Battles**: A 'Boss Battle' is a major milestone, like a full practice test. Do not include one in every path. However, you should aim to ONLY include ONE every 2-3 paths to ensure the student is consistently tested on their progress. If the user has completed many standard tasks since the last Boss Battle, it is a good time to add one. The description for such a task MUST begin with 'Boss Battle AND SHOULD ALWAYS BE THE LAST TASK (TASK 5):'.\n\n"
+        f"# CRITICAL DIRECTIVES & JSON SCHEMA\n"
+        f"1.  **JSON Output ONLY**: Your entire output MUST be a single, raw JSON object. No extra text.\n"
+        f"2.  **Adaptive Focus**: If context shows a focus on SAT or ACT, all tasks must target that test. Never mix.\n"
+        f"3.  **Meaningful Milestones**: Use 'milestone' only for major assessments (e.g., a full practice test). `stat_to_update` must be null for 'standard' tasks.\n"
+        f"4.  **Correct Stat Naming**: For milestones, `stat_to_update` must be one of: ['sat_math', 'sat_ebrw', 'sat_total', 'act_math', 'act_reading', 'act_science', 'act_composite'].\n"
+        f"5.  **Intelligent 'Boss Battles'**: A 'Boss Battle' is a major milestone, like a full practice test. It should be the culmination of the preceding tasks. The description for such a task MUST begin with 'Boss Battle:'. Use these strategically every 2-3 paths to assess progress.\n"
+        f"6.  **SAT Math & Desmos**: If SAT Math is a weakness, at least one task MUST focus on using the Desmos calculator as a strategic tool.\n\n"
 
-        f"# JSON OUTPUT SCHEMA\n"
-        f"Your output must conform strictly to this structure:\n"
+        f"# JSON OUTPUT STRUCTURE\n"
         f"{{\n"
         f'  "tasks": [\n'
         f'    {{\n'
-        f'      "description": "A specific, actionable task including a markdown link like [this resource](https://example.com). For major assessments, it must start with \'Boss Battle:\'.",\n'
-        f'      "reason": "A brief, motivating explanation of why this task is important for the user\'s goal.",\n'
+        f'      "description": "Specific, actionable task with a markdown link, like [this resource](https://example.com).",\n'
+        f'      "reason": "A brief, motivating explanation for this task.",\n'
         f'      "type": "Either \'standard\' or \'milestone\'.",\n'
-        f'      "stat_to_update": "A string from the list above ONLY if type is milestone, otherwise null.",\n'
-        f'      "category": "This MUST be the string \'Test Prep\'."\n'
+        f'      "stat_to_update": "A valid stat name (string) ONLY if type is milestone, otherwise null.",\n'
+        f'      "category": "This MUST be the string \'Test Prep\'.",\n'
+        f'      "difficulty": "Either \'easy\' (10 points), \'medium\' (25 points), or \'hard\' (50 points). Boss Battles should be \'epic\' (100 points)."\n'
         f'    }}\n'
         f'    // ... (four more task objects)\n'
         f'  ]\n'
         f'}}'
     )
-
     try:
         model = genai.GenerativeModel(
             'gemini-2.5-flash',
@@ -570,21 +564,21 @@ def _get_current_numbered_tasks(user_id, category):
 
 
 def _get_college_planning_ai_tasks(college_context, user_stats, path_history, chat_history=[], stat_history=""):
-    """Generates college planning tasks with a hyper-detailed prompt."""
+    """Generates hyper-intelligent, adaptive college planning tasks with a detailed, gamified prompt."""
 
     def get_mock_tasks_reliably():
         print("--- DEBUG: Running corrected College Planning mock generator. ---")
         all_mock_tasks = [
             {"description": "Research 5 colleges that match your interests.", "reason": "Finding the right fit is the first step to a successful college experience.",
-                "type": "standard", "stat_to_update": None, "category": "College Planning"},
+                "type": "standard", "stat_to_update": None, "category": "College Planning", "difficulty": "medium"},
             {"description": "Write a rough draft of your Common App personal statement.", "reason": "This is your chance to tell your story and show admissions officers who you are.",
-                "type": "milestone", "stat_to_update": "essay_progress", "category": "College Planning"},
+                "type": "milestone", "stat_to_update": "essay_progress", "category": "College Planning", "difficulty": "hard"},
             {"description": "Update your GPA in your profile.", "reason": "Keeping your academic information up-to-date is important for tracking your progress.",
-                "type": "milestone", "stat_to_update": "gpa", "category": "College Planning"},
+                "type": "milestone", "stat_to_update": "gpa", "category": "College Planning", "difficulty": "easy"},
             {"description": "Request three letters of recommendation from teachers.", "reason": "Strong letters of recommendation can make a big difference in your application.",
-                "type": "standard", "stat_to_update": None, "category": "College Planning"},
+                "type": "standard", "stat_to_update": None, "category": "College Planning", "difficulty": "medium"},
             {"description": "Create a spreadsheet to track application deadlines.", "reason": "Staying organized is key to a stress-free application season.",
-                "type": "standard", "stat_to_update": None, "category": "College Planning"}
+                "type": "standard", "stat_to_update": None, "category": "College Planning", "difficulty": "easy"}
         ]
         return random.sample(all_mock_tasks, 5)
 
@@ -597,65 +591,61 @@ def _get_college_planning_ai_tasks(college_context, user_stats, path_history, ch
         [f"- {task['description']}" for task in path_history.get('incomplete', [])]) or "None."
     chat_history_str = "\n".join(
         [f"{msg['role'].capitalize()}: {msg['content']}" for msg in chat_history]) or "No conversation history yet."
+    latest_user_message = next((msg['content'] for msg in reversed(
+        chat_history) if msg['role'] == 'user'), "N/A")
 
     prompt = (
         f"# MISSION\n"
-        f"You are an expert AI college admissions counselor and mentor. Your mission is to generate a personalized, forward-looking 5-step roadmap that helps a high school student make measurable progress in the college planning process. Your guidance should:\n"
-        f"- Be resource-rich, including markdown links to reputable sources like the Common App website, College Board, or insightful articles/videos.\n"
-        f"- Build logically on their recent conversations, completed tasks, and current progress.\n"
-        f"- Stay aligned with their grade level, planning stage, and long-term goals.\n\n"
+        f"You are an expert AI college admissions counselor for the Mentics platform. Your mission is to generate an intelligent, 5-step roadmap that provides a clear, logical, and motivating path for a high school student. The plan must be a thoughtful continuation of their journey, not just a random list of tasks.\n\n"
 
-        f"# STUDENT ANALYSIS\n"
-        f"Analyze the following data to build a deep understanding of the student:\n"
+        f"## CRITICAL SCENARIO ANALYSIS (ACTION REQUIRED)\n"
+        f"First, determine the student's current situation and choose your generation strategy:\n"
+        f"1.  **Regeneration Request:** If the most recent user message (see below) contains keywords like 'regenerate', 'new path', or expresses a significant change in plans (e.g., 'I want to apply to different schools now'), your **highest priority** is to generate a path that directly addresses that immediate request.\n"
+        f"2.  **Post-Path Continuation:** If the student has just completed all tasks in their previous path, the new plan MUST be a logical next step in the college planning process (e.g., moving from 'researching colleges' to 'drafting supplemental essays'). It should feel like a natural progression.\n"
+        f"3.  **Standard Generation:** If neither of the above applies, generate a standard path that is appropriate for their grade level and builds upon their historical data.\n\n"
+
+        f"# STUDENT ANALYSIS DATA\n"
         f"- Current Grade: {college_context.get('grade', 'N/A')}\n"
-        f"- Current Planning Stage: {college_context.get('planning_stage', 'N/A')}\n"
+        f"- Stated Planning Stage: {college_context.get('planning_stage', 'N/A')}\n"
         f"- Interested Majors: {college_context.get('majors', 'N/A')}\n"
         f"- Target Colleges: {college_context.get('target_colleges', 'None specified')}\n"
-        f"- Current SAT Math: {user_stats.get('sat_math', 'Not provided')}\n"
-        f"- Current SAT EBRW: {user_stats.get('sat_ebrw', 'Not provided')}\n"
-        f"- Current ACT Math: {user_stats.get('act_math', 'Not provided')}\n"
-        f"- Current ACT Reading: {user_stats.get('act_reading', 'Not provided')}\n"
-        f"- Current ACT Science: {user_stats.get('act_science', 'Not provided')}\n"
         f"- Current GPA: {user_stats.get('gpa', 'N/A')}\n\n"
 
-        f"## STUDENT PERFORMANCE & CONVERSATION HISTORY\n"
-        f"This is CRITICAL CONTEXT. The new plan MUST acknowledge their history and create next-step tasks that extend their growth.\n\n"
+        f"## HISTORICAL & CONVERSATIONAL CONTEXT\n"
+        f"This is CRITICAL for creating an intelligent, continuous learning journey.\n"
+        f"- **Most Recent User Request:** '{latest_user_message}' <== **If this is a regeneration request, it takes precedence over all other data.**\n"
         f"- Recently Completed Tasks: {completed_tasks_str}\n"
-        f"- Incomplete or Failed Tasks: {incomplete_tasks_str}\n"
-        f"- Recent Conversation: {chat_history_str}\n"
-        f"- Historical Performance Data (from Tracker):\n{stat_history}\n\n"
+        f"- Incomplete Tasks from Previous Path: {incomplete_tasks_str}\n"
+        f"- Full Conversation History: {chat_history_str}\n"
+        f"- Historical Performance Data (Tracker):\n{stat_history}\n\n"
 
-        f"# YOUR TASK: GENERATE A NEW 5-STEP ROADMAP\n"
-        f"Based on your analysis, generate a new, 5-step roadmap. Each task must:\n"
-        f"- Be actionable and motivational.\n"
-        f"- Directly support their stage-appropriate goals.\n"
-        f"- Introduce fresh, concrete next steps instead of repeating old ones.\n"
-        f"- Include at least one markdown link to a helpful, free resource in the description (e.g., 'Start your Common App essay using these [brainstorming tips](https://...)').\n\n"
+        f"# YOUR TASK: GENERATE THE NEW 5-STEP ROADMAP\n"
+        f"Based on your scenario analysis and all student data, generate a new, 5-step roadmap. Each task must:\n"
+        f"- Be specific, actionable, and include a markdown link to a reputable, free resource (e.g., Common App, College Board, financial aid sites, specific articles).\n"
+        f"- Include a mix of task types: at least one **Resource Task** (e.g., 'Read this guide'), one **Action Task** (e.g., 'Draft your activity list'), and one **Reflection Task** (e.g., 'Brainstorm essay topics').\n"
+        f"- Have an assigned difficulty for gamification purposes.\n\n"
 
-        f"# CRITICAL DIRECTIVES\n"
-        f"1.  **JSON Output ONLY**: Your entire output MUST be a single, raw JSON object.\n"
-        f"2.  **Exact Task Count**: The plan must contain EXACTLY 5 task objects.\n"
-        f"3.  **Stage-Appropriate Tasks**: Align difficulty and scope to grade and planning stage. (Example: 9th graders explore interests, 12th graders finalize applications.)\n"
-        f"4.  **Novelty & Continuity**: Never repeat recent tasks. Every new roadmap should clearly extend or deepen their progress.\n"
-        f"5.  **Meaningful Milestones**: Use 'milestone' only for major achievements (essay draft, submitting applications, updating GPA). Use 'standard' for exploratory/research tasks. 'stat_to_update' must be null for 'standard' tasks.\n"
-        f"6.  **Intelligent Boss Battles**: A 'Boss Battle' is a major milestone like submitting an application or finalizing an essay. You should ONLY include one every 2-3 paths to ensure the student is making significant progress. Base the timing on the student's grade and planning stage. The description for such a task MUST begin with 'Boss Battle AND SHOULD ALWAYS BE THE LAST TASK (TASK 5) ::'.\n\n"
+        f"# CRITICAL DIRECTIVES & JSON SCHEMA\n"
+        f"1.  **JSON Output ONLY**: Your entire output MUST be a single, raw JSON object. No extra text.\n"
+        f"2.  **Stage-Appropriate Tasks**: Align all tasks to the student's grade level and planning stage. A 9th grader should be exploring, while a 12th grader should be finalizing applications.\n"
+        f"3.  **Meaningful Milestones**: Use 'milestone' only for significant achievements (e.g., completing an essay draft, updating GPA, submitting an application). `stat_to_update` must be null for 'standard' tasks.\n"
+        f"4.  **Intelligent 'Boss Battles'**: A 'Boss Battle' is a major milestone, like submitting a complete application or finalizing a personal statement. It should be the culmination of the preceding tasks. The description for such a task MUST begin with 'Boss Battle:'. Use these strategically based on the student's grade and timeline.\n\n"
 
-        f"# JSON OUTPUT SCHEMA\n"
-        f"Your output must conform strictly to this structure:\n"
+        f"# JSON OUTPUT STRUCTURE\n"
         f"{{\n"
         f'  "tasks": [\n'
         f'    {{\n'
-        f'      "description": "A specific, actionable task including a markdown link. (IF IT IS A MAJOR MILESTONE , it must start with \'Boss Battle:\').",\n'
-        f'      "reason": "A brief, motivating explanation of why this task is important for the user\'s goal.",\n'
+        f'      "description": "Specific, actionable task with a markdown link, like [this resource](https://example.com).",\n'
+        f'      "reason": "A brief, motivating explanation for this task.",\n'
         f'      "type": "Either \'standard\' or \'milestone\'.",\n'
-        f'      "stat_to_update": "A string (e.g., \'gpa\', \'essay_progress\', \'applications_submitted\') ONLY if type is milestone, otherwise null.",\n'
-        f'      "category": "This MUST be the string \'College Planning\'."\n'
+        f'      "stat_to_update": "A string (\'gpa\', \'essay_progress\', \'applications_submitted\') ONLY if type is milestone, otherwise null.",\n'
+        f'      "category": "This MUST be the string \'College Planning\'.",\n'
+        f'      "difficulty": "Either \'easy\' (10 points), \'medium\' (25 points), or \'hard\' (50 points). Boss Battles should be \'epic\' (100 points)."\n'
         f'    }}\n'
         f'    // ... (four more task objects)\n'
         f'  ]\n'
         f'}}'
     )
-
     try:
         model = genai.GenerativeModel(
             'gemini-2.5-flash',
@@ -1075,7 +1065,7 @@ def dashboard(user):
                 user_tz_str = session.get('timezone', 'UTC')
                 user_today = datetime.now(ZoneInfo(user_tz_str)).date()
             except ZoneInfoNotFoundError:
-                user_today = date.today() # Fallback to server date
+                user_today = date.today()  # Fallback to server date
             days_left = (test_date - user_today).days
             if days_left >= 0:
                 test_date_info["days_left"] = days_left
@@ -1376,7 +1366,8 @@ def tracker(user):
         if stat_name in stat_history_processed:
             try:
                 stat_history_processed[stat_name].append({
-                    "date": recorded_at.split(" ")[0],  # Keep as YYYY-MM-DD for JS
+                    # Keep as YYYY-MM-DD for JS
+                    "date": recorded_at.split(" ")[0],
                     "value": int(stat_value)
                 })
             except (ValueError, TypeError):
