@@ -624,6 +624,7 @@ def _get_college_planning_ai_tasks(college_context, user_stats, path_history, ch
         f"- Be specific, actionable, and include a markdown link to a reputable, free resource (e.g., Common App, College Board, financial aid sites, specific articles).\n"
         f"- Include a mix of task types: at least one **Resource Task** (e.g., 'Read this guide'), one **Action Task** (e.g., 'Draft your activity list'), and one **Reflection Task** (e.g., 'Brainstorm essay topics').\n"
         f"- Have an assigned difficulty for gamification purposes.\n\n"
+        f"- For anything related to test prep, refer the student to the Test Prep Path and do NOT include test prep tasks here( the testprep is the other path when u click path builder on the mentics dashboard).\n\n"
 
         f"# CRITICAL DIRECTIVES & JSON SCHEMA\n"
         f"1.  **JSON Output ONLY**: Your entire output MUST be a single, raw JSON object. No extra text.\n"
