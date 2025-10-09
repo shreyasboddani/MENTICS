@@ -68,11 +68,18 @@
         </a>
       </div>
 
+      <p class="text-xs text-center text-slate-500 mt-4">
+        By continuing with Google, you agree to the Mentics
+        <a href="{{ url_for('terms') }}" target="_blank" class="hover:underline text-purple-600">Terms of Service</a>
+        and
+        <a href="{{ url_for('privacy') }}" target="_blank" class="hover:underline text-purple-600">Privacy Policy</a>.
+      </p>
       <p class="text-sm text-center text-slate-600 mt-8">Don't have an account?
         <a href="/signup" class="text-purple-600 hover:underline font-medium">Sign Up</a>
       </p>
     </div>
   </main>
+
 
   <script src="https://unpkg.com/aos@2.3.1/dist/aos.js"></script>
   <script>
@@ -81,6 +88,15 @@
       duration: 800
     });
   </script>
+  <footer class="text-center p-8 text-sm text-slate-500">
+    <p>
+      <span>&copy; 2025 Mentics. All Rights Reserved.</span>
+      <span class="mx-2">|</span>
+      <a href="{{ url_for('terms') }}" class="hover:text-purple-600 hover:underline">Terms of Service</a>
+      <span class="mx-2">|</span>
+      <a href="{{ url_for('privacy') }}" class="hover:text-purple-600 hover:underline">Privacy Policy</a>
+    </p>
+  </footer>
 </body>
 
 </html>

@@ -16,18 +16,80 @@
     <style>
         .search-input {
             width: 8rem;
-            /* Initial smaller width */
             transition: width 0.3s ease-in-out;
         }
 
         .search-input:focus {
             width: 100%;
-            /* Expand to full width on focus */
+        }
+
+        /* Enhancements for Forum Readability and UX */
+        .post-card {
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+
+        .post-header {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        .avatar {
+            width: 40px;
+            height: 40px;
+            border-radius: 9999px;
+            background-color: #e2e8f0;
+            /* slate-200 */
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            color: #475569;
+            /* slate-600 */
+            font-size: 1.125rem;
+            flex-shrink: 0;
+        }
+
+        .post-meta {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .post-content {
+            padding-left: 3.25rem;
+            /* 40px avatar + 12px gap */
+        }
+
+        .post-actions {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            padding-left: 3.25rem;
+            margin-top: 0.5rem;
+            color: #64748b;
+            /* slate-500 */
+        }
+
+        .reply-card {
+            display: flex;
+            gap: 0.75rem;
+            background-color: #f1f5f9;
+            /* slate-100 */
+            padding: 0.75rem;
+            border-radius: 0.75rem;
+        }
+
+        .reply-card .avatar {
+            width: 32px;
+            height: 32px;
+            font-size: 1rem;
         }
     </style>
 </head>
 
-<body class="bg-slate-50 font-sans text-slate-800 antialiased">
+<body class="bg-slate-50 font-sans text-slate-800 antialiased flex flex-col min-h-screen">
 
     <div class="background-shapes">
         <div class="shape-1"></div>
@@ -93,9 +155,16 @@
         </div>
     </header>
 
-    <main class="w-full max-w-6xl mx-auto p-6 lg:p-8 grid grid-cols-1 lg:grid-cols-3 gap-8">
-        <div class="lg:col-span-2">
-            <div class="card p-6 md:p-8" data-aos="fade-up">
+    <main class="w-full max-w-6xl mx-auto p-6 lg:p-8 grid grid-cols-1 lg:grid-cols-3 gap-8 flex-grow items-start">
+        <div class="lg:col-span-2 space-y-6">
+            <div data-aos="fade-up">
+                <button id="create-thread-btn"
+                    class="w-full card p-4 text-left text-lg font-semibold text-slate-500 hover:bg-slate-100/70 transition-all duration-300 ease-in-out shadow-sm hover:shadow-md hover:border-slate-300/70 border border-transparent">
+                    + Start a new discussion...
+                </button>
+            </div>
+
+            <div id="create-thread-form" class="card p-6 md:p-8 hidden" data-aos="fade-up">
                 <h2 class="text-2xl font-bold font-lalezar text-purple-700 mb-4">Start a Discussion</h2>
                 <div class="space-y-4">
                     <input id="post-title"
@@ -110,24 +179,43 @@
                 </div>
             </div>
 
-            <div id="posts-container" class="space-y-6 mt-8">
+            <div id="posts-container" class="space-y-6">
                 {% for post in posts %}
-                <div class="card p-6" data-aos="fade-up" data-aos-delay="100">
-                    <h3 class="text-xl font-bold font-lalezar text-slate-800">{{ post.title }}</h3>
-                    <div class="flex items-center justify-between text-xs text-slate-500 mb-4">
-                        <span>By {{ post.user_name }}</span>
-                        <span>{{ post.created_at | time_ago }}</span>
-                    </div>
-                    <p class="text-slate-700">{{ post.content }}</p>
-
-                    <div class="replies-container mt-4 pt-4 border-t border-slate-200/80 space-y-3">
-                        {% for reply in post.replies %}
-                        <div class="bg-slate-100/70 p-3 rounded-lg">
-                            <div class="flex items-center justify-between text-xs text-slate-500 mb-1">
-                                <span class="font-semibold text-purple-800">{{ reply.user_name }}</span>
-                                <span>{{ reply.created_at | time_ago }}</span>
+                <div class="card p-6 post-card" data-aos="fade-up" data-aos-delay="100">
+                    <div class="post-header">
+                        <div class="avatar">{{ post.user_name[0] }}</div>
+                        <div class="post-meta">
+                            <h3 class="text-xl font-bold font-lalezar text-slate-800">{{ post.title }}</h3>
+                            <div class="text-xs text-slate-500">
+                                By <span class="font-semibold">{{ post.user_name }}</span> &bull; {{ post.created_at |
+                                time_ago }}
                             </div>
-                            <p class="text-sm text-slate-700">{{ reply.content }}</p>
+                        </div>
+                    </div>
+                    <p class="text-slate-700 post-content">{{ post.content }}</p>
+                    <div class="post-actions">
+                        <div class="flex items-center gap-1.5">
+                            <svg class="w-4 h-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"
+                                fill="currentColor">
+                                <path fill-rule="evenodd"
+                                    d="M10 3c-4.31 0-8 3.033-8 7 0 1.54.493 2.955 1.332 4.134.33.475.243.95-.19 1.278L.61 17.143a.75.75 0 00.933.933l1.731-1.532c.328-.29.803-.32 1.278-.19A7.012 7.012 0 0010 17c4.31 0 8-3.033 8-7s-3.69-7-8-7zm0 11.5a5.5 5.5 0 100-11 5.5 5.5 0 000 11z"
+                                    clip-rule="evenodd" />
+                            </svg>
+                            <span class="text-sm font-medium">{{ post.replies|length }} Replies</span>
+                        </div>
+                    </div>
+
+                    <div class="replies-container mt-2 pt-4 border-t border-slate-200/80 space-y-3">
+                        {% for reply in post.replies %}
+                        <div class="reply-card">
+                            <div class="avatar">{{ reply.user_name[0] }}</div>
+                            <div class="flex-1">
+                                <div class="flex items-center justify-between text-xs text-slate-500 mb-1">
+                                    <span class="font-semibold text-purple-800">{{ reply.user_name }}</span>
+                                    <span>{{ reply.created_at | time_ago }}</span>
+                                </div>
+                                <p class="text-sm text-slate-700">{{ reply.content }}</p>
+                            </div>
                         </div>
                         {% endfor %}
                     </div>
@@ -145,34 +233,48 @@
             </div>
         </div>
 
-        <div class="lg:col-span-1 space-y-8">
-            <div class="card p-6" data-aos="fade-up" data-aos-delay="200">
-                <form action="{{ url_for('forum') }}" method="get" class="flex items-center gap-2">
-                    <input type="search" name="search" value="{{ search_query }}" placeholder="Search..."
-                        class="search-input bg-white/50 border border-slate-300/70 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-purple-500">
-                    <button type="submit" class="bg-purple-600 text-white p-2.5 rounded-lg hover:bg-purple-700"><svg
-                            xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                            <path fill-rule="evenodd"
-                                d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z"
-                                clip-rule="evenodd" />
-                        </svg></button>
-                </form>
-            </div>
-            <div class="card p-6" data-aos="fade-up" data-aos-delay="300">
-                <h3 class="text-lg font-bold font-lalezar text-purple-700 mb-4">Today's Threads</h3>
-                <div class="space-y-3">
-                    {% for thread in todays_threads %}
-                    <a href="#" class="block p-3 rounded-lg bg-slate-100/70 hover:bg-slate-200/70 transition">
-                        <p class="font-semibold text-sm text-slate-800">{{ thread.title }}</p>
-                        <p class="text-xs text-slate-500">by {{ thread.user_name }}</p>
-                    </a>
-                    {% else %}
-                    <p class="text-sm text-slate-500">No new threads today.</p>
-                    {% endfor %}
+        <div class="lg:col-span-1">
+            <div class="sticky top-28 space-y-8">
+                <div class="card p-6" data-aos="fade-up" data-aos-delay="200">
+                    <form action="{{ url_for('forum') }}" method="get" class="flex items-center gap-2">
+                        <input type="search" name="search" value="{{ search_query }}" placeholder="Search..."
+                            class="search-input bg-white/50 border border-slate-300/70 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-purple-500">
+                        <button type="submit" class="bg-purple-600 text-white p-2.5 rounded-lg hover:bg-purple-700"><svg
+                                xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20"
+                                fill="currentColor">
+                                <path fill-rule="evenodd"
+                                    d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z"
+                                    clip-rule="evenodd" />
+                            </svg>
+                        </button>
+                    </form>
+                </div>
+                <div class="card p-6" data-aos="fade-up" data-aos-delay="300">
+                    <h3 class="text-lg font-bold font-lalezar text-purple-700 mb-4">Today's Threads</h3>
+                    <div class="space-y-3">
+                        {% for thread in todays_threads %}
+                        <a href="#" class="block p-3 rounded-lg bg-slate-100/70 hover:bg-slate-200/70 transition">
+                            <p class="font-semibold text-sm text-slate-800">{{ thread.title }}</p>
+                            <p class="text-xs text-slate-500">by {{ thread.user_name }}</p>
+                        </a>
+                        {% else %}
+                        <p class="text-sm text-slate-500">No new threads today.</p>
+                        {% endfor %}
+                    </div>
                 </div>
             </div>
         </div>
     </main>
+
+    <footer class="text-center p-8 text-sm text-slate-500">
+        <p>
+            <span>&copy; 2025 Mentics. All Rights Reserved.</span>
+            <span class="mx-2">|</span>
+            <a href="#" class="hover:text-purple-600 hover:underline">Terms of Service</a>
+            <span class="mx-2">|</span>
+            <a href="#" class="hover:text-purple-600 hover:underline">Privacy Policy</a>
+        </p>
+    </footer>
 
     <script src="https://unpkg.com/aos@2.3.1/dist/aos.js"></script>
     <script>
@@ -181,6 +283,18 @@
             duration: 800
         });
 
+        // --- NEW SCRIPT for toggling the create thread form ---
+        const createThreadBtn = document.getElementById('create-thread-btn');
+        const createThreadForm = document.getElementById('create-thread-form');
+
+        createThreadBtn.addEventListener('click', () => {
+            createThreadForm.classList.remove('hidden');
+            createThreadBtn.classList.add('hidden');
+            document.getElementById('post-title').focus();
+        });
+
+
+        // --- Existing scripts for submitting posts and replies ---
         document.getElementById('submit-post').addEventListener('click', async () => {
             const title = document.getElementById('post-title').value;
             const content = document.getElementById('post-content').value;

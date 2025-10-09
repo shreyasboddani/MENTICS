@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <title>Privacy Policy – Mentics</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Lalezar&display=swap"
+        rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='dashboard.css') }}">
+    <link rel="icon" href="{{ url_for('static', filename='favicon.svg') }}" type="image/svg+xml">
+    <style>
+        .prose h2 {
+            font-family: 'Lalezar', cursive;
+            color: #5b21b6;
+            /* Corresponds to violet-800 */
+            border-bottom: 2px solid #ddd6fe;
+            /* Corresponds to violet-200 */
+            padding-bottom: 0.5rem;
+            margin-top: 2em;
+        }
+
+        .prose h3 {
+            font-family: 'Lalezar', cursive;
+            color: #4338ca;
+            /* Corresponds to indigo-700 */
+            margin-top: 1.5em;
+        }
+
+        .prose ul>li::before {
+            background-color: #a78bfa;
+            /* Corresponds to violet-400 */
+        }
+
+        .prose strong {
+            color: #1e293b;
+            /* Corresponds to slate-800 */
+        }
+    </style>
+</head>
+
+<body class="bg-slate-50 font-sans text-slate-800 antialiased">
+
+    <div class="background-shapes">
+        <div class="shape-1"></div>
+        <div class="shape-2"></div>
+    </div>
+
+    <header class="top-nav">
+        <div class="flex justify-between items-center">
+            <a href="/" class="text-3xl font-bold text-purple-600 tracking-tight font-lalezar">MENTICS</a>
+            <nav>
+                <a href="/dashboard"
+                    class="text-sm font-semibold text-slate-600 hover:text-purple-600 transition-colors duration-200">
+                    &larr; Back to Dashboard
+                </a>
+            </nav>
+        </div>
+    </header>
+
+    <main class="w-full max-w-4xl mx-auto px-6 lg:px-8 py-24">
+        <div class="card p-8 md:p-12">
+            <div class="text-center mb-10">
+                <h1 class="text-4xl md:text-5xl font-bold font-lalezar text-purple-700">Privacy Policy</h1>
+                <p class="text-slate-500 mt-2">Last Updated: October 9, 2025</p>
+            </div>
+
+            <div class="prose max-w-none text-slate-700">
+                <p>Welcome to Mentics! Your privacy is important to us. This Privacy Policy explains how Mentics ("we,"
+                    "us," or "our") collects, uses, discloses, and safeguards your information when you use our website
+                    and services (collectively, the "Services").</p>
+
+                <h2>1. Information We Collect</h2>
+                <p>We may collect information about you in a variety of ways. The information we may collect on the
+                    Service includes:</p>
+
+                <h3>Personal Data You Provide to Us</h3>
+                <ul>
+                    <li><strong>Account Information:</strong> When you register for an account, we collect your name and
+                        email address. If you register using a password, we store a secure, hashed version of your
+                        password. If you register using Google OAuth, we collect your name and email from your Google
+                        profile.</li>
+                    <li><strong>Profile and Educational Data:</strong> To personalize your experience, we collect
+                        information you provide during onboarding or in your profile, such as your academic goals,
+                        learning style, anxieties, GPA, SAT/ACT scores (current and desired), strengths, weaknesses,
+                        test dates, grade level, interested majors, and target colleges. You may also voluntarily upload
+                        a profile picture.</li>
+                    <li><strong>User-Generated Content:</strong> We collect content you voluntarily create and submit.
+                        This includes:
+                        <ul>
+                            <li>Posts and replies you make in our community forum.</li>
+                            <li>Your conversations with our AI Assistant.</li>
+                            <li>Essays and associated prompts that you submit for AI analysis.</li>
+                        </ul>
+                    </li>
+                </ul>
+
+                <h3>Data We Collect Automatically</h3>
+                <ul>
+                    <li><strong>Derivative Data:</strong> Our servers automatically collect information when you access
+                        the Services, such as your IP address, browser type, operating system, access times, and the
+                        pages you have viewed.</li>
+                    <li><strong>Activity Data:</strong> We log your interactions with the Services, such as when you
+                        complete tasks, generate a new path, or update your stats, to power features like your activity
+                        feed and progress charts.</li>
+                </ul>
+
+                <h2>2. How We Use Your Information</h2>
+                <p>We use the information collected about you to provide a smooth, efficient, and customized experience.
+                    Specifically, we use your information to:</p>
+                <ul>
+                    <li>Create and manage your account.</li>
+                    <li>Generate highly personalized learning paths for test prep and college planning based on your
+                        specific goals, scores, and self-reported strengths and weaknesses.</li>
+                    <li>Provide contextual and relevant assistance through our AI-powered chat and essay feedback tools.
+                    </li>
+                    <li>Operate and moderate community features like the forum and leaderboard.</li>
+                    <li>Track your progress over time and visualize your growth on your dashboard and tracker pages.
+                    </li>
+                    <li>Monitor and analyze usage and trends to improve our Services, including the performance of our
+                        AI models.</li>
+                    <li>Administer gamification features, including awarding points for task completion and tracking
+                        daily streaks to keep you motivated.</li>
+                </ul>
+
+                <h2>3. Disclosure of Your Information</h2>
+                <p>We are committed to maintaining your trust, and we do not sell your personal information. We may
+                    share information we have collected about you in certain limited situations:</p>
+                <ul>
+                    <li><strong>By Law or to Protect Rights:</strong> If we believe the release of information about you
+                        is necessary to respond to legal process, to investigate or remedy potential violations of our
+                        policies, or to protect the rights, property, and safety of others, we may share your
+                        information as permitted or required by law.</li>
+                    <li><strong>Third-Party Service Providers:</strong> We share data with third-party vendors who
+                        perform services for us. This includes:
+                        <ul>
+                            <li><strong>Google Gemini API:</strong> To power our AI features, we send your inputs (such
+                                as chat messages and essay text) to Google's Generative AI services. This data is used
+                                to generate responses and is handled in accordance with Google's privacy policies.</li>
+                        </ul>
+                    </li>
+                    <li><strong>Third-Party Advertisers:</strong> We do not currently share user information with
+                        third-party advertisers. If this practice changes in the future, we will update this policy and
+                        provide you with the choice to opt out.</li>
+                </ul>
+
+                <h2>4. Children's Online Privacy Protection Act (COPPA)</h2>
+                <p>Our services are intended for high school students, who may be under the age of 18 but are generally
+                    over the age of 13. We do not knowingly collect personally identifiable information from children
+                    under the age of 13. If we determine that a user is under 13, we will require verifiable parental
+                    consent before they can use the Service. If you are a parent or guardian and you are aware that your
+                    child has provided us with personal information without your consent, please contact us immediately
+                    so we can take appropriate action.</p>
+
+                <h2>5. Your Rights and Choices</h2>
+                <p>You have control over your personal information and how it is used:</p>
+                <ul>
+                    <li><strong>Account Information:</strong> You may review or change the information in your account
+                        or terminate your account at any time by accessing your account settings page.</li>
+                    <li><strong>Emails and Communications:</strong> If you no longer wish to receive emails or other
+                        communications from us, you may opt-out by contacting us at the email address provided below.
+                    </li>
+                </ul>
+
+                <h2>6. Security of Your Information</h2>
+                <p>We use administrative, technical, and physical security measures to help protect your personal
+                    information. While we have taken reasonable steps to secure the personal information you provide to
+                    us, please be aware that despite our efforts, no security measures are perfect or impenetrable, and
+                    no method of data transmission can be guaranteed against any interception or other type of misuse.
+                </p>
+
+                <h2>7. Contact Us</h2>
+                <p>If you have questions or comments about this Privacy Policy, please contact us at:</p>
+                <p><strong>Mentics</strong><br>
+                    Email: thementicsapp@gmail.com</p>
+            </div>
+        </div>
+    </main>
+
+    <footer class="text-center p-8 text-sm text-slate-500">
+        <p>
+            <span>&copy; 2025 Mentics. All Rights Reserved.</span>
+            <span class="mx-2">|</span>
+            <a href="{{ url_for('terms') }}" class="hover:text-purple-600 hover:underline">Terms of Service</a>
+            <span class="mx-2">|</span>
+            <a href="{{ url_for('privacy') }}" class="hover:text-purple-600 hover:underline">Privacy Policy</a>
+        </p>
+    </footer>
+
+</body>
+
+</html>

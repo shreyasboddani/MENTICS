@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <title>Terms of Service – Mentics</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Lalezar&display=swap"
+        rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='dashboard.css') }}">
+    <link rel="icon" href="{{ url_for('static', filename='favicon.svg') }}" type="image/svg+xml">
+    <style>
+        .prose h2 {
+            font-family: 'Lalezar', cursive;
+            color: #5b21b6;
+            /* Corresponds to violet-800 */
+            border-bottom: 2px solid #ddd6fe;
+            /* Corresponds to violet-200 */
+            padding-bottom: 0.5rem;
+            margin-top: 2em;
+        }
+
+        .prose h3 {
+            font-family: 'Lalezar', cursive;
+            color: #4338ca;
+            /* Corresponds to indigo-700 */
+            margin-top: 1.5em;
+        }
+
+        .prose ul>li::before {
+            background-color: #a78bfa;
+            /* Corresponds to violet-400 */
+        }
+
+        .prose strong {
+            color: #1e293b;
+            /* Corresponds to slate-800 */
+        }
+
+        .disclaimer-box {
+            background-color: #f1f5f9;
+            /* slate-100 */
+            border-left: 4px solid #a78bfa;
+            /* violet-400 */
+            padding: 1rem;
+            margin: 1.5rem 0;
+            border-radius: 0.25rem;
+        }
+    </style>
+</head>
+
+<body class="bg-slate-50 font-sans text-slate-800 antialiased">
+
+    <div class="background-shapes">
+        <div class="shape-1"></div>
+        <div class="shape-2"></div>
+    </div>
+
+    <header class="top-nav">
+        <div class="flex justify-between items-center">
+            <a href="/" class="text-3xl font-bold text-purple-600 tracking-tight font-lalezar">MENTICS</a>
+            <nav>
+                <a href="/dashboard"
+                    class="text-sm font-semibold text-slate-600 hover:text-purple-600 transition-colors duration-200">
+                    &larr; Back to Dashboard
+                </a>
+            </nav>
+        </div>
+    </header>
+
+    <main class="w-full max-w-4xl mx-auto px-6 lg:px-8 py-24">
+        <div class="card p-8 md:p-12">
+            <div class="text-center mb-10">
+                <h1 class="text-4xl md:text-5xl font-bold font-lalezar text-purple-700">Terms of Service</h1>
+                <p class="text-slate-500 mt-2">Last Updated: October 9, 2025</p>
+            </div>
+
+            <div class="prose max-w-none text-slate-700">
+                <p>Please read these Terms of Service ("Terms") carefully before using the Mentics website and services
+                    (the "Service") operated by Mentics.</p>
+
+                <h2>1. Agreement to Terms</h2>
+                <p>By creating an account, accessing, or using our Service, you agree to be bound by these Terms and our
+                    Privacy Policy. If you disagree with any part of the terms, then you may not access the Service.</p>
+
+                <h2>2. Description of Service</h2>
+                <p>Mentics is a web application designed to assist high school students with test preparation and
+                    college planning. Our services include, but are not limited to:</p>
+                <ul>
+                    <li>Personalized, AI-generated learning paths for test prep (SAT/ACT) and college planning.</li>
+                    <li>An AI-powered assistant for guidance and support.</li>
+                    <li>Tools for tracking academic stats and progress over time.</li>
+                    <li>Gamification features such as points, streaks, and achievements to encourage engagement.</li>
+                    <li>A community forum for user discussion and support.</li>
+                    <li>AI-driven analysis of user-submitted essays.</li>
+                </ul>
+
+                <h2>3. User Accounts and Eligibility</h2>
+                <p>You must be at least 13 years old to create an account on Mentics. You are responsible for
+                    safeguarding the password you use to access the Service and for any activities or actions under your
+                    password. You agree to provide accurate and complete information when creating your account.</p>
+
+                <h2>4. User-Generated Content (UGC)</h2>
+                <p>Our Service allows you to post, link, store, share and otherwise make available certain information,
+                    text, graphics, or other material ("User Content"). You are responsible for the User Content that
+                    you post on or through the Service, including its legality, reliability, and appropriateness.</p>
+                <ul>
+                    <li>By posting User Content, you grant Mentics a non-exclusive, worldwide, royalty-free, perpetual,
+                        and transferable license to use, reproduce, modify, display, and distribute such User Content in
+                        connection with providing and improving the Service.</li>
+                    <li>You represent and warrant that you own the User Content or have all necessary rights to post it
+                        and grant us the license provided in these Terms.</li>
+                    <li>We reserve the right, but not the obligation, to monitor and remove any User Content that we
+                        determine, in our sole discretion, violates these Terms or is otherwise harmful or
+                        objectionable.</li>
+                </ul>
+
+                <h2>5. AI and API Usage</h2>
+                <p>Mentics utilizes third-party AI services, including the Google Gemini API, to provide its core
+                    features. By using the Service, you acknowledge and agree to the following:</p>
+                <ul>
+                    <li><strong>Responsible Use:</strong> We are committed to using these AI services responsibly. We
+                        will not knowingly engage in practices that abuse API quotas or violate the terms of service of
+                        our AI providers.</li>
+                    <li><strong>No Guarantees:</strong> AI-generated content (including learning paths, chat responses,
+                        and essay feedback) is provided for educational and informational purposes only. We make no
+                        representations or warranties about the accuracy, reliability, or suitability of this content.
+                        You are responsible for verifying any information and using your own judgment.</li>
+                </ul>
+
+                <h2>6. Prohibited Activities</h2>
+                <p>You agree not to engage in any of the following prohibited activities:</p>
+                <ul>
+                    <li>Using the Service for any illegal purpose or in violation of any local, state, national, or
+                        international law.</li>
+                    <li>Harassing, threatening, or defrauding other users.</li>
+                    <li>Posting User Content that is obscene, defamatory, hateful, or infringes on any third party's
+                        intellectual property rights.</li>
+                    <li>Attempting to interfere with, compromise the system integrity or security, or decipher any
+                        transmissions to or from the servers running the Service.</li>
+                    <li>Submitting false or misleading information.</li>
+                </ul>
+
+                <h2>7. Copyright Policy and DMCA</h2>
+                <p>We respect the intellectual property rights of others. If you believe that any User Content on the
+                    Service infringes your copyright, please submit a claim to our designated Copyright Agent at
+                    <strong>thementicsapp@gmail.com</strong> with the subject line: "Copyright Infringement". Your claim
+                    must include a detailed description of the alleged infringement as required by the Digital
+                    Millennium Copyright Act (DMCA).
+                </p>
+
+                <h2>8. Disclaimers and Trademark Notice</h2>
+                <div class="disclaimer-box">
+                    <p><strong>Mentics is an independent service and is not affiliated with, endorsed by, or sponsored
+                            by the College Board®, which is the owner of the SAT®, or ACT®, Inc., which is the owner of
+                            the ACT®. SAT® is a registered trademark of the College Board. ACT® is a registered
+                            trademark of ACT, Inc.</strong></p>
+                    <p>All AI-generated content is provided on an "as is" and "as available" basis. Mentics makes no
+                        representations or warranties of any kind, express or implied, as to the operation of their
+                        services, or the information, content or materials included therein.</p>
+                </div>
+
+                <h2>9. Termination</h2>
+                <p>We may terminate or suspend your account immediately, without prior notice or liability, for any
+                    reason whatsoever, including, without limitation, if you breach these Terms.</p>
+
+                <h2>10. Governing Law and Dispute Resolution</h2>
+                <p>These Terms shall be governed and construed in accordance with the laws of the State of Georgia,
+                    United States. Any dispute arising from these Terms shall be resolved through binding arbitration in
+                    <strong>Cumming, Georgia</strong>, except for claims that qualify for small claims court.
+                </p>
+
+                <h2>11. Limitation of Liability</h2>
+                <p>In no event shall Mentics, its directors, employees, or agents, be liable for any indirect,
+                    incidental, special, consequential, or punitive damages, including without limitation, loss of
+                    profits, data, or goodwill, arising from your use of the Service or any content obtained from the
+                    Service.</p>
+
+                <h2>12. Changes to Terms</h2>
+                <p>We reserve the right to modify or replace these Terms at any time. If a revision is material, we will
+                    provide at least 30 days' notice prior to any new terms taking effect.</p>
+
+                <h2>13. Contact Us</h2>
+                <p>If you have any questions about these Terms, please contact us at:</p>
+                <p><strong>Mentics</strong><br>
+                    Email: thementicsapp@gmail.com</p>
+            </div>
+        </div>
+    </main>
+
+    <footer class="text-center p-8 text-sm text-slate-500">
+        <p>
+            <span>&copy; 2025 Mentics. All Rights Reserved.</span>
+            <span class="mx-2">|</span>
+            <a href="{{ url_for('terms') }}" class="hover:text-purple-600 hover:underline">Terms of Service</a>
+            <span class="mx-2">|</span>
+            <a href="{{ url_for('privacy') }}" class="hover:text-purple-600 hover:underline">Privacy Policy</a>
+        </p>
+    </footer>
+
+</body>
+
+</html>

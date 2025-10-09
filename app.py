@@ -792,6 +792,16 @@ def _generate_and_save_new_college_path(user_id, college_context, chat_history=[
 # --- Standard Routes ---
 
 
+@app.route("/privacy")
+def privacy():
+    return render_template("privacy.html")
+
+
+@app.route("/terms")
+def terms():
+    return render_template("terms.html")
+
+
 @app.route("/")
 def home():
     is_logged_in = "user" in session
