@@ -155,12 +155,22 @@ def init_db():
         "FOREIGN KEY(user_id)": "REFERENCES users(id) ON DELETE CASCADE",
         "FOREIGN KEY(question_id)": "REFERENCES quiz_questions(id) ON DELETE CASCADE"
     })
+    # --- START of the FIX ---
+    # Drop the old, inefficient index if it exists, to be safe.
+    try:
+        db.execute("DROP INDEX IF EXISTS idx_paths_user_category_active;")
+    except Exception as e:
+        print(f"Could not drop old index (this is likely fine): {e}")
+
+    # Create the new, correct, and highly performant index.
+    # This new index includes the 'created_at' column which is critical for performance.
     db.execute(
         """
-        CREATE INDEX IF NOT EXISTS idx_paths_user_category_active 
-        ON paths (user_id, category, is_active);
+        CREATE INDEX IF NOT EXISTS idx_paths_user_category_active_created
+        ON paths (user_id, category, is_active, created_at DESC);
         """
     )
+    # --- END of the FIX ---
 
 
 # --- HELPER FUNCTIONS ---
