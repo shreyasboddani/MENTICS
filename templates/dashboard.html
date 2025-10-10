@@ -269,7 +269,7 @@
 
                 <div class="card suggestion-card" data-aos="fade-up" data-aos-delay="750">
                     <h3 class="card-header">💡 AI Encouragement</h3>
-                    <p class="text-slate-600">{{ suggestion }}</p>
+                    <p id="ai-suggestion-text" class="text-slate-600">Loading your personalized tip...</p>
                 </div>
             </div>
         </div>
@@ -499,6 +499,24 @@
             if (e.key === "Escape" && !modal.classList.contains('hidden')) {
                 closePathModal();
             }
+        });
+        document.addEventListener('DOMContentLoaded', function () {
+            const suggestionText = document.getElementById('ai-suggestion-text');
+
+            // Fetch the suggestion from our new API route
+            fetch('/api/get-suggestion')
+                .then(response => response.json())
+                .then(data => {
+                    if (data.suggestion) {
+                        suggestionText.textContent = data.suggestion;
+                    } else {
+                        suggestionText.textContent = "Welcome! Complete a few tasks to get your first tip.";
+                    }
+                })
+                .catch(error => {
+                    console.error("Error fetching AI suggestion:", error);
+                    suggestionText.textContent = "Could not load a tip right now. Keep up the great work!";
+                });
         });
     </script>
     <footer class="text-center p-8 text-sm text-slate-500">

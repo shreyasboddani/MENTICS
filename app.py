@@ -1012,6 +1012,9 @@ def set_timezone():
 # --- Dashboard & Path Routes ---
 
 
+# --- Dashboard & Path Routes ---
+
+
 @app.route("/dashboard")
 @login_required
 def dashboard(user):
@@ -1021,9 +1024,6 @@ def dashboard(user):
     user_id = user.data['id']
     name = user.get_name()
     all_tasks = db.select("paths", where={"user_id": user_id})
-
-    # Get proactive suggestion
-    suggestion = _get_proactive_ai_suggestions(user)
 
     # --- Gamification Stats ---
     gamification_stats_list = db.select(
@@ -1132,12 +1132,11 @@ def dashboard(user):
         try:
             test_date = datetime.strptime(
                 test_path_stats["test_date"], '%Y-%m-%d').date()
-            # Use user's timezone for 'today' to ensure accurate countdown
             try:
                 user_tz_str = session.get('timezone', 'UTC')
                 user_today = datetime.now(ZoneInfo(user_tz_str)).date()
             except ZoneInfoNotFoundError:
-                user_today = date.today()  # Fallback to server date
+                user_today = date.today()
             days_left = (test_date - user_today).days
             if days_left >= 0:
                 test_date_info["days_left"] = days_left
@@ -1173,7 +1172,6 @@ def dashboard(user):
 
     all_completed_tasks = total_test_prep_completed + total_college_planning_completed
 
-    # Check which achievements are earned
     if any(t['category'] == 'Test Prep' for t in all_tasks):
         all_achievements[0]['is_earned'] = True
     if any(t['category'] == 'College Planning' for t in all_tasks):
@@ -1208,8 +1206,15 @@ def dashboard(user):
         test_date_info=test_date_info,
         earned_achievements=earned_achievements,
         game_stats=game_stats,
-        suggestion=suggestion
     )
+
+
+@app.route("/api/get-suggestion")
+@login_required
+def get_suggestion(user):
+    """A new route to fetch the AI suggestion asynchronously."""
+    suggestion = _get_proactive_ai_suggestions(user)
+    return jsonify({"suggestion": suggestion})
 
 
 @app.route('/account', methods=['GET', 'POST'])
