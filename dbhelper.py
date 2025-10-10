@@ -115,6 +115,8 @@ class DatabaseHandler:
         self.execute(query, tuple(data.values()))
 # This is inside the DatabaseHandler class in dbhelper.py
 
+    # This is inside the DatabaseHandler class in dbhelper.py
+
     def execute_for_one(self, query, params=None):
         """
         Executes a query and fetches only the first result.
@@ -131,5 +133,31 @@ class DatabaseHandler:
         # Use fetchone() for maximum efficiency
         row = c.fetchone()
 
+        conn.close()
+        return dict(row) if row else None
+# Add this new function inside the DatabaseHandler class in dbhelper.py
+
+    def select_one(self, table_name, columns='*', where=None, order_by=None):
+        """
+        Efficiently selects a single row from the database using fetchone().
+        """
+        if isinstance(columns, list):
+            cols = ', '.join(columns)
+        else:
+            cols = columns
+        query = f"SELECT {cols} FROM {table_name}"
+        params = ()
+        if where:
+            where_clause = ' AND '.join([f"{k}=?" for k in where.keys()])
+            query += f" WHERE {where_clause}"
+            params = tuple(where.values())
+        if order_by:
+            query += f" ORDER BY {order_by}"
+
+        conn = sqlite3.connect(self.db_name, timeout=10)
+        conn.row_factory = sqlite3.Row
+        c = conn.cursor()
+        c.execute(query, params)
+        row = c.fetchone()
         conn.close()
         return dict(row) if row else None

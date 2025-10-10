@@ -923,14 +923,13 @@ def login():
     if request.method == "POST":
         email = request.form["email"]
         password = request.form["password"]
-        user_record_list = db.select("users", where={"email": email})
-        if user_record_list:
-            user_record = user_record_list[0]
-            if check_password_hash(user_record['password'], password):
-                session["user"] = user_record['email']
-                session["user_id"] = user_record['id']
-                session.permanent = True
-                return redirect(url_for("dashboard"))
+        # Use the new, efficient select_one method
+        user_record = db.select_one("users", where={"email": email})
+        if user_record and check_password_hash(user_record['password'], password):
+            session["user"] = user_record['email']
+            session["user_id"] = user_record['id']
+            session.permanent = True
+            return redirect(url_for("dashboard"))
         error = "Invalid credentials"
     return render_template("login.html", error=error)
 
@@ -945,24 +944,22 @@ def google_login():
 # NEW: Google Authorize Route (Callback) - UPDATED
 
 
+# Replace the entire authorize function in app.py
 @app.route('/authorize')
 def authorize():
     token = oauth.google.authorize_access_token()
-    # The 'nonce' is retrieved from the session and passed to the parse_id_token method
     user_info = oauth.google.parse_id_token(token, nonce=session.get('nonce'))
 
-    # Check if user exists
-    user_record_list = db.select("users", where={"email": user_info['email']})
+    # Use the new, efficient select_one method
+    user_record = db.select_one("users", where={"email": user_info['email']})
 
-    if user_record_list:
+    if user_record:
         # User exists, log them in
-        user_record = user_record_list[0]
         session["user"] = user_record['email']
         session["user_id"] = user_record['id']
         session.permanent = True
     else:
         # New user, create an account
-        # We use a placeholder for the password hash as they'll log in via Google
         password_hash = generate_password_hash(os.urandom(16).hex())
         user_id = db.insert("users", {
             "email": user_info['email'],
@@ -973,7 +970,6 @@ def authorize():
                 "act_reading": "", "act_science": "", "gpa": "", "milestones": 0
             })
         })
-        # Initialize gamification stats for new Google user
         db.insert("gamification_stats", {
                   "user_id": user_id, "points": 0, "current_streak": 0})
 
@@ -1505,7 +1501,7 @@ def test_path_status(user):
     user_id = user.data['id']
     # This query is optimized to be extremely fast. It stops looking after finding just one match.
     query = "SELECT 1 FROM paths WHERE user_id=? AND is_active=True AND category='Test Prep' LIMIT 1"
-    # Use the new, highly efficient function
+    # Use the new, highly efficient function from dbhelper
     result = db.execute_for_one(query, (user_id,))
     return jsonify({"has_path": bool(result)})
 
@@ -1518,7 +1514,7 @@ def college_path_status(user):
     user_id = user.data['id']
     # This query is also optimized for speed.
     query = "SELECT 1 FROM paths WHERE user_id=? AND is_active=True AND category='College Planning' LIMIT 1"
-    # Use the new, highly efficient function
+    # Use the new, highly efficient function from dbhelper
     result = db.execute_for_one(query, (user_id,))
     return jsonify({"has_path": bool(result)})
 
