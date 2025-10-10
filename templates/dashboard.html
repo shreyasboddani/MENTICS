@@ -354,99 +354,47 @@
             delay: 100
         });
 
+        // --- START OF THE FIX ---
+
         document.addEventListener('DOMContentLoaded', function () {
-            // NEW: Add this block to detect and set the user's timezone
+            // Timezone setting logic remains the same
             const userTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
             fetch('/set-timezone', {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
+                headers: { 'Content-Type': 'application/json', },
                 body: JSON.stringify({ timezone: userTimezone }),
-            })
-                .then(response => response.json())
-                .then(data => {
-                    if (data.success) {
-                        console.log('Timezone set successfully:', userTimezone);
-                        // The page will now use the correct timezone on subsequent loads.
-                        // For the initial load, we render the chart with potentially stale data,
-                        // but it will be correct on the next visit.
-                    } else {
-                        console.error('Failed to set timezone on the server.');
-                    }
-                })
-                .catch((error) => {
-                    console.error('Error sending timezone to server:', error);
-                });
+            }).catch((error) => console.error('Error sending timezone to server:', error));
 
-            // --- ApexCharts Initialization ---
+            // Chart initialization remains the same
             const activityData = JSON.parse('{{ activity_data | safe }}');
             var options = {
-                chart: {
-                    height: '100%',
-                    type: 'area',
-                    toolbar: {
-                        show: false
-                    },
-                    fontFamily: 'Inter, sans-serif'
-                },
-                series: [{
-                    name: 'Activities',
-                    data: activityData.data
-                }],
-                xaxis: {
-                    categories: activityData.labels,
-                    labels: {
-                        style: {
-                            colors: '#64748b'
-                        }
-                    },
-                    axisBorder: {
-                        show: false
-                    },
-                    axisTicks: {
-                        show: false
-                    }
-                },
-                yaxis: {
-                    labels: {
-                        style: {
-                            colors: '#64748b'
-                        },
-                        formatter: (value) => {
-                            return Math.round(value)
-                        }
-                    },
-                    min: 0,
-                    tickAmount: 4
-                },
-                dataLabels: {
-                    enabled: false
-                },
-                stroke: {
-                    curve: 'smooth',
-                    width: 3
-                },
-                fill: {
-                    type: 'gradient',
-                    gradient: {
-                        shadeIntensity: 1,
-                        opacityFrom: 0.7,
-                        opacityTo: 0.2,
-                        stops: [0, 100]
-                    }
-                },
-                grid: {
-                    borderColor: '#e2e8f0',
-                    strokeDashArray: 4
-                },
-                colors: ['#0ea5e9'] // sky-500
+                chart: { height: '100%', type: 'area', toolbar: { show: false }, fontFamily: 'Inter, sans-serif' },
+                series: [{ name: 'Activities', data: activityData.data }],
+                xaxis: { categories: activityData.labels, labels: { style: { colors: '#64748b' } }, axisBorder: { show: false }, axisTicks: { show: false } },
+                yaxis: { labels: { style: { colors: '#64748b' }, formatter: (value) => Math.round(value) }, min: 0, tickAmount: 4 },
+                dataLabels: { enabled: false },
+                stroke: { curve: 'smooth', width: 3 },
+                fill: { type: 'gradient', gradient: { shadeIntensity: 1, opacityFrom: 0.7, opacityTo: 0.2, stops: [0, 100] } },
+                grid: { borderColor: '#e2e8f0', strokeDashArray: 4 },
+                colors: ['#0ea5e9']
             };
             var chart = new ApexCharts(document.querySelector("#activityChart"), options);
             chart.render();
+
+            // AI Suggestion logic remains the same
+            const suggestionText = document.getElementById('ai-suggestion-text');
+            fetch('/api/get-suggestion')
+                .then(response => response.json())
+                .then(data => {
+                    suggestionText.textContent = data.suggestion || "Welcome! Complete a few tasks to get your first tip.";
+                })
+                .catch(error => {
+                    console.error("Error fetching AI suggestion:", error);
+                    suggestionText.textContent = "Could not load a tip right now. Keep up the great work!";
+                });
         });
 
-        // --- Modal Logic ---
+        // --- MODAL AND PORTAL LOGIC ---
         const modal = document.getElementById('pathModal');
         const modalContentWrapper = modal.querySelector('.modal-content-wrapper');
         const testPrepPortal = document.getElementById('test-prep-portal');
@@ -468,56 +416,71 @@
                 modalContentWrapper.classList.remove('modal-content-fading-out');
                 testPrepPortal.classList.remove('warping');
                 collegePortal.classList.remove('warping');
+                // Re-enable buttons after closing animation
+                testPrepPortal.disabled = false;
+                collegePortal.disabled = false;
             }, 300);
         }
 
-        function warpToPage(portalElement, url) {
-            if (portalElement.classList.contains('warping')) return;
-            modalContentWrapper.classList.add('modal-content-fading-out');
-            portalElement.classList.add('warping');
+        // --- REWRITTEN PORTAL CLICK LOGIC ---
+
+        // Function that just handles the final navigation
+        function navigateToUrl(url) {
             setTimeout(() => {
                 window.location.href = url;
-            }, 800);
+            }, 800); // 800ms to allow the animation to finish
         }
 
+        // Test Prep Portal Click Handler
         testPrepPortal.addEventListener('click', () => {
-            fetch('/api/test-path-status').then(res => res.json()).then(data => {
-                const url = data.has_path ? '/dashboard/test-path-view' : '/dashboard/test-path-builder';
-                warpToPage(testPrepPortal, url);
-            }).catch(() => warpToPage(testPrepPortal, '/dashboard/test-path-builder'));
+            // Immediately start animation and disable buttons
+            if (testPrepPortal.disabled) return;
+            testPrepPortal.disabled = true;
+            collegePortal.disabled = true;
+            modalContentWrapper.classList.add('modal-content-fading-out');
+            testPrepPortal.classList.add('warping');
+
+            // Fetch the URL in the background
+            fetch('/api/test-path-status')
+                .then(res => res.json())
+                .then(data => {
+                    const url = data.has_path ? '/dashboard/test-path-view' : '/dashboard/test-path-builder';
+                    navigateToUrl(url); // Navigate when fetch completes
+                })
+                .catch(() => {
+                    navigateToUrl('/dashboard/test-path-builder'); // Navigate to default on error
+                });
         });
 
+        // College Portal Click Handler
         collegePortal.addEventListener('click', () => {
-            fetch('/api/college-path-status').then(res => res.json()).then(data => {
-                const url = data.has_path ? "{{ url_for('college_path_view') }}" :
-                    "{{ url_for('college_path_builder') }}";
-                warpToPage(collegePortal, url);
-            }).catch(() => warpToPage(collegePortal, "{{ url_for('college_path_builder') }}"));
+            // Immediately start animation and disable buttons
+            if (collegePortal.disabled) return;
+            testPrepPortal.disabled = true;
+            collegePortal.disabled = true;
+            modalContentWrapper.classList.add('modal-content-fading-out');
+            collegePortal.classList.add('warping');
+
+            // Fetch the URL in the background
+            fetch('/api/college-path-status')
+                .then(res => res.json())
+                .then(data => {
+                    const url = data.has_path ? "{{ url_for('college_path_view') }}" : "{{ url_for('college_path_builder') }}";
+                    navigateToUrl(url); // Navigate when fetch completes
+                })
+                .catch(() => {
+                    navigateToUrl("{{ url_for('college_path_builder') }}"); // Navigate to default on error
+                });
         });
 
+        // Close modal with Escape key
         document.addEventListener('keydown', function (e) {
             if (e.key === "Escape" && !modal.classList.contains('hidden')) {
                 closePathModal();
             }
         });
-        document.addEventListener('DOMContentLoaded', function () {
-            const suggestionText = document.getElementById('ai-suggestion-text');
 
-            // Fetch the suggestion from our new API route
-            fetch('/api/get-suggestion')
-                .then(response => response.json())
-                .then(data => {
-                    if (data.suggestion) {
-                        suggestionText.textContent = data.suggestion;
-                    } else {
-                        suggestionText.textContent = "Welcome! Complete a few tasks to get your first tip.";
-                    }
-                })
-                .catch(error => {
-                    console.error("Error fetching AI suggestion:", error);
-                    suggestionText.textContent = "Could not load a tip right now. Keep up the great work!";
-                });
-        });
+        // --- END OF THE FIX ---
     </script>
     <footer class="text-center p-8 text-sm text-slate-500">
         <p>
