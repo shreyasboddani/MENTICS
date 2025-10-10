@@ -155,6 +155,12 @@ def init_db():
         "FOREIGN KEY(user_id)": "REFERENCES users(id) ON DELETE CASCADE",
         "FOREIGN KEY(question_id)": "REFERENCES quiz_questions(id) ON DELETE CASCADE"
     })
+    db.execute(
+        """
+        CREATE INDEX IF NOT EXISTS idx_paths_user_category_active 
+        ON paths (user_id, category, is_active);
+        """
+    )
 
 
 # --- HELPER FUNCTIONS ---
