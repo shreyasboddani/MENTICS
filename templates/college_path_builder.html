@@ -116,6 +116,7 @@
             once: true,
             duration: 800
         });
+        localStorage.setItem('hasCollegePath', 'false');
 
         document.getElementById('path-builder-form').addEventListener('submit', function () {
             const loader = document.getElementById('builder-loader-overlay');

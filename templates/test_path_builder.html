@@ -118,6 +118,9 @@
             once: true,
             duration: 800
         });
+        // --- START OF THE FIX ---
+        localStorage.setItem('hasTestPath', 'false');
+        // --- END OF THE FIX ---
 
         document.getElementById('path-builder-form').addEventListener('submit', function () {
             const loader = document.getElementById('builder-loader-overlay');

@@ -354,10 +354,7 @@
             delay: 100
         });
 
-        // --- START OF THE FIX ---
-
         document.addEventListener('DOMContentLoaded', function () {
-            // Timezone setting logic remains the same
             const userTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
             fetch('/set-timezone', {
                 method: 'POST',
@@ -365,7 +362,6 @@
                 body: JSON.stringify({ timezone: userTimezone }),
             }).catch((error) => console.error('Error sending timezone to server:', error));
 
-            // Chart initialization remains the same
             const activityData = JSON.parse('{{ activity_data | safe }}');
             var options = {
                 chart: { height: '100%', type: 'area', toolbar: { show: false }, fontFamily: 'Inter, sans-serif' },
@@ -381,7 +377,6 @@
             var chart = new ApexCharts(document.querySelector("#activityChart"), options);
             chart.render();
 
-            // AI Suggestion logic remains the same
             const suggestionText = document.getElementById('ai-suggestion-text');
             fetch('/api/get-suggestion')
                 .then(response => response.json())
@@ -394,7 +389,6 @@
                 });
         });
 
-        // --- MODAL AND PORTAL LOGIC ---
         const modal = document.getElementById('pathModal');
         const modalContentWrapper = modal.querySelector('.modal-content-wrapper');
         const testPrepPortal = document.getElementById('test-prep-portal');
@@ -416,71 +410,54 @@
                 modalContentWrapper.classList.remove('modal-content-fading-out');
                 testPrepPortal.classList.remove('warping');
                 collegePortal.classList.remove('warping');
-                // Re-enable buttons after closing animation
                 testPrepPortal.disabled = false;
                 collegePortal.disabled = false;
             }, 300);
         }
 
-        // --- REWRITTEN PORTAL CLICK LOGIC ---
-
-        // Function that just handles the final navigation
         function navigateToUrl(url) {
             setTimeout(() => {
                 window.location.href = url;
-            }, 800); // 800ms to allow the animation to finish
+            }, 800);
         }
 
         // Test Prep Portal Click Handler
         testPrepPortal.addEventListener('click', () => {
-            // Immediately start animation and disable buttons
             if (testPrepPortal.disabled) return;
             testPrepPortal.disabled = true;
             collegePortal.disabled = true;
             modalContentWrapper.classList.add('modal-content-fading-out');
             testPrepPortal.classList.add('warping');
 
-            // Fetch the URL in the background
-            fetch('/api/test-path-status')
-                .then(res => res.json())
-                .then(data => {
-                    const url = data.has_path ? '/dashboard/test-path-view' : '/dashboard/test-path-builder';
-                    navigateToUrl(url); // Navigate when fetch completes
-                })
-                .catch(() => {
-                    navigateToUrl('/dashboard/test-path-builder'); // Navigate to default on error
-                });
+            const hasTestPath = localStorage.getItem('hasTestPath');
+            const predictedUrl = hasTestPath === 'true' ? '/dashboard/test-path-view' : '/dashboard/test-path-builder';
+            navigateToUrl(predictedUrl);
+
+            fetch('/api/test-path-status').catch(err => console.error("Could not verify path status:", err));
         });
 
+        // --- START OF THE FIX ---
         // College Portal Click Handler
         collegePortal.addEventListener('click', () => {
-            // Immediately start animation and disable buttons
             if (collegePortal.disabled) return;
             testPrepPortal.disabled = true;
             collegePortal.disabled = true;
             modalContentWrapper.classList.add('modal-content-fading-out');
             collegePortal.classList.add('warping');
 
-            // Fetch the URL in the background
-            fetch('/api/college-path-status')
-                .then(res => res.json())
-                .then(data => {
-                    const url = data.has_path ? "{{ url_for('college_path_view') }}" : "{{ url_for('college_path_builder') }}";
-                    navigateToUrl(url); // Navigate when fetch completes
-                })
-                .catch(() => {
-                    navigateToUrl("{{ url_for('college_path_builder') }}"); // Navigate to default on error
-                });
-        });
+            const hasCollegePath = localStorage.getItem('hasCollegePath');
+            const predictedUrl = hasCollegePath === 'true' ? "{{ url_for('college_path_view') }}" : "{{ url_for('college_path_builder') }}";
+            navigateToUrl(predictedUrl);
 
-        // Close modal with Escape key
+            fetch('/api/college-path-status').catch(err => console.error("Could not verify college path status:", err));
+        });
+        // --- END OF THE FIX ---
+
         document.addEventListener('keydown', function (e) {
             if (e.key === "Escape" && !modal.classList.contains('hidden')) {
                 closePathModal();
             }
         });
-
-        // --- END OF THE FIX ---
     </script>
     <footer class="text-center p-8 text-sm text-slate-500">
         <p>

@@ -417,16 +417,14 @@
         let currentTasks = [];
         let currentTaskId = null;
         let conversationHistory = [];
-        const chatCategory = 'Test Prep'; // Define category for this page
+        const chatCategory = 'Test Prep';
 
-        // --- NEW QUIZ STATE VARIABLES ---
         let currentQuizData = null;
         let currentQuestionIndex = 0;
         let score = 0;
         let sprintTimerInterval = null;
 
 
-        // NEW: Loader Functions
         const loaderOverlay = document.getElementById('ai-loader-overlay');
         const loaderText = document.getElementById('loader-text');
 
@@ -439,8 +437,6 @@
             loaderOverlay.classList.remove('visible');
         }
 
-
-        // Function to load chat history from the server
         async function loadChatHistory() {
             try {
                 const response = await fetch(`/api/chat_history?category=${chatCategory}`);
@@ -465,7 +461,6 @@
             }
         }
 
-        // Function to trigger the initial greeting from the bot
         function startInitialChat() {
             conversationHistory.push({
                 role: 'user',
@@ -493,7 +488,6 @@
                         status: task.is_completed ? 'complete' : 'pending'
                     }));
                     if (isRegeneration) {
-                        // Wait a moment before hiding the loader to let the user see the message
                         setTimeout(() => {
                             hideLoader();
                             renderPathAndConnectors(currentTasks, true);
@@ -515,11 +509,10 @@
             const nodesContainer = document.getElementById('path-nodes-container');
             const svgContainer = document.getElementById('path-svg');
             nodesContainer.innerHTML = '';
-            svgContainer.innerHTML = ''; // Clear old connectors
+            svgContainer.innerHTML = '';
 
             const firstPendingIndex = tasks.findIndex(t => t.status === 'pending');
 
-            // Create all node elements first
             tasks.forEach((task, index) => {
                 const isCompleted = task.status === 'complete';
                 const isUnlocked = index === firstPendingIndex;
@@ -554,7 +547,6 @@
                     contentHTML = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-10 h-10 text-slate-500"><path fill-rule="evenodd" d="M12 1.5a5.25 5.25 0 0 0-5.25 5.25v3a3 3 0 0 0-3 3v6.75a3 3 0 0 0 3 3h10.5a3 3 0 0 0 3-3v-6.75a3 3 0 0 0-3-3v-3c0-2.9-2.35-5.25-5.25-5.25Zm3.75 8.25v-3a3.75 3.75 0 1 0-7.5 0v3h7.5Z" clip-rule="evenodd" /></svg>`;
                 }
 
-                // Add quiz icon indicator
                 if (isQuiz) {
                     const quizIcon = `<span class="absolute top-1 right-1 bg-white/30 rounded-full p-1"><svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-white" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd" /></svg></span>`;
                     taskButton.innerHTML = contentHTML + quizIcon;
@@ -595,7 +587,6 @@
             const svg = document.getElementById('path-svg');
             if (!svg || !startNode || !endNode) return;
 
-            // Determine line color based on the page/path type
             const isCollegePath = window.location.pathname.includes('college');
             const strokeColor = isCollegePath ? '#C7D2FE' : '#C7B8F9';
 
@@ -615,7 +606,6 @@
 
             const pathData = `M ${startX} ${startY} C ${controlX1} ${controlY1}, ${controlX2} ${controlY2}, ${endX} ${endY}`;
 
-            // Create a temporary, invisible path to measure
             const tempPath = document.createElementNS('http://www.w3.org/2000/svg', 'path');
             tempPath.setAttribute('d', pathData);
             const totalLength = tempPath.getTotalLength();
@@ -625,11 +615,8 @@
             const patternLength = dashLength + gapLength;
             const dashSegments = [];
 
-            // *** FIX APPLIED HERE ***
-            // Ensure the loop runs at least once to draw a line even if it's very short.
             const loopUntil = Math.max(totalLength, patternLength);
 
-            // Create individual line segments for each dash
             for (let currentLength = 0; currentLength < loopUntil; currentLength += patternLength) {
                 const start = tempPath.getPointAtLength(currentLength);
                 const end = tempPath.getPointAtLength(Math.min(currentLength + dashLength, totalLength));
@@ -649,8 +636,7 @@
                 dashSegments.push(segment);
             }
 
-            // Animate them in one by one
-            const delayBetweenDashes = 12; // ms
+            const delayBetweenDashes = 12;
             for (let i = 0; i < dashSegments.length; i++) {
                 const segment = dashSegments[i];
                 segment.style.animationDelay = `${i * delayBetweenDashes}ms`;
@@ -665,7 +651,6 @@
             const nodes = Array.from(document.querySelectorAll('.task-node.visible'));
             if (!svg || nodes.length < 2) return;
 
-            // Determine line color based on the page/path type
             const isCollegePath = window.location.pathname.includes('college');
             const strokeColor = isCollegePath ? '#C7D2FE' : '#C7B8F9';
 
@@ -692,7 +677,6 @@
 
                 const pathData = `M ${startX} ${startY} C ${controlX1} ${controlY1}, ${controlX2} ${controlY2}, ${endX} ${endY}`;
 
-                // Create a temporary, invisible path to measure
                 const tempPath = document.createElementNS('http://www.w3.org/2000/svg', 'path');
                 tempPath.setAttribute('d', pathData);
                 const totalLength = tempPath.getTotalLength();
@@ -701,11 +685,8 @@
                 const gapLength = 6;
                 const patternLength = dashLength + gapLength;
 
-                // *** FIX APPLIED HERE ***
-                // Ensure the loop runs at least once to draw a line even if it's very short.
                 const loopUntil = Math.max(totalLength, patternLength);
 
-                // Create individual line segments for each dash
                 for (let currentLength = 0; currentLength < loopUntil; currentLength += patternLength) {
                     const start = tempPath.getPointAtLength(currentLength);
                     const end = tempPath.getPointAtLength(Math.min(currentLength + dashLength, totalLength));
@@ -723,7 +704,6 @@
             }
         }
 
-        // --- UPDATED MODAL LOGIC ---
         async function openModalForTask(task) {
             currentTaskId = task.id;
             if (task.task_format === 'quiz') {
@@ -746,7 +726,6 @@
             const modal = document.getElementById('taskModal');
             document.getElementById('modalTitle').textContent = `Step ${task.client_id}: Your Task`;
 
-            // Use marked.js to render markdown links
             document.getElementById('modalDescription').innerHTML = marked.parse(task.description);
             document.getElementById('modalReason').innerHTML = `<b>Why:</b> ${marked.parse(task.reason)}`;
 
@@ -766,14 +745,10 @@
             modal.classList.remove('hidden');
         }
 
-        // --- NEW QUIZ MODAL FUNCTIONS ---
-
         function openQuizModal() {
-            // Reset state
             currentQuestionIndex = 0;
             score = 0;
 
-            // Show start screen
             document.getElementById('quizTitle').textContent = currentQuizData.title;
             document.getElementById('quizReason').textContent = currentQuizData.reason;
             document.getElementById('quiz-start-screen').classList.remove('hidden');
@@ -811,7 +786,6 @@
         }
 
         function selectAnswer(selectedIndex, button) {
-            // Disable all option buttons
             document.querySelectorAll('#options-container button').forEach(btn => btn.disabled = true);
 
             const question = currentQuizData.questions[currentQuestionIndex];
@@ -831,7 +805,6 @@
             } else {
                 button.classList.remove('border-slate-300/70');
                 button.classList.add('border-red-500', 'bg-red-100/50');
-                // Highlight the correct answer
                 document.querySelectorAll('#options-container button')[question.correct_option].classList.add('border-emerald-500', 'bg-emerald-100/50');
                 feedbackContent.className = 'p-4 rounded-lg bg-red-100/70 border border-red-300/80';
                 feedbackTitle.textContent = "Not quite!";
@@ -860,15 +833,10 @@
         }
 
         function closeQuizModal(markComplete = false) {
-            // Hide modal
             document.getElementById('quizModal').classList.add('hidden');
-
-            // Stop and clear the sprint timer to avoid background intervals
             stopSprintTimer();
             const timerEl = document.getElementById('sprint-timer');
             if (timerEl) timerEl.textContent = '';
-
-            // Reset quiz screens to initial state so reopening is clean
             const startScreen = document.getElementById('quiz-start-screen');
             const mainScreen = document.getElementById('quiz-main-screen');
             const endScreen = document.getElementById('quiz-end-screen');
@@ -876,7 +844,6 @@
             if (mainScreen) mainScreen.classList.add('hidden');
             if (endScreen) endScreen.classList.add('hidden');
 
-            // If user chose to mark the task complete (from end screen), perform action
             if (markComplete) {
                 handleTaskAction('complete');
             }
@@ -898,7 +865,6 @@
                 if (--timer < 0) {
                     stopSprintTimer();
                     timerEl.textContent = "Time's up!";
-                    // Optionally force the quiz to end
                     showEndScreen();
                 }
             }, 1000);
@@ -1049,7 +1015,7 @@
                 if (status === 'complete') {
                     const taskIndex = currentTasks.findIndex(t => t.id === currentTaskId);
                     if (taskIndex !== -1) currentTasks[taskIndex].status = 'complete';
-                    renderPathAndConnectors(currentTasks, false); // No animation on complete
+                    renderPathAndConnectors(currentTasks, false);
                     if (task.type === 'milestone' && task.stat_to_update) {
                         setTimeout(() => openStatModal(task), 500);
                     } else {
@@ -1067,7 +1033,7 @@
             if (allComplete && currentTasks.length > 0) {
                 setTimeout(async () => {
                     alert("Great job! Generating your next set of challenges.");
-                    await fetchPath(true); // This will show the loader
+                    await fetchPath(true);
                 }, 500);
             }
         }
@@ -1138,7 +1104,7 @@
             statValueInput.min = details.min || "";
             statValueInput.max = details.max || "";
             statNameToUpdate.value = statName;
-            statValueInput.value = ""; // Clear previous input
+            statValueInput.value = "";
 
             if (statName === 'sat_total' || statName === 'act_composite') {
                 p.innerHTML =
@@ -1156,7 +1122,6 @@
             const stat_name = document.getElementById('statNameToUpdate').value;
             const stat_value = statValueInput.value;
 
-            // --- START: VALIDATION LOGIC ---
             if (!stat_value) {
                 alert("Please enter a value.");
                 return;
@@ -1174,7 +1139,6 @@
                 alert(`The score cannot be greater than ${max}. Please enter a valid score.`);
                 return;
             }
-            // --- END: VALIDATION LOGIC ---
 
             try {
                 const response = await fetch('/api/update_stats', {
@@ -1252,7 +1216,6 @@
                 const data = await response.json();
                 typingIndicator.remove();
 
-                // Clear the 'INITIAL_MESSAGE' placeholder after the first real response
                 if (isInitialMessage) {
                     conversationHistory = [];
                 }
@@ -1268,8 +1231,6 @@
                         client_id: index + 1,
                         status: task.is_completed ? 'complete' : 'pending'
                     }));
-
-                    // Hide loader right before rendering the new path
                     hideLoader();
                     renderPathAndConnectors(currentTasks, true);
 
@@ -1285,7 +1246,7 @@
             } catch (error) {
                 typingIndicator.querySelector('p').textContent = "Sorry, I'm having trouble connecting.";
                 console.error("Chat error:", error);
-                if (isRegenRequest) hideLoader(); // Also hide loader on error
+                if (isRegenRequest) hideLoader();
             } finally {
                 chatInput.disabled = false;
                 sendButton.disabled = false;
@@ -1293,7 +1254,6 @@
             }
         }
 
-        // NEW: Function to handle chat reset
         async function handleResetChat() {
             if (confirm("Are you sure you want to reset your chat history? This cannot be undone.")) {
                 try {
@@ -1310,7 +1270,7 @@
 
                     document.getElementById('chat-history').innerHTML = '';
                     conversationHistory = [];
-                    startInitialChat(); // Get a fresh greeting from the bot
+                    startInitialChat();
                 } catch (error) {
                     console.error("Error resetting chat:", error);
                     alert("Could not reset chat history. Please try again.");
@@ -1332,7 +1292,6 @@
             }
             messageDiv.className = cssClass;
 
-            // Use marked.js to render markdown links in chat
             messageDiv.innerHTML = marked.parse(text);
 
             messageWrapper.appendChild(messageDiv);
@@ -1342,6 +1301,9 @@
         }
 
         document.addEventListener('DOMContentLoaded', () => {
+            // --- START OF THE FIX ---
+            localStorage.setItem('hasTestPath', 'true');
+            // --- END OF THE FIX ---
             fetchPath();
             loadChatHistory();
         });

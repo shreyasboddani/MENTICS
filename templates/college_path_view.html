@@ -1181,6 +1181,7 @@
         }
 
         document.addEventListener('DOMContentLoaded', () => {
+            localStorage.setItem('hasCollegePath', 'true');
             fetchPath();
             loadChatHistory();
         });
