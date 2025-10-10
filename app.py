@@ -401,9 +401,9 @@ def _get_test_prep_ai_tasks(strengths, weaknesses, user_stats={}, chat_history=[
         f"    - **Reading Comp:** Generate a short, college-level passage (150-200 words) and ask 1-2 inference-based questions. The passage MUST be in the `question_text`.\n"
         f"    - **Vocabulary:** Create 'Words in Context' questions within a sentence.\n"
         f"    - **Math:** Focus on tricky, multi-step concepts like geometry, functions, or word problems.\n"
-        f"3.  **Targeted Content:** The quiz MUST directly address one of the student's listed **weaknesses** or a topic from their **Recent Quiz Performance**.\n\n"
-        f"4.  **Detailed Explanations:** Each question must include a brief explanation of the correct answer.\n
-        f"5.  Each quiz should have 5-10 questions.\n\n"
+        f" 3.  **Targeted Content:** The quiz MUST directly address one of the student's listed **weaknesses** or a topic from their **Recent Quiz Performance**.\n\n"
+        f" 4.  **Detailed Explanations:** Each question must include a brief explanation of the correct answer.\n"
+        f" 5.  Each quiz should have 5-10 questions.\n\n"
 
         f"# CRITICAL DIRECTIVES & JSON SCHEMA\n"
         f"1.  **JSON Output ONLY**: Your output MUST be a single, raw JSON object.\n"
