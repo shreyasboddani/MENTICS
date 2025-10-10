@@ -1,3 +1,5 @@
+# MENTICS/dbhelper.py
+
 import sqlite3
 
 

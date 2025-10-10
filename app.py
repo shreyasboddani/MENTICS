@@ -73,6 +73,9 @@ def init_db():
         "is_user_added": "BOOLEAN DEFAULT FALSE",
         "reason": "TEXT"
     })
+    db.add_column("paths", "task_format", "TEXT DEFAULT 'link'")
+    db.add_column("paths", "task_content_id", "INTEGER")
+
     db.create_table("subtasks", {
         "id": "INTEGER PRIMARY KEY AUTOINCREMENT",
         "parent_task_id": "INTEGER NOT NULL",
@@ -94,17 +97,13 @@ def init_db():
         "history": "TEXT NOT NULL",
         "UNIQUE": "(user_id, category)"
     })
-    # NEW: Table to store recent user activities
     db.create_table("activity_log", {
         "id": "INTEGER PRIMARY KEY AUTOINCREMENT",
         "user_id": "INTEGER NOT NULL",
-        # e.g., 'task_completed', 'path_generated', 'stat_updated'
         "activity_type": "TEXT NOT NULL",
-        # JSON string with context like task name, stat name, etc.
         "details": "TEXT",
         "created_at": "TIMESTAMP DEFAULT CURRENT_TIMESTAMP"
     })
-    # NEW: Table for gamification stats
     db.create_table("gamification_stats", {
         "user_id": "INTEGER PRIMARY KEY",
         "points": "INTEGER DEFAULT 0",
@@ -112,7 +111,6 @@ def init_db():
         "last_completed_date": "TEXT",
         "FOREIGN KEY(user_id)": "REFERENCES users(id) ON DELETE CASCADE"
     })
-    # NEW: Table for forum posts (threads)
     db.create_table("forum_posts", {
         "id": "INTEGER PRIMARY KEY AUTOINCREMENT",
         "user_id": "INTEGER NOT NULL",
@@ -122,7 +120,6 @@ def init_db():
         "created_at": "TIMESTAMP DEFAULT CURRENT_TIMESTAMP",
         "FOREIGN KEY(user_id)": "REFERENCES users(id) ON DELETE CASCADE"
     })
-    # NEW: Table for forum replies
     db.create_table("forum_replies", {
         "id": "INTEGER PRIMARY KEY AUTOINCREMENT",
         "post_id": "INTEGER NOT NULL",
@@ -132,6 +129,31 @@ def init_db():
         "created_at": "TIMESTAMP DEFAULT CURRENT_TIMESTAMP",
         "FOREIGN KEY(post_id)": "REFERENCES forum_posts(id) ON DELETE CASCADE",
         "FOREIGN KEY(user_id)": "REFERENCES users(id) ON DELETE CASCADE"
+    })
+    db.create_table("quizzes", {
+        "id": "INTEGER PRIMARY KEY AUTOINCREMENT",
+        "task_id": "INTEGER NOT NULL",
+        "title": "TEXT NOT NULL",
+        "FOREIGN KEY(task_id)": "REFERENCES paths(id) ON DELETE CASCADE"
+    })
+    db.create_table("quiz_questions", {
+        "id": "INTEGER PRIMARY KEY AUTOINCREMENT",
+        "quiz_id": "INTEGER NOT NULL",
+        "question_text": "TEXT NOT NULL",
+        "options": "TEXT NOT NULL",
+        "correct_option": "INTEGER NOT NULL",
+        "explanation": "TEXT",
+        "FOREIGN KEY(quiz_id)": "REFERENCES quizzes(id) ON DELETE CASCADE"
+    })
+    # --- NEW TABLE FOR QUIZ RESULTS ---
+    db.create_table("quiz_results", {
+        "id": "INTEGER PRIMARY KEY AUTOINCREMENT",
+        "user_id": "INTEGER NOT NULL",
+        "question_id": "INTEGER NOT NULL",
+        "is_correct": "BOOLEAN NOT NULL",
+        "submitted_at": "TIMESTAMP DEFAULT CURRENT_TIMESTAMP",
+        "FOREIGN KEY(user_id)": "REFERENCES users(id) ON DELETE CASCADE",
+        "FOREIGN KEY(question_id)": "REFERENCES quiz_questions(id) ON DELETE CASCADE"
     })
 
 
@@ -145,8 +167,6 @@ def log_activity(user_id, activity_type, details={}):
         "activity_type": activity_type,
         "details": json.dumps(details)
     })
-
-# NEW: Helper to get tracker data for prompts
 
 
 def _get_stat_history_for_prompt(user_id):
@@ -166,6 +186,35 @@ def _get_stat_history_for_prompt(user_id):
             f"- On {date}, their {readable_name} was recorded as {stat_value}.")
     return "\n".join(summary)
 
+# --- NEW HELPER FUNCTION TO GET QUIZ RESULTS ---
+
+
+def _get_quiz_results_for_prompt(user_id):
+    """Fetches and formats a summary of the user's recent incorrect quiz answers for AI prompts."""
+    query = """
+        SELECT qq.question_text, qq.options, qq.correct_option, qq.explanation
+        FROM quiz_results qr
+        JOIN quiz_questions qq ON qr.question_id = qq.id
+        WHERE qr.user_id = ? AND qr.is_correct = 0
+        ORDER BY qr.submitted_at DESC
+        LIMIT 5
+    """
+    incorrect_answers = db.execute(query, (user_id,))
+
+    if not incorrect_answers:
+        return "No recent incorrect quiz answers on record. The user may be new or performing well."
+
+    summary = []
+    for answer in incorrect_answers:
+        options = json.loads(answer['options'])
+        correct_answer_text = options[answer['correct_option']]
+        summary.append(
+            f"- Question: {answer['question_text']}\n"
+            f"  - Correct Answer: \"{correct_answer_text}\"\n"
+            f"  - Explanation: {answer['explanation']}"
+        )
+    return "\n".join(summary)
+
 
 # --- DECORATORS & FILTERS ---
 
@@ -179,7 +228,6 @@ def login_required(f):
         if user is None:
             session.clear()
             return redirect(url_for("login"))
-        # Pass the user object to the decorated function
         kwargs['user'] = user
         return f(*args, **kwargs)
     return decorated_function
@@ -190,20 +238,14 @@ def format_date_filter(s):
     if not s:
         return ""
     try:
-        # Use the user's timezone from the session, with a fallback to UTC
         user_tz_str = session.get('timezone', 'UTC')
         user_tz = ZoneInfo(user_tz_str)
-
         naive_dt = datetime.strptime(s, '%Y-%m-%d %H:%M:%S')
         utc_dt = naive_dt.replace(tzinfo=ZoneInfo("UTC"))
         user_local_dt = utc_dt.astimezone(user_tz)
-        # More readable format e.g., Jan 01, 2024
         return user_local_dt.strftime('%b %d, %Y')
     except (ZoneInfoNotFoundError, ValueError, TypeError):
-        # Fallback for just the date part if parsing fails
         return s.split(' ')[0]
-
-# NEW: Jinja2 filter to display relative time
 
 
 @app.template_filter('time_ago')
@@ -215,7 +257,6 @@ def time_ago_filter(s):
         utc_dt = naive_dt.replace(tzinfo=ZoneInfo("UTC"))
         now = datetime.now(ZoneInfo("UTC"))
         diff = now - utc_dt
-
         seconds = diff.total_seconds()
         if seconds < 60:
             return "just now"
@@ -242,10 +283,8 @@ def _get_current_numbered_tasks(user_id, category):
     """
     latest_task_timestamp_result = db.execute(
         latest_task_query, (user_id, category))
-
     if not latest_task_timestamp_result:
         return "No active tasks at the moment."
-
     latest_timestamp = latest_task_timestamp_result[0]['created_at']
     active_tasks = db.select(
         "paths",
@@ -256,38 +295,47 @@ def _get_current_numbered_tasks(user_id, category):
             "created_at": latest_timestamp
         }
     )
-
     if not active_tasks:
         return "No active tasks at the moment."
-
-    # Sort by task_order and create numbered list
     active_tasks = sorted(active_tasks, key=lambda x: x['task_order'])
     numbered_tasks = []
     for i, task in enumerate(active_tasks, 1):
         status = "✅ (Completed)" if task['is_completed'] else "⏳ (In Progress)"
         numbered_tasks.append(f"Task {i}: {task['description']} - {status}")
-
     return "\n".join(numbered_tasks)
 
 
-def _get_test_prep_ai_tasks(strengths, weaknesses, user_stats={}, chat_history=[], path_history={}, stat_history=""):
-    """Generates hyper-intelligent, adaptive test prep tasks with a detailed, gamified prompt."""
+def _get_test_prep_ai_tasks(strengths, weaknesses, user_stats={}, chat_history=[], path_history={}, stat_history="", quiz_results=""):
+    """Generates hyper-intelligent, adaptive test prep tasks with a detailed, gamified prompt, now including interactive quizzes and feedback loops."""
 
     def get_mock_tasks_reliably():
         print("--- DEBUG: Running corrected Test Prep mock generator. ---")
+        mock_quiz = {
+            "task_format": "quiz",
+            "description": "Take a 5-question mini-quiz on SAT Algebra.",
+            "reason": "This quick quiz will test your core algebra skills, a critical component of the SAT Math section.",
+            "type": "standard", "stat_to_update": None, "category": "Test Prep", "difficulty": "medium",
+            "quiz_content": {
+                "title": "SAT Algebra Practice",
+                "questions": [
+                    {"question_text": "If 3x - 7 = 5, what is the value of x?", "options": [
+                        "2", "3", "4", "5"], "correct_option": 2, "explanation": "Add 7 to both sides to get 3x = 12. Then, divide by 3 to find x = 4."},
+                    {"question_text": "Which of the following is equivalent to (2x + 3)(x - 1)?", "options": [
+                        "2x^2 + x - 3", "2x^2 - x - 3", "2x^2 + 5x + 3", "x^2 + 2x - 3"], "correct_option": 0, "explanation": "Use the FOIL method to get 2x^2 + x - 3."}
+                ]
+            }
+        }
         all_mock_tasks = [
-            {"description": "Take a full-length, timed SAT practice test.", "reason": "This is a 'boss battle' to test your skills under pressure and identify areas for improvement.",
-                "type": "milestone", "stat_to_update": "sat_total", "category": "Test Prep", "difficulty": "hard"},
-            {"description": "Review algebra concepts from your SAT practice test.", "reason": "Understanding algebra is crucial for a high score on the math section.",
-                "type": "standard", "stat_to_update": None, "category": "Test Prep", "difficulty": "medium"},
-            {"description": "Practice 15 difficult vocabulary words.", "reason": "A strong vocabulary will help you tackle the reading and writing sections with confidence.",
-                "type": "standard", "stat_to_update": None, "category": "Test Prep", "difficulty": "easy"},
-            {"description": "Take a timed ACT Science practice section.", "reason": "This will help you get used to the pace of the science section and improve your time management.",
-                "type": "milestone", "stat_to_update": "act_science", "category": "Test Prep", "difficulty": "hard"},
-            {"description": "Work on time management strategies for the reading section.", "reason": "Finishing the reading section on time is a common challenge. Practicing strategies will improve your score.",
-                "type": "standard", "stat_to_update": None, "category": "Test Prep", "difficulty": "medium"}
+            {"task_format": "link", "description": "Take a full-length, timed SAT practice test from the [official College Board site](https://satsuite.collegeboard.org/sat/practice-preparation/practice-tests).",
+             "reason": "This is a 'boss battle' to test your skills under pressure.", "type": "milestone", "stat_to_update": "sat_total", "category": "Test Prep", "difficulty": "hard"},
+            mock_quiz,
         ]
-        return random.sample(all_mock_tasks, 5)
+        return random.sample(all_mock_tasks, 2) + random.sample([
+            {"task_format": "link", "description": "Review algebra concepts using [Khan Academy](https://www.khanacademy.org/math/algebra).",
+             "reason": "A strong algebra foundation is crucial.", "type": "standard", "stat_to_update": None, "category": "Test Prep", "difficulty": "medium"},
+            {"task_format": "link", "description": "Practice time management for the reading section.", "reason": "Pacing is key to finishing on time.",
+                "type": "standard", "stat_to_update": None, "category": "Test Prep", "difficulty": "medium"}
+        ], 3)
 
     if not os.getenv("GEMINI_API_KEY"):
         return get_mock_tasks_reliably()
@@ -297,7 +345,7 @@ def _get_test_prep_ai_tasks(strengths, weaknesses, user_stats={}, chat_history=[
     incomplete_tasks_str = "\n".join(
         [f"- {task['description']}" for task in path_history.get('incomplete', [])]) or "None."
     chat_history_str = "\n".join(
-        [f"{msg['role'].capitalize()}: {msg['content']}" for msg in chat_history]) or "No conversation history yet."
+        [f"{msg['role'].capitalize()}: {msg['content']}" for msg in chat_history]) or "No conversation history."
     latest_user_message = next((msg['content'] for msg in reversed(
         chat_history) if msg['role'] == 'user'), "N/A")
 
@@ -305,73 +353,81 @@ def _get_test_prep_ai_tasks(strengths, weaknesses, user_stats={}, chat_history=[
     test_date_str = user_stats.get("test_path", {}).get("test_date")
     if test_date_str:
         try:
-            user_tz_str = session.get('timezone', 'UTC')
-            try:
-                user_tz = ZoneInfo(user_tz_str)
-            except ZoneInfoNotFoundError:
-                user_tz = ZoneInfo("UTC")
-
-            test_date = datetime.strptime(test_date_str, '%Y-%m-%d')
-            delta = test_date.replace(tzinfo=user_tz) - datetime.now(user_tz)
+            user_tz = ZoneInfo(session.get('timezone', 'UTC'))
+            test_date = datetime.strptime(test_date_str, '%Y-%m-%d').date()
+            delta = test_date - datetime.now(user_tz).date()
             formatted_date = test_date.strftime('%B %d, %Y')
             if delta.days >= 0:
                 test_date_info = f"on {formatted_date} ({delta.days} days remaining)"
             else:
                 test_date_info = f"on {formatted_date} (this date has passed)"
-        except ValueError:
+        except (ValueError, ZoneInfoNotFoundError):
             test_date_info = "in an invalid format."
 
     prompt = (
         f"# MISSION\n"
-        f"You are an elite AI test prep coach for the Mentics platform. Your mission is to generate an intelligent, 5-step study plan that is precisely tailored to the student's evolving needs. The plan must be a logical continuation of their journey, demonstrating a deep understanding of their history and current context.\n\n"
+        f"You are an elite AI test prep coach for Mentics. Your mission is to generate an intelligent, 5-step study plan tailored to the student's evolving needs, demonstrating a deep understanding of their history and context.\n\n"
 
-        f"## CRITICAL SCENARIO ANALYSIS (ACTION REQUIRED)\n"
-        f"First, determine the student's current situation and choose your generation strategy:\n"
-        f"1.  **Regeneration Request:** If the most recent user message (see below) contains keywords like 'regenerate', 'new path', 'change', or expresses a desire for a different approach (e.g., 'the test is tomorrow!'), your **highest priority** is to generate a path that directly addresses that immediate request. The new plan MUST reflect the specific needs mentioned in that message.\n"
-        f"2.  **Post-Path Continuation:** If the student has just completed all tasks in their previous path, the new plan MUST be a logical next step. For example, if they just finished a pre-test path, the new path should focus on analyzing their scores, identifying new weaknesses from the test, and planning long-term improvements. DO NOT simply assign more practice.\n"
-        f"3.  **Standard Generation:** If neither of the above applies, generate a standard path that builds upon their history and addresses their stated goals.\n\n"
+        f"## CRITICAL SCENARIO ANALYSIS\n"
+        f"1.  **Regeneration Request:** If the user's latest message asks for a new path, your highest priority is to generate one that addresses their immediate request.\n"
+        f"2.  **Post-Path Continuation:** If the student just completed all tasks, the new plan MUST be a logical next step (e.g., analyzing scores, planning long-term improvements).\n"
+        f"3.  **Standard Generation:** Otherwise, generate a standard path that builds on their history.\n\n"
 
         f"# STUDENT ANALYSIS DATA\n"
         f"- Strengths: {strengths}\n"
         f"- Weaknesses: {weaknesses}\n"
         f"- Test Date: {test_date_info}\n"
-        f"- Current SAT Scores: Math {user_stats.get('sat_math', 'N/A')}, EBRW {user_stats.get('sat_ebrw', 'N/A')}\n"
-        f"- Current ACT Scores: Math {user_stats.get('act_math', 'N/A')}, Reading {user_stats.get('act_reading', 'N/A')}, Science {user_stats.get('act_science', 'N/A')}\n\n"
+        f"- Current Scores: SAT Math {user_stats.get('sat_math', 'N/A')}, SAT EBRW {user_stats.get('sat_ebrw', 'N/A')}, ACT Composite {user_stats.get('act_average', 'N/A')}\n\n"
 
         f"## HISTORICAL & CONVERSATIONAL CONTEXT\n"
-        f"This is CRITICAL for creating an intelligent, continuous learning journey.\n"
-        f"- **Most Recent User Request:** '{latest_user_message}' <== **If this is a regeneration request, it takes precedence over all other data.**\n"
+        f"- **Most Recent User Request:** '{latest_user_message}'\n"
         f"- Recently Completed Tasks: {completed_tasks_str}\n"
         f"- Incomplete Tasks from Previous Path: {incomplete_tasks_str}\n"
-        f"- Full Conversation History: {chat_history_str}\n"
         f"- Historical Performance Data (Tracker):\n{stat_history}\n\n"
 
+        f"## RECENT QUIZ PERFORMANCE (Incorrect Answers)\n"
+        f"This shows specific questions the user recently got wrong. Use this granular data to create targeted follow-up tasks.\n{quiz_results}\n\n"
+
         f"# YOUR TASK: GENERATE THE NEW 5-STEP PLAN\n"
-        f"Based on your scenario analysis and all student data, generate a new 5-step study plan. Each task must:\n"
-        f"- Be specific, actionable, and include a markdown link to a high-quality, free resource (Khan Academy, official practice tests, specific YouTube tutorials).\n"
+        f"- Based on your scenario analysis and all student data, you must Generate a new 5-step study plan. It must contain a mix of standard `link` tasks and interactive `quiz` tasks. **All tasks must be comprehensive and high-quality.** At least ONE task MUST be an interactive quiz.\n\n"
+        f"- Be specific, actionable, and include refrence to a high-quality, free resource (Khan Academy, official practice tests, specific YouTube tutorials).\n"
         f"- Include a mix of task types: at least one **Resource Task** (e.g., 'Watch a video'), one **Practice Task** (e.g., 'Complete a quiz'), and one **Strategic Task** (e.g., 'Develop a new timing strategy').\n"
         f"- Have an assigned difficulty for gamification purposes.\n\n"
 
+        f"## QUIZ GENERATION DIRECTIVES (CRITICAL)\n"
+        f"When generating a quiz (`task_format: 'quiz'`), you must adhere to these rules:\n"
+        f"1.  **Strategic Placement:** A quiz should ideally follow a 'Resource Task'. For example, if Task 1 is 'Watch a video on quadratic equations', Task 2 could be a quiz on that topic.\n"
+        f"2.  **SAT-Level Comprehensiveness:** Questions must mirror official SAT complexity.\n"
+        f"    - **Reading Comp:** Generate a short, college-level passage (150-200 words) and ask 1-2 inference-based questions. The passage MUST be in the `question_text`.\n"
+        f"    - **Vocabulary:** Create 'Words in Context' questions within a sentence.\n"
+        f"    - **Math:** Focus on tricky, multi-step concepts like geometry, functions, or word problems.\n"
+        f"3.  **Targeted Content:** The quiz MUST directly address one of the student's listed **weaknesses** or a topic from their **Recent Quiz Performance**.\n\n"
+
         f"# CRITICAL DIRECTIVES & JSON SCHEMA\n"
-        f"1.  **JSON Output ONLY**: Your entire output MUST be a single, raw JSON object. No extra text.\n"
-        f"2.  **Adaptive Focus**: If context shows a focus on SAT or ACT, all tasks must target that test. Never mix.\n"
-        f"3.  **Meaningful Milestones**: Use 'milestone' only for major assessments (e.g., a full practice test). `stat_to_update` must be null for 'standard' tasks.\n"
-        f"4.  **Correct Stat Naming**: For milestones, `stat_to_update` must be one of: ['sat_math', 'sat_ebrw', 'sat_total', 'act_math', 'act_reading', 'act_science', 'act_composite'].\n"
-        f"5.  **Intelligent 'Boss Battles'**: A 'Boss Battle' is a major milestone, like a full practice test. It should be the culmination of the preceding tasks. The description for such a task MUST begin with 'Boss Battle:'. Use these strategically every 2-3 paths to assess progress.\n"
-        f"6.  **SAT Math & Desmos**: If SAT Math is a weakness, at least one task MUST focus on using the Desmos calculator as a strategic tool.\n\n"
+        f"1.  **JSON Output ONLY**: Your output MUST be a single, raw JSON object.\n"
+        f"2.  **Comprehensive `link` Tasks**: Descriptions for `link` tasks must be specific and actionable, with a markdown link to a reputable, free resource.\n"
+        f"3.  **Mix of Tasks:** The plan must include a mix of **Resource**, **Practice**, and **Strategic** tasks.\n"
+        f"4.  **Milestones & 'Boss Battles'**: Use 'milestone' for major assessments. A 'Boss Battle' description must begin with 'Boss Battle:'.\n"
+        f"5.  **Correct Stat Naming**: `stat_to_update` must be one of: ['sat_math', 'sat_ebrw', 'sat_total', 'act_math', 'act_reading', 'act_science', 'act_composite'].\n\n"
 
         f"# JSON OUTPUT STRUCTURE\n"
         f"{{\n"
         f'  "tasks": [\n'
         f'    {{\n'
-        f'      "description": "Specific, actionable task with a markdown link, like [this resource](https://example.com).",\n'
-        f'      "reason": "A brief, motivating explanation for this task.",\n'
+        f'      "task_format": "Either \'link\' or \'quiz\'.",\n'
+        f'      "description": "If format is \'link\', MUST include a markdown link. If \'quiz\', it is a simple description.",\n'
+        f'      "reason": "A brief, motivating explanation.",\n'
         f'      "type": "Either \'standard\' or \'milestone\'.",\n'
-        f'      "stat_to_update": "A valid stat name (string) ONLY if type is milestone, otherwise null.",\n'
+        f'      "stat_to_update": "Valid stat name ONLY if type is milestone, otherwise null.",\n'
         f'      "category": "This MUST be the string \'Test Prep\'.",\n'
-        f'      "difficulty": "Either \'easy\' (10 points), \'medium\' (25 points), or \'hard\' (50 points). Boss Battles should be \'epic\' (100 points)."\n'
+        f'      "difficulty": "Either \'easy\', \'medium\', \'hard\', or \'epic\'.",\n'
+        f'      "quiz_content": {{  // REQUIRED if task_format is \'quiz\', otherwise null.\n'
+        f'          "title": "Title of the quiz",\n'
+        f'          "questions": [\n'
+        f'              {{"question_text": "Question text. For reading comp, include passage here.", "options": ["A", "B", "C", "D"], "correct_option": 0, "explanation": "Brief explanation."}}\n'
+        f'          ]\n'
+        f'      }}\n'
         f'    }}\n'
-        f'    // ... (four more task objects)\n'
         f'  ]\n'
         f'}}'
     )
@@ -391,7 +447,7 @@ def _get_test_prep_ai_tasks(strengths, weaknesses, user_stats={}, chat_history=[
         return get_mock_tasks_reliably()
 
 
-def _get_test_prep_ai_chat_response(history, user_stats, stat_history="", user_id=None):
+def _get_test_prep_ai_chat_response(history, user_stats, stat_history="", quiz_results="", user_id=None):
     if not os.getenv("GEMINI_API_KEY"):
         return "I'm in testing mode, but I'm saving our conversation!"
 
@@ -453,6 +509,8 @@ def _get_test_prep_ai_chat_response(history, user_stats, stat_history="", user_i
         f"- Incomplete/Failed Tasks: {incomplete_tasks_str}\n"
         f"- Historical Performance Data (from Tracker): {stat_history}\n"
         f"- Current Active Tasks:\n{current_tasks}\n\n"
+        f"## RECENT QUIZ PERFORMANCE (Incorrect Answers)\n"
+        f"This shows specific questions the user recently got wrong. Use this granular data to mentor them in their path.\n{quiz_results}\n\n"
 
         "## CORE COACHING DIRECTIVES (Your Rules of Engagement)\n"
         "0.  **Initial Greeting**: Your very first message to the user *must* be a warm and encouraging welcome. It *must* also clearly state that they can type **'regenerate'** or **'new path'** at any time to get a new path based on your conversation.\n"
@@ -512,57 +570,58 @@ def _generate_and_save_new_test_path(user_id, test_path_info, chat_history=[]):
 
     saved_tasks = []
     for i, task in enumerate(tasks):
-        task_id = db.insert("paths", {
-            "user_id": user_id, "task_order": i + 1, "description": task.get("description"),
-            "reason": task.get("reason"), "type": task.get("type"), "stat_to_update": task.get("stat_to_update"),
-            "category": "Test Prep", "is_active": True, "is_completed": False
-        })
+        task_format = task.get("task_format", "link")
+        task_content_id = None
+
+        if task_format == 'quiz' and task.get('quiz_content'):
+            # This is a new quiz, so we need to save it and get its ID
+            quiz_content = task['quiz_content']
+
+            # First, create the task to get a task_id
+            task_id = db.insert("paths", {
+                "user_id": user_id, "task_order": i + 1, "description": task.get("description"),
+                "reason": task.get("reason"), "type": task.get("type"), "stat_to_update": task.get("stat_to_update"),
+                "category": "Test Prep", "is_active": True, "is_completed": False, "task_format": "quiz"
+            })
+
+            # Now, create the quiz and link it to the task
+            quiz_id = db.insert("quizzes", {
+                "task_id": task_id,
+                "title": quiz_content.get("title", "Quiz")
+            })
+
+            # Update the task with the new quiz_id
+            db.update("paths", {"task_content_id": quiz_id},
+                      where={"id": task_id})
+
+            # Add questions to the quiz
+            for q in quiz_content.get("questions", []):
+                db.insert("quiz_questions", {
+                    "quiz_id": quiz_id,
+                    "question_text": q.get("question_text"),
+                    "options": json.dumps(q.get("options")),
+                    "correct_option": q.get("correct_option"),
+                    "explanation": q.get("explanation")
+                })
+            task_content_id = quiz_id
+        else:
+            # This is a standard link-based task
+            task_id = db.insert("paths", {
+                "user_id": user_id, "task_order": i + 1, "description": task.get("description"),
+                "reason": task.get("reason"), "type": task.get("type"), "stat_to_update": task.get("stat_to_update"),
+                "category": "Test Prep", "is_active": True, "is_completed": False, "task_format": "link"
+            })
+
         new_task_data = db.select("paths", where={"id": task_id})[0]
         saved_tasks.append({
             "id": new_task_data['id'], "description": new_task_data['description'],
             "reason": new_task_data['reason'], "type": new_task_data['type'],
-            "stat_to_update": new_task_data['stat_to_update'], "is_completed": False
+            "stat_to_update": new_task_data['stat_to_update'], "is_completed": False,
+            "task_format": new_task_data['task_format'], "task_content_id": new_task_data['task_content_id']
         })
     # LOGGING
     log_activity(user_id, 'path_generated', {'category': 'Test Prep'})
     return saved_tasks
-
-
-def _get_current_numbered_tasks(user_id, category):
-    """Helper function to get current active tasks with numbering for a specific category."""
-    latest_task_query = """
-        SELECT created_at FROM paths
-        WHERE user_id=? AND category=? AND is_active=True
-        ORDER BY created_at DESC LIMIT 1
-    """
-    latest_task_timestamp_result = db.execute(
-        latest_task_query, (user_id, category))
-
-    if not latest_task_timestamp_result:
-        return "No active tasks at the moment."
-
-    latest_timestamp = latest_task_timestamp_result[0]['created_at']
-    active_tasks = db.select(
-        "paths",
-        where={
-            "user_id": user_id,
-            "is_active": True,
-            "category": category,
-            "created_at": latest_timestamp
-        }
-    )
-
-    if not active_tasks:
-        return "No active tasks at the moment."
-
-    # Sort by task_order and create numbered list
-    active_tasks = sorted(active_tasks, key=lambda x: x['task_order'])
-    numbered_tasks = []
-    for i, task in enumerate(active_tasks, 1):
-        status = "✅ (Completed)" if task['is_completed'] else "⏳ (In Progress)"
-        numbered_tasks.append(f"Task {i}: {task['description']} - {status}")
-
-    return "\n".join(numbered_tasks)
 
 
 def _get_college_planning_ai_tasks(college_context, user_stats, path_history, chat_history=[], stat_history=""):
@@ -1396,6 +1455,27 @@ def tracker(user):
 # ... (Previous API routes are unchanged)
 
 
+@app.route('/api/submit_quiz_results', methods=['POST'])
+@login_required
+def submit_quiz_results(user):
+    data = request.get_json()
+    # Expecting a list of {'question_id': id, 'is_correct': bool}
+    results = data.get('results')
+    if not results or not isinstance(results, list):
+        return jsonify({"success": False, "error": "Invalid results format"}), 400
+
+    user_id = user.data['id']
+    for result in results:
+        if 'question_id' in result and 'is_correct' in result:
+            db.insert('quiz_results', {
+                'user_id': user_id,
+                'question_id': result.get('question_id'),
+                'is_correct': result.get('is_correct')
+            })
+
+    return jsonify({"success": True})
+
+
 @app.route('/api/test-path-status')
 @login_required
 def test_path_status(user):
@@ -1474,7 +1554,9 @@ def api_tasks(user):
                     "stat_to_update": r['stat_to_update'],
                     "due_date": r['due_date'],
                     "is_user_added": bool(r['is_user_added']),
-                    "subtasks": subtasks
+                    "subtasks": subtasks,
+                    "task_format": r.get('task_format', 'link'),
+                    "task_content_id": r.get('task_content_id')
                 })
             return jsonify(tasks_with_subtasks)
 
@@ -1482,6 +1564,39 @@ def api_tasks(user):
     except Exception as e:
         print(f"API tasks error for category {category}: {e}")
         return jsonify({"error": "An error occurred"}), 500
+
+# NEW: API Route to fetch quiz data
+
+
+@app.route('/api/quiz/<int:task_id>')
+@login_required
+def get_quiz(user, task_id):
+    # Ensure the task belongs to the user
+    task_info = db.select(
+        "paths", where={"id": task_id, "user_id": user.data['id']})
+    if not task_info or task_info[0]['task_format'] != 'quiz':
+        return jsonify({"error": "Quiz not found or task is not a quiz"}), 404
+
+    quiz_id = task_info[0]['task_content_id']
+    quiz_details = db.select("quizzes", where={"id": quiz_id})
+    if not quiz_details:
+        return jsonify({"error": "Quiz details not found"}), 404
+
+    questions_raw = db.select("quiz_questions", where={"quiz_id": quiz_id})
+    questions = []
+    for q in questions_raw:
+        questions.append({
+            "id": q['id'],
+            "question_text": q['question_text'],
+            "options": json.loads(q['options']),
+            "correct_option": q['correct_option'],
+            "explanation": q['explanation']
+        })
+
+    return jsonify({
+        "title": quiz_details[0]['title'],
+        "questions": questions
+    })
 
 
 @app.route("/api/update_task_status", methods=['POST'])
@@ -1838,7 +1953,7 @@ def _get_proactive_ai_suggestions(user):
     )
 
     try:
-        model = genai.GenerativeModel('gemini-2.5-flash-lite')
+        model = genai.GenerativeModel('gemini-2.5-flash')
         response = model.generate_content(prompt)
         return response.text.strip()
     except Exception as e:
@@ -1863,7 +1978,6 @@ def leaderboard(user):
     return render_template('leaderboard.html', leaderboard=leaderboard_data)
 
 
-@app.route('/forum')
 @app.route('/forum')
 @login_required
 def forum(user):
@@ -1957,18 +2071,15 @@ else:
 
 # Initialize the database handler with the correct path
 db = DatabaseHandler(DB_PATH)
-# --- Auto-Create Database on Startup ---
-# This block checks if the database file exists and creates it if not.
-# It runs within the Flask application context to ensure all parts of the app,
-# including the init_db function, are available.
+# --- Auto-Create AND Migrate Database on Startup ---
+# This block now runs on every deployment, ensuring the database schema is up-to-date.
 with app.app_context():
-    if not os.path.exists(DB_PATH):
-        print(f"Database not found at {DB_PATH}. Initializing a new one...")
-        try:
-            init_db()
-            print("Database initialized successfully.")
-        except Exception as e:
-            print(f"!!! CRITICAL: FAILED TO INITIALIZE DATABASE: {e}")
-# --- End of Auto-Create Block ---
+    print(f"Connecting to database at {DB_PATH}...")
+    try:
+        # This will now create tables if they don't exist AND add the new columns if they are missing.
+        init_db()
+        print("Database schema check complete. All tables and columns are present.")
+    except Exception as e:
+        print(f"!!! CRITICAL: FAILED TO INITIALIZE OR MIGRATE DATABASE: {e}")
 if __name__ == "__main__":
     app.run(debug=True)

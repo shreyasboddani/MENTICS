@@ -234,10 +234,10 @@
             <div id="modalReason" class="text-slate-700 mb-4 prose prose-sm"></div>
 
             <div id="subtasks-container" class="mb-6 space-y-2">
-                <h4 class="text-sm font-bold text-slate-600">Sub-tasks</h4>
+                <h4 class="text-sm font-bold text-slate-600">Sub-tasks (Notes)</h4>
                 <div id="subtasks-list" class="space-y-1"></div>
                 <div class="flex items-center gap-2 mt-2">
-                    <input type="text" id="newSubtaskInput" placeholder="Add a new sub-task..."
+                    <input type="text" id="newSubtaskInput" placeholder="Add a new note or sub-task..."
                         class="w-full bg-white/50 border border-slate-300/70 rounded-lg p-2 text-sm focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition">
                     <button onclick="handleAddSubtask()"
                         class="bg-purple-500 text-white p-2 rounded-lg hover:bg-purple-600 font-semibold transition text-sm">Add</button>
@@ -263,6 +263,82 @@
             </div>
         </div>
     </div>
+
+    <div id="quizModal"
+        class="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 hidden p-4">
+        <div id="quiz-modal-panel"
+            class="bg-white/60 backdrop-blur-xl border border-white/20 w-full max-w-2xl rounded-2xl shadow-2xl p-6 md:p-8 relative"
+            data-aos="zoom-in" data-aos-duration="400">
+            <button onclick="closeQuizModal(false)"
+                class="text-slate-400 hover:text-slate-600 transition-colors rounded-full p-1 absolute top-4 right-4 focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-500"
+                title="Close quiz">
+                <span class="sr-only">Close</span>
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-6 h-6">
+                    <path fill-rule="evenodd"
+                        d="M5.47 5.47a.75.75 0 0 1 1.06 0L12 10.94l5.47-5.47a.75.75 0 1 1 1.06 1.06L13.06 12l5.47 5.47a.75.75 0 1 1-1.06 1.06L12 13.06l-5.47 5.47a.75.75 0 0 1-1.06-1.06L10.94 12 5.47 6.53a.75.75 0 0 1 0-1.06Z"
+                        clip-rule="evenodd" />
+                </svg>
+            </button>
+            <div id="quiz-start-screen">
+                <h3 id="quizTitle" class="text-3xl font-bold font-lalezar text-purple-700 mb-2 text-center">Quiz Title
+                </h3>
+                <p id="quizReason" class="text-slate-600 mb-6 text-center"></p>
+                <div class="text-center">
+                    <p class="text-lg font-semibold">Ready to start your 12-minute Study Sprint?</p>
+                    <button onclick="startQuiz()"
+                        class="mt-4 bg-purple-600 hover:bg-purple-700 text-white font-semibold py-3 px-8 rounded-lg transition shadow-lg hover:shadow-xl transform hover:-translate-y-1">Start
+                        Quiz</button>
+                </div>
+            </div>
+
+            <div id="quiz-main-screen" class="hidden">
+                <div class="flex justify-between items-center mb-4">
+                    <h3 id="quizTitleInProgress" class="text-xl font-bold font-lalezar text-purple-700">Quiz In Progress
+                    </h3>
+                    <div
+                        class="flex items-center gap-2 font-semibold text-purple-700 bg-purple-100/80 px-3 py-1 rounded-full">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                            <path fill-rule="evenodd"
+                                d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z"
+                                clip-rule="evenodd" />
+                        </svg>
+                        <span id="sprint-timer">12:00</span>
+                    </div>
+                </div>
+
+                <div id="quiz-question-container">
+                    <p class="text-right text-sm font-semibold text-slate-500 mb-2">Question <span
+                            id="question-counter">1</span> of <span id="question-total">5</span></p>
+                    <p id="question-text" class="text-lg font-semibold text-slate-800 mb-4"></p>
+                    <div id="options-container" class="space-y-3"></div>
+                </div>
+
+                <div id="quiz-feedback-container" class="hidden mt-4">
+                    <div id="feedback-content" class="p-4 rounded-lg">
+                        <h4 id="feedback-title" class="font-bold text-lg"></h4>
+                        <p id="feedback-explanation" class="text-sm mt-2"></p>
+                    </div>
+                    <button id="next-question-btn"
+                        class="mt-4 w-full bg-purple-600 hover:bg-purple-700 text-white font-semibold py-2.5 rounded-lg transition">Next
+                        Question</button>
+                </div>
+            </div>
+
+            <div id="quiz-end-screen" class="hidden text-center">
+                <h3 class="text-3xl font-bold font-lalezar text-purple-700 mb-2">Quiz Complete!</h3>
+                <p class="text-lg">You scored <span id="final-score" class="font-bold"></span>/<span
+                        id="total-questions-end" class="font-bold"></span>.</p>
+                <div class="mt-6">
+                    <button onclick="closeQuizModal(true)"
+                        class="bg-emerald-500 hover:bg-emerald-600 text-white font-semibold py-2 px-5 rounded-lg transition">Mark
+                        Task as Complete</button>
+                    <button onclick="closeQuizModal(false)" class="mt-2 text-sm text-slate-600 hover:underline">Review
+                        Later</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
 
     <div id="statEntryModal"
         class="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 hidden p-4"
@@ -342,6 +418,13 @@
         let currentTaskId = null;
         let conversationHistory = [];
         const chatCategory = 'Test Prep'; // Define category for this page
+
+        // --- NEW QUIZ STATE VARIABLES ---
+        let currentQuizData = null;
+        let currentQuestionIndex = 0;
+        let score = 0;
+        let sprintTimerInterval = null;
+
 
         // NEW: Loader Functions
         const loaderOverlay = document.getElementById('ai-loader-overlay');
@@ -442,6 +525,7 @@
                 const isUnlocked = index === firstPendingIndex;
                 const isLocked = index > firstPendingIndex && firstPendingIndex !== -1;
                 const isBossBattle = task.description.startsWith('Boss Battle:');
+                const isQuiz = task.task_format === 'quiz';
 
                 const alignmentWrapper = document.createElement('div');
                 alignmentWrapper.className = 'flex';
@@ -450,23 +534,34 @@
 
                 const taskButton = document.createElement('button');
                 taskButton.id = `task-node-${task.client_id}`;
-                taskButton.className = 'task-node w-28 h-28 rounded-full flex items-center justify-center font-bold text-4xl text-white transition-all duration-300 transform hover:scale-110 focus:outline-none focus-visible:ring-4 focus-visible:ring-offset-2 focus-visible:ring-purple-400';
-                taskButton.onclick = () => openTaskModal(task);
+                taskButton.className = 'task-node w-28 h-28 rounded-full flex flex-col items-center justify-center font-bold text-4xl text-white transition-all duration-300 transform hover:scale-110 focus:outline-none focus-visible:ring-4 focus-visible:ring-offset-2 focus-visible:ring-purple-400 relative';
+                taskButton.onclick = () => openModalForTask(task);
                 taskButton.disabled = isLocked;
+
+                let contentHTML = '';
 
                 if (isBossBattle) {
                     taskButton.classList.add('bg-red-500', 'shadow-lg', 'shadow-red-400/50');
-                    taskButton.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" class="h-12 w-12" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM7 4a1 1 0 000 2h6a1 1 0 100-2H7z" clip-rule="evenodd" /></svg>`;
+                    contentHTML = `<svg xmlns="http://www.w3.org/2000/svg" class="h-12 w-12" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM7 4a1 1 0 000 2h6a1 1 0 100-2H7z" clip-rule="evenodd" /></svg>`;
                 } else if (isCompleted) {
                     taskButton.classList.add('bg-emerald-500', 'shadow-lg');
-                    taskButton.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-10 h-10"><path fill-rule="evenodd" d="M19.916 4.626a.75.75 0 0 1 .208 1.04l-9 13.5a.75.75 0 0 1-1.154.114l-6-6a.75.75 0 0 1 1.06-1.06l5.353 5.353 8.493-12.74a.75.75 0 0 1 1.04-.207Z" clip-rule="evenodd" /></svg>`;
+                    contentHTML = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-10 h-10"><path fill-rule="evenodd" d="M19.916 4.626a.75.75 0 0 1 .208 1.04l-9 13.5a.75.75 0 0 1-1.154.114l-6-6a.75.75 0 0 1 1.06-1.06l5.353 5.353 8.493-12.74a.75.75 0 0 1 1.04-.207Z" clip-rule="evenodd" /></svg>`;
                 } else if (isUnlocked) {
                     taskButton.classList.add('bg-purple-500', 'shadow-lg', 'shadow-purple-400/50');
-                    taskButton.textContent = task.client_id;
+                    contentHTML = String(task.client_id);
                 } else {
                     taskButton.classList.add('bg-slate-300', 'cursor-not-allowed');
-                    taskButton.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-10 h-10 text-slate-500"><path fill-rule="evenodd" d="M12 1.5a5.25 5.25 0 0 0-5.25 5.25v3a3 3 0 0 0-3 3v6.75a3 3 0 0 0 3 3h10.5a3 3 0 0 0 3-3v-6.75a3 3 0 0 0-3-3v-3c0-2.9-2.35-5.25-5.25-5.25Zm3.75 8.25v-3a3.75 3.75 0 1 0-7.5 0v3h7.5Z" clip-rule="evenodd" /></svg>`;
+                    contentHTML = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-10 h-10 text-slate-500"><path fill-rule="evenodd" d="M12 1.5a5.25 5.25 0 0 0-5.25 5.25v3a3 3 0 0 0-3 3v6.75a3 3 0 0 0 3 3h10.5a3 3 0 0 0 3-3v-6.75a3 3 0 0 0-3-3v-3c0-2.9-2.35-5.25-5.25-5.25Zm3.75 8.25v-3a3.75 3.75 0 1 0-7.5 0v3h7.5Z" clip-rule="evenodd" /></svg>`;
                 }
+
+                // Add quiz icon indicator
+                if (isQuiz) {
+                    const quizIcon = `<span class="absolute top-1 right-1 bg-white/30 rounded-full p-1"><svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-white" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd" /></svg></span>`;
+                    taskButton.innerHTML = contentHTML + quizIcon;
+                } else {
+                    taskButton.innerHTML = contentHTML;
+                }
+
 
                 if (!withAnimation) {
                     taskButton.classList.add('visible');
@@ -627,8 +722,27 @@
                 }
             }
         }
-        function openTaskModal(task) {
+
+        // --- UPDATED MODAL LOGIC ---
+        async function openModalForTask(task) {
             currentTaskId = task.id;
+            if (task.task_format === 'quiz') {
+                try {
+                    const response = await fetch(`/api/quiz/${task.id}`);
+                    if (!response.ok) throw new Error('Failed to load quiz');
+                    currentQuizData = await response.json();
+                    currentQuizData.reason = task.reason;
+                    openQuizModal();
+                } catch (error) {
+                    console.error("Error fetching quiz:", error);
+                    alert("Could not load the quiz. Please try again.");
+                }
+            } else {
+                openTaskModal(task);
+            }
+        }
+
+        function openTaskModal(task) {
             const modal = document.getElementById('taskModal');
             document.getElementById('modalTitle').textContent = `Step ${task.client_id}: Your Task`;
 
@@ -652,11 +766,154 @@
             modal.classList.remove('hidden');
         }
 
+        // --- NEW QUIZ MODAL FUNCTIONS ---
+
+        function openQuizModal() {
+            // Reset state
+            currentQuestionIndex = 0;
+            score = 0;
+
+            // Show start screen
+            document.getElementById('quizTitle').textContent = currentQuizData.title;
+            document.getElementById('quizReason').textContent = currentQuizData.reason;
+            document.getElementById('quiz-start-screen').classList.remove('hidden');
+            document.getElementById('quiz-main-screen').classList.add('hidden');
+            document.getElementById('quiz-end-screen').classList.add('hidden');
+            document.getElementById('quizModal').classList.remove('hidden');
+        }
+
+        function startQuiz() {
+            document.getElementById('quiz-start-screen').classList.add('hidden');
+            document.getElementById('quiz-main-screen').classList.remove('hidden');
+            document.getElementById('quizTitleInProgress').textContent = currentQuizData.title;
+
+            displayQuestion();
+            startSprintTimer(12 * 60);
+        }
+
+        function displayQuestion() {
+            const question = currentQuizData.questions[currentQuestionIndex];
+            document.getElementById('question-counter').textContent = currentQuestionIndex + 1;
+            document.getElementById('question-total').textContent = currentQuizData.questions.length;
+            document.getElementById('question-text').textContent = question.question_text;
+
+            const optionsContainer = document.getElementById('options-container');
+            optionsContainer.innerHTML = '';
+            question.options.forEach((option, index) => {
+                const button = document.createElement('button');
+                button.textContent = option;
+                button.className = 'w-full text-left p-3 border-2 border-slate-300/70 rounded-lg hover:bg-purple-100/50 hover:border-purple-400 transition';
+                button.onclick = () => selectAnswer(index, button);
+                optionsContainer.appendChild(button);
+            });
+
+            document.getElementById('quiz-feedback-container').classList.add('hidden');
+        }
+
+        function selectAnswer(selectedIndex, button) {
+            // Disable all option buttons
+            document.querySelectorAll('#options-container button').forEach(btn => btn.disabled = true);
+
+            const question = currentQuizData.questions[currentQuestionIndex];
+            const isCorrect = selectedIndex === question.correct_option;
+
+            const feedbackContent = document.getElementById('feedback-content');
+            const feedbackTitle = document.getElementById('feedback-title');
+            const feedbackExplanation = document.getElementById('feedback-explanation');
+
+            if (isCorrect) {
+                score++;
+                button.classList.remove('border-slate-300/70');
+                button.classList.add('border-emerald-500', 'bg-emerald-100/50');
+                feedbackContent.className = 'p-4 rounded-lg bg-emerald-100/70 border border-emerald-300/80';
+                feedbackTitle.textContent = "Correct!";
+                feedbackTitle.className = "font-bold text-lg text-emerald-800";
+            } else {
+                button.classList.remove('border-slate-300/70');
+                button.classList.add('border-red-500', 'bg-red-100/50');
+                // Highlight the correct answer
+                document.querySelectorAll('#options-container button')[question.correct_option].classList.add('border-emerald-500', 'bg-emerald-100/50');
+                feedbackContent.className = 'p-4 rounded-lg bg-red-100/70 border border-red-300/80';
+                feedbackTitle.textContent = "Not quite!";
+                feedbackTitle.className = "font-bold text-lg text-red-800";
+            }
+
+            feedbackExplanation.textContent = question.explanation;
+            document.getElementById('quiz-feedback-container').classList.remove('hidden');
+        }
+
+        document.getElementById('next-question-btn').addEventListener('click', () => {
+            currentQuestionIndex++;
+            if (currentQuestionIndex < currentQuizData.questions.length) {
+                displayQuestion();
+            } else {
+                showEndScreen();
+            }
+        });
+
+        function showEndScreen() {
+            document.getElementById('quiz-main-screen').classList.add('hidden');
+            document.getElementById('quiz-end-screen').classList.remove('hidden');
+            document.getElementById('final-score').textContent = score;
+            document.getElementById('total-questions-end').textContent = currentQuizData.questions.length;
+            stopSprintTimer();
+        }
+
+        function closeQuizModal(markComplete = false) {
+            // Hide modal
+            document.getElementById('quizModal').classList.add('hidden');
+
+            // Stop and clear the sprint timer to avoid background intervals
+            stopSprintTimer();
+            const timerEl = document.getElementById('sprint-timer');
+            if (timerEl) timerEl.textContent = '';
+
+            // Reset quiz screens to initial state so reopening is clean
+            const startScreen = document.getElementById('quiz-start-screen');
+            const mainScreen = document.getElementById('quiz-main-screen');
+            const endScreen = document.getElementById('quiz-end-screen');
+            if (startScreen) startScreen.classList.remove('hidden');
+            if (mainScreen) mainScreen.classList.add('hidden');
+            if (endScreen) endScreen.classList.add('hidden');
+
+            // If user chose to mark the task complete (from end screen), perform action
+            if (markComplete) {
+                handleTaskAction('complete');
+            }
+        }
+
+        function startSprintTimer(duration) {
+            let timer = duration, minutes, seconds;
+            const timerEl = document.getElementById('sprint-timer');
+
+            sprintTimerInterval = setInterval(() => {
+                minutes = parseInt(timer / 60, 10);
+                seconds = parseInt(timer % 60, 10);
+
+                minutes = minutes < 10 ? "0" + minutes : minutes;
+                seconds = seconds < 10 ? "0" + seconds : seconds;
+
+                timerEl.textContent = minutes + ":" + seconds;
+
+                if (--timer < 0) {
+                    stopSprintTimer();
+                    timerEl.textContent = "Time's up!";
+                    // Optionally force the quiz to end
+                    showEndScreen();
+                }
+            }, 1000);
+        }
+
+        function stopSprintTimer() {
+            clearInterval(sprintTimerInterval);
+        }
+
+
         function renderSubtasks(subtasks) {
             const subtasksList = document.getElementById('subtasks-list');
             subtasksList.innerHTML = '';
             if (subtasks.length === 0) {
-                subtasksList.innerHTML = '<p class="text-sm text-slate-500">No sub-tasks yet.</p>';
+                subtasksList.innerHTML = '<p class="text-sm text-slate-500">No notes or sub-tasks yet.</p>';
                 return;
             }
             subtasks.forEach(subtask => {
