@@ -26,6 +26,91 @@
             transform: translateY(-8px) scale(1.02);
             box-shadow: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1);
         }
+
+        /* --- NEW: Wormhole Animation Styles --- */
+        #warp-overlay {
+            position: fixed;
+            inset: 0;
+            z-index: 1000;
+            background-color: #000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-direction: column;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+
+        #warp-canvas {
+            position: absolute;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+        }
+
+        #warp-text {
+            position: relative;
+            z-index: 1;
+            font-size: 1.25rem;
+            font-weight: 600;
+            color: white;
+            text-shadow: 0 0 10px rgba(255, 255, 255, 0.5);
+            opacity: 0;
+            transform: translateY(20px);
+            transition: opacity 0.5s ease 0.5s, transform 0.5s ease 0.5s;
+        }
+
+        #warp-overlay.visible #warp-text {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        /* --- ADDED: Suction Animation Styles --- */
+        .portal-button.warping {
+            z-index: 100;
+        }
+
+        .portal-button.warping .portal-svg-background {
+            animation: portal-warp-out 0.8s cubic-bezier(0.6, 0, 1, 0.5) forwards;
+        }
+
+        .portal-button.warping .portal-content {
+            transition: opacity 0.2s ease, transform 0.2s ease;
+            opacity: 0;
+            transform: scale(0.8);
+        }
+
+        .modal-content-wrapper.modal-fading-out>*:not(.warping) {
+            transition: opacity 0.2s ease, transform 0.2s ease !important;
+            opacity: 0 !important;
+            transform: translateY(20px) scale(0.95) !important;
+        }
+
+        .modal-content-wrapper.modal-fading-out .modal-header-text,
+        .modal-content-wrapper.modal-fading-out .modal-header-subtext {
+            transform: translateY(-20px) !important;
+        }
+
+        @keyframes portal-warp-out {
+            0% {
+                transform: scale(1.05) rotate(0deg);
+                filter: brightness(1.1);
+                opacity: 1;
+            }
+
+            30% {
+                transform: scale(1.8) rotate(180deg);
+                filter: brightness(1.8) hue-rotate(30deg) saturate(1.5);
+                opacity: 0.9;
+            }
+
+            100% {
+                transform: scale(100) rotate(1080deg);
+                filter: brightness(2.5) hue-rotate(90deg) saturate(2);
+                opacity: 0;
+            }
+        }
     </style>
 </head>
 
@@ -345,6 +430,12 @@
         </div>
     </div>
 
+    <div id="warp-overlay">
+        <canvas id="warp-canvas"></canvas>
+        <div id="warp-text">Connecting To Your Path...</div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
     <script src="{{ url_for('static', filename='js/alert.js') }}"></script>
     <script src="https://unpkg.com/aos@2.3.1/dist/aos.js"></script>
     <script>
@@ -354,10 +445,8 @@
             delay: 100
         });
 
-        // --- START OF THE FIX ---
-
+        // --- Chart and Suggestion Logic (Unchanged) ---
         document.addEventListener('DOMContentLoaded', function () {
-            // Timezone setting logic remains the same
             const userTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
             fetch('/set-timezone', {
                 method: 'POST',
@@ -365,7 +454,6 @@
                 body: JSON.stringify({ timezone: userTimezone }),
             }).catch((error) => console.error('Error sending timezone to server:', error));
 
-            // Chart initialization remains the same
             const activityData = JSON.parse('{{ activity_data | safe }}');
             var options = {
                 chart: { height: '100%', type: 'area', toolbar: { show: false }, fontFamily: 'Inter, sans-serif' },
@@ -381,7 +469,6 @@
             var chart = new ApexCharts(document.querySelector("#activityChart"), options);
             chart.render();
 
-            // AI Suggestion logic remains the same
             const suggestionText = document.getElementById('ai-suggestion-text');
             fetch('/api/get-suggestion')
                 .then(response => response.json())
@@ -394,93 +481,180 @@
                 });
         });
 
-        // --- MODAL AND PORTAL LOGIC ---
+        // --- Modal Logic ---
         const modal = document.getElementById('pathModal');
-        const modalContentWrapper = modal.querySelector('.modal-content-wrapper');
-        const testPrepPortal = document.getElementById('test-prep-portal');
-        const collegePortal = document.getElementById('college-portal');
-
         function handlePathBuilderClick() {
             modal.classList.remove('hidden', 'opacity-0');
             document.body.style.overflow = 'hidden';
-            modal.classList.remove('modal-leave-active');
-            modal.classList.add('modal-enter-active');
         }
-
         function closePathModal() {
-            modal.classList.remove('modal-enter-active');
-            modal.classList.add('modal-leave-active');
+            modal.classList.add('opacity-0');
             document.body.style.overflow = '';
-            setTimeout(() => {
-                modal.classList.add('hidden');
-                modalContentWrapper.classList.remove('modal-content-fading-out');
-                testPrepPortal.classList.remove('warping');
-                collegePortal.classList.remove('warping');
-                // Re-enable buttons after closing animation
-                testPrepPortal.disabled = false;
-                collegePortal.disabled = false;
-            }, 300);
+            setTimeout(() => modal.classList.add('hidden'), 300);
         }
-
-        // --- REWRITTEN PORTAL CLICK LOGIC ---
-
-        // Function that just handles the final navigation
-        function navigateToUrl(url) {
-            setTimeout(() => {
-                window.location.href = url;
-            }, 800); // 800ms to allow the animation to finish
-        }
-
-        // Test Prep Portal Click Handler
-        testPrepPortal.addEventListener('click', () => {
-            // Immediately start animation and disable buttons
-            if (testPrepPortal.disabled) return;
-            testPrepPortal.disabled = true;
-            collegePortal.disabled = true;
-            modalContentWrapper.classList.add('modal-content-fading-out');
-            testPrepPortal.classList.add('warping');
-
-            // Fetch the URL in the background
-            fetch('/api/test-path-status')
-                .then(res => res.json())
-                .then(data => {
-                    const url = data.has_path ? '/dashboard/test-path-view' : '/dashboard/test-path-builder';
-                    navigateToUrl(url); // Navigate when fetch completes
-                })
-                .catch(() => {
-                    navigateToUrl('/dashboard/test-path-builder'); // Navigate to default on error
-                });
+        document.addEventListener('keydown', (e) => {
+            if (e.key === "Escape" && !modal.classList.contains('hidden')) closePathModal();
         });
 
-        // College Portal Click Handler
-        collegePortal.addEventListener('click', () => {
-            // Immediately start animation and disable buttons
-            if (collegePortal.disabled) return;
+        // --- NEW WORMHOLE ANIMATION LOGIC ---
+        const warpOverlay = document.getElementById('warp-overlay');
+        const canvas = document.getElementById('warp-canvas');
+        const ctx = canvas.getContext('2d');
+        let animationFrameId;
+
+        const config = {
+            particleCount: 1500,
+            zFactor: 0.005,
+            colors: {
+                testPrep: { r: 168, g: 85, b: 247 }, // Purple
+                college: { r: 99, g: 102, b: 241 }  // Indigo
+            }
+        };
+
+        let particles = [];
+        let width, height, center;
+        let warpColor = config.colors.testPrep;
+
+        function resizeCanvas() {
+            width = canvas.width = window.innerWidth;
+            height = canvas.height = window.innerHeight;
+            center = { x: width / 2, y: height / 2 };
+        }
+
+        class Particle {
+            constructor() { this.reset(); }
+            reset() {
+                this.x = (Math.random() - 0.5) * width;
+                this.y = (Math.random() - 0.5) * height;
+                this.z = Math.random() * 2;
+            }
+            update() {
+                this.z -= config.zFactor;
+                if (this.z <= 0) this.reset();
+            }
+            draw() {
+                const scale = 1 / this.z;
+                const x = center.x + this.x * scale;
+                const y = center.y + this.y * scale;
+                const size = (2 - this.z) * 1.5;
+                if (x < 0 || x > width || y < 0 || y > height) return;
+                ctx.beginPath();
+                ctx.arc(x, y, size, 0, Math.PI * 2);
+                ctx.fillStyle = `rgba(${warpColor.r}, ${warpColor.g}, ${warpColor.b}, ${1 - this.z * 0.5})`;
+                ctx.fill();
+            }
+        }
+
+        function animate() {
+            ctx.clearRect(0, 0, width, height);
+            particles.forEach(p => { p.update(); p.draw(); });
+            animationFrameId = requestAnimationFrame(animate);
+        }
+
+        function startWarp(type) {
+            resizeCanvas();
+            particles = Array.from({ length: config.particleCount }, () => new Particle());
+            warpColor = type === 'testPrep' ? config.colors.testPrep : config.colors.college;
+            warpOverlay.classList.add('visible');
+            warpOverlay.style.opacity = 1;
+            warpOverlay.style.pointerEvents = 'auto';
+            gsap.to(config, { zFactor: 0.05, duration: 1.5, ease: "power2.in" });
+            animate();
+        }
+
+        function stopWarp(onComplete) {
+            gsap.to(config, {
+                zFactor: 0.5, // Hyper speed!
+                duration: 0.5,
+                ease: "power4.in",
+                onComplete: () => {
+                    gsap.to(warpOverlay, {
+                        opacity: 0,
+                        duration: 0.3,
+                        onComplete: () => {
+                            cancelAnimationFrame(animationFrameId);
+                            config.zFactor = 0.005; // Reset for next time
+                            warpOverlay.style.pointerEvents = 'none';
+                            warpOverlay.classList.remove('visible');
+                            if (onComplete) onComplete();
+                        }
+                    });
+                }
+            });
+        }
+
+        // --- PORTAL CLICK LOGIC (REWRITTEN & INTEGRATED) ---
+        const testPrepPortal = document.getElementById('test-prep-portal');
+        const collegePortal = document.getElementById('college-portal');
+
+        async function handlePortalClick(portalType, portalElement, apiUrl, defaultUrl) {
+            // 1. Disable buttons to prevent double clicks
             testPrepPortal.disabled = true;
             collegePortal.disabled = true;
+
+            // 2. Fade out other modal elements & start suction animation on clicked portal
+            const modalContentWrapper = document.querySelector('.modal-content-wrapper');
             modalContentWrapper.classList.add('modal-content-fading-out');
-            collegePortal.classList.add('warping');
+            portalElement.classList.add('warping');
 
-            // Fetch the URL in the background
-            fetch('/api/college-path-status')
-                .then(res => res.json())
-                .then(data => {
-                    const url = data.has_path ? "{{ url_for('college_path_view') }}" : "{{ url_for('college_path_builder') }}";
-                    navigateToUrl(url); // Navigate when fetch completes
-                })
-                .catch(() => {
-                    navigateToUrl("{{ url_for('college_path_builder') }}"); // Navigate to default on error
-                });
-        });
+            // This also handles closing the modal visually before the warp
+            document.body.style.overflow = '';
 
-        // Close modal with Escape key
-        document.addEventListener('keydown', function (e) {
-            if (e.key === "Escape" && !modal.classList.contains('hidden')) {
-                closePathModal();
+
+            // 4. After the suction animation starts, begin the particle warp
+            setTimeout(() => {
+                startWarp(portalType);
+            }, 400); // Start particle warp 400ms into the 800ms suction
+
+            // 5. Fetch the destination URL while animations are playing
+            try {
+                const response = await fetch(apiUrl);
+                const data = await response.json();
+                const destinationUrl = data.has_path ? defaultUrl.view : defaultUrl.builder;
+
+                // 6. Wait for all animations to roughly finish, then navigate
+                setTimeout(() => {
+                    stopWarp(() => window.location.href = destinationUrl);
+                }, 1200);
+
+            } catch (error) {
+                console.error("Error fetching path status:", error);
+                // Fallback navigation after animations
+                setTimeout(() => {
+                    stopWarp(() => window.location.href = defaultUrl.builder);
+                }, 1200);
+            }
+        }
+
+        testPrepPortal.addEventListener('click', () => handlePortalClick(
+            'testPrep',
+            testPrepPortal,
+            '/api/test-path-status',
+            { view: '/dashboard/test-path-view', builder: '/dashboard/test-path-builder' }
+        ));
+
+        collegePortal.addEventListener('click', () => handlePortalClick(
+            'college',
+            collegePortal,
+            '/api/college-path-status',
+            { view: "{{ url_for('college_path_view') }}", builder: "{{ url_for('college_path_builder') }}" }
+        ));
+
+
+        // --- BACK BUTTON FIX ---
+        window.addEventListener('pageshow', function (event) {
+            if (event.persisted) {
+                // On back/forward, if the warp overlay is still visible, hide it.
+                if (warpOverlay.style.opacity > 0) {
+                    warpOverlay.style.opacity = 0;
+                    warpOverlay.style.pointerEvents = 'none';
+                    warpOverlay.classList.remove('visible');
+                    cancelAnimationFrame(animationFrameId);
+                }
+                // Reload to reset any weird animation states
+                window.location.reload();
             }
         });
-
-        // --- END OF THE FIX ---
     </script>
     <footer class="text-center p-8 text-sm text-slate-500">
         <p>
