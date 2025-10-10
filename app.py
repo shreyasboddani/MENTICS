@@ -1503,18 +1503,22 @@ def submit_quiz_results(user):
 @login_required
 def test_path_status(user):
     user_id = user.data['id']
-    active_tasks = db.select(
-        "paths", where={"user_id": user_id, "is_active": True, "category": "Test Prep"})
-    return jsonify({"has_path": bool(active_tasks)})
+    # This query is optimized to be extremely fast. It stops looking after finding just one match.
+    query = "SELECT 1 FROM paths WHERE user_id=? AND is_active=True AND category='Test Prep' LIMIT 1"
+    result = db.execute(query, (user_id,))
+    return jsonify({"has_path": bool(result)})
+
+# Replace the OLD college_path_status function with this NEW version
 
 
 @app.route('/api/college-path-status')
 @login_required
 def college_path_status(user):
     user_id = user.data['id']
-    active_tasks = db.select(
-        "paths", where={"user_id": user_id, "is_active": True, "category": "College Planning"})
-    return jsonify({"has_path": bool(active_tasks)})
+    # This query is also optimized for speed.
+    query = "SELECT 1 FROM paths WHERE user_id=? AND is_active=True AND category='College Planning' LIMIT 1"
+    result = db.execute(query, (user_id,))
+    return jsonify({"has_path": bool(result)})
 
 
 @app.route("/api/tasks", methods=['GET', 'POST'])
