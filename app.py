@@ -1505,7 +1505,8 @@ def test_path_status(user):
     user_id = user.data['id']
     # This query is optimized to be extremely fast. It stops looking after finding just one match.
     query = "SELECT 1 FROM paths WHERE user_id=? AND is_active=True AND category='Test Prep' LIMIT 1"
-    result = db.execute(query, (user_id,))
+    # Use the new, highly efficient function
+    result = db.execute_for_one(query, (user_id,))
     return jsonify({"has_path": bool(result)})
 
 # Replace the OLD college_path_status function with this NEW version
@@ -1517,7 +1518,8 @@ def college_path_status(user):
     user_id = user.data['id']
     # This query is also optimized for speed.
     query = "SELECT 1 FROM paths WHERE user_id=? AND is_active=True AND category='College Planning' LIMIT 1"
-    result = db.execute(query, (user_id,))
+    # Use the new, highly efficient function
+    result = db.execute_for_one(query, (user_id,))
     return jsonify({"has_path": bool(result)})
 
 

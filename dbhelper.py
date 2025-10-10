@@ -113,3 +113,23 @@ class DatabaseHandler:
             {set_clause}
         """
         self.execute(query, tuple(data.values()))
+# This is inside the DatabaseHandler class in dbhelper.py
+
+    def execute_for_one(self, query, params=None):
+        """
+        Executes a query and fetches only the first result.
+        This is much more efficient for existence checks.
+        """
+        conn = sqlite3.connect(self.db_name, timeout=10)
+        conn.row_factory = sqlite3.Row
+        c = conn.cursor()
+        if params:
+            c.execute(query, params)
+        else:
+            c.execute(query)
+
+        # Use fetchone() for maximum efficiency
+        row = c.fetchone()
+
+        conn.close()
+        return dict(row) if row else None
