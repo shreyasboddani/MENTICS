@@ -11,9 +11,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Lalezar&display=swap"
         rel="stylesheet">
     <link href="https://unpkg.com/aos@2.3.1/dist/aos.css" rel="stylesheet">
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <script
-        src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <link rel="icon" href="{{ url_for('static', filename='favicon.svg') }}" type="image/svg+xml">
     <link rel="stylesheet" href="{{ url_for('static', filename='dashboard.css') }}">
@@ -146,7 +144,6 @@
                         <div class="flex items-center gap-2 bg-slate-100/80 p-1 rounded-lg">
                             <button data-chart-group="sat" class="chart-main-btn">SAT</button>
                             <button data-chart-group="act" class="chart-main-btn">ACT</button>
-                            <button data-chart-group="college" class="chart-main-btn">College</button>
                         </div>
                         <button id="analyze-btn"
                             class="bg-purple-100 text-purple-700 font-semibold py-2 px-4 rounded-lg hover:bg-purple-200 transition focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-500 flex items-center gap-2 self-start md:self-center">
@@ -161,7 +158,9 @@
                     </div>
                     <div id="sub-chart-controls" class="flex flex-wrap items-center gap-3 mb-4">
                     </div>
-                    <div class="flex-grow min-h-0 h-96"><canvas id="mainChart"></canvas></div>
+                    <div class="flex-grow min-h-0 h-96" id="chart-container">
+                        <div id="mainChart"></div>
+                    </div>
                 </section>
             </div>
 
@@ -209,145 +208,121 @@
 
     <script>
         document.addEventListener('DOMContentLoaded', () => {
-            // --- DATA & CONFIG ---
             const statHistory = {{ stat_history | tojson
         }};
         const kpis = {{ kpis | tojson }};
-        let mainChartInstance;
+        let mainChart;
 
         const config = {
             metadata: {
-                'sat_total': { label: 'Total Score', color: '#8B5CF6', yAxisID: 'ySatTotal' },
-                'sat_math': { label: 'Math Section', color: '#A78BFA', yAxisID: 'ySatSub' },
-                'sat_ebrw': { label: 'EBRW Section', color: '#C4B5FD', yAxisID: 'ySatSub' },
-                'act_composite': { label: 'Composite Score', color: '#4F46E5', yAxisID: 'yAct' },
-                'act_math': { label: 'Math Section', color: '#6366F1', yAxisID: 'yAct' },
-                'act_reading': { label: 'Reading Section', color: '#818CF8', yAxisID: 'yAct' },
-                'act_science': { label: 'Science Section', color: '#A5B4FC', yAxisID: 'yAct' },
-                'gpa': { label: 'GPA', color: '#10B981', yAxisID: 'yGpa' },
-                'colleges_researched': { label: 'Colleges Researched', color: '#3B82F6', yAxisID: 'yCollege' },
-                'applications_submitted': { label: 'Apps Submitted', color: '#60A5FA', yAxisID: 'yCollege' }
+                'sat_total': { label: 'SAT Total', color: '#8B5CF6', min: 400, max: 1600 },
+                'sat_math': { label: 'SAT Math', color: '#A78BFA', min: 200, max: 800 },
+                'sat_ebrw': { label: 'SAT EBRW', color: '#C4B5FD', min: 200, max: 800 },
+                'act_composite': { label: 'ACT Composite', color: '#4F46E5', min: 1, max: 36 },
+                'act_math': { label: 'ACT Math', color: '#6366F1', min: 1, max: 36 },
+                'act_reading': { label: 'ACT Reading', color: '#818CF8', min: 1, max: 36 },
+                'act_science': { label: 'ACT Science', color: '#A5B4FC', min: 1, max: 36 }
             },
             groups: {
                 sat: ['sat_total', 'sat_math', 'sat_ebrw'],
-                act: ['act_composite', 'act_math', 'act_reading', 'act_science'],
-                college: ['gpa', 'colleges_researched', 'applications_submitted']
+                act: ['act_composite', 'act_math', 'act_reading', 'act_science']
             }
         };
 
-        // --- CHART SETUP ---
-        const ctx = document.getElementById('mainChart').getContext('2d');
-        mainChartInstance = new Chart(ctx, {
-            type: 'line', data: { datasets: [] },
-            options: {
-                maintainAspectRatio: false, responsive: true, interaction: { mode: 'index', intersect: false },
-                plugins: { legend: { display: false } },
-                scales: {
-                    x: { type: 'time', time: { unit: 'day', tooltipFormat: 'MMM d, yyyy' }, grid: { display: false } },
-                    ySatTotal: { display: false, min: 400, max: 1600, position: 'left', ticks: { color: config.metadata.sat_total.color } },
-                    ySatSub: { display: false, min: 200, max: 800, position: 'left', ticks: { color: config.metadata.sat_math.color } },
-                    yAct: { display: false, min: 1, max: 36, position: 'right', grid: { drawOnChartArea: false }, ticks: { color: config.metadata.act_composite.color } },
-                    yGpa: { display: false, min: 0, max: 4.5, position: 'left', ticks: { color: config.metadata.gpa.color, stepSize: 0.5 } },
-                    yCollege: { display: false, beginAtZero: true, position: 'right', grid: { drawOnChartArea: false }, ticks: { color: config.metadata.colleges_researched.color, stepSize: 1 } }
-                }
-            }
-        });
+        const initialChartOptions = {
+            chart: { type: 'line', height: '100%', toolbar: { show: false }, fontFamily: 'Inter, sans-serif' },
+            series: [],
+            xaxis: { type: 'datetime', labels: { style: { colors: '#64748b' } } },
+            yaxis: [], // We will define this dynamically
+            stroke: { curve: 'smooth', width: 3 },
+            dataLabels: { enabled: false },
+            grid: { borderColor: '#e2e8f0', strokeDashArray: 4 },
+            legend: { show: true, position: 'top', horizontalAlign: 'left' },
+            tooltip: { x: { format: 'MMM dd, yyyy' } }
+        };
 
-        // --- CHART LOGIC ---
+        mainChart = new ApexCharts(document.querySelector("#mainChart"), initialChartOptions);
+        mainChart.render();
+
         function updateChart(groupKey) {
-            let keysToShow = [];
+            const checkboxes = Array.from(document.querySelectorAll('#sub-chart-controls input[type=checkbox]'));
+            const keysToShow = checkboxes.filter(c => c.checked).map(c => c.value);
 
-            // If we have checkbox controls for subsections, use checked ones
-            if (groupKey === 'sat' || groupKey === 'act') {
-                const checkboxes = Array.from(document.querySelectorAll('#sub-chart-controls input[type=checkbox]'));
-                const checked = checkboxes.filter(c => c.checked).map(c => c.value);
-                if (checked.length > 0) keysToShow = checked;
-            }
-
-            // Fallback to single subject selector (legacy)
             if (keysToShow.length === 0) {
-                const subjectKey = document.getElementById('subject-selector')?.value || config.groups[groupKey][0];
-                keysToShow = [subjectKey];
+                mainChart.updateOptions({ series: [], yaxis: [] });
+                return;
             }
 
-            if (groupKey === 'college') {
-                keysToShow = config.groups.college;
-            }
+            const newSeries = [];
+            const newYAxis = [];
+            const yAxisConfigs = {};
 
-            const activeYAxes = new Set();
-
-            mainChartInstance.data.datasets = keysToShow
-                .filter(key => statHistory[key] && statHistory[key].length > 0)
-                .map(key => {
+            keysToShow.forEach((key, index) => {
+                if (statHistory[key] && statHistory[key].length > 0) {
                     const meta = config.metadata[key];
-                    activeYAxes.add(meta.yAxisID);
-                    return {
-                        label: meta.label,
-                        data: statHistory[key].map(item => ({ x: new Date(item.date).valueOf(), y: item.value })),
-                        borderColor: meta.color, backgroundColor: meta.color + '1A', tension: 0.3,
-                        yAxisID: meta.yAxisID, fill: 'start', pointRadius: 4, pointBackgroundColor: meta.color,
-                    };
-                });
+                    newSeries.push({
+                        name: meta.label,
+                        data: statHistory[key].map(item => [new Date(item.date).getTime(), item.value])
+                    });
 
-            Object.keys(mainChartInstance.options.scales).forEach(scaleId => {
-                if (scaleId !== 'x') mainChartInstance.options.scales[scaleId].display = activeYAxes.has(scaleId);
+                    // Group Y-axes by scale (e.g., all ACT scores on one axis)
+                    const axisKey = (key.startsWith('sat')) ? `sat_${meta.min}-${meta.max}` : `act_${meta.min}-${meta.max}`;
+
+                    if (!yAxisConfigs[axisKey]) {
+                        yAxisConfigs[axisKey] = {
+                            seriesName: meta.label,
+                            min: meta.min,
+                            max: meta.max,
+                            tickAmount: 4,
+                            decimalsInFloat: 0,
+                            labels: {
+                                style: { colors: meta.color },
+                                formatter: val => val.toFixed(0)
+                            },
+                            title: { text: `${key.startsWith('sat') ? 'SAT' : 'ACT'} Score`, style: { color: meta.color } },
+                            opposite: Object.keys(yAxisConfigs).length % 2 !== 0 // Alternate sides
+                        };
+                    }
+                }
             });
-            mainChartInstance.update();
+
+            mainChart.updateOptions({
+                series: newSeries,
+                yaxis: Object.values(yAxisConfigs),
+                colors: newSeries.map(s => config.metadata[Object.keys(config.metadata).find(k => config.metadata[k].label === s.name)].color)
+            });
         }
 
         function setupControls(groupKey) {
             const subControlsContainer = document.getElementById('sub-chart-controls');
             subControlsContainer.innerHTML = '';
+            const subjects = config.groups[groupKey];
 
-            const groupSubjects = config.groups[groupKey];
+            if (!subjects) return;
 
-            // For college group or single subject groups keep behavior
-            if (!groupSubjects || groupSubjects.length <= 1 || groupKey === 'college') {
-                updateChart(groupKey);
-                return;
-            }
-
-            // Create multi-select checkboxes so users can toggle SAT/ACT subsections
             const boxWrapper = document.createElement('div');
             boxWrapper.className = 'flex items-center gap-2 flex-wrap';
 
-            const selectAll = document.createElement('button');
-            selectAll.type = 'button';
-            selectAll.className = 'text-sm px-2 py-1 bg-white/60 border rounded text-slate-600 hover:bg-white';
-            selectAll.textContent = 'Toggle All';
-            boxWrapper.appendChild(selectAll);
-
-            const inputs = [];
-            groupSubjects.forEach(key => {
+            subjects.forEach((key, index) => {
                 if (statHistory[key] && statHistory[key].length > 0) {
                     const id = `chk_${key}`;
                     const label = document.createElement('label');
-                    label.className = 'inline-flex items-center gap-2 text-sm bg-white/50 border border-slate-300/70 rounded-lg p-1 px-2';
+                    label.className = 'inline-flex items-center gap-2 text-sm bg-white/50 border border-slate-300/70 rounded-lg p-1 px-2 cursor-pointer';
                     const input = document.createElement('input');
                     input.type = 'checkbox';
                     input.id = id;
                     input.value = key;
-                    input.checked = key === groupSubjects[0];
-                    input.className = 'w-4 h-4';
+                    input.checked = index === 0;
+                    input.className = 'w-4 h-4 text-purple-600 bg-gray-100 border-gray-300 rounded focus:ring-purple-500';
                     const span = document.createElement('span');
                     span.textContent = config.metadata[key].label;
                     label.appendChild(input);
                     label.appendChild(span);
                     boxWrapper.appendChild(label);
-                    inputs.push(input);
                     input.addEventListener('change', () => updateChart(groupKey));
                 }
             });
-
-            // Toggle all convenience
-            selectAll.addEventListener('click', () => {
-                const anyUnchecked = inputs.some(i => !i.checked);
-                inputs.forEach(i => i.checked = anyUnchecked);
-                updateChart(groupKey);
-            });
-
             subControlsContainer.appendChild(boxWrapper);
-            // initial render
             updateChart(groupKey);
         }
 
@@ -359,7 +334,6 @@
             });
         });
 
-        // --- UI RENDERING ---
         function renderKPIs() {
             const container = document.getElementById('kpi-container');
             container.innerHTML = '';
@@ -415,7 +389,6 @@
             container.innerHTML = html;
         }
 
-        // --- TAB & AI MODAL LOGIC ---
         const tabBtns = document.querySelectorAll('.tab-btn');
         const tabContents = document.querySelectorAll('.tab-content');
         tabBtns.forEach(btn => {
@@ -448,8 +421,6 @@
         });
         window.closeAnalysisModal = () => analysisModal.classList.add('hidden');
 
-
-        // --- INITIAL PAGE LOAD ---
         renderKPIs();
         renderTimeline('tab-content-test-prep', {{ test_prep_history | tojson }}, 'purple');
         renderTimeline('tab-content-college', {{ college_planning_history | tojson }}, 'indigo');

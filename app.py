@@ -871,6 +871,122 @@ def _generate_and_save_new_college_path(user_id, college_context, chat_history=[
 # Add this new function inside app.py
 
 
+@app.route("/dashboard/tracker")
+@login_required
+def tracker(user):
+    user_id = user.data['id']
+
+    # --- 1. Comprehensive Stat History Processing ---
+    stat_history_raw = db.select(
+        "stat_history", where={"user_id": user_id}, order_by="recorded_at ASC")
+
+    # A dictionary to hold lists of {"date": d, "value": v} for each stat
+    history_by_stat = {}
+    for record in stat_history_raw:
+        stat_name = record['stat_name']
+        if stat_name not in history_by_stat:
+            history_by_stat[stat_name] = []
+        try:
+            history_by_stat[stat_name].append({
+                "date": record['recorded_at'].split(" ")[0],
+                "value": float(record['stat_value'])
+            })
+        except (ValueError, TypeError):
+            continue  # Skip records with non-numeric values
+
+    # --- 2. Calculate Composite/Total Scores from Sectional History ---
+    # This ensures that practice test totals from the path view are included.
+    sat_scores_by_date = {}
+    for entry in history_by_stat.get('sat_math', []):
+        sat_scores_by_date.setdefault(entry['date'], {})[
+            'math'] = entry['value']
+    for entry in history_by_stat.get('sat_ebrw', []):
+        sat_scores_by_date.setdefault(entry['date'], {})[
+            'ebrw'] = entry['value']
+
+    sat_total_history = history_by_stat.get('sat_total', [])
+    for date, scores in sat_scores_by_date.items():
+        if 'math' in scores and 'ebrw' in scores:
+            total = scores['math'] + scores['ebrw']
+            # Avoid adding duplicate totals for the same day
+            if not any(entry['date'] == date for entry in sat_total_history):
+                sat_total_history.append({"date": date, "value": total})
+
+    if 'sat_total' in history_by_stat:
+        history_by_stat['sat_total'] = sorted(
+            sat_total_history, key=lambda x: x['date'])
+
+    act_scores_by_date = {}
+    for subject in ['act_math', 'act_reading', 'act_science']:
+        for entry in history_by_stat.get(subject, []):
+            act_scores_by_date.setdefault(
+                entry['date'], []).append(entry['value'])
+
+    act_composite_history = history_by_stat.get('act_composite', [])
+    for date, scores in act_scores_by_date.items():
+        if scores:
+            # ACT composite is the average of the sections
+            composite = round(sum(scores) / len(scores))
+            # Avoid adding duplicate composites for the same day
+            if not any(entry['date'] == date for entry in act_composite_history):
+                act_composite_history.append(
+                    {"date": date, "value": composite})
+
+    if 'act_composite' in history_by_stat:
+        history_by_stat['act_composite'] = sorted(
+            act_composite_history, key=lambda x: x['date'])
+
+    # --- 3. KPI Calculation (Most recent, best, improvement) ---
+    kpis = {}
+    stat_names_for_kpi = [
+        "sat_total", "sat_math", "sat_ebrw",
+        "act_composite", "act_math", "act_reading", "act_science",
+        "gpa", "colleges_researched", "applications_submitted"
+    ]
+    for name in stat_names_for_kpi:
+        records = history_by_stat.get(name)
+        if records and len(records) > 0:
+            values = [r['value'] for r in records]
+            kpis[name] = {
+                'latest': values[-1],
+                'best': max(values),
+                'improvement': values[-1] - values[0] if len(values) > 1 else 0
+            }
+
+    # --- 4. Path History Processing (Separated by Category) ---
+    all_tasks_raw = db.select(
+        "paths", where={"user_id": user_id}, order_by="created_at DESC")
+
+    test_prep_generations, college_planning_generations = {}, {}
+
+    for task in all_tasks_raw:
+        gen_key, category = task['created_at'], task['category']
+        target_dict = test_prep_generations if category == 'Test Prep' else college_planning_generations
+
+        if gen_key not in target_dict:
+            target_dict[gen_key] = {'date': gen_key,
+                                    'category': category, 'tasks': []}
+        target_dict[gen_key]['tasks'].append(task)
+
+    test_prep_history = sorted(
+        test_prep_generations.values(), key=lambda x: x['date'], reverse=True)
+    for gen in test_prep_history:
+        gen['tasks'].sort(key=lambda x: x['task_order'])
+
+    college_planning_history = sorted(
+        college_planning_generations.values(), key=lambda x: x['date'], reverse=True)
+    for gen in college_planning_history:
+        gen['tasks'].sort(key=lambda x: x['task_order'])
+
+    return render_template(
+        "tracker.html",
+        stat_history=history_by_stat,
+        kpis=kpis,
+        test_prep_history=test_prep_history,
+        college_planning_history=college_planning_history
+    )
+
+
 def _get_tracker_ai_analysis(user):
     """Generates a comprehensive AI-powered analysis of all user progress."""
     user_id = user.data['id']
@@ -1532,130 +1648,6 @@ def edit_stats(user):
     )
 
 
-# Replace the existing tracker() function in app.py with this one
-
-# Replace the existing tracker() function in app.py with this new, robust version
-
-# Replace the existing tracker() function in app.py with this new, robust version
-
-# Replace the existing tracker() function in app.py with this new, robust version
-
-# Replace the existing tracker() function in app.py with this new, robust version
-
-@app.route("/dashboard/tracker")
-@login_required
-def tracker(user):
-    user_id = user.data['id']
-
-    # --- 1. Comprehensive Stat History Processing ---
-    stat_history_raw = db.select(
-        "stat_history", where={"user_id": user_id}, order_by="recorded_at ASC")
-
-    # A dictionary to hold lists of {"date": d, "value": v} for each stat
-    history_by_stat = {}
-    for record in stat_history_raw:
-        stat_name = record['stat_name']
-        if stat_name not in history_by_stat:
-            history_by_stat[stat_name] = []
-        try:
-            history_by_stat[stat_name].append({
-                "date": record['recorded_at'].split(" ")[0],
-                "value": float(record['stat_value'])
-            })
-        except (ValueError, TypeError):
-            continue  # Skip records with non-numeric values
-
-    # --- 2. Calculate Composite/Total Scores from Sectional History ---
-    # This ensures that practice test totals from the path view are included.
-    sat_scores_by_date = {}
-    for entry in history_by_stat.get('sat_math', []):
-        sat_scores_by_date.setdefault(entry['date'], {})[
-            'math'] = entry['value']
-    for entry in history_by_stat.get('sat_ebrw', []):
-        sat_scores_by_date.setdefault(entry['date'], {})[
-            'ebrw'] = entry['value']
-
-    sat_total_history = history_by_stat.get('sat_total', [])
-    for date, scores in sat_scores_by_date.items():
-        if 'math' in scores and 'ebrw' in scores:
-            total = scores['math'] + scores['ebrw']
-            # Avoid adding duplicate totals for the same day
-            if not any(entry['date'] == date for entry in sat_total_history):
-                sat_total_history.append({"date": date, "value": total})
-
-    if 'sat_total' in history_by_stat:
-        history_by_stat['sat_total'] = sorted(
-            sat_total_history, key=lambda x: x['date'])
-
-    act_scores_by_date = {}
-    for subject in ['act_math', 'act_reading', 'act_science']:
-        for entry in history_by_stat.get(subject, []):
-            act_scores_by_date.setdefault(
-                entry['date'], []).append(entry['value'])
-
-    act_composite_history = history_by_stat.get('act_composite', [])
-    for date, scores in act_scores_by_date.items():
-        if scores:
-            # ACT composite is the average of the sections
-            composite = round(sum(scores) / len(scores))
-            # Avoid adding duplicate composites for the same day
-            if not any(entry['date'] == date for entry in act_composite_history):
-                act_composite_history.append(
-                    {"date": date, "value": composite})
-
-    if 'act_composite' in history_by_stat:
-        history_by_stat['act_composite'] = sorted(
-            act_composite_history, key=lambda x: x['date'])
-
-    # --- 3. KPI Calculation (Most recent, best, improvement) ---
-    kpis = {}
-    stat_names_for_kpi = [
-        "sat_total", "sat_math", "sat_ebrw",
-        "act_composite", "act_math", "act_reading", "act_science",
-        "gpa", "colleges_researched", "applications_submitted"
-    ]
-    for name in stat_names_for_kpi:
-        records = history_by_stat.get(name)
-        if records and len(records) > 0:
-            values = [r['value'] for r in records]
-            kpis[name] = {
-                'latest': values[-1],
-                'best': max(values),
-                'improvement': values[-1] - values[0] if len(values) > 1 else 0
-            }
-
-    # --- 4. Path History Processing (Separated by Category) ---
-    all_tasks_raw = db.select(
-        "paths", where={"user_id": user_id}, order_by="created_at DESC")
-
-    test_prep_generations, college_planning_generations = {}, {}
-
-    for task in all_tasks_raw:
-        gen_key, category = task['created_at'], task['category']
-        target_dict = test_prep_generations if category == 'Test Prep' else college_planning_generations
-
-        if gen_key not in target_dict:
-            target_dict[gen_key] = {'date': gen_key,
-                                    'category': category, 'tasks': []}
-        target_dict[gen_key]['tasks'].append(task)
-
-    test_prep_history = sorted(
-        test_prep_generations.values(), key=lambda x: x['date'], reverse=True)
-    for gen in test_prep_history:
-        gen['tasks'].sort(key=lambda x: x['task_order'])
-
-    college_planning_history = sorted(
-        college_planning_generations.values(), key=lambda x: x['date'], reverse=True)
-    for gen in college_planning_history:
-        gen['tasks'].sort(key=lambda x: x['task_order'])
-
-    return render_template(
-        "tracker.html",
-        stat_history=history_by_stat,
-        kpis=kpis,
-        test_prep_history=test_prep_history,
-        college_planning_history=college_planning_history
-    )
 # --- API ROUTES ---
 
 # ... (Previous API routes are unchanged)
