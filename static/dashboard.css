@@ -657,3 +657,68 @@ body {
         opacity: 0;
     }
 }
+
+.portal-button:disabled {
+    cursor: not-allowed;
+    filter: grayscale(50%);
+}
+
+/* In static/dashboard.css */
+
+.chart-main-btn {
+    padding: 0.5rem 1rem;
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: #475569;
+    /* slate-600 */
+    border-radius: 0.5rem;
+    transition: all 0.2s ease-in-out;
+}
+
+.chart-main-btn:hover {
+    background-color: #f1f5f9;
+    /* slate-100 */
+    color: #1e293b;
+    /* slate-800 */
+}
+
+.chart-main-btn.active {
+    background-color: #ffffff;
+    color: #4f46e5;
+    /* indigo-600 */
+    box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
+}
+
+/* Style for the new dropdown selector */
+#subject-selector {
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    appearance: none;
+    background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e");
+    background-position: right 0.5rem center;
+    background-repeat: no-repeat;
+    background-size: 1.5em 1.5em;
+    padding-right: 2.5rem;
+}
+
+/* Tab Styles for Path History */
+.tab-btn {
+    padding: 0.5rem 1rem;
+    font-weight: 600;
+    color: #64748b;
+    border-bottom: 2px solid transparent;
+    transition: all 0.2s;
+}
+
+.tab-btn.active {
+    color: #4f46e5;
+    border-bottom-color: #4f46e5;
+}
+
+.tab-content {
+    display: none;
+}
+
+.tab-content.active {
+    display: block;
+}

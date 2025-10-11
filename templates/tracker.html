@@ -2,9 +2,9 @@
 <html lang="en">
 
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta charset="UTF-8" />
     <title>Tracker – Mentics</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -12,8 +12,59 @@
         rel="stylesheet">
     <link href="https://unpkg.com/aos@2.3.1/dist/aos.css" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script
+        src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <link rel="icon" href="{{ url_for('static', filename='favicon.svg') }}" type="image/svg+xml">
     <link rel="stylesheet" href="{{ url_for('static', filename='dashboard.css') }}">
+    <style>
+        .timeline {
+            position: relative;
+            padding-left: 1rem;
+        }
+
+        .timeline::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            height: 100%;
+            width: 2px;
+            background-color: #e2e8f0;
+        }
+
+        .timeline-item {
+            position: relative;
+            padding-left: 2.5rem;
+            margin-bottom: 2rem;
+        }
+
+        .timeline-icon {
+            position: absolute;
+            top: 0;
+            left: -0.75rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 1.5rem;
+            height: 1.5rem;
+            border-radius: 9999px;
+            background-color: #f8fafc;
+            border: 2px solid;
+        }
+
+        #aiAnalysisOutput h3 {
+            font-size: 1.25rem;
+            font-weight: 700;
+            margin-top: 1rem;
+            margin-bottom: 0.5rem;
+        }
+
+        #aiAnalysisOutput ul {
+            list-style-type: disc;
+            padding-left: 1.5rem;
+        }
+    </style>
 </head>
 
 <body class="bg-slate-50 font-sans text-slate-800 antialiased">
@@ -41,7 +92,7 @@
                     </svg>
                     <span>Stats</span>
                 </a>
-                <a href="/dashboard/tracker" class="nav-item">
+                <a href="/dashboard/tracker" class="nav-item active">
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
                         <path fill-rule="evenodd"
                             d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V4a1 1 0 011-1zm10 8a1 1 0 011-1h3a1 1 0 011 1v4a1 1 0 01-1 1h-3a1 1 0 01-1-1v-4zm-7 1a1 1 0 011-1h2a1 1 0 011 1v3a1 1 0 01-1 1H8a1 1 0 01-1-1v-3z"
@@ -82,303 +133,338 @@
         </div>
     </header>
 
-    <main class="p-6 lg:p-8">
+    <main class="w-full max-w-7xl mx-auto p-6 lg:p-8">
         <div data-aos="fade-in" class="mb-8">
             <h1 class="text-4xl md:text-5xl font-bold font-lalezar text-slate-800">Progress Tracker</h1>
-            <p class="text-lg text-slate-600">Visualize your growth and review your history.</p>
+            <p class="text-lg text-slate-600">Your entire journey, analyzed.</p>
         </div>
 
-        <div class="space-y-8">
-            <section data-aos="fade-up">
-                <h2 class="text-2xl font-bold font-lalezar text-purple-700 mb-4">Test Score Tracker</h2>
-                <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                    <div class="card p-6">
-                        <div class="flex justify-between items-center mb-4">
-                            <h3 class="font-bold text-slate-800">SAT Score Progression</h3>
-                            <select id="sat-subject-selector"
-                                class="text-sm bg-white/50 border border-slate-300/70 rounded-lg p-1 focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition">
-                                <option value="total">Total</option>
-                                <option value="sat_math">Math</option>
-                                <option value="sat_ebrw">EBRW</option>
-                            </select>
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-8">
+            <div class="lg:col-span-7 xl:col-span-8">
+                <section data-aos="fade-up" class="card p-6 h-full flex flex-col">
+                    <div class="flex flex-col md:flex-row justify-between md:items-center gap-4 mb-4">
+                        <div class="flex items-center gap-2 bg-slate-100/80 p-1 rounded-lg">
+                            <button data-chart-group="sat" class="chart-main-btn">SAT</button>
+                            <button data-chart-group="act" class="chart-main-btn">ACT</button>
+                            <button data-chart-group="college" class="chart-main-btn">College</button>
                         </div>
-                        <div class="h-64"><canvas id="satChart"></canvas></div>
+                        <button id="analyze-btn"
+                            class="bg-purple-100 text-purple-700 font-semibold py-2 px-4 rounded-lg hover:bg-purple-200 transition focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-500 flex items-center gap-2 self-start md:self-center">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20"
+                                fill="currentColor">
+                                <path
+                                    d="M10 3.5a1.5 1.5 0 011.5 1.5v2.336a3.5 3.5 0 016.1 2.333c0 1.932-1.567 3.5-3.5 3.5h-1.1c-1.226 0-2.327-.604-2.941-1.559a1.5 1.5 0 01-2.918 0c-.614.955-1.715 1.559-2.941 1.559H3.5A3.5 3.5 0 010 13.169a3.5 3.5 0 016.1-2.333V5A1.5 1.5 0 017.5 3.5h5zm-3.5 9a2 2 0 100 4 2 2 0 000-4z" />
+                                <path d="M12.5 12.5a2 2 0 100 4 2 2 0 000-4z" />
+                            </svg>
+                            Get AI Analysis
+                        </button>
                     </div>
-                    <div class="card p-6">
-                        <div class="flex justify-between items-center mb-4">
-                            <h3 class="font-bold text-slate-800">ACT Score Progression</h3>
-                            <select id="act-subject-selector"
-                                class="text-sm bg-white/50 border border-slate-300/70 rounded-lg p-1 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition">
-                                <option value="composite">Composite</option>
-                                <option value="act_math">Math</option>
-                                <option value="act_reading">Reading</option>
-                                <option value="act_science">Science</option>
-                            </select>
-                        </div>
-                        <div class="h-64"><canvas id="actChart"></canvas></div>
+                    <div id="sub-chart-controls" class="flex flex-wrap items-center gap-3 mb-4">
                     </div>
-                </div>
-            </section>
+                    <div class="flex-grow min-h-0 h-96"><canvas id="mainChart"></canvas></div>
+                </section>
+            </div>
 
-            <section data-aos="fade-up" data-aos-delay="100">
-                <h2 class="text-2xl font-bold font-lalezar text-indigo-700 mb-4">College Planning Progress</h2>
-                <div class="card p-6">
-                    <h3 class="font-bold text-slate-800 mb-4">Application Progress Tracker</h3>
-                    <div class="h-64"><canvas id="collegeChart"></canvas></div>
-                </div>
-            </section>
-
-            <section data-aos="fade-up" data-aos-delay="200">
-                <h2 class="text-2xl font-bold font-lalezar text-slate-700 mb-4">Path History</h2>
-                <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                    <div class="card p-6">
-                        <h3 class="font-semibold text-slate-800 mb-2">Test Prep Paths</h3>
-                        <div class="space-y-4 max-h-96 overflow-y-auto pr-2">
-                            {% for date, tasks in test_prep_generations.items() %}
-                            <div class="p-4 bg-purple-50/50 rounded-lg">
-                                <p class="text-sm font-semibold text-purple-800">Generated: {{ date | format_date }}
-                                </p>
-                                <ul class="mt-2 text-sm space-y-1">
-                                    {% for task in tasks %}
-                                    <li
-                                        class="flex items-center gap-2 {% if not task['is_completed'] %}text-slate-500{% endif %}">
-                                        {% if task['is_completed'] %}
-                                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"
-                                            class="w-5 h-5 text-emerald-500 flex-shrink-0">
-                                            <path fill-rule="evenodd"
-                                                d="M10 18a8 8 0 1 0 0-16 8 8 0 0 0 0 16Zm3.857-9.809a.75.75 0 0 0-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 1 0-1.06 1.061l2.5 2.5a.75.75 0 0 0 1.137-.089l4-5.5Z"
-                                                clip-rule="evenodd" />
-                                        </svg>
-                                        {% else %}
-                                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"
-                                            class="w-5 h-5 text-slate-400 flex-shrink-0">
-                                            <path fill-rule="evenodd"
-                                                d="M10 18a8 8 0 1 0 0-16 8 8 0 0 0 0 16ZM8.28 7.22a.75.75 0 0 0-1.06 1.06L8.94 10l-1.72 1.72a.75.75 0 1 0 1.06 1.06L10 11.06l1.72 1.72a.75.75 0 1 0 1.06-1.06L11.06 10l1.72-1.72a.75.75 0 0 0-1.06-1.06L10 8.94 8.28 7.22Z"
-                                                clip-rule="evenodd" />
-                                        </svg>
-                                        {% endif %}
-                                        <span>{{ task['description'] }}</span>
-                                    </li>
-                                    {% endfor %}
-                                </ul>
-                            </div>
-                            {% else %}
-                            <p class="text-slate-500 text-center py-8">No Test Prep history found.</p>
-                            {% endfor %}
-                        </div>
+            <div class="lg:col-span-5 xl:col-span-4 h-[calc(100vh-12rem)] overflow-y-auto pr-2 space-y-8">
+                <section data-aos="fade-up" data-aos-delay="100">
+                    <h2 class="text-xl font-bold font-lalezar text-slate-700 mb-3">Key Metrics</h2>
+                    <div id="kpi-container" class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     </div>
+                </section>
+                <section data-aos="fade-up" data-aos-delay="200">
+                    <h2 class="text-xl font-bold font-lalezar text-slate-700 mb-3">Path History</h2>
                     <div class="card p-6">
-                        <h3 class="font-semibold text-slate-800 mb-2">College Planning Paths</h3>
-                        <div class="space-y-4 max-h-96 overflow-y-auto pr-2">
-                            {% for date, tasks in college_planning_generations.items() %}
-                            <div class="p-4 bg-indigo-50/50 rounded-lg">
-                                <p class="text-sm font-semibold text-indigo-800">Generated: {{ date | format_date }}
-                                </p>
-                                <ul class="mt-2 text-sm space-y-1">
-                                    {% for task in tasks %}
-                                    <li
-                                        class="flex items-center gap-2 {% if not task['is_completed'] %}text-slate-500{% endif %}">
-                                        {% if task['is_completed'] %}
-                                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"
-                                            class="w-5 h-5 text-emerald-500 flex-shrink-0">
-                                            <path fill-rule="evenodd"
-                                                d="M10 18a8 8 0 1 0 0-16 8 8 0 0 0 0 16Zm3.857-9.809a.75.75 0 0 0-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 1 0-1.06 1.061l2.5 2.5a.75.75 0 0 0 1.137-.089l4-5.5Z"
-                                                clip-rule="evenodd" />
-                                        </svg>
-                                        {% else %}
-                                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"
-                                            class="w-5 h-5 text-slate-400 flex-shrink-0">
-                                            <path fill-rule="evenodd"
-                                                d="M10 18a8 8 0 1 0 0-16 8 8 0 0 0 0 16ZM8.28 7.22a.75.75 0 0 0-1.06 1.06L8.94 10l-1.72 1.72a.75.75 0 1 0 1.06 1.06L10 11.06l1.72 1.72a.75.75 0 1 0 1.06-1.06L11.06 10l1.72-1.72a.75.75 0 0 0-1.06-1.06L10 8.94 8.28 7.22Z"
-                                                clip-rule="evenodd" />
-                                        </svg>
-                                        {% endif %}
-                                        <span>{{ task['description'] }}</span>
-                                    </li>
-                                    {% endfor %}
-                                </ul>
-                            </div>
-                            {% else %}
-                            <p class="text-slate-500 text-center py-8">No College Planning history found.</p>
-                            {% endfor %}
+                        <div class="border-b border-slate-200/80 mb-4">
+                            <nav class="-mb-px flex gap-6" aria-label="Tabs">
+                                <button id="tab-btn-test-prep" class="tab-btn">Test Prep</button>
+                                <button id="tab-btn-college" class="tab-btn">College Planning</button>
+                            </nav>
                         </div>
+                        <div id="tab-content-test-prep" class="tab-content"></div>
+                        <div id="tab-content-college" class="tab-content"></div>
                     </div>
-                </div>
-            </section>
+                </section>
+            </div>
         </div>
     </main>
 
+    <div id="aiAnalysisModal"
+        class="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 hidden p-4">
+        <div
+            class="bg-white/60 backdrop-blur-xl border border-white/20 w-full max-w-2xl rounded-2xl shadow-2xl p-6 md:p-8 relative flex flex-col h-auto max-h-[80vh]">
+            <button onclick="closeAnalysisModal()"
+                class="text-slate-400 hover:text-slate-600 transition-colors rounded-full p-1 absolute top-4 right-4 focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-500">
+                <span class="sr-only">Close</span>
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-6 h-6">
+                    <path fill-rule="evenodd"
+                        d="M5.47 5.47a.75.75 0 0 1 1.06 0L12 10.94l5.47-5.47a.75.75 0 1 1 1.06 1.06L13.06 12l5.47 5.47a.75.75 0 1 1-1.06 1.06L12 13.06l-5.47 5.47a.75.75 0 0 1-1.06-1.06L10.94 12 5.47 6.53a.75.75 0 0 1 0-1.06Z"
+                        clip-rule="evenodd" />
+                </svg>
+            </button>
+            <h3 class="text-2xl font-bold font-lalezar text-purple-700 mb-4">AI Progress Analysis</h3>
+            <div id="aiAnalysisOutput" class="prose prose-sm max-w-none w-full flex-grow overflow-y-auto pr-2">
+            </div>
+        </div>
+    </div>
+
     <script>
         document.addEventListener('DOMContentLoaded', () => {
-            const statHistory = {{ stat_history| tojson
+            // --- DATA & CONFIG ---
+            const statHistory = {{ stat_history | tojson
         }};
-        // Get the user's local timezone
-        const userTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+        const kpis = {{ kpis | tojson }};
+        let mainChartInstance;
 
-        let satChartInstance;
-        let actChartInstance;
-        let collegeChartInstance;
+        const config = {
+            metadata: {
+                'sat_total': { label: 'Total Score', color: '#8B5CF6', yAxisID: 'ySatTotal' },
+                'sat_math': { label: 'Math Section', color: '#A78BFA', yAxisID: 'ySatSub' },
+                'sat_ebrw': { label: 'EBRW Section', color: '#C4B5FD', yAxisID: 'ySatSub' },
+                'act_composite': { label: 'Composite Score', color: '#4F46E5', yAxisID: 'yAct' },
+                'act_math': { label: 'Math Section', color: '#6366F1', yAxisID: 'yAct' },
+                'act_reading': { label: 'Reading Section', color: '#818CF8', yAxisID: 'yAct' },
+                'act_science': { label: 'Science Section', color: '#A5B4FC', yAxisID: 'yAct' },
+                'gpa': { label: 'GPA', color: '#10B981', yAxisID: 'yGpa' },
+                'colleges_researched': { label: 'Colleges Researched', color: '#3B82F6', yAxisID: 'yCollege' },
+                'applications_submitted': { label: 'Apps Submitted', color: '#60A5FA', yAxisID: 'yCollege' }
+            },
+            groups: {
+                sat: ['sat_total', 'sat_math', 'sat_ebrw'],
+                act: ['act_composite', 'act_math', 'act_reading', 'act_science'],
+                college: ['gpa', 'colleges_researched', 'applications_submitted']
+            }
+        };
 
-        function renderSatChart(subject = 'total') {
-            const ctx = document.getElementById('satChart').getContext('2d');
-            let labels = [];
-            let data = [];
-            let label = 'SAT Total Score';
-            let yAxisMin = 400;
-            let yAxisMax = 1600;
+        // --- CHART SETUP ---
+        const ctx = document.getElementById('mainChart').getContext('2d');
+        mainChartInstance = new Chart(ctx, {
+            type: 'line', data: { datasets: [] },
+            options: {
+                maintainAspectRatio: false, responsive: true, interaction: { mode: 'index', intersect: false },
+                plugins: { legend: { display: false } },
+                scales: {
+                    x: { type: 'time', time: { unit: 'day', tooltipFormat: 'MMM d, yyyy' }, grid: { display: false } },
+                    ySatTotal: { display: false, min: 400, max: 1600, position: 'left', ticks: { color: config.metadata.sat_total.color } },
+                    ySatSub: { display: false, min: 200, max: 800, position: 'left', ticks: { color: config.metadata.sat_math.color } },
+                    yAct: { display: false, min: 1, max: 36, position: 'right', grid: { drawOnChartArea: false }, ticks: { color: config.metadata.act_composite.color } },
+                    yGpa: { display: false, min: 0, max: 4.5, position: 'left', ticks: { color: config.metadata.gpa.color, stepSize: 0.5 } },
+                    yCollege: { display: false, beginAtZero: true, position: 'right', grid: { drawOnChartArea: false }, ticks: { color: config.metadata.colleges_researched.color, stepSize: 1 } }
+                }
+            }
+        });
 
-            const historyData = statHistory[subject === 'total' ? 'sat_total' : subject] || [];
+        // --- CHART LOGIC ---
+        function updateChart(groupKey) {
+            let keysToShow = [];
 
-            historyData.forEach(item => {
-                // Use the user's timezone for consistent date formatting
-                const date = new Date(item.date + 'T00:00:00'); // Assume date is YYYY-MM-DD from server
-                labels.push(date.toLocaleDateString(undefined, { timeZone: userTimezone, month: 'short', day: 'numeric' }));
-                data.push(item.value);
-            });
-
-            if (subject !== 'total') {
-                yAxisMin = 200;
-                yAxisMax = 800;
-                label = subject === 'sat_math' ? 'SAT Math Score' : 'SAT EBRW Score';
+            // If we have checkbox controls for subsections, use checked ones
+            if (groupKey === 'sat' || groupKey === 'act') {
+                const checkboxes = Array.from(document.querySelectorAll('#sub-chart-controls input[type=checkbox]'));
+                const checked = checkboxes.filter(c => c.checked).map(c => c.value);
+                if (checked.length > 0) keysToShow = checked;
             }
 
-            if (satChartInstance) satChartInstance.destroy();
-
-            satChartInstance = new Chart(ctx, {
-                type: 'bar',
-                data: {
-                    labels: labels,
-                    datasets: [{
-                        label: label,
-                        data: data,
-                        backgroundColor: 'rgba(167, 139, 250, 0.6)',
-                        borderColor: 'rgba(167, 139, 250, 1)',
-                        borderWidth: 1,
-                        borderRadius: 4
-                    }]
-                },
-                options: {
-                    maintainAspectRatio: false,
-                    responsive: true,
-                    plugins: { legend: { display: false } },
-                    scales: {
-                        y: { min: yAxisMin, max: yAxisMax, grid: { color: '#e2e8f0' } },
-                        x: { grid: { display: false } }
-                    }
-                }
-            });
-        }
-
-        function renderActChart(subject = 'composite') {
-            const ctx = document.getElementById('actChart').getContext('2d');
-            let labels = [];
-            let data = [];
-            let label;
-
-            const dataKey = subject === 'composite' ? 'act_composite' : subject;
-            const historyData = statHistory[dataKey] || [];
-
-            if (subject === 'composite') {
-                label = 'ACT Composite Score';
-            } else {
-                const subjectName = subject.split('_')[1];
-                label = `ACT ${subjectName.charAt(0).toUpperCase() + subjectName.slice(1)} Score`;
+            // Fallback to single subject selector (legacy)
+            if (keysToShow.length === 0) {
+                const subjectKey = document.getElementById('subject-selector')?.value || config.groups[groupKey][0];
+                keysToShow = [subjectKey];
             }
 
-            historyData.forEach(item => {
-                // Use the user's timezone
-                const date = new Date(item.date + 'T00:00:00'); // Assume date is YYYY-MM-DD from server
-                labels.push(date.toLocaleDateString(undefined, { timeZone: userTimezone, month: 'short', day: 'numeric' }));
-                data.push(item.value);
+            if (groupKey === 'college') {
+                keysToShow = config.groups.college;
+            }
+
+            const activeYAxes = new Set();
+
+            mainChartInstance.data.datasets = keysToShow
+                .filter(key => statHistory[key] && statHistory[key].length > 0)
+                .map(key => {
+                    const meta = config.metadata[key];
+                    activeYAxes.add(meta.yAxisID);
+                    return {
+                        label: meta.label,
+                        data: statHistory[key].map(item => ({ x: new Date(item.date).valueOf(), y: item.value })),
+                        borderColor: meta.color, backgroundColor: meta.color + '1A', tension: 0.3,
+                        yAxisID: meta.yAxisID, fill: 'start', pointRadius: 4, pointBackgroundColor: meta.color,
+                    };
+                });
+
+            Object.keys(mainChartInstance.options.scales).forEach(scaleId => {
+                if (scaleId !== 'x') mainChartInstance.options.scales[scaleId].display = activeYAxes.has(scaleId);
+            });
+            mainChartInstance.update();
+        }
+
+        function setupControls(groupKey) {
+            const subControlsContainer = document.getElementById('sub-chart-controls');
+            subControlsContainer.innerHTML = '';
+
+            const groupSubjects = config.groups[groupKey];
+
+            // For college group or single subject groups keep behavior
+            if (!groupSubjects || groupSubjects.length <= 1 || groupKey === 'college') {
+                updateChart(groupKey);
+                return;
+            }
+
+            // Create multi-select checkboxes so users can toggle SAT/ACT subsections
+            const boxWrapper = document.createElement('div');
+            boxWrapper.className = 'flex items-center gap-2 flex-wrap';
+
+            const selectAll = document.createElement('button');
+            selectAll.type = 'button';
+            selectAll.className = 'text-sm px-2 py-1 bg-white/60 border rounded text-slate-600 hover:bg-white';
+            selectAll.textContent = 'Toggle All';
+            boxWrapper.appendChild(selectAll);
+
+            const inputs = [];
+            groupSubjects.forEach(key => {
+                if (statHistory[key] && statHistory[key].length > 0) {
+                    const id = `chk_${key}`;
+                    const label = document.createElement('label');
+                    label.className = 'inline-flex items-center gap-2 text-sm bg-white/50 border border-slate-300/70 rounded-lg p-1 px-2';
+                    const input = document.createElement('input');
+                    input.type = 'checkbox';
+                    input.id = id;
+                    input.value = key;
+                    input.checked = key === groupSubjects[0];
+                    input.className = 'w-4 h-4';
+                    const span = document.createElement('span');
+                    span.textContent = config.metadata[key].label;
+                    label.appendChild(input);
+                    label.appendChild(span);
+                    boxWrapper.appendChild(label);
+                    inputs.push(input);
+                    input.addEventListener('change', () => updateChart(groupKey));
+                }
             });
 
-            if (actChartInstance) actChartInstance.destroy();
+            // Toggle all convenience
+            selectAll.addEventListener('click', () => {
+                const anyUnchecked = inputs.some(i => !i.checked);
+                inputs.forEach(i => i.checked = anyUnchecked);
+                updateChart(groupKey);
+            });
 
-            actChartInstance = new Chart(ctx, {
-                type: 'bar',
-                data: {
-                    labels: labels,
-                    datasets: [{
-                        label: label,
-                        data: data,
-                        backgroundColor: 'rgba(99, 102, 241, 0.6)',
-                        borderColor: 'rgba(99, 102, 241, 1)',
-                        borderWidth: 1,
-                        borderRadius: 4
-                    }]
-                },
-                options: {
-                    maintainAspectRatio: false,
-                    responsive: true,
-                    plugins: { legend: { display: false } },
-                    scales: {
-                        y: { min: 0, max: 36, grid: { color: '#e2e8f0' } },
-                        x: { grid: { display: false } }
-                    }
-                }
+            subControlsContainer.appendChild(boxWrapper);
+            // initial render
+            updateChart(groupKey);
+        }
+
+        document.querySelectorAll('.chart-main-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                document.querySelectorAll('.chart-main-btn').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                setupControls(btn.dataset.chartGroup);
+            });
+        });
+
+        // --- UI RENDERING ---
+        function renderKPIs() {
+            const container = document.getElementById('kpi-container');
+            container.innerHTML = '';
+            const kpiData = Object.entries(kpis);
+            if (kpiData.length === 0) {
+                container.innerHTML = `<div class="card p-4 text-center sm:col-span-2"><p class="text-slate-500">Log your scores to see key metrics!</p></div>`;
+                return;
+            }
+            kpiData.forEach(([key, data]) => {
+                const meta = config.metadata[key];
+                if (!meta) return;
+                const improvement = data.improvement;
+                const improvementText = improvement % 1 === 0 ? improvement.toFixed(0) : improvement.toFixed(1);
+                const latestText = data.latest % 1 === 0 ? data.latest.toFixed(0) : data.latest.toFixed(1);
+                const bestText = data.best % 1 === 0 ? data.best.toFixed(0) : data.best.toFixed(1);
+                const improvementClass = improvement >= 0 ? 'text-emerald-500' : 'text-red-500';
+
+                container.innerHTML += `
+                        <div class="card p-4">
+                            <p class="text-sm font-semibold text-slate-500">${meta.label}</p>
+                            <div class="flex justify-between items-baseline mt-1">
+                                <p class="text-3xl font-bold text-slate-800">${latestText}</p>
+                                ${improvement !== 0 ? `<p class="text-sm font-semibold ${improvementClass}">${improvement > 0 ? '+' : ''}${improvementText}</p>` : ''}
+                            </div>
+                            <p class="text-xs text-slate-400">Best: ${bestText}</p>
+                        </div>`;
             });
         }
 
-        function renderCollegeChart() {
-            const ctx = document.getElementById('collegeChart').getContext('2d');
-            const collegesResearched = statHistory.colleges_researched || [];
-            const appsSubmitted = statHistory.applications_submitted || [];
-            const essayProgress = statHistory.essay_progress || [];
-
-            const latestResearched = collegesResearched.length > 0 ? collegesResearched[collegesResearched.length - 1].value : 0;
-            const latestSubmitted = appsSubmitted.length > 0 ? appsSubmitted[appsSubmitted.length - 1].value : 0;
-            const latestEssay = essayProgress.length > 0 ? essayProgress[essayProgress.length - 1].value : 0;
-
-            const essayStatus = latestEssay === 1 ? 'Drafting' : (latestEssay === 2 ? 'Finalizing' : 'Not Started');
-
-            if (collegeChartInstance) collegeChartInstance.destroy();
-
-            collegeChartInstance = new Chart(ctx, {
-                type: 'bar',
-                data: {
-                    labels: ['Colleges Researched', 'Applications Submitted'],
-                    datasets: [{
-                        label: 'Count',
-                        data: [latestResearched, latestSubmitted],
-                        backgroundColor: ['rgba(99, 102, 241, 0.6)', 'rgba(129, 140, 248, 0.6)'],
-                        borderColor: ['rgba(99, 102, 241, 1)', 'rgba(129, 140, 248, 1)'],
-                        borderWidth: 1,
-                        borderRadius: 4
-                    }]
-                },
-                options: {
-                    maintainAspectRatio: false,
-                    responsive: true,
-                    plugins: {
-                        legend: { display: false },
-                        title: { display: true, text: `Current Essay Status: ${essayStatus}` }
-                    },
-                    scales: {
-                        y: { beginAtZero: true, ticks: { stepSize: 1 }, grid: { color: '#e2e8f0' } },
-                        x: { grid: { display: false } }
-                    }
-                }
+        function renderTimeline(containerId, historyData, color) {
+            const container = document.getElementById(containerId);
+            if (!historyData || historyData.length === 0) {
+                container.innerHTML = `<p class="text-slate-500 text-center py-8">No history found for this category.</p>`;
+                return;
+            }
+            let html = '<div class="timeline">';
+            historyData.forEach(gen => {
+                const borderColor = color === 'purple' ? '#a855f7' : '#6366f1';
+                html += `
+                    <div class="timeline-item">
+                        <div class="timeline-icon" style="border-color: ${borderColor};"></div>
+                        <p class="text-xs font-semibold text-slate-500 mb-1">${new Date(gen.date).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}</p>
+                        <p class="font-bold text-sm text-${color}-700">${gen.category} Path</p>
+                        <ul class="mt-2 text-xs space-y-1.5 pl-1">${gen.tasks.map(task => `
+                            <li class="flex items-start gap-2">
+                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" class="w-4 h-4 flex-shrink-0 mt-px ${task.is_completed ? 'text-emerald-500' : 'text-slate-300'}"><path fill-rule="evenodd" d="M8 15A7 7 0 1 0 8 1a7 7 0 0 0 0 14Zm3.84-9.43a.75.75 0 0 0-1.18-.94l-2.65 3.16-1.1-1.1a.75.75 0 0 0-1.06 1.06l1.5 1.5a.75.75 0 0 0 1.05-.01l3.25-4-1.81.22Z" clip-rule="evenodd" /></svg>
+                                <span class="${task.is_completed ? 'text-slate-500 line-through' : ''}">${task.description}</span>
+                            </li>
+                        `).join('')}</ul>
+                    </div>`;
             });
+            html += '</div>';
+            container.innerHTML = html;
         }
 
-        document.getElementById('sat-subject-selector').addEventListener('change', (e) => renderSatChart(e.target.value));
-        document.getElementById('act-subject-selector').addEventListener('change', (e) => renderActChart(e.target.value));
+        // --- TAB & AI MODAL LOGIC ---
+        const tabBtns = document.querySelectorAll('.tab-btn');
+        const tabContents = document.querySelectorAll('.tab-content');
+        tabBtns.forEach(btn => {
+            btn.addEventListener('click', () => {
+                tabBtns.forEach(b => b.classList.remove('active'));
+                tabContents.forEach(c => c.classList.remove('active'));
+                btn.classList.add('active');
+                document.getElementById(btn.id.replace('btn', 'content')).classList.add('active');
+            });
+        });
 
-        renderSatChart();
-        renderActChart();
-        renderCollegeChart();
+        const analyzeBtn = document.getElementById('analyze-btn');
+        const analysisModal = document.getElementById('aiAnalysisModal');
+        const analysisOutput = document.getElementById('aiAnalysisOutput');
+        analyzeBtn.addEventListener('click', async () => {
+            analysisModal.classList.remove('hidden');
+            analysisOutput.innerHTML = '<p class="text-slate-500 animate-pulse">Your AI analysis is being generated...</p>';
+            analyzeBtn.disabled = true;
+            try {
+                const response = await fetch('/api/tracker-analysis');
+                const data = await response.json();
+                if (response.ok) {
+                    analysisOutput.innerHTML = marked.parse(data.analysis);
+                } else { throw new Error(data.error || 'Failed to get analysis'); }
+            } catch (error) {
+                analysisOutput.innerHTML = `<p class="text-red-500">Error: ${error.message}</p>`;
+            } finally {
+                analyzeBtn.disabled = false;
+            }
+        });
+        window.closeAnalysisModal = () => analysisModal.classList.add('hidden');
+
+
+        // --- INITIAL PAGE LOAD ---
+        renderKPIs();
+        renderTimeline('tab-content-test-prep', {{ test_prep_history | tojson }}, 'purple');
+        renderTimeline('tab-content-college', {{ college_planning_history | tojson }}, 'indigo');
+
+        document.querySelector('.chart-main-btn[data-chart-group="sat"]').click();
+        document.getElementById('tab-btn-test-prep').click();
         });
     </script>
     <script src="https://unpkg.com/aos@2.3.1/dist/aos.js"></script>
-    <script>AOS.init({ once: true, duration: 800 });</script>
+    <script>AOS.init({ once: true, duration: 800, delay: 50 });</script>
     <footer class="text-center p-8 text-sm text-slate-500">
-        <p>
-            <span>&copy; 2025 Mentics. All Rights Reserved.</span>
-            <span class="mx-2">|</span>
-            <a href="{{ url_for('terms') }}" class="hover:text-purple-600 hover:underline">Terms of Service</a>
-            <span class="mx-2">|</span>
-            <a href="{{ url_for('privacy') }}" class="hover:text-purple-600 hover:underline">Privacy Policy</a>
-        </p>
+        <p><span>&copy; 2025 Mentics. All Rights Reserved.</span><span class="mx-2">|</span><a
+                href="{{ url_for('terms') }}" class="hover:text-purple-600 hover:underline">Terms of Service</a><span
+                class="mx-2">|</span><a href="{{ url_for('privacy') }}"
+                class="hover:text-purple-600 hover:underline">Privacy Policy</a></p>
     </footer>
 </body>
 

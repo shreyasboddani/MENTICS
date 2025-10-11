@@ -868,6 +868,113 @@ def _generate_and_save_new_college_path(user_id, college_context, chat_history=[
         print(f"Error in _generate_and_save_new_college_path: {e}")
         return []
 
+# Add this new function inside app.py
+
+
+def _get_tracker_ai_analysis(user):
+    """Generates a comprehensive AI-powered analysis of all user progress."""
+    user_id = user.data['id']
+    stats = user.get_stats()
+
+    # --- Gather All Data Points ---
+    stat_history_summary = _get_stat_history_for_prompt(user_id)
+    quiz_results_summary = _get_quiz_results_for_prompt(user_id)
+
+    all_paths_raw = db.select(
+        "paths", where={"user_id": user_id}, order_by="created_at DESC")
+    path_history_summary = []
+    if all_paths_raw:
+        completed_count = sum(1 for p in all_paths_raw if p['is_completed'])
+        total_count = len(all_paths_raw)
+        path_history_summary.append(
+            f"Overall Task Completion: {completed_count}/{total_count} tasks completed.")
+
+        last_path_date = all_paths_raw[0]['created_at'].split(' ')[0]
+        last_path_category = all_paths_raw[0]['category']
+        path_history_summary.append(
+            f"Most Recent Path: A '{last_path_category}' path generated on {last_path_date}.")
+
+    # Better structured prompt focusing on trends, causes, and 3 actionable steps.
+    prompt = (
+        f"You are an expert education analyst. Produce a concise markdown report for the student.\n\n"
+        f"CONTEXT:\n- Recent score history (latest 20 records):\n{stat_history_summary}\n\n"
+        f"- Recent incorrect quiz examples (up to 5):\n{quiz_results_summary}\n\n"
+        f"- Path/task summary:\n{_get_current_numbered_tasks(user_id, 'Test Prep')}\n{_get_current_numbered_tasks(user_id, 'College Planning')}\n{', '.join(path_history_summary)}\n\n"
+        f"INSTRUCTIONS:\n1) Provide a 3-sentence overall progress snapshot.\n2) List 3 specific strengths with data references.\n3) List 3 specific weaknesses or patterns to address, referencing quiz examples when useful.\n4) Provide 3 prioritized, actionable next steps (short, doable, and measurable).\n5) Suggest one micro-quiz/task the student can do in the next 48 hours.\n6) Keep tone encouraging and avoid technical jargon.\n\n"
+    )
+
+    # If a cloud AI key is available, call the model. Otherwise produce a safe local heuristic summary.
+    if os.getenv("GEMINI_API_KEY"):
+        try:
+            model = genai.GenerativeModel('gemini-2.5-flash')
+            response = model.generate_content(prompt)
+            return response.text
+        except Exception as e:
+            print(f"Error in tracker AI analysis (remote): {e}")
+            # fallthrough to local summary
+
+    # Local fallback: generate a simple heuristic analysis
+    try:
+        # Build simple heuristics from stat_history_summary and quiz_results_summary
+        analysis_lines = []
+        # Snapshot
+        latest_scores = []
+        try:
+            for line in stat_history_summary.splitlines()[:6]:
+                latest_scores.append(line)
+        except Exception:
+            pass
+        analysis_lines.append("### 📈 Progress Snapshot")
+        if latest_scores:
+            analysis_lines.append("""
+Recent notable entries:
+""")
+            analysis_lines.extend([f"- {s}" for s in latest_scores])
+        else:
+            analysis_lines.append("No recent score records available.")
+
+        # Strengths & Weaknesses via simple keyword checks
+        analysis_lines.append("\n### 🏆 Key Strengths")
+        if 'improved' in stat_history_summary.lower() or 'increase' in stat_history_summary.lower():
+            analysis_lines.append(
+                "- Detected improvement trend in at least one metric based on recent records.")
+        else:
+            analysis_lines.append(
+                "- No clear upward trend detected in the recent records.")
+
+        analysis_lines.append("\n### 💡 Areas for Strategic Focus")
+        if quiz_results_summary.strip():
+            analysis_lines.append(
+                "- Several incorrect quiz answers exist; focus on the types of questions shown in those examples.")
+            analysis_lines.append(
+                "- Use short targeted practice sessions on the weakest subtopics.")
+        else:
+            analysis_lines.append(
+                "- No recent incorrect quiz data available to analyze. Consider taking a short diagnostic quiz.")
+
+        analysis_lines.append("\n### 🚀 Recommended Next Steps")
+        analysis_lines.append(
+            "1. Schedule two 45-minute targeted practice sessions this week focusing on the top weak area.")
+        analysis_lines.append(
+            "2. Generate a focused Test Prep path for the weakest subsection.")
+        analysis_lines.append(
+            "3. Take one timed mini-quiz (10 questions) and review incorrect answers within 24 hours.")
+
+        analysis_lines.append("\n### ✏️ Quick Micro-Quiz")
+        analysis_lines.append(
+            "Try a 10-question mixed quiz focusing on the weakest subsection; aim for 80%+ accuracy.")
+
+        return "\n".join(analysis_lines)
+    except Exception as e:
+        print(f"Error in local tracker analysis: {e}")
+        return "AI analysis is currently unavailable. Please try again later."
+
+
+@app.route('/api/tracker-analysis')
+@login_required
+def tracker_analysis(user):
+    analysis_text = _get_tracker_ai_analysis(user)
+    return jsonify({"analysis": analysis_text})
 # --- Standard Routes ---
 
 
@@ -1425,49 +1532,129 @@ def edit_stats(user):
     )
 
 
+# Replace the existing tracker() function in app.py with this one
+
+# Replace the existing tracker() function in app.py with this new, robust version
+
+# Replace the existing tracker() function in app.py with this new, robust version
+
+# Replace the existing tracker() function in app.py with this new, robust version
+
+# Replace the existing tracker() function in app.py with this new, robust version
+
 @app.route("/dashboard/tracker")
 @login_required
 def tracker(user):
     user_id = user.data['id']
-    all_tasks = db.select(
+
+    # --- 1. Comprehensive Stat History Processing ---
+    stat_history_raw = db.select(
+        "stat_history", where={"user_id": user_id}, order_by="recorded_at ASC")
+
+    # A dictionary to hold lists of {"date": d, "value": v} for each stat
+    history_by_stat = {}
+    for record in stat_history_raw:
+        stat_name = record['stat_name']
+        if stat_name not in history_by_stat:
+            history_by_stat[stat_name] = []
+        try:
+            history_by_stat[stat_name].append({
+                "date": record['recorded_at'].split(" ")[0],
+                "value": float(record['stat_value'])
+            })
+        except (ValueError, TypeError):
+            continue  # Skip records with non-numeric values
+
+    # --- 2. Calculate Composite/Total Scores from Sectional History ---
+    # This ensures that practice test totals from the path view are included.
+    sat_scores_by_date = {}
+    for entry in history_by_stat.get('sat_math', []):
+        sat_scores_by_date.setdefault(entry['date'], {})[
+            'math'] = entry['value']
+    for entry in history_by_stat.get('sat_ebrw', []):
+        sat_scores_by_date.setdefault(entry['date'], {})[
+            'ebrw'] = entry['value']
+
+    sat_total_history = history_by_stat.get('sat_total', [])
+    for date, scores in sat_scores_by_date.items():
+        if 'math' in scores and 'ebrw' in scores:
+            total = scores['math'] + scores['ebrw']
+            # Avoid adding duplicate totals for the same day
+            if not any(entry['date'] == date for entry in sat_total_history):
+                sat_total_history.append({"date": date, "value": total})
+
+    if 'sat_total' in history_by_stat:
+        history_by_stat['sat_total'] = sorted(
+            sat_total_history, key=lambda x: x['date'])
+
+    act_scores_by_date = {}
+    for subject in ['act_math', 'act_reading', 'act_science']:
+        for entry in history_by_stat.get(subject, []):
+            act_scores_by_date.setdefault(
+                entry['date'], []).append(entry['value'])
+
+    act_composite_history = history_by_stat.get('act_composite', [])
+    for date, scores in act_scores_by_date.items():
+        if scores:
+            # ACT composite is the average of the sections
+            composite = round(sum(scores) / len(scores))
+            # Avoid adding duplicate composites for the same day
+            if not any(entry['date'] == date for entry in act_composite_history):
+                act_composite_history.append(
+                    {"date": date, "value": composite})
+
+    if 'act_composite' in history_by_stat:
+        history_by_stat['act_composite'] = sorted(
+            act_composite_history, key=lambda x: x['date'])
+
+    # --- 3. KPI Calculation (Most recent, best, improvement) ---
+    kpis = {}
+    stat_names_for_kpi = [
+        "sat_total", "sat_math", "sat_ebrw",
+        "act_composite", "act_math", "act_reading", "act_science",
+        "gpa", "colleges_researched", "applications_submitted"
+    ]
+    for name in stat_names_for_kpi:
+        records = history_by_stat.get(name)
+        if records and len(records) > 0:
+            values = [r['value'] for r in records]
+            kpis[name] = {
+                'latest': values[-1],
+                'best': max(values),
+                'improvement': values[-1] - values[0] if len(values) > 1 else 0
+            }
+
+    # --- 4. Path History Processing (Separated by Category) ---
+    all_tasks_raw = db.select(
         "paths", where={"user_id": user_id}, order_by="created_at DESC")
+
     test_prep_generations, college_planning_generations = {}, {}
 
-    for task in all_tasks:
-        generation_key, category = task['created_at'], task['category']
-        if category == 'Test Prep':
-            if generation_key not in test_prep_generations:
-                test_prep_generations[generation_key] = []
-            test_prep_generations[generation_key].append(task)
-        elif category == 'College Planning':
-            if generation_key not in college_planning_generations:
-                college_planning_generations[generation_key] = []
-            college_planning_generations[generation_key].append(task)
+    for task in all_tasks_raw:
+        gen_key, category = task['created_at'], task['category']
+        target_dict = test_prep_generations if category == 'Test Prep' else college_planning_generations
 
-    stat_history_processed = {
-        "sat_math": [], "sat_ebrw": [], "act_math": [],
-        "act_reading": [], "act_science": [], "colleges_researched": [],
-        "applications_submitted": [], "essay_progress": [],
-        "sat_total": [], "act_composite": []
-    }
-    history_records = db.select(
-        "stat_history", where={"user_id": user_id}, order_by="recorded_at ASC")
-    for record in history_records:
-        stat_name, stat_value, recorded_at = record['stat_name'], record['stat_value'], record['recorded_at']
-        if stat_name in stat_history_processed:
-            try:
-                stat_history_processed[stat_name].append({
-                    # Keep as YYYY-MM-DD for JS
-                    "date": recorded_at.split(" ")[0],
-                    "value": int(stat_value)
-                })
-            except (ValueError, TypeError):
-                continue
+        if gen_key not in target_dict:
+            target_dict[gen_key] = {'date': gen_key,
+                                    'category': category, 'tasks': []}
+        target_dict[gen_key]['tasks'].append(task)
+
+    test_prep_history = sorted(
+        test_prep_generations.values(), key=lambda x: x['date'], reverse=True)
+    for gen in test_prep_history:
+        gen['tasks'].sort(key=lambda x: x['task_order'])
+
+    college_planning_history = sorted(
+        college_planning_generations.values(), key=lambda x: x['date'], reverse=True)
+    for gen in college_planning_history:
+        gen['tasks'].sort(key=lambda x: x['task_order'])
+
     return render_template(
         "tracker.html",
-        stat_history=stat_history_processed,
-        test_prep_generations=test_prep_generations,
-        college_planning_generations=college_planning_generations
+        stat_history=history_by_stat,
+        kpis=kpis,
+        test_prep_history=test_prep_history,
+        college_planning_history=college_planning_history
     )
 # --- API ROUTES ---
 
