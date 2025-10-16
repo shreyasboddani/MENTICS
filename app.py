@@ -1330,7 +1330,7 @@ def dashboard(user):
             "timestamp": activity['created_at']
         })
 
-    # --- Data for Activity Chart (UPDATED FOR TIMEZONE) ---
+    # --- START OF FIX: Data for Activity Chart ---
     user_tz_str = session.get('timezone', 'UTC')
     try:
         user_tz = ZoneInfo(user_tz_str)
@@ -1339,24 +1339,36 @@ def dashboard(user):
 
     today = datetime.now(user_tz).date()
     seven_days_ago = today - timedelta(days=6)
-    activity_counts = {(seven_days_ago + timedelta(days=i)
-                        ).strftime('%a'): 0 for i in range(7)}
+
+    # Use a dictionary with specific dates as keys to avoid ambiguity
+    activity_counts = {}
+    labels = []
+    for i in range(7):
+        current_date = seven_days_ago + timedelta(days=i)
+        labels.append(current_date.strftime('%a'))
+        activity_counts[current_date] = 0
+
     recent_logs = db.execute(
         "SELECT created_at FROM activity_log WHERE user_id = ? AND date(created_at) >= ?",
         (user_id, seven_days_ago.strftime('%Y-%m-%d'))
     )
+
     if recent_logs:
         for log in recent_logs:
             utc_dt = datetime.strptime(
                 log['created_at'], '%Y-%m-%d %H:%M:%S').replace(tzinfo=ZoneInfo("UTC"))
-            user_local_dt = utc_dt.astimezone(user_tz)
-            log_date_str = user_local_dt.strftime('%a')
-            if log_date_str in activity_counts:
-                activity_counts[log_date_str] += 1
+            # Get the date part in the user's local timezone
+            user_local_date = utc_dt.astimezone(user_tz).date()
+
+            # Increment the count for that specific date
+            if user_local_date in activity_counts:
+                activity_counts[user_local_date] += 1
+
     activity_data = {
-        "labels": list(activity_counts.keys()),
+        "labels": labels,
         "data": list(activity_counts.values())
     }
+    # --- END OF FIX ---
 
     # --- Upcoming Test Date Logic ---
     test_date_info = {
