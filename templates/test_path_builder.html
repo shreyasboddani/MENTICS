@@ -13,6 +13,49 @@
     <link href="https://unpkg.com/aos@2.3.1/dist/aos.css" rel="stylesheet">
     <link rel="icon" href="{{ url_for('static', filename='favicon.svg') }}" type="image/svg+xml">
     <link rel="stylesheet" href="{{ url_for('static', filename='dashboard.css') }}">
+    <style>
+        /* Add simple styling for radio button cards */
+        .option-card {
+            display: flex;
+            align-items: center;
+            padding: 0.75rem 1rem;
+            border: 2px solid #e2e8f0;
+            /* slate-200 */
+            border-radius: 0.75rem;
+            cursor: pointer;
+            transition: all 0.2s ease-in-out;
+            gap: 0.5rem;
+        }
+
+        .option-card:hover {
+            border-color: #a78bfa;
+            /* violet-400 */
+            background-color: #f5f3ff;
+            /* violet-50 */
+        }
+
+        .option-card input[type="radio"]:checked+div {
+            border-color: #8b5cf6;
+            /* purple-600 */
+            background-color: #ede9fe;
+            /* purple-100 */
+            box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.2);
+        }
+
+        .option-card input[type="radio"] {
+            appearance: none;
+            /* Hide default radio */
+            position: absolute;
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .score-input-group label {
+            min-width: 80px;
+            /* Align labels */
+        }
+    </style>
 </head>
 
 <body
@@ -37,7 +80,7 @@
         </div>
     </header>
 
-    <main class="w-full max-w-2xl" data-aos="fade-up">
+    <main class="w-full max-w-3xl" data-aos="fade-up">
         <div class="card p-6 md:p-8">
             <div class="text-center mb-6">
                 <h1 class="text-3xl font-bold font-lalezar text-purple-700 mb-2">Test Prep Path Builder</h1>
@@ -45,19 +88,44 @@
             </div>
 
             <form id="path-builder-form" method="POST">
-                <div class="space-y-5">
+                <div class="space-y-6">
+
+                    <div>
+                        <label class="block text-sm font-semibold text-slate-700 mb-2">Which test(s) are you preparing
+                            for?</label>
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <label class="option-card">
+                                <input type="radio" name="test_focus" value="sat" {% if test_focus=='sat' %}checked{%
+                                    endif %} required>
+                                <div class="w-full text-center p-2 rounded-lg border-2 border-transparent">SAT Only
+                                </div>
+                            </label>
+                            <label class="option-card">
+                                <input type="radio" name="test_focus" value="act" {% if test_focus=='act' %}checked{%
+                                    endif %}>
+                                <div class="w-full text-center p-2 rounded-lg border-2 border-transparent">ACT Only
+                                </div>
+                            </label>
+                            <label class="option-card">
+                                <input type="radio" name="test_focus" value="both" {% if test_focus=='both' %}checked{%
+                                    endif %}>
+                                <div class="w-full text-center p-2 rounded-lg border-2 border-transparent">Both SAT &
+                                    ACT</div>
+                            </label>
+                        </div>
+                    </div>
 
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
                             <label class="block text-sm font-semibold text-slate-700 mb-1" for="desired_sat">Desired SAT
-                                Score</label>
+                                Score <span class="text-slate-400 font-normal">(400-1600)</span></label>
                             <input type="number" min="400" max="1600" step="10" id="desired_sat" name="desired_sat"
                                 class="w-full bg-white/50 border border-slate-300/70 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition"
                                 placeholder="e.g., 1500" value="{{ desired_sat }}">
                         </div>
                         <div>
                             <label class="block text-sm font-semibold text-slate-700 mb-1" for="desired_act">Desired ACT
-                                Score</label>
+                                Score <span class="text-slate-400 font-normal">(1-36)</span></label>
                             <input type="number" min="1" max="36" id="desired_act" name="desired_act"
                                 class="w-full bg-white/50 border border-slate-300/70 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition"
                                 placeholder="e.g., 34" value="{{ desired_act }}">
@@ -65,34 +133,75 @@
                     </div>
 
                     <div>
+                        <label class="block text-sm font-semibold text-slate-700 mb-2">Current Scores <span
+                                class="text-slate-400 font-normal">(Optional, if known)</span></label>
+                        <div class="space-y-3 bg-slate-50/50 p-4 rounded-lg border border-slate-200/80">
+                            <div class="flex items-center gap-3 score-input-group">
+                                <label for="current_sat_ebrw" class="text-sm text-slate-600">SAT EBRW:</label>
+                                <input type="number" min="200" max="800" step="10" id="current_sat_ebrw"
+                                    name="current_sat_ebrw" value="{{ current_sat_ebrw }}" placeholder="200-800"
+                                    class="flex-1 bg-white/50 border border-slate-300/70 rounded-lg p-2 text-sm focus:ring-1 focus:ring-purple-500">
+                                <label for="current_sat_math" class="text-sm text-slate-600 ml-4">SAT Math:</label>
+                                <input type="number" min="200" max="800" step="10" id="current_sat_math"
+                                    name="current_sat_math" value="{{ current_sat_math }}" placeholder="200-800"
+                                    class="flex-1 bg-white/50 border border-slate-300/70 rounded-lg p-2 text-sm focus:ring-1 focus:ring-purple-500">
+                            </div>
+                            <div class="flex items-center gap-3 score-input-group">
+                                <label for="current_act_composite" class="text-sm text-slate-600">ACT Comp:</label>
+                                <input type="number" min="1" max="36" id="current_act_composite"
+                                    name="current_act_composite" value="{{ current_act_composite }}" placeholder="1-36"
+                                    class="flex-1 bg-white/50 border border-slate-300/70 rounded-lg p-2 text-sm focus:ring-1 focus:ring-purple-500">
+                                <span class="text-slate-400 text-xs">(Or enter section scores below)</span>
+                            </div>
+                            <div class="flex items-center gap-3 score-input-group">
+                                <label for="current_act_math" class="text-sm text-slate-600">ACT Math:</label>
+                                <input type="number" min="1" max="36" id="current_act_math" name="current_act_math"
+                                    value="{{ current_act_math }}" placeholder="1-36"
+                                    class="flex-1 bg-white/50 border border-slate-300/70 rounded-lg p-2 text-sm focus:ring-1 focus:ring-purple-500">
+                                <label for="current_act_reading" class="text-sm text-slate-600 ml-4">ACT Read:</label>
+                                <input type="number" min="1" max="36" id="current_act_reading"
+                                    name="current_act_reading" value="{{ current_act_reading }}" placeholder="1-36"
+                                    class="flex-1 bg-white/50 border border-slate-300/70 rounded-lg p-2 text-sm focus:ring-1 focus:ring-purple-500">
+                                <label for="current_act_science" class="text-sm text-slate-600 ml-4">ACT Sci:</label>
+                                <input type="number" min="1" max="36" id="current_act_science"
+                                    name="current_act_science" value="{{ current_act_science }}" placeholder="1-36"
+                                    class="flex-1 bg-white/50 border border-slate-300/70 rounded-lg p-2 text-sm focus:ring-1 focus:ring-purple-500">
+                            </div>
+                        </div>
+                    </div>
+
+                    <div>
                         <label class="block text-sm font-semibold text-slate-700 mb-1" for="strengths">Strengths</label>
                         <textarea id="strengths" name="strengths" rows="3"
                             class="w-full bg-white/50 border border-slate-300/70 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition"
-                            placeholder="What are you good at? (e.g., Algebra, Reading Comprehension)">{{ strengths }}</textarea>
+                            placeholder="What specific topics or question types are you good at? (e.g., Algebra, Reading Comprehension, Punctuation)">{{ strengths }}</textarea>
                     </div>
 
                     <div>
                         <label class="block text-sm font-semibold text-slate-700 mb-1"
                             for="weaknesses">Weaknesses</label>
-                        <textarea id="weaknesses" name="weaknesses" rows="3"
+                        <textarea id="weaknesses" name="weaknesses" rows="3" required
                             class="w-full bg-white/50 border border-slate-300/70 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition"
-                            placeholder="What do you need to work on? (e.g., Geometry, Punctuation Rules)">{{ weaknesses }}</textarea>
+                            placeholder="What specific topics or question types do you need to work on? (e.g., Geometry, Vocab-in-Context, Data Interpretation)">{{ weaknesses }}</textarea>
+                        <p class="text-xs text-slate-500 mt-1">Be specific! This helps the AI create the best path for
+                            you.</p>
                     </div>
 
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
-                            <label class="block text-sm font-semibold text-slate-700 mb-1" for="test_date">Test
-                                Date</label>
+                            <label class="block text-sm font-semibold text-slate-700 mb-1" for="test_date">Official Test
+                                Date <span class="text-slate-400 font-normal">(Optional)</span></label>
                             <input type="date" id="test_date" name="test_date"
                                 class="w-full bg-white/50 border border-slate-300/70 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition"
                                 value="{{ test_date }}">
                         </div>
                         <div>
-                            <label class="block text-sm font-semibold text-slate-700 mb-1" for="test_time">Test
-                                Time</label>
-                            <input type="time" id="test_time" name="test_time"
+                            <label class="block text-sm font-semibold text-slate-700 mb-1"
+                                for="hours_per_week">Hours/Week for Prep <span
+                                    class="text-slate-400 font-normal">(Estimate)</span></label>
+                            <input type="number" min="1" max="40" id="hours_per_week" name="hours_per_week"
                                 class="w-full bg-white/50 border border-slate-300/70 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition"
-                                value="{{ test_time }}">
+                                placeholder="e.g., 5" value="{{ hours_per_week }}">
                         </div>
                     </div>
                 </div>
@@ -118,15 +227,54 @@
             once: true,
             duration: 800
         });
-        // --- START OF THE FIX ---
         localStorage.setItem('hasTestPath', 'false');
-        // --- END OF THE FIX ---
 
-        document.getElementById('path-builder-form').addEventListener('submit', function () {
+        document.getElementById('path-builder-form').addEventListener('submit', function (e) {
+            // Basic validation: Ensure at least one desired score is entered if focusing on that test
+            const focus = document.querySelector('input[name="test_focus"]:checked').value;
+            const desiredSat = document.getElementById('desired_sat').value;
+            const desiredAct = document.getElementById('desired_act').value;
+
+            if ((focus === 'sat' || focus === 'both') && !desiredSat) {
+                alert('Please enter a desired SAT score.');
+                e.preventDefault();
+                return;
+            }
+            if ((focus === 'act' || focus === 'both') && !desiredAct) {
+                alert('Please enter a desired ACT score.');
+                e.preventDefault();
+                return;
+            }
+
+            // Show loader if validation passes
             const loader = document.getElementById('builder-loader-overlay');
             loader.style.display = 'flex';
             setTimeout(() => loader.classList.add('visible'), 10);
         });
+
+        // Add event listeners to radio buttons to update selection style
+        document.querySelectorAll('.option-card input[type="radio"]').forEach(radio => {
+            radio.addEventListener('change', () => {
+                document.querySelectorAll('.option-card').forEach(card => {
+                    card.querySelector('div').classList.remove('selected', 'border-purple-600', 'bg-purple-100');
+                    card.querySelector('div').classList.add('border-transparent');
+                });
+                if (radio.checked) {
+                    const parentCard = radio.closest('.option-card').querySelector('div');
+                    parentCard.classList.add('selected', 'border-purple-600', 'bg-purple-100');
+                    parentCard.classList.remove('border-transparent');
+                }
+            });
+        });
+
+        // Initialize radio button styles on page load if a value is pre-selected
+        const checkedRadio = document.querySelector('.option-card input[type="radio"]:checked');
+        if (checkedRadio) {
+            const parentCardDiv = checkedRadio.closest('.option-card').querySelector('div');
+            parentCardDiv.classList.add('selected', 'border-purple-600', 'bg-purple-100');
+            parentCardDiv.classList.remove('border-transparent');
+        }
+
     </script>
     <footer class="text-center p-8 text-sm text-slate-500">
         <p>

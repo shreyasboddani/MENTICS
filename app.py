@@ -389,12 +389,13 @@ def _get_sprint_results_for_prompt(user_id):
     return "\n".join(summary)
 
 
-def _get_test_prep_ai_tasks(strengths, weaknesses, user_stats={}, chat_history=[], path_history={}, stat_history="", quiz_results="", sprint_results=""):
-    """Generates hyper-intelligent, adaptive test prep tasks, now including interactive Practice Sprints and Strategy Articles."""
+def _get_test_prep_ai_tasks(strengths, weaknesses, test_focus, current_scores={}, desired_scores={}, test_date_str=None, hours_per_week=None, chat_history=[], path_history={}, stat_history="", quiz_results="", sprint_results=""):
+    """Generates hyper-intelligent, adaptive test prep tasks, now including interactive Practice Sprints, Strategy Articles, and better context."""
 
     def get_mock_tasks_reliably():
         """A fallback function to provide tasks if the AI service is unavailable."""
         print("--- DEBUG: Running fallback mock task generator for Test Prep. ---")
+        # (Keep the fallback content the same as before)
         return [
             {"task_format": "link", "description": "Take a full-length, timed SAT practice test from the [official College Board site](https://satsuite.collegeboard.org/sat/practice-preparation/practice-tests).",
              "reason": "This is a 'boss battle' to test your skills under pressure.", "type": "milestone", "stat_to_update": "sat_total", "category": "Test Prep", "difficulty": "hard"},
@@ -414,8 +415,8 @@ def _get_test_prep_ai_tasks(strengths, weaknesses, user_stats={}, chat_history=[
     latest_user_message = next((msg['content'] for msg in reversed(
         chat_history) if msg['role'] == 'user'), "N/A")
 
-    test_date_info = "Not set by the student."
-    test_date_str = user_stats.get("test_path", {}).get("test_date")
+    # --- Test Date Formatting ---
+    test_date_info = "Not set."
     if test_date_str:
         try:
             user_tz = ZoneInfo(session.get('timezone', 'UTC'))
@@ -427,7 +428,48 @@ def _get_test_prep_ai_tasks(strengths, weaknesses, user_stats={}, chat_history=[
             else:
                 test_date_info = f"on {formatted_date} (this date has passed)"
         except (ValueError, ZoneInfoNotFoundError):
-            test_date_info = "in an invalid format."
+            test_date_info = "Invalid date format."
+
+    # --- Format Current Scores for Prompt ---
+    current_scores_formatted = []
+    if current_scores.get("current_sat_ebrw"):
+        current_scores_formatted.append(
+            f"SAT EBRW: {current_scores['current_sat_ebrw']}")
+    if current_scores.get("current_sat_math"):
+        current_scores_formatted.append(
+            f"SAT Math: {current_scores['current_sat_math']}")
+    if current_scores.get("current_act_composite"):
+        current_scores_formatted.append(
+            f"ACT Composite: {current_scores['current_act_composite']}")
+    if current_scores.get("current_act_math"):
+        current_scores_formatted.append(
+            f"ACT Math: {current_scores['current_act_math']}")
+    if current_scores.get("current_act_reading"):
+        current_scores_formatted.append(
+            f"ACT Reading: {current_scores['current_act_reading']}")
+    if current_scores.get("current_act_science"):
+        current_scores_formatted.append(
+            f"ACT Science: {current_scores['current_act_science']}")
+    current_scores_str = ", ".join(
+        current_scores_formatted) if current_scores_formatted else "Not provided"
+
+    # --- Format Desired Scores for Prompt ---
+    desired_scores_formatted = []
+    if desired_scores.get("desired_sat"):
+        desired_scores_formatted.append(
+            f"SAT: {desired_scores['desired_sat']}")
+    if desired_scores.get("desired_act"):
+        desired_scores_formatted.append(
+            f"ACT: {desired_scores['desired_act']}")
+    desired_scores_str = ", ".join(
+        desired_scores_formatted) if desired_scores_formatted else "Not specified"
+
+    # --- Determine Test Focus Description ---
+    focus_desc = "SAT"
+    if test_focus == 'act':
+        focus_desc = "ACT"
+    elif test_focus == 'both':
+        focus_desc = "both SAT and ACT"
 
     prompt = (
         f"# MISSION\n"
@@ -439,10 +481,14 @@ def _get_test_prep_ai_tasks(strengths, weaknesses, user_stats={}, chat_history=[
         f"3.  **Standard Generation:** Otherwise, generate a standard path that builds on their history.\n\n"
 
         f"# STUDENT ANALYSIS DATA\n"
+        f"- **Primary Test Focus:** {focus_desc}\n"  # NEW
         f"- Strengths: {strengths}\n"
-        f"- Weaknesses: {weaknesses}\n"
-        f"- Test Date: {test_date_info}\n"
-        f"- Current Scores: SAT Math {user_stats.get('sat_math', 'N/A')}, SAT EBRW {user_stats.get('sat_ebrw', 'N/A')}, ACT Composite {user_stats.get('act_average', 'N/A')}\n\n"
+        f"- Weaknesses: {weaknesses} <== **Base your tasks primarily on these specific weaknesses.**\n"
+        f"- **Current Scores (Baseline):** {current_scores_str}\n"  # NEW
+        f"- Desired Scores: {desired_scores_str}\n"  # Updated
+        f"- Official Test Date: {test_date_info}\n"  # Updated
+        # NEW
+        f"- Estimated Weekly Study Time: {hours_per_week or 'Not specified'} hours\n\n"
 
         f"## HISTORICAL & CONVERSATIONAL CONTEXT\n"
         f"- **Most Recent User Request:** '{latest_user_message}'\n"
@@ -456,7 +502,8 @@ def _get_test_prep_ai_tasks(strengths, weaknesses, user_stats={}, chat_history=[
         f"## RECENT PRACTICE SPRINT PERFORMANCE (Incorrect Answers)\n"
         f"This shows specific questions the user recently got wrong on FOCUSED sprints. This is the most important data for identifying specific skill gaps.\n{sprint_results}\n\n"
 
-        f"# YOUR TASK: GENERATE THE NEW 5-STEP PLAN\n"
+        f"# YOUR TASK: GENERATE THE NEW 5-STEP PLAN(for {focus_desc.upper()})\n"
+        f"- **Focus on {focus_desc.upper()}:** All content, examples, and resources MUST be relevant to the chosen test format(s).\n"
         f"- **Task Format Logic (Crucial!):** You must differentiate between passive learning and active practice. \n"
         f"  - If a task involves **actively solving problems or answering questions or mastering a math concept or advancing/consolidating knowlege **, it MUST be a `practice_sprint`.\n"
         f"  - If a task involves **reading articles, or watching content on yt or using external resources**, it MUST be a `link`, `strategy`, or `review` task.\n"
@@ -517,44 +564,73 @@ def _get_test_prep_ai_tasks(strengths, weaknesses, user_stats={}, chat_history=[
     )
     try:
         model = genai.GenerativeModel(
-            'gemini-2.5-flash',
+            'gemini-2.5-flash',  # Using 2.5-flash as it's generally good with JSON
             generation_config={"response_mime_type": "application/json"}
         )
         response = model.generate_content(prompt)
-        # Robust parsing: some model responses can contain stray control characters
-        # or extra surrounding text. Try a few strategies before failing:
+
         response_data = None
-        # 1) If the response object has a .json() method, prefer that
-        try:
-            if hasattr(response, 'json'):
-                response_data = response.json()
-        except Exception:
-            response_data = None
-
         raw_text = None
-        # 2) Pull raw text from common attributes
-        if response_data is None:
-            raw_text = getattr(response, 'text', None) or getattr(
-                response, 'content', None) or str(response)
-            # sanitize non-printable control characters except common whitespace
-            import re
-            # Remove control chars in ranges that break json parsing, keep \n, \r, \t
-            cleaned = re.sub(r'[\x00-\x08\x0b\x0c\x0e-\x1f]', '', raw_text)
-            # Try to extract the first JSON object/array-looking substring
-            m = re.search(r'([\[{].*[\]}])', cleaned, re.S)
-            if m:
-                candidate = m.group(1)
-            else:
-                candidate = cleaned
-            try:
-                response_data = json.loads(candidate)
-            except Exception as e:
-                # Final attempt: try to be permissive and report a clear error
-                raise ValueError(
-                    f"Failed to parse AI JSON response: {e}\nRaw response (first 2000 chars): {candidate[:2000]}")
 
+        # Try to access the text content reliably
+        try:
+            # The structure might vary slightly depending on the exact Gemini library version
+            if hasattr(response, 'text'):
+                raw_text = response.text
+            elif hasattr(response, 'parts') and response.parts:
+                # Handle potential streaming or multi-part responses if applicable
+                raw_text = "".join(
+                    part.text for part in response.parts if hasattr(part, 'text'))
+            elif hasattr(response, 'content') and hasattr(response.content, 'parts') and response.content.parts:
+                raw_text = "".join(
+                    part.text for part in response.content.parts if hasattr(part, 'text'))
+            else:
+                # Fallback to string representation if unsure
+                raw_text = str(response)
+        except Exception as e:
+            print(f"--- Error accessing Gemini response text: {e} ---")
+            raw_text = str(response)  # Fallback again
+
+        if not raw_text:
+            raise ValueError(
+                "AI response was empty or text could not be extracted.")
+
+        # Clean the raw text FIRST
+        import re
+        # Remove control characters that are invalid in JSON, keep \n, \r, \t
+        # Expanded range to catch potential issues like the one reported
+        cleaned_text = re.sub(
+            r'[\x00-\x08\x0b\x0c\x0e-\x1f\x7f-\x9f]', '', raw_text)
+
+        # Attempt to parse the cleaned text
+        try:
+            # Attempt direct parsing first, as the mime_type should ensure it's JSON
+            response_data = json.loads(cleaned_text)
+        except json.JSONDecodeError as direct_e:
+            # If direct parsing fails, try extracting the JSON part (more robust fallback)
+            print(
+                f"--- Direct JSON parsing failed: {direct_e}. Attempting extraction... ---")
+            # Look for the outermost '{...}' or '[...]' structure
+            match = re.search(
+                r'^\s*(\{.*\}|\[.*\])\s*$', cleaned_text, re.DOTALL)
+            if match:
+                json_candidate = match.group(1)
+                try:
+                    response_data = json.loads(json_candidate)
+                    print("--- Successfully parsed extracted JSON. ---")
+                except json.JSONDecodeError as extract_e:
+                    # If even extraction fails, raise the original error with context
+                    raise ValueError(
+                        f"Failed to parse cleaned AI JSON response even after extraction: {extract_e}\nCleaned text (first 2000 chars): {cleaned_text[:2000]}") from extract_e
+            else:
+                # If no JSON structure is found after cleaning
+                raise ValueError(
+                    f"No valid JSON structure found in the cleaned AI response.\nCleaned text (first 2000 chars): {cleaned_text[:2000]}") from direct_e
+
+        # --- (Proceed with task extraction and normalization as before) ---
         tasks = response_data.get("tasks", [])
 
+        # (Normalization logic remains the same - reusing the existing robust code block)
         def looks_like_practice(desc):
             if not desc:
                 return False
@@ -563,168 +639,116 @@ def _get_test_prep_ai_tasks(strengths, weaknesses, user_stats={}, chat_history=[
             desc_l = desc.lower()
             return any(k in desc_l for k in kws)
 
+        # ... (rest of the normalization helper functions: make_mock_sprint, make_strategy_article, make_mock_quiz) ...
         def make_mock_sprint(skill):
-            questions = []
-            for qi in range(5):
-                questions.append({
-                    'question_text': f"SAT-style practice {qi+1} on {skill}: Create or attempt one focused question targeting {skill}.",
-                    'options': ['A', 'B', 'C', 'D'],
-                    'correct_option': 0,
-                    'explanation': f"Walkthrough: key steps to solve this kind of {skill} question."
-                })
+            questions = [{'question_text': f"SAT/ACT practice {qi+1} on {skill}.", 'options': ['A', 'B',
+                                                                                               'C', 'D'], 'correct_option': 0, 'explanation': f"Key steps for {skill}."} for qi in range(5)]
             return {'title': f"Practice Sprint: {skill}", 'questions': questions}
 
         def make_strategy_article(skill, weakness_note):
-            title = f"Strategies to Master {skill}"
-            content = (
-                f"# {title}\n\n"
-                f"This short guide explains how to master {skill}.\n\n"
-                f"1. Identify common traps and misconceptions for {skill}.\n"
-                f"2. Practice targeted problems that force you to apply the concept under time pressure.\n"
-                f"3. After each question, immediately review the explanation and note one actionable takeaway.\n\n"
-                f"Why this matters: {weakness_note or 'This skill was flagged as a weakness.'}\n"
-            )
+            title = f"Strategies for {skill}"
+            content = f"# {title}\n\nHow to master {skill}.\n\n1. Key concept.\n2. Common trap.\n3. Strategy.\n\nWhy: {weakness_note or 'Improvement needed.'}"
             return {'title': title, 'content': content}
 
         def make_mock_quiz(topic):
-            """Generate a simple cumulative quiz (5-10 questions) as a fallback."""
-            import random
-            num_q = 7
-            questions = []
-            for qi in range(num_q):
-                questions.append({
-                    'question_text': f"Cumulative quiz question {qi+1} on {topic}: Create or attempt a representative SAT-style question targeting {topic}.",
-                    'options': ['A', 'B', 'C', 'D'],
-                    'correct_option': 0,
-                    'explanation': f"Solution outline: how to approach this type of {topic} problem."
-                })
+            questions = [{'question_text': f"Quiz question {qi+1} on {topic}.", 'options': ['A', 'B',
+                                                                                            'C', 'D'], 'correct_option': 0, 'explanation': f"Solution for {topic}."} for qi in range(7)]
             return {'title': f"Cumulative Quiz: {topic}", 'questions': questions}
 
-        # normalize each task
         normalized = []
+        # (The normalization loop remains exactly the same as before)
         for t in tasks if isinstance(tasks, list) else []:
             try:
+                # ... (entire normalization logic for each task 't') ...
                 if not isinstance(t, dict):
                     continue
                 desc = t.get('description', '') or ''
-                # ensure category
-                t['category'] = 'Test Prep'
+                t['category'] = 'Test Prep'  # Ensure category
+                inferred_format = t.get('task_format') or (
+                    'practice_sprint' if looks_like_practice(desc) else 'link')
+                t['task_format'] = inferred_format
 
-                # If AI didn't set a task_format, infer it
-                inferred_format = t.get('task_format') or ''
-                if not inferred_format:
-                    inferred_format = 'practice_sprint' if looks_like_practice(
-                        desc) else 'link'
-                    t['task_format'] = inferred_format
-
-                # Make passive reading/watch tasks more specific
-                # Also ensure that explicit 'strategy' or 'review' tasks stay as strategy guides (not converted to practice sprints)
                 skip_practice = False
                 if t['task_format'] in ('link', 'strategy', 'review'):
                     if len(desc) < 40 and t['task_format'] == 'link':
                         main_weak = (weaknesses.split(',')[0].strip(
                         ) if weaknesses else '') or 'your weakest subskill'
                         t['description'] = desc.strip(
-                        ) + f" Specifically: read a focused article or watch a Khan Academy video about {main_weak} and summarize 3 key strategies you learned."
-
-                    # If the AI explicitly marked this as a strategy/review task, ensure a strategy_article exists
+                        ) + f" Read/watch content on {main_weak} & summarize 3 key strategies."
                     if t['task_format'] in ('strategy', 'review'):
                         skip_practice = True
-                        # infer topic/skill
-                        topic = None
-                        if weaknesses:
-                            topic = weaknesses.split(',')[0].strip()
-                        if not topic:
-                            topic = desc.split(
-                                ' on ')[-1].split('.')[0][:40].strip() or 'strategies'
+                        topic = (weaknesses.split(',')[0].strip() if weaknesses else '') or desc.split(
+                            ' on ')[-1].split('.')[0][:40].strip() or 'strategies'
                         if not t.get('strategy_article'):
-                            t['strategy_article'] = make_strategy_article(topic, t.get(
-                                'reason') or f"This guide focuses on {topic} based on user history.")
-                        # Remove any accidental sprint content to avoid confusion
-                        if t.get('sprint_content'):
-                            t.pop('sprint_content', None)
+                            t['strategy_article'] = make_strategy_article(
+                                topic, t.get('reason') or f"Focus on {topic}.")
+                        t.pop('sprint_content', None)
 
-                # Force practice tasks to include sprint_content and strategy_article
-                # Skip if we already decided this is a strategy/review guide
                 if (not skip_practice) and (t['task_format'] == 'practice_sprint' or looks_like_practice(desc)):
                     t['task_format'] = 'practice_sprint'
-                    # infer skill from description or weaknesses
-                    skill = None
-                    if weaknesses:
-                        skill = weaknesses.split(',')[0].strip()
-                    if not skill:
-                        # try to extract a short phrase from description
-                        skill = desc.split(
-                            ' on ')[-1].split('.')[0][:40].strip() or 'targeted skill'
-
+                    skill = (weaknesses.split(',')[0].strip() if weaknesses else '') or desc.split(
+                        ' on ')[-1].split('.')[0][:40].strip() or 'targeted skill'
                     if not t.get('sprint_content'):
                         t['sprint_content'] = make_mock_sprint(skill)
-
                     if not t.get('strategy_article'):
-                        t['strategy_article'] = make_strategy_article(skill, t.get(
-                            'reason') or f"This targets {skill} based on user history.")
+                        t['strategy_article'] = make_strategy_article(
+                            skill, t.get('reason') or f"Target {skill}.")
 
-                # Ensure quiz tasks are fully-formed cumulative quizzes
                 desc_l = desc.lower()
-                if t.get('task_format') == 'quiz' or any(k in desc_l for k in ('quiz', 'cumulative review', 'cumulative')):
+                if t.get('task_format') == 'quiz' or any(k in desc_l for k in ('quiz', 'cumulative')):
                     t['task_format'] = 'quiz'
-                    # infer quiz topic from weaknesses or description
-                    quiz_topic = None
-                    if weaknesses:
-                        quiz_topic = weaknesses.split(',')[0].strip()
-                    if not quiz_topic:
-                        # fallback to extracting a short phrase
-                        quiz_topic = desc.split(
-                            ' on ')[-1].split('.')[0][:40].strip() or 'mixed topics'
+                    quiz_topic = (weaknesses.split(',')[0].strip() if weaknesses else '') or desc.split(
+                        ' on ')[-1].split('.')[0][:40].strip() or 'mixed topics'
                     if not t.get('quiz_content'):
                         t['quiz_content'] = make_mock_quiz(quiz_topic)
 
-                # Boss Battle normalization: ensure milestone instructs a full-length official practice test
                 if 'boss battle' in desc.lower() or desc.startswith('Boss Battle'):
-                    # Force milestone
                     t['type'] = 'milestone'
-                    # Ensure description clearly instructs taking a full-length, timed test on an official platform
-                    preferred_test = 'SAT'
-                    if user_stats.get('desired_act'):
-                        preferred_test = 'ACT'
-                    # Choose stat to update based on preferred test
+                    preferred_test = 'SAT' if test_focus != 'act' else 'ACT'
                     stat_map = {'SAT': 'sat_total', 'ACT': 'act_composite'}
-                    t['stat_to_update'] = stat_map.get(preferred_test, None)
-
-                    # Ensure the description starts with 'Boss Battle:' and includes a recommended resource
-                    resource_hint = 'Take a full-length, timed official practice test (e.g., College Board Bluebook or an official digital practice platform).'
-                    # Add a helpful link to College Board practice tests for SAT as a safe default
-                    cb_link = 'https://satsuite.collegeboard.org/sat/practice-preparation/practice-tests'
-                    if preferred_test == 'ACT':
-                        resource_hint = 'Take a full-length, timed official ACT practice test on a trusted platform.'
-                        cb_link = ''
-
-                    # Normalize the description
+                    t['stat_to_update'] = stat_map.get(preferred_test)
+                    resource_hint = f'Take a full-length, timed official {preferred_test} practice test (e.g., College Board Bluebook for SAT, official ACT platform).'
+                    cb_link = 'https://satsuite.collegeboard.org/sat/practice-preparation/practice-tests' if preferred_test == 'SAT' else ''
+                    act_link = 'https://www.act.org/content/act/en/products-and-services/the-act/test-preparation/free-act-test-prep.html' if preferred_test == 'ACT' else ''  # Example ACT link
+                    link_md = f" [Official Practice]({cb_link or act_link})" if (
+                        cb_link or act_link) else ""
+                    norm_desc = f"Boss Battle: {resource_hint}{link_md}"
                     if not desc.startswith('Boss Battle:'):
-                        t['description'] = f"Boss Battle: {resource_hint} {('[College Board practice tests](' + cb_link + ')') if cb_link else ''}"
-                    else:
-                        # ensure resource hint is present
-                        if resource_hint.lower() not in desc.lower():
-                            t['description'] = desc.strip() + ' ' + \
-                                resource_hint
+                        t['description'] = norm_desc
+                    elif resource_hint.lower() not in desc.lower():
+                        t['description'] = desc.strip() + ' ' + \
+                            resource_hint + link_md
 
-                # Validate milestone stat_to_update
                 if t.get('type') == 'milestone':
                     valid_stats = ['sat_math', 'sat_ebrw', 'sat_total',
                                    'act_math', 'act_reading', 'act_science', 'act_composite']
                     if t.get('stat_to_update') not in valid_stats:
                         t['stat_to_update'] = None
-
                 normalized.append(t)
-            except Exception:
-                continue
+            except Exception as norm_e:
+                print(
+                    f"--- Error normalizing task: {norm_e} --- Task data: {t}")
+                continue  # Skip problematic task
 
         if isinstance(normalized, list) and len(normalized) > 0:
             return normalized
-        raise ValueError(
-            "Invalid format from AI or normalization produced no tasks")
+        elif isinstance(normalized, list) and len(normalized) == 0 and tasks:
+            print("--- WARNING: Normalization removed all tasks. Falling back. ---")
+            return get_mock_tasks_reliably()  # Fallback if normalization failed badly
+        else:  # tasks might not have been a list or was empty
+            raise ValueError(
+                "AI response did not contain a valid 'tasks' list or normalization produced no tasks")
+
+    # --- ***** END OF CORRECTED PARSING LOGIC ***** ---
     except Exception as e:
-        print(f"\n--- GEMINI API ERROR IN _get_test_prep_ai_tasks: {e} ---\n")
+        # General catch-all for API errors or unexpected issues
+        print(
+            f"\n--- GEMINI API OR PROCESSING ERROR IN _get_test_prep_ai_tasks: {e} ---\n")
+        # Ensure raw_text is defined for logging, even if extraction failed earlier
+        if 'raw_text' not in locals():
+            raw_text = "Raw text extraction failed."
+        print(
+            f"--- Raw Response (if available, first 500 chars): {str(raw_text)[:500]} ---")
         return get_mock_tasks_reliably()
 
 
@@ -794,10 +818,32 @@ def submit_sprint_results(user):
 
 def _generate_and_save_new_test_path(user_id, test_path_info, chat_history=[]):
     user_record = db.select_one("users", where={"id": user_id})
-    user_stats = json.loads(user_record['stats']) if user_record else {}
+    user_stats = json.loads(user_record['stats']) if user_record else {
+    }  # Load main stats like GPA
+
+    # Extract info from test_path_info (which now contains more fields)
     strengths = test_path_info.get("strengths", "")
     weaknesses = test_path_info.get("weaknesses", "")
+    # Default to SAT if not provided
+    test_focus = test_path_info.get("test_focus", "sat")
+    test_date_str = test_path_info.get("test_date")
+    hours_per_week = test_path_info.get("hours_per_week")
 
+    # Group current and desired scores for clarity
+    current_scores = {
+        "current_sat_ebrw": test_path_info.get("current_sat_ebrw"),
+        "current_sat_math": test_path_info.get("current_sat_math"),
+        "current_act_composite": test_path_info.get("current_act_composite"),
+        "current_act_math": test_path_info.get("current_act_math"),
+        "current_act_reading": test_path_info.get("current_act_reading"),
+        "current_act_science": test_path_info.get("current_act_science"),
+    }
+    desired_scores = {
+        "desired_sat": test_path_info.get("desired_sat"),
+        "desired_act": test_path_info.get("desired_act"),
+    }
+
+    # (Path history fetching remains the same)
     all_tasks = db.select(
         "paths", where={"user_id": user_id, "category": "Test Prep"})
     path_history = {
@@ -805,23 +851,39 @@ def _generate_and_save_new_test_path(user_id, test_path_info, chat_history=[]):
         "incomplete": [t for t in all_tasks if not t['is_completed']]
     }
 
-    # Fetch all context data
+    # (Context data fetching remains the same)
     stat_history = _get_stat_history_for_prompt(user_id)
     quiz_results = _get_quiz_results_for_prompt(user_id)
-    sprint_results = _get_sprint_results_for_prompt(user_id)
+    sprint_results = _get_sprint_results_for_prompt(
+        user_id)  # Ensure this line exists
 
+    # Deactivate old path
     db.update("paths", {"is_active": False}, where={
               "user_id": user_id, "category": "Test Prep", "is_active": True})
 
-    tasks = _get_test_prep_ai_tasks(strengths, weaknesses, user_stats,
-                                    chat_history, path_history, stat_history, quiz_results, sprint_results)
-    tasks = tasks[:5]
+    # ***** UPDATED CALL *****
+    tasks = _get_test_prep_ai_tasks(
+        strengths=strengths,
+        weaknesses=weaknesses,
+        test_focus=test_focus,  # Pass the new focus
+        current_scores=current_scores,  # Pass current scores
+        desired_scores=desired_scores,  # Pass desired scores
+        test_date_str=test_date_str,  # Pass test date
+        hours_per_week=hours_per_week,  # Pass hours
+        chat_history=chat_history,
+        path_history=path_history,
+        stat_history=stat_history,
+        quiz_results=quiz_results,
+        sprint_results=sprint_results
+    )
+    # ***** END UPDATED CALL *****
 
+    tasks = tasks[:5]  # Limit to 5 tasks
+
+    # (Saving tasks logic remains the same, including quizzes, sprints, articles)
     saved_tasks = []
     for i, task in enumerate(tasks):
         task_format = task.get("task_format", "link")
-
-        # Insert the base task first to get an ID
         task_id = db.insert("paths", {
             "user_id": user_id, "task_order": i + 1, "description": task.get("description"),
             "reason": task.get("reason"), "type": task.get("type"), "stat_to_update": task.get("stat_to_update"),
@@ -838,18 +900,13 @@ def _generate_and_save_new_test_path(user_id, test_path_info, chat_history=[]):
                       where={"id": task_id})
 
         elif task_format == 'practice_sprint' and task.get('sprint_content') and task.get('strategy_article'):
-            # Save the sprint
             sprint_id = db.insert("practice_sprints", {
                                   "task_id": task_id, "title": task['sprint_content'].get("title", "Practice Sprint")})
             for q in task['sprint_content'].get("questions", []):
                 db.insert("sprint_questions", {"sprint_id": sprint_id, "question_text": q.get("question_text"), "options": json.dumps(
                     q.get("options")), "correct_option": q.get("correct_option"), "explanation": q.get("explanation")})
-
-            # Save the strategy article
             article_id = db.insert("strategy_articles", {"task_id": task_id, "title": task['strategy_article'].get(
                 "title"), "content": task['strategy_article'].get("content")})
-
-            # Link them to the main task
             db.update("paths", {"task_content_id": sprint_id,
                       "secondary_content_id": article_id}, where={"id": task_id})
 
@@ -860,24 +917,39 @@ def _generate_and_save_new_test_path(user_id, test_path_info, chat_history=[]):
     return saved_tasks
 
 
-def _get_test_prep_ai_chat_response(history, user_stats, stat_history="", quiz_results="", user_id=None):
+# Added sprint_results parameter
+def _get_test_prep_ai_chat_response(history, user_stats, stat_history="", quiz_results="", sprint_results="", user_id=None):
     if not os.getenv("GEMINI_API_KEY"):
         return "I'm in testing mode, but I'm saving our conversation!"
 
-    # Extract test date info
+    # Extract test path info, including new fields
+    test_path_info = user_stats.get("test_path", {})
+    test_focus = test_path_info.get("test_focus", "not specified")
+    desired_sat = test_path_info.get("desired_sat", "N/A")
+    desired_act = test_path_info.get("desired_act", "N/A")
+    current_sat_ebrw = test_path_info.get("current_sat_ebrw", "N/A")
+    current_sat_math = test_path_info.get("current_sat_math", "N/A")
+    current_act_comp = test_path_info.get(
+        "current_act_composite", "N/A")  # Renamed for clarity
+    hours_per_week = test_path_info.get("hours_per_week", "N/A")
+    strengths = test_path_info.get("strengths", "Not provided")
+    weaknesses = test_path_info.get("weaknesses", "Not provided")
+
+    # --- Test Date Formatting (same as before) ---
     test_date_info = "The student has not set a test date yet."
-    test_date_str = user_stats.get("test_path", {}).get("test_date")
+    test_date_str = test_path_info.get("test_date")
+    # ... (rest of date formatting logic is the same) ...
     if test_date_str:
         try:
-            # Use user's timezone for 'now' to get accurate days remaining
             user_tz_str = session.get('timezone', 'UTC')
             try:
                 user_tz = ZoneInfo(user_tz_str)
             except ZoneInfoNotFoundError:
                 user_tz = ZoneInfo("UTC")
-
-            test_date = datetime.strptime(test_date_str, '%Y-%m-%d')
-            delta = test_date.replace(tzinfo=user_tz) - datetime.now(user_tz)
+            test_date = datetime.strptime(
+                test_date_str, '%Y-%m-%d').date()  # Use .date()
+            # Compare dates directly
+            delta = test_date - datetime.now(user_tz).date()
             formatted_date = test_date.strftime('%B %d, %Y')
             if delta.days >= 0:
                 test_date_info = f"The student's test is on {formatted_date} ({delta.days} days from now)."
@@ -886,15 +958,16 @@ def _get_test_prep_ai_chat_response(history, user_stats, stat_history="", quiz_r
         except ValueError:
             test_date_info = f"The student has set a test date, but it's in an invalid format: {test_date_str}."
 
-        # Pull additional student data
-    strengths = user_stats.get("strengths", "Not provided")
-    weaknesses = user_stats.get("weaknesses", "Not provided")
-    completed_tasks_str = user_stats.get("completed_tasks", "None")
-    incomplete_tasks_str = user_stats.get("incomplete_tasks", "None")
-
-    # Get current active tasks
+    # --- Current Task Info (same as before) ---
     current_tasks = "No tasks available." if user_id is None else _get_current_numbered_tasks(
-        user_id, "Test Prep")    # Build system message with all context
+        user_id, "Test Prep")
+
+    # Determine Test Focus Description
+    focus_desc = "SAT"
+    if test_focus == 'act':
+        focus_desc = "ACT"
+    elif test_focus == 'both':
+        focus_desc = "both SAT and ACT"
     system_message = (
         "# MISSION & IDENTITY\n"
         "You are an expert AI assistant for Mentics, a web app that creates personalized learning paths for high school students. Your specific persona is a highly adaptive, intelligent, and supportive SAT/ACT test prep coach. Your personality is encouraging yet focused, guiding students toward steady, measurable progress. You are a supplement to the main 'Path' feature, which visually lays out the student's learning journey.\n\n"
@@ -907,23 +980,25 @@ def _get_test_prep_ai_chat_response(history, user_stats, stat_history="", quiz_r
         "- **Gamification**: The app includes points and streaks for completing tasks to keep users motivated.\n"
         "- **Forum & Leaderboard**: Social features where users can connect and compete.\n\n"
 
-        f"## CURRENT STUDENT ANALYSIS\n"
+        f"## CURRENT STUDENT ANALYSIS (CONTEXT FOR YOUR RESPONSE)\n"
         f"This is the specific student you are currently coaching:\n"
-        f"- SAT Math: {user_stats.get('sat_math', 'Not provided')}\n"
-        f"- SAT EBRW: {user_stats.get('sat_ebrw', 'Not provided')}\n"
-        f"- ACT Math: {user_stats.get('act_math', 'Not provided')}\n"
-        f"- ACT Reading: {user_stats.get('act_reading', 'Not provided')}\n"
-        f"- ACT Science: {user_stats.get('act_science', 'Not provided')}\n"
-        f"- GPA: {user_stats.get('gpa', 'Not provided')}\n"
-        f"- Test Date Info: {test_date_info}\n"
+        f"- **Primary Test Focus:** {focus_desc}\n"  # NEW
+        # NEW
+        f"- Current SAT EBRW: {current_sat_ebrw}, Current SAT Math: {current_sat_math}\n"
+        # NEW (You can add section scores too if needed)
+        f"- Current ACT Composite: {current_act_comp}\n"
+        # Updated
+        f"- Desired SAT: {desired_sat}, Desired ACT: {desired_act}\n"
         f"- Strengths: {strengths}\n"
         f"- Weaknesses: {weaknesses}\n"
-        f"- Recently Completed Tasks: {completed_tasks_str}\n"
-        f"- Incomplete/Failed Tasks: {incomplete_tasks_str}\n"
+        f"- Official Test Date Info: {test_date_info}\n"  # Updated name
+        f"- Estimated Weekly Study Time: {hours_per_week} hours\n"  # NEW
         f"- Historical Performance Data (from Tracker): {stat_history}\n"
-        f"- Current Active Tasks:\n{current_tasks}\n\n"
-        f"## RECENT QUIZ PERFORMANCE (Incorrect Answers)\n"
-        f"This shows specific questions the user recently got wrong. Use this granular data to mentor them in their path.\n{quiz_results}\n\n"
+        f"- Current Active Tasks (numbered):\n{current_tasks}\n\n"
+        f"## RECENT QUIZ PERFORMANCE (Incorrect Answers)\n{quiz_results}\n\n"
+        # Added sprint results here too
+        f"## RECENT SPRINT PERFORMANCE (Incorrect Answers)\n{sprint_results}\n\n"
+        f"This shows specific questions the user recently got wrong. Use this granular data to mentor them in their path."
 
         "## CORE COACHING DIRECTIVES (Your Rules of Engagement)\n"
         "0.  **Initial Greeting**: Your very first message to the user *must* be a warm and encouraging welcome. It *must* also clearly state that they can type **'regenerate'** or **'new path'** at any time to get a new path based on your conversation.\n"
@@ -1844,21 +1919,43 @@ def account(user):
 @login_required
 def test_path_builder(user):
     stats = user.get_stats()
+    # Provide existing values to the template, defaulting to empty strings
+    current_test_path_info = stats.get("test_path", {})
+
     if request.method == "POST":
+        # Collect all form data, including new fields
         test_path = {
+            # NEW: sat, act, or both
+            "test_focus": request.form.get("test_focus"),
             "desired_sat": request.form.get("desired_sat", ""),
             "desired_act": request.form.get("desired_act", ""),
-            "test_date": request.form.get("test_date", ""),
-            "test_time": request.form.get("test_time", ""),
+            # NEW
+            "current_sat_ebrw": request.form.get("current_sat_ebrw", ""),
+            # NEW
+            "current_sat_math": request.form.get("current_sat_math", ""),
+            # NEW
+            "current_act_composite": request.form.get("current_act_composite", ""),
+            # NEW
+            "current_act_math": request.form.get("current_act_math", ""),
+            # NEW
+            "current_act_reading": request.form.get("current_act_reading", ""),
+            # NEW
+            "current_act_science": request.form.get("current_act_science", ""),
             "strengths": request.form.get("strengths", ""),
-            "weaknesses": request.form.get("weaknesses", "")
+            "weaknesses": request.form.get("weaknesses", ""),
+            "test_date": request.form.get("test_date", ""),
+            # NEW (renamed from test_time)
+            "hours_per_week": request.form.get("hours_per_week", "")
         }
         stats["test_path"] = test_path
-        user.set_stats(stats)
+        user.set_stats(stats)  # Save the updated info to the user's stats
         _generate_and_save_new_test_path(
+            # Pass the full info to the generation function
             user.data['id'], test_path)
         return redirect(url_for("test_path_view"))
-    return render_template("test_path_builder.html", **stats.get("test_path", {}))
+
+    # Pass existing data to pre-fill the form on GET request
+    return render_template("test_path_builder.html", **current_test_path_info)
 
 
 @app.route("/dashboard/test-path-view")
