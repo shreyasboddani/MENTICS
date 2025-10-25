@@ -155,6 +155,45 @@ def init_db():
         "FOREIGN KEY(user_id)": "REFERENCES users(id) ON DELETE CASCADE",
         "FOREIGN KEY(question_id)": "REFERENCES quiz_questions(id) ON DELETE CASCADE"
     })
+    # In app.py, inside the init_db() function
+
+    db.create_table("practice_sprints", {
+        "id": "INTEGER PRIMARY KEY AUTOINCREMENT",
+        "task_id": "INTEGER NOT NULL UNIQUE",
+        "title": "TEXT NOT NULL",
+        "FOREIGN KEY(task_id)": "REFERENCES paths(id) ON DELETE CASCADE"
+    })
+
+    db.create_table("sprint_questions", {
+        "id": "INTEGER PRIMARY KEY AUTOINCREMENT",
+        "sprint_id": "INTEGER NOT NULL",
+        "question_text": "TEXT NOT NULL",
+        "options": "TEXT NOT NULL",  # JSON list of strings
+        "correct_option": "INTEGER NOT NULL",  # Index of correct option
+        "explanation": "TEXT",
+        "FOREIGN KEY(sprint_id)": "REFERENCES practice_sprints(id) ON DELETE CASCADE"
+    })
+
+    db.create_table("sprint_results", {
+        "id": "INTEGER PRIMARY KEY AUTOINCREMENT",
+        "user_id": "INTEGER NOT NULL",
+        "question_id": "INTEGER NOT NULL",
+        "is_correct": "BOOLEAN NOT NULL",
+        "submitted_at": "TIMESTAMP DEFAULT CURRENT_TIMESTAMP",
+        "FOREIGN KEY(user_id)": "REFERENCES users(id) ON DELETE CASCADE",
+        "FOREIGN KEY(question_id)": "REFERENCES sprint_questions(id) ON DELETE CASCADE"
+    })
+
+    db.create_table("strategy_articles", {
+        "id": "INTEGER PRIMARY KEY AUTOINCREMENT",
+        "task_id": "INTEGER NOT NULL UNIQUE",
+        "title": "TEXT NOT NULL",
+        "content": "TEXT NOT NULL",  # Markdown content
+        "FOREIGN KEY(task_id)": "REFERENCES paths(id) ON DELETE CASCADE"
+    })
+
+    # Add a new column to the paths table to store the article ID
+    db.add_column("paths", "secondary_content_id", "INTEGER")
     # --- START of the FIX ---
     # Drop the old, inefficient index if it exists, to be safe.
     try:
@@ -321,37 +360,49 @@ def _get_current_numbered_tasks(user_id, category):
     return "\n".join(numbered_tasks)
 
 
-def _get_test_prep_ai_tasks(strengths, weaknesses, user_stats={}, chat_history=[], path_history={}, stat_history="", quiz_results=""):
-    """Generates hyper-intelligent, adaptive test prep tasks with a detailed, gamified prompt, now including interactive quizzes and feedback loops."""
+# In app.py, add this new helper function before your _get_test_prep_ai_tasks function
+
+
+def _get_sprint_results_for_prompt(user_id):
+    """Fetches and formats a summary of the user's recent incorrect sprint answers for AI prompts."""
+    query = """
+        SELECT sq.question_text, sq.options, sq.correct_option, sq.explanation
+        FROM sprint_results sr
+        JOIN sprint_questions sq ON sr.question_id = sq.id
+        WHERE sr.user_id = ? AND sr.is_correct = 0
+        ORDER BY sr.submitted_at DESC
+        LIMIT 5
+    """
+    incorrect_answers = db.execute(query, (user_id,))
+    if not incorrect_answers:
+        return "No recent incorrect answers in practice sprints."
+
+    summary = []
+    for answer in incorrect_answers:
+        options = json.loads(answer['options'])
+        correct_answer_text = options[answer['correct_option']]
+        summary.append(
+            f"- Question: {answer['question_text']}\n"
+            f"  - Correct Answer: \"{correct_answer_text}\"\n"
+            f"  - Explanation: {answer['explanation']}"
+        )
+    return "\n".join(summary)
+
+
+def _get_test_prep_ai_tasks(strengths, weaknesses, user_stats={}, chat_history=[], path_history={}, stat_history="", quiz_results="", sprint_results=""):
+    """Generates hyper-intelligent, adaptive test prep tasks, now including interactive Practice Sprints and Strategy Articles."""
 
     def get_mock_tasks_reliably():
-        print("--- DEBUG: Running corrected Test Prep mock generator. ---")
-        mock_quiz = {
-            "task_format": "quiz",
-            "description": "Take a 5-question mini-quiz on SAT Algebra.",
-            "reason": "This quick quiz will test your core algebra skills, a critical component of the SAT Math section.",
-            "type": "standard", "stat_to_update": None, "category": "Test Prep", "difficulty": "medium",
-            "quiz_content": {
-                "title": "SAT Algebra Practice",
-                "questions": [
-                    {"question_text": "If 3x - 7 = 5, what is the value of x?", "options": [
-                        "2", "3", "4", "5"], "correct_option": 2, "explanation": "Add 7 to both sides to get 3x = 12. Then, divide by 3 to find x = 4."},
-                    {"question_text": "Which of the following is equivalent to (2x + 3)(x - 1)?", "options": [
-                        "2x^2 + x - 3", "2x^2 - x - 3", "2x^2 + 5x + 3", "x^2 + 2x - 3"], "correct_option": 0, "explanation": "Use the FOIL method to get 2x^2 + x - 3."}
-                ]
-            }
-        }
-        all_mock_tasks = [
+        """A fallback function to provide tasks if the AI service is unavailable."""
+        print("--- DEBUG: Running fallback mock task generator for Test Prep. ---")
+        return [
             {"task_format": "link", "description": "Take a full-length, timed SAT practice test from the [official College Board site](https://satsuite.collegeboard.org/sat/practice-preparation/practice-tests).",
              "reason": "This is a 'boss battle' to test your skills under pressure.", "type": "milestone", "stat_to_update": "sat_total", "category": "Test Prep", "difficulty": "hard"},
-            mock_quiz,
-        ]
-        return random.sample(all_mock_tasks, 2) + random.sample([
             {"task_format": "link", "description": "Review algebra concepts using [Khan Academy](https://www.khanacademy.org/math/algebra).",
              "reason": "A strong algebra foundation is crucial.", "type": "standard", "stat_to_update": None, "category": "Test Prep", "difficulty": "medium"},
             {"task_format": "link", "description": "Practice time management for the reading section.", "reason": "Pacing is key to finishing on time.",
                 "type": "standard", "stat_to_update": None, "category": "Test Prep", "difficulty": "medium"}
-        ], 3)
+        ]
 
     if not os.getenv("GEMINI_API_KEY"):
         return get_mock_tasks_reliably()
@@ -360,8 +411,6 @@ def _get_test_prep_ai_tasks(strengths, weaknesses, user_stats={}, chat_history=[
         [f"- {task['description']}" for task in path_history.get('completed', [])]) or "None."
     incomplete_tasks_str = "\n".join(
         [f"- {task['description']}" for task in path_history.get('incomplete', [])]) or "None."
-    chat_history_str = "\n".join(
-        [f"{msg['role'].capitalize()}: {msg['content']}" for msg in chat_history]) or "No conversation history."
     latest_user_message = next((msg['content'] for msg in reversed(
         chat_history) if msg['role'] == 'user'), "N/A")
 
@@ -382,7 +431,7 @@ def _get_test_prep_ai_tasks(strengths, weaknesses, user_stats={}, chat_history=[
 
     prompt = (
         f"# MISSION\n"
-        f"You are an elite AI test prep coach for Mentics. Your mission is to generate an intelligent, 5-step study plan tailored to the student's evolving needs, demonstrating a deep understanding of their history and context.\n\n"
+        f"You are an elite AI test prep coach for Mentics. Your mission is to generate an intelligent, 5-step study plan tailored to the student's evolving needs, demonstrating a deep understanding of their history and context SPECIFICALY FOR THE DIGITAL SAT AND THE ACT.\n\n"
 
         f"## CRITICAL SCENARIO ANALYSIS\n"
         f"1.  **Regeneration Request:** If the user's latest message asks for a new path, your highest priority is to generate one that addresses their immediate request.\n"
@@ -402,48 +451,65 @@ def _get_test_prep_ai_tasks(strengths, weaknesses, user_stats={}, chat_history=[
         f"- Historical Performance Data (Tracker):\n{stat_history}\n\n"
 
         f"## RECENT QUIZ PERFORMANCE (Incorrect Answers)\n"
-        f"This shows specific questions the user recently got wrong. Use this granular data to create targeted follow-up tasks.\n{quiz_results}\n\n"
+        f"This shows specific questions the user recently got wrong on CUMULATIVE quizzes. Use this granular data to create targeted follow-up tasks.\n{quiz_results}\n\n"
+
+        f"## RECENT PRACTICE SPRINT PERFORMANCE (Incorrect Answers)\n"
+        f"This shows specific questions the user recently got wrong on FOCUSED sprints. This is the most important data for identifying specific skill gaps.\n{sprint_results}\n\n"
 
         f"# YOUR TASK: GENERATE THE NEW 5-STEP PLAN\n"
-        f"- Based on your scenario analysis and all student data, you must Generate a new 5-step study plan. It must contain a mix of standard `link` tasks and interactive `quiz` tasks. **All tasks must be comprehensive and high-quality.** At least ONE task MUST be an interactive quiz.\n\n"
-        f"- Be specific, actionable, and include refrence to a high-quality, free resource (Khan Academy, official practice tests, specific YouTube tutorials).\n"
-        f"- Include a mix of task types: at least one **Resource Task** (e.g., 'Watch a video'), one **Practice Task** (e.g., 'Complete a quiz'), and one **Strategic Task** (e.g., 'Develop a new timing strategy').\n"
-        f"- Have an assigned difficulty for gamification purposes.\n\n"
+        f"- **Task Format Logic (Crucial!):** You must differentiate between passive learning and active practice. \n"
+        f"  - If a task involves **actively solving problems or answering questions or mastering a math concept or advancing/consolidating knowlege **, it MUST be a `practice_sprint`.\n"
+        f"  - If a task involves **reading articles, or watching content on yt or using external resources**, it MUST be a `link`, `strategy`, or `review` task.\n"
+        f"- **Synthesize, Don't Just List:** Your primary function is to connect multiple data points to create hyper-specific tasks. Generic tasks like 'Practice Algebra' are forbidden.\n"
+        f"- **Extreme Specificity & Actionable Verbs:** Descriptions must be granular and start with a strong verb (e.g., 'Master', 'Analyze', 'Implement').\n"
+        f"- **Incorporate Multiple Formats:** The plan must include a mix of task types, including at least one `practice_sprint`.\n"
+        f"- ** DIGITAL SAT & ACT FOCUS:** All tasks must be relevant to the unique formats and content of the Digital SAT and ACT, do not include thigns that were on the Paper SAT like ELA IS NOW JS EBRW AND MATH ACT IS similar to paper.\n"
+        f"- **Data-Driven Justification:** The `reason` for each task is critical. It MUST explicitly reference the student's personal data (e.g., 'This is important because you listed Geometry as a weakness...').\n\n"
+        f"- **Math:** is the user is struggling in math the biggest thing to ensure is they know how to use desmos regression for the tricky constant questions. table regressiopn, tilde regression, and system of eqs regression and also normalizing the x values. This is like a starting point for math but get specific with other topics if they need specific practice.\n\n"
 
-        f"## QUIZ GENERATION DIRECTIVES (CRITICAL)\n"
-        f"When generating a quiz (`task_format: 'quiz'`), you must adhere to these rules:\n"
-        f"1.  **Strategic Placement:** A quiz should ideally follow a 'Resource Task'. For example, if Task 1 is 'Watch a video on quadratic equations', Task 2 could be a quiz on that topic.\n"
-        f"2.  **SAT-Level Comprehensiveness:** Questions must mirror official SAT complexity.\n"
-        f"    - **Reading Comp:** Generate a short, college-level passage (150-200 words) and ask 1-2 inference-based questions. The passage MUST be in the `question_text`.\n"
-        f"    - **Vocabulary:** Create 'Words in Context' questions within a sentence.\n"
-        f"    - **Math:** Focus on tricky, multi-step concepts like geometry, functions, or word problems.\n"
-        f" 3.  **Targeted Content:** The quiz MUST directly address one of the student's listed **weaknesses** or a topic from their **Recent Quiz Performance**.\n\n"
-        f" 4.  **Detailed Explanations:** Each question must include a brief explanation of the correct answer.\n"
-        f" 5.  Each quiz should have 5-10 questions.\n\n"
+        f"## `practice_sprint` & `strategy_article` GENERATION (CRITICAL)\n"
+        f"This format is ONLY for tasks that require the user to practice questions. When you create a `practice_sprint`, you MUST ALSO generate a corresponding `strategy_article`.\n"
+        f"1.  **Hyper-Focused Sprint:** The `sprint_content` must contain exactly 5 SAT-level questions targeting a single, narrow skill (e.g., 'verb tense consistency' or 'solving systems of linear equations'). This skill must be chosen based on the student's weaknesses or incorrect answers.\n"
+        f"2.  **Actionable Strategy Article:** The `strategy_article` must be a high-quality, concise guide (using Markdown) that teaches the student how to master the specific skill in the sprint.\n\n"
+
+        f"## `quiz` GENERATION DIRECTIVES (CRITICAL)\n"
+        f"A `quiz` is different from a sprint and is a tpe `quiz`. It is a CUMULATIVE review of a broader topic and should be used to test overall knowledge, not for focused practice.\n"
+        f"1.  **Strategic Placement:** A quiz should ideally follow a 'Resource Task' (`link`).\n"
+        f"2.  **SAT-Level Comprehensiveness:** Questions must mirror official SAT complexity, including reading passages, 'words in context', and multi-step math problems.\n"
+        f"3.  **Targeted Content:** The quiz topic MUST address one of the student's listed weaknesses.\n"
+        f"4.  **Detailed Explanations:** Every question must have an explanation.\n"
+        f"5.  Each quiz should have 5-10 questions.\n\n"
 
         f"# CRITICAL DIRECTIVES & JSON SCHEMA\n"
         f"1.  **JSON Output ONLY**: Your output MUST be a single, raw JSON object.\n"
-        f"2.  **Comprehensive `link` Tasks**: Descriptions for `link` tasks must be specific and actionable, with a markdown link to a reputable, free resource.\n"
-        f"3.  **Mix of Tasks:** The plan must include a mix of **Resource**, **Practice**, and **Strategic** tasks.\n"
-        f"4.  **Milestones & 'Boss Battles'**: Use 'milestone' for major assessments. A 'Boss Battle' description must begin with 'Boss Battle:'.\n"
+        f"2.  **Task Formats**: You must use a mix of `link`, `quiz`, `practice_sprint`, `strategy`, and `review` based on the logic in 'YOUR TASK'.\n"
+        f"3.  **Data-Driven Justification**: The `reason` field is mandatory and must explain *why* the task is assigned, referencing the student's data.\n"
+        f"4.  **Milestones & 'Boss Battles'**: Use 'milestone' for major assessments. 'Boss Battle' descriptions must start with 'Boss Battle:' they DO NOT have any practice sprints with them and they DO NOT habve a guide they SHOULD direct the user to take a test on one prep or bluebook.\n"
         f"5.  **Correct Stat Naming**: `stat_to_update` must be one of: ['sat_math', 'sat_ebrw', 'sat_total', 'act_math', 'act_reading', 'act_science', 'act_composite'].\n\n"
+        f"6.  ** The tasks without any practice sprints should tell user to read or watch something and then summarize key strategies. The tasks with practice sprints should have a strategy article that teaches the skill being practiced. The quiz tasks should be cumulative and test a broader topic, not just one skill.\n\n"
 
         f"# JSON OUTPUT STRUCTURE\n"
         f"{{\n"
         f'  "tasks": [\n'
         f'    {{\n'
-        f'      "task_format": "Either \'link\' or \'quiz\'.",\n'
-        f'      "description": "If format is \'link\', MUST include a markdown link. If \'quiz\', it is a simple description.",\n'
-        f'      "reason": "A brief, motivating explanation.",\n'
+        f'      "task_format": "Can be \'link\', \'quiz\', \'strategy\', \'review\', or \'practice_sprint\'.",\n'
+        f'      "description": "Hyper-specific instruction. For a sprint, describe the skill (e.g., \'Practice Sprint: Subject-Verb Agreement\'). MUST include markdown link if format is \'link\'.",\n'
+        f'      "reason": "Mandatory, data-driven justification referencing the student\'s specific stats, weaknesses, or history.",\n'
         f'      "type": "Either \'standard\' or \'milestone\'.",\n'
         f'      "stat_to_update": "Valid stat name ONLY if type is milestone, otherwise null.",\n'
         f'      "category": "This MUST be the string \'Test Prep\'.",\n'
         f'      "difficulty": "Either \'easy\', \'medium\', \'hard\', or \'epic\'.",\n'
-        f'      "quiz_content": {{  // REQUIRED if task_format is \'quiz\', otherwise null.\n'
+        f'      "quiz_content": {{  // For \'quiz\' format ONLY. 5-10 questions. \n'
         f'          "title": "Title of the quiz",\n'
-        f'          "questions": [\n'
-        f'              {{"question_text": "Question text. For reading comp, include passage here.", "options": ["A", "B", "C", "D"], "correct_option": 0, "explanation": "Brief explanation."}}\n'
-        f'          ]\n'
+        f'          "questions": [ {{"question_text": "...", "options": [], "correct_option": 0, "explanation": "..."}} ]\n'
+        f'      }},\n'
+        f'      "sprint_content": {{  // REQUIRED if task_format is \'practice_sprint\', otherwise null.\n'
+        f'          "title": "Title of the sprint (e.g., \'Algebra: Functions Practice\')",\n'
+        f'          "questions": [ {{"question_text": "...", "options": [], "correct_option": 0, "explanation": "..."}} ] // EXACTLY 5 questions on ONE skill\n'
+        f'      }},\n'
+        f'      "strategy_article": {{ // REQUIRED if task_format is \'practice_sprint\', otherwise null.\n'
+        f'          "title": "Article Title (e.g., \'Strategies for Tackling Function Questions\')",\n'
+        f'          "content": "Full article text in Markdown format. Explain key concepts and provide 2-3 actionable strategies."\n'
         f'      }}\n'
         f'    }}\n'
         f'  ]\n'
@@ -455,14 +521,343 @@ def _get_test_prep_ai_tasks(strengths, weaknesses, user_stats={}, chat_history=[
             generation_config={"response_mime_type": "application/json"}
         )
         response = model.generate_content(prompt)
-        response_data = json.loads(response.text)
+        # Robust parsing: some model responses can contain stray control characters
+        # or extra surrounding text. Try a few strategies before failing:
+        response_data = None
+        # 1) If the response object has a .json() method, prefer that
+        try:
+            if hasattr(response, 'json'):
+                response_data = response.json()
+        except Exception:
+            response_data = None
+
+        raw_text = None
+        # 2) Pull raw text from common attributes
+        if response_data is None:
+            raw_text = getattr(response, 'text', None) or getattr(
+                response, 'content', None) or str(response)
+            # sanitize non-printable control characters except common whitespace
+            import re
+            # Remove control chars in ranges that break json parsing, keep \n, \r, \t
+            cleaned = re.sub(r'[\x00-\x08\x0b\x0c\x0e-\x1f]', '', raw_text)
+            # Try to extract the first JSON object/array-looking substring
+            m = re.search(r'([\[{].*[\]}])', cleaned, re.S)
+            if m:
+                candidate = m.group(1)
+            else:
+                candidate = cleaned
+            try:
+                response_data = json.loads(candidate)
+            except Exception as e:
+                # Final attempt: try to be permissive and report a clear error
+                raise ValueError(
+                    f"Failed to parse AI JSON response: {e}\nRaw response (first 2000 chars): {candidate[:2000]}")
+
         tasks = response_data.get("tasks", [])
-        if isinstance(tasks, list) and len(tasks) > 0:
-            return tasks
-        raise ValueError("Invalid format from AI")
+
+        def looks_like_practice(desc):
+            if not desc:
+                return False
+            kws = ['practice', 'solve', 'questions', 'problem', 'drill',
+                   'master', 'consolidate', 'attempt', 'answer', 'worksheet', 'sprint']
+            desc_l = desc.lower()
+            return any(k in desc_l for k in kws)
+
+        def make_mock_sprint(skill):
+            questions = []
+            for qi in range(5):
+                questions.append({
+                    'question_text': f"SAT-style practice {qi+1} on {skill}: Create or attempt one focused question targeting {skill}.",
+                    'options': ['A', 'B', 'C', 'D'],
+                    'correct_option': 0,
+                    'explanation': f"Walkthrough: key steps to solve this kind of {skill} question."
+                })
+            return {'title': f"Practice Sprint: {skill}", 'questions': questions}
+
+        def make_strategy_article(skill, weakness_note):
+            title = f"Strategies to Master {skill}"
+            content = (
+                f"# {title}\n\n"
+                f"This short guide explains how to master {skill}.\n\n"
+                f"1. Identify common traps and misconceptions for {skill}.\n"
+                f"2. Practice targeted problems that force you to apply the concept under time pressure.\n"
+                f"3. After each question, immediately review the explanation and note one actionable takeaway.\n\n"
+                f"Why this matters: {weakness_note or 'This skill was flagged as a weakness.'}\n"
+            )
+            return {'title': title, 'content': content}
+
+        def make_mock_quiz(topic):
+            """Generate a simple cumulative quiz (5-10 questions) as a fallback."""
+            import random
+            num_q = 7
+            questions = []
+            for qi in range(num_q):
+                questions.append({
+                    'question_text': f"Cumulative quiz question {qi+1} on {topic}: Create or attempt a representative SAT-style question targeting {topic}.",
+                    'options': ['A', 'B', 'C', 'D'],
+                    'correct_option': 0,
+                    'explanation': f"Solution outline: how to approach this type of {topic} problem."
+                })
+            return {'title': f"Cumulative Quiz: {topic}", 'questions': questions}
+
+        # normalize each task
+        normalized = []
+        for t in tasks if isinstance(tasks, list) else []:
+            try:
+                if not isinstance(t, dict):
+                    continue
+                desc = t.get('description', '') or ''
+                # ensure category
+                t['category'] = 'Test Prep'
+
+                # If AI didn't set a task_format, infer it
+                inferred_format = t.get('task_format') or ''
+                if not inferred_format:
+                    inferred_format = 'practice_sprint' if looks_like_practice(
+                        desc) else 'link'
+                    t['task_format'] = inferred_format
+
+                # Make passive reading/watch tasks more specific
+                # Also ensure that explicit 'strategy' or 'review' tasks stay as strategy guides (not converted to practice sprints)
+                skip_practice = False
+                if t['task_format'] in ('link', 'strategy', 'review'):
+                    if len(desc) < 40 and t['task_format'] == 'link':
+                        main_weak = (weaknesses.split(',')[0].strip(
+                        ) if weaknesses else '') or 'your weakest subskill'
+                        t['description'] = desc.strip(
+                        ) + f" Specifically: read a focused article or watch a Khan Academy video about {main_weak} and summarize 3 key strategies you learned."
+
+                    # If the AI explicitly marked this as a strategy/review task, ensure a strategy_article exists
+                    if t['task_format'] in ('strategy', 'review'):
+                        skip_practice = True
+                        # infer topic/skill
+                        topic = None
+                        if weaknesses:
+                            topic = weaknesses.split(',')[0].strip()
+                        if not topic:
+                            topic = desc.split(
+                                ' on ')[-1].split('.')[0][:40].strip() or 'strategies'
+                        if not t.get('strategy_article'):
+                            t['strategy_article'] = make_strategy_article(topic, t.get(
+                                'reason') or f"This guide focuses on {topic} based on user history.")
+                        # Remove any accidental sprint content to avoid confusion
+                        if t.get('sprint_content'):
+                            t.pop('sprint_content', None)
+
+                # Force practice tasks to include sprint_content and strategy_article
+                # Skip if we already decided this is a strategy/review guide
+                if (not skip_practice) and (t['task_format'] == 'practice_sprint' or looks_like_practice(desc)):
+                    t['task_format'] = 'practice_sprint'
+                    # infer skill from description or weaknesses
+                    skill = None
+                    if weaknesses:
+                        skill = weaknesses.split(',')[0].strip()
+                    if not skill:
+                        # try to extract a short phrase from description
+                        skill = desc.split(
+                            ' on ')[-1].split('.')[0][:40].strip() or 'targeted skill'
+
+                    if not t.get('sprint_content'):
+                        t['sprint_content'] = make_mock_sprint(skill)
+
+                    if not t.get('strategy_article'):
+                        t['strategy_article'] = make_strategy_article(skill, t.get(
+                            'reason') or f"This targets {skill} based on user history.")
+
+                # Ensure quiz tasks are fully-formed cumulative quizzes
+                desc_l = desc.lower()
+                if t.get('task_format') == 'quiz' or any(k in desc_l for k in ('quiz', 'cumulative review', 'cumulative')):
+                    t['task_format'] = 'quiz'
+                    # infer quiz topic from weaknesses or description
+                    quiz_topic = None
+                    if weaknesses:
+                        quiz_topic = weaknesses.split(',')[0].strip()
+                    if not quiz_topic:
+                        # fallback to extracting a short phrase
+                        quiz_topic = desc.split(
+                            ' on ')[-1].split('.')[0][:40].strip() or 'mixed topics'
+                    if not t.get('quiz_content'):
+                        t['quiz_content'] = make_mock_quiz(quiz_topic)
+
+                # Boss Battle normalization: ensure milestone instructs a full-length official practice test
+                if 'boss battle' in desc.lower() or desc.startswith('Boss Battle'):
+                    # Force milestone
+                    t['type'] = 'milestone'
+                    # Ensure description clearly instructs taking a full-length, timed test on an official platform
+                    preferred_test = 'SAT'
+                    if user_stats.get('desired_act'):
+                        preferred_test = 'ACT'
+                    # Choose stat to update based on preferred test
+                    stat_map = {'SAT': 'sat_total', 'ACT': 'act_composite'}
+                    t['stat_to_update'] = stat_map.get(preferred_test, None)
+
+                    # Ensure the description starts with 'Boss Battle:' and includes a recommended resource
+                    resource_hint = 'Take a full-length, timed official practice test (e.g., College Board Bluebook or an official digital practice platform).'
+                    # Add a helpful link to College Board practice tests for SAT as a safe default
+                    cb_link = 'https://satsuite.collegeboard.org/sat/practice-preparation/practice-tests'
+                    if preferred_test == 'ACT':
+                        resource_hint = 'Take a full-length, timed official ACT practice test on a trusted platform.'
+                        cb_link = ''
+
+                    # Normalize the description
+                    if not desc.startswith('Boss Battle:'):
+                        t['description'] = f"Boss Battle: {resource_hint} {('[College Board practice tests](' + cb_link + ')') if cb_link else ''}"
+                    else:
+                        # ensure resource hint is present
+                        if resource_hint.lower() not in desc.lower():
+                            t['description'] = desc.strip() + ' ' + \
+                                resource_hint
+
+                # Validate milestone stat_to_update
+                if t.get('type') == 'milestone':
+                    valid_stats = ['sat_math', 'sat_ebrw', 'sat_total',
+                                   'act_math', 'act_reading', 'act_science', 'act_composite']
+                    if t.get('stat_to_update') not in valid_stats:
+                        t['stat_to_update'] = None
+
+                normalized.append(t)
+            except Exception:
+                continue
+
+        if isinstance(normalized, list) and len(normalized) > 0:
+            return normalized
+        raise ValueError(
+            "Invalid format from AI or normalization produced no tasks")
     except Exception as e:
         print(f"\n--- GEMINI API ERROR IN _get_test_prep_ai_tasks: {e} ---\n")
         return get_mock_tasks_reliably()
+
+
+@app.route('/strategy_article/<int:task_id>')
+@login_required
+def strategy_article(user, task_id):
+    # Ensure the user has access to this task
+    task = db.select_one(
+        "paths", where={"id": task_id, "user_id": user.data['id']})
+    if not task:
+        return "Article not found or you do not have permission to view it.", 404
+
+    article = db.select_one("strategy_articles", where={"task_id": task_id})
+    if not article:
+        return "Article not found for this task.", 404
+
+    return render_template("strategy_article.html", article=article)
+
+
+@app.route('/api/practice_sprint/<int:task_id>')
+@login_required
+def get_practice_sprint(user, task_id):
+    task_info = db.select_one(
+        "paths", where={"id": task_id, "user_id": user.data['id']})
+    if not task_info or task_info['task_format'] != 'practice_sprint':
+        return jsonify({"error": "Practice sprint not found"}), 404
+
+    sprint_details = db.select_one(
+        "practice_sprints", where={"task_id": task_id})
+    if not sprint_details:
+        return jsonify({"error": "Sprint details not found"}), 404
+
+    questions_raw = db.select("sprint_questions", where={
+                              "sprint_id": sprint_details['id']})
+    questions = [{
+        "id": q['id'],
+        "question_text": q['question_text'],
+        "options": json.loads(q['options']),
+        "correct_option": q['correct_option'],
+        "explanation": q['explanation']
+    } for q in questions_raw]
+
+    return jsonify({"title": sprint_details['title'], "questions": questions})
+
+
+@app.route('/api/submit_sprint_results', methods=['POST'])
+@login_required
+def submit_sprint_results(user):
+    data = request.get_json()
+    # Expecting list of {'question_id': id, 'is_correct': bool}
+    results = data.get('results')
+    if not results:
+        return jsonify({"success": False, "error": "Invalid results format"}), 400
+
+    user_id = user.data['id']
+    for result in results:
+        if 'question_id' in result and 'is_correct' in result:
+            db.insert('sprint_results', {
+                'user_id': user_id,
+                'question_id': result.get('question_id'),
+                'is_correct': result.get('is_correct')
+            })
+    return jsonify({"success": True})
+
+
+# In app.py, REPLACE the entire _generate_and_save_new_test_path function
+
+def _generate_and_save_new_test_path(user_id, test_path_info, chat_history=[]):
+    user_record = db.select_one("users", where={"id": user_id})
+    user_stats = json.loads(user_record['stats']) if user_record else {}
+    strengths = test_path_info.get("strengths", "")
+    weaknesses = test_path_info.get("weaknesses", "")
+
+    all_tasks = db.select(
+        "paths", where={"user_id": user_id, "category": "Test Prep"})
+    path_history = {
+        "completed": [t for t in all_tasks if t['is_completed']],
+        "incomplete": [t for t in all_tasks if not t['is_completed']]
+    }
+
+    # Fetch all context data
+    stat_history = _get_stat_history_for_prompt(user_id)
+    quiz_results = _get_quiz_results_for_prompt(user_id)
+    sprint_results = _get_sprint_results_for_prompt(user_id)
+
+    db.update("paths", {"is_active": False}, where={
+              "user_id": user_id, "category": "Test Prep", "is_active": True})
+
+    tasks = _get_test_prep_ai_tasks(strengths, weaknesses, user_stats,
+                                    chat_history, path_history, stat_history, quiz_results, sprint_results)
+    tasks = tasks[:5]
+
+    saved_tasks = []
+    for i, task in enumerate(tasks):
+        task_format = task.get("task_format", "link")
+
+        # Insert the base task first to get an ID
+        task_id = db.insert("paths", {
+            "user_id": user_id, "task_order": i + 1, "description": task.get("description"),
+            "reason": task.get("reason"), "type": task.get("type"), "stat_to_update": task.get("stat_to_update"),
+            "category": "Test Prep", "is_active": True, "is_completed": False, "task_format": task_format
+        })
+
+        if task_format == 'quiz' and task.get('quiz_content'):
+            quiz_id = db.insert("quizzes", {
+                                "task_id": task_id, "title": task['quiz_content'].get("title", "Quiz")})
+            for q in task['quiz_content'].get("questions", []):
+                db.insert("quiz_questions", {"quiz_id": quiz_id, "question_text": q.get("question_text"), "options": json.dumps(
+                    q.get("options")), "correct_option": q.get("correct_option"), "explanation": q.get("explanation")})
+            db.update("paths", {"task_content_id": quiz_id},
+                      where={"id": task_id})
+
+        elif task_format == 'practice_sprint' and task.get('sprint_content') and task.get('strategy_article'):
+            # Save the sprint
+            sprint_id = db.insert("practice_sprints", {
+                                  "task_id": task_id, "title": task['sprint_content'].get("title", "Practice Sprint")})
+            for q in task['sprint_content'].get("questions", []):
+                db.insert("sprint_questions", {"sprint_id": sprint_id, "question_text": q.get("question_text"), "options": json.dumps(
+                    q.get("options")), "correct_option": q.get("correct_option"), "explanation": q.get("explanation")})
+
+            # Save the strategy article
+            article_id = db.insert("strategy_articles", {"task_id": task_id, "title": task['strategy_article'].get(
+                "title"), "content": task['strategy_article'].get("content")})
+
+            # Link them to the main task
+            db.update("paths", {"task_content_id": sprint_id,
+                      "secondary_content_id": article_id}, where={"id": task_id})
+
+        new_task_data = db.select_one("paths", where={"id": task_id})
+        saved_tasks.append({**new_task_data, "is_completed": False})
+
+    log_activity(user_id, 'path_generated', {'category': 'Test Prep'})
+    return saved_tasks
 
 
 def _get_test_prep_ai_chat_response(history, user_stats, stat_history="", quiz_results="", user_id=None):
@@ -563,85 +958,6 @@ def _get_test_prep_ai_chat_response(history, user_stats, stat_history="", quiz_r
         return "Sorry, I encountered an error connecting to the AI."
 
 
-def _generate_and_save_new_test_path(user_id, test_path_info, chat_history=[]):
-    user_record = db.select("users", where={"id": user_id})
-    user_stats = json.loads(user_record[0]['stats']) if user_record else {}
-    strengths = test_path_info.get("strengths", "general studying")
-    weaknesses = test_path_info.get("weaknesses", "test-taking skills")
-
-    all_tasks = db.select(
-        "paths", where={"user_id": user_id, "category": "Test Prep"})
-    path_history = {
-        "completed": [task for task in all_tasks if task['is_completed']],
-        "incomplete": [task for task in all_tasks if not task['is_completed']]
-    }
-
-    # Fetch tracker data
-    stat_history = _get_stat_history_for_prompt(user_id)
-
-    db.update("paths", {"is_active": False}, where={
-              "user_id": user_id, "category": "Test Prep", "is_active": True})
-
-    tasks = _get_test_prep_ai_tasks(strengths, weaknesses,
-                                    user_stats, chat_history, path_history, stat_history)
-    tasks = tasks[:5]
-
-    saved_tasks = []
-    for i, task in enumerate(tasks):
-        task_format = task.get("task_format", "link")
-        task_content_id = None
-
-        if task_format == 'quiz' and task.get('quiz_content'):
-            # This is a new quiz, so we need to save it and get its ID
-            quiz_content = task['quiz_content']
-
-            # First, create the task to get a task_id
-            task_id = db.insert("paths", {
-                "user_id": user_id, "task_order": i + 1, "description": task.get("description"),
-                "reason": task.get("reason"), "type": task.get("type"), "stat_to_update": task.get("stat_to_update"),
-                "category": "Test Prep", "is_active": True, "is_completed": False, "task_format": "quiz"
-            })
-
-            # Now, create the quiz and link it to the task
-            quiz_id = db.insert("quizzes", {
-                "task_id": task_id,
-                "title": quiz_content.get("title", "Quiz")
-            })
-
-            # Update the task with the new quiz_id
-            db.update("paths", {"task_content_id": quiz_id},
-                      where={"id": task_id})
-
-            # Add questions to the quiz
-            for q in quiz_content.get("questions", []):
-                db.insert("quiz_questions", {
-                    "quiz_id": quiz_id,
-                    "question_text": q.get("question_text"),
-                    "options": json.dumps(q.get("options")),
-                    "correct_option": q.get("correct_option"),
-                    "explanation": q.get("explanation")
-                })
-            task_content_id = quiz_id
-        else:
-            # This is a standard link-based task
-            task_id = db.insert("paths", {
-                "user_id": user_id, "task_order": i + 1, "description": task.get("description"),
-                "reason": task.get("reason"), "type": task.get("type"), "stat_to_update": task.get("stat_to_update"),
-                "category": "Test Prep", "is_active": True, "is_completed": False, "task_format": "link"
-            })
-
-        new_task_data = db.select("paths", where={"id": task_id})[0]
-        saved_tasks.append({
-            "id": new_task_data['id'], "description": new_task_data['description'],
-            "reason": new_task_data['reason'], "type": new_task_data['type'],
-            "stat_to_update": new_task_data['stat_to_update'], "is_completed": False,
-            "task_format": new_task_data['task_format'], "task_content_id": new_task_data['task_content_id']
-        })
-    # LOGGING
-    log_activity(user_id, 'path_generated', {'category': 'Test Prep'})
-    return saved_tasks
-
-
 def _get_college_planning_ai_tasks(college_context, user_stats, path_history, chat_history=[], stat_history=""):
     """Generates hyper-intelligent, adaptive college planning tasks with a detailed, gamified prompt."""
 
@@ -699,30 +1015,30 @@ def _get_college_planning_ai_tasks(college_context, user_stats, path_history, ch
         f"- Historical Performance Data (Tracker):\n{stat_history}\n\n"
 
         f"# YOUR TASK: GENERATE THE NEW 5-STEP ROADMAP\n"
-        f"Based on your scenario analysis and all student data, generate a new, 5-step roadmap. Each task must:\n"
-        f"- Be specific, actionable, and include a markdown link to a reputable, free resource (e.g., Common App, College Board, financial aid sites, specific articles).\n"
-        f"- Include a mix of task types: at least one **Resource Task** (e.g., 'Read this guide'), one **Action Task** (e.g., 'Draft your activity list'), and one **Reflection Task** (e.g., 'Brainstorm essay topics').\n"
-        f"- Have an assigned difficulty for gamification purposes.\n\n"
-        f"- For anything related to test prep, refer the student to the Test Prep Path and do NOT include test prep tasks here( the testprep is the other path when u click path builder on the mentics dashboard).\n\n"
+        f"- **Synthesize, Don't Just List:** Your primary function is to connect the student's grade, goals, and history to create hyper-specific tasks. Generic tasks like 'Work on your essay' are forbidden.\n"
+        f"- **Extreme Specificity & Actionable Verbs:** Descriptions must be granular and start with a strong verb (e.g., 'Draft', 'Research', 'Finalize'). Instead of 'Explore majors', generate 'Research the core curriculum for a Computer Science major at {college_context.get('target_colleges', 'one of your target schools')} to see if it aligns with your interests.'\n"
+        f"- **Incorporate Multiple Formats:** The plan must include a mix of task types. Include at least one **Resource Task** (e.g., 'Watch this guide on financial aid'), one **Action Task** (e.g., 'Draft your Common App activity list'), and one **Strategic/Review Task** (e.g., 'Analyze the supplemental essay prompts for your target schools and categorize them by theme').\n"
+        f"- **Data-Driven Justification:** The `reason` for each task is critical. It MUST explicitly reference the student's personal data (grade, major, goals). For example: 'As an 11th grader interested in Biology, it is crucial to start identifying teachers for your recommendation letters now.'\n\n"
 
         f"# CRITICAL DIRECTIVES & JSON SCHEMA\n"
         f"1.  **JSON Output ONLY**: Your entire output MUST be a single, raw JSON object. No extra text.\n"
-        f"2.  **Stage-Appropriate Tasks**: Align all tasks to the student's grade level and planning stage. A 9th grader should be exploring, while a 12th grader should be finalizing applications.\n"
-        f"3.  **Meaningful Milestones**: Use 'milestone' only for significant achievements (e.g., completing an essay draft, updating GPA, submitting an application). `stat_to_update` must be null for 'standard' tasks.\n"
-        f"4.  **Intelligent 'Boss Battles'**: A 'Boss Battle' is a major milestone, like submitting a complete application or finalizing a personal statement. It should be the culmination of the preceding tasks. The description for such a task MUST begin with 'Boss Battle:'. Use these strategically based on the student's grade and timeline.\n\n"
+        f"2.  **New Task Formats**: You can now use `strategy` and `review` in the `task_format` field for tasks focused on planning or self-evaluation. These do not require a markdown link.\n"
+        f"3.  **Data-Driven Justification**: The `reason` field is mandatory and must explain *why* this task is relevant to *this specific student* by referencing their data (e.g., '...because you're in 12th grade and application deadlines are approaching').\n"
+        f"4.  **Meaningful Milestones & 'Boss Battles'**: Use 'milestone' for significant achievements (e.g., completing an essay draft, submitting an application). A 'Boss Battle' description must begin with 'Boss Battle:'.\n"
+        f"5.  **Refer to Test Prep Path**: If test prep is relevant, do not create a task for it. Instead, create a task that instructs the user to work on their 'Test Prep Path' within the Mentics app.\n\n"
 
         f"# JSON OUTPUT STRUCTURE\n"
         f"{{\n"
         f'  "tasks": [\n'
         f'    {{\n'
-        f'      "description": "Specific, actionable task with a markdown link, like [this resource](https://example.com).",\n'
-        f'      "reason": "A brief, motivating explanation for this task.",\n'
+        f'      "task_format": "Either \'link\', \'strategy\', or \'review\'.",\n'
+        f'      "description": "Hyper-specific instruction. MUST include a markdown link if format is \'link\'.",\n'
+        f'      "reason": "Mandatory, data-driven justification referencing the student\'s specific grade, goals, or history.",\n'
         f'      "type": "Either \'standard\' or \'milestone\'.",\n'
         f'      "stat_to_update": "A string (\'gpa\', \'essay_progress\', \'applications_submitted\') ONLY if type is milestone, otherwise null.",\n'
         f'      "category": "This MUST be the string \'College Planning\'.",\n'
-        f'      "difficulty": "Either \'easy\' (10 points), \'medium\' (25 points), or \'hard\' (50 points). Boss Battles should be \'epic\' (100 points)."\n'
+        f'      "difficulty": "Either \'easy\', \'medium\', \'hard\', or \'epic\'."\n'
         f'    }}\n'
-        f'    // ... (four more task objects)\n'
         f'  ]\n'
         f'}}'
     )

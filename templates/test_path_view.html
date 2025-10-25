@@ -244,21 +244,31 @@
                 </div>
             </div>
 
-            <div id="modal-actions" class="flex justify-between items-center gap-3 pt-4 border-t border-slate-200/80">
-                <div>
-                    <input type="date" id="task-deadline-picker"
-                        class="bg-white/50 border border-slate-300/70 rounded-lg p-2 text-sm focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition">
-                    <button onclick="handleSetDeadline()"
-                        class="text-sm bg-slate-200 text-slate-700 px-3 py-2 rounded-lg hover:bg-slate-300 font-semibold transition">Set
-                        Date</button>
+            <div class="pt-4 border-t border-slate-200/80">
+                <div id="default-actions" class="flex justify-between items-center gap-3">
+                    <div>
+                        <input type="date" id="task-deadline-picker"
+                            class="bg-white/50 border border-slate-300/70 rounded-lg p-2 text-sm focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition">
+                        <button onclick="handleSetDeadline()"
+                            class="text-sm bg-slate-200 text-slate-700 px-3 py-2 rounded-lg hover:bg-slate-300 font-semibold transition">Set
+                            Date</button>
+                    </div>
+                    <div class="flex gap-3">
+                        <button onclick="handleImStuck()"
+                            class="bg-red-500 hover:bg-red-600 text-white font-semibold py-2 px-4 rounded-lg transition">I'm
+                            Stuck</button>
+                        <button onclick="handleTaskAction('complete')"
+                            class="bg-emerald-500 hover:bg-emerald-600 text-white font-semibold py-2 px-4 rounded-lg transition">Mark
+                            as Complete</button>
+                    </div>
                 </div>
-                <div class="flex gap-3">
-                    <button onclick="handleImStuck()"
-                        class="bg-red-500 hover:bg-red-600 text-white font-semibold py-2 px-4 rounded-lg transition">I'm
-                        Stuck</button>
-                    <button onclick="handleTaskAction('complete')"
-                        class="bg-emerald-500 hover:bg-emerald-600 text-white font-semibold py-2 px-4 rounded-lg transition">Mark
-                        as Complete</button>
+                <div id="sprint-actions" class="hidden flex justify-between items-center gap-3">
+                    <a id="view-strategy-btn" href="#" target="_blank"
+                        class="bg-indigo-100 text-indigo-700 font-semibold py-2 px-4 rounded-lg hover:bg-indigo-200 transition">View
+                        Strategy Guide</a>
+                    <button id="start-sprint-btn"
+                        class="bg-purple-600 hover:bg-purple-700 text-white font-semibold py-2 px-5 rounded-lg transition">Start
+                        5-Question Sprint</button>
                 </div>
             </div>
         </div>
@@ -302,7 +312,7 @@
                                 d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z"
                                 clip-rule="evenodd" />
                         </svg>
-                        <span id="sprint-timer">12:00</span>
+                        <span id="quiz-timer-display">12:00</span>
                     </div>
                 </div>
 
@@ -339,6 +349,77 @@
         </div>
     </div>
 
+    <div id="sprintModal"
+        class="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 hidden p-4">
+        <div id="sprint-modal-panel"
+            class="bg-white/60 backdrop-blur-xl border border-white/20 w-full max-w-2xl rounded-2xl shadow-2xl p-6 md:p-8 relative"
+            data-aos="zoom-in" data-aos-duration="400">
+            <button onclick="closeSprintModal(false)"
+                class="text-slate-400 hover:text-slate-600 transition-colors rounded-full p-1 absolute top-4 right-4 focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-500"
+                title="Close sprint">
+                <span class="sr-only">Close</span>
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-6 h-6">
+                    <path fill-rule="evenodd"
+                        d="M5.47 5.47a.75.75 0 0 1 1.06 0L12 10.94l5.47-5.47a.75.75 0 1 1 1.06 1.06L13.06 12l5.47 5.47a.75.75 0 1 1-1.06 1.06L12 13.06l-5.47 5.47a.75.75 0 0 1-1.06-1.06L10.94 12 5.47 6.53a.75.75 0 0 1 0-1.06Z"
+                        clip-rule="evenodd" />
+                </svg>
+            </button>
+            <div id="sprint-start-screen">
+                <h3 id="sprintTitle" class="text-3xl font-bold font-lalezar text-purple-700 mb-2 text-center">Practice
+                    Sprint</h3>
+                <p id="sprintReason" class="text-slate-600 mb-6 text-center"></p>
+                <div class="text-center">
+                    <p class="text-lg font-semibold">Ready for a 5-minute focused practice?</p>
+                    <button onclick="startSprint()"
+                        class="mt-4 bg-purple-600 hover:bg-purple-700 text-white font-semibold py-3 px-8 rounded-lg transition shadow-lg hover:shadow-xl transform hover:-translate-y-1">Start
+                        Sprint</button>
+                </div>
+            </div>
+
+            <div id="sprint-main-screen" class="hidden">
+                <div class="flex justify-between items-center mb-4">
+                    <h3 id="sprintTitleInProgress" class="text-xl font-bold font-lalezar text-purple-700">Sprint In
+                        Progress</h3>
+                    <div
+                        class="flex items-center gap-2 font-semibold text-purple-700 bg-purple-100/80 px-3 py-1 rounded-full">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                            <path fill-rule="evenodd"
+                                d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z"
+                                clip-rule="evenodd" />
+                        </svg>
+                        <span id="sprint-timer-display">05:00</span>
+                    </div>
+                </div>
+                <div id="sprint-question-container">
+                    <p class="text-right text-sm font-semibold text-slate-500 mb-2">Question <span
+                            id="sprint-question-counter">1</span> of 5</p>
+                    <p id="sprint-question-text" class="text-lg font-semibold text-slate-800 mb-4"></p>
+                    <div id="sprint-options-container" class="space-y-3"></div>
+                </div>
+                <div id="sprint-feedback-container" class="hidden mt-4">
+                    <div id="sprint-feedback-content" class="p-4 rounded-lg">
+                        <h4 id="sprint-feedback-title" class="font-bold text-lg"></h4>
+                        <p id="sprint-feedback-explanation" class="text-sm mt-2"></p>
+                    </div>
+                    <button id="sprint-next-question-btn"
+                        class="mt-4 w-full bg-purple-600 hover:bg-purple-700 text-white font-semibold py-2.5 rounded-lg transition">Next
+                        Question</button>
+                </div>
+            </div>
+
+            <div id="sprint-end-screen" class="hidden text-center">
+                <h3 class="text-3xl font-bold font-lalezar text-purple-700 mb-2">Sprint Complete!</h3>
+                <p class="text-lg">You scored <span id="sprint-final-score" class="font-bold"></span>/5.</p>
+                <div class="mt-6">
+                    <button onclick="closeSprintModal(true)"
+                        class="bg-emerald-500 hover:bg-emerald-600 text-white font-semibold py-2 px-5 rounded-lg transition">Mark
+                        Task as Complete</button>
+                    <button onclick="closeSprintModal(false)"
+                        class="mt-2 text-sm text-slate-600 hover:underline">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
 
     <div id="statEntryModal"
         class="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 hidden p-4"
@@ -379,7 +460,6 @@
             </div>
         </div>
     </div>
-
     <div id="addTaskModal"
         class="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 hidden p-4">
         <div class="bg-white/60 backdrop-blur-xl border border-white/20 w-full max-w-lg rounded-2xl shadow-2xl p-6 md:p-8"
@@ -419,10 +499,18 @@
         let conversationHistory = [];
         const chatCategory = 'Test Prep';
 
+        // Quiz specific variables
         let currentQuizData = null;
         let currentQuestionIndex = 0;
         let score = 0;
+        let quizTimerInterval = null;
+
+        // NEW: Sprint specific variables
+        let currentSprintData = null;
+        let currentSprintQuestionIndex = 0;
+        let sprintScore = 0;
         let sprintTimerInterval = null;
+        let sprintResultsToSubmit = [];
 
 
         const loaderOverlay = document.getElementById('ai-loader-overlay');
@@ -519,6 +607,7 @@
                 const isLocked = index > firstPendingIndex && firstPendingIndex !== -1;
                 const isBossBattle = task.description.startsWith('Boss Battle:');
                 const isQuiz = task.task_format === 'quiz';
+                const isSprint = task.task_format === 'practice_sprint';
 
                 const alignmentWrapper = document.createElement('div');
                 alignmentWrapper.className = 'flex';
@@ -547,13 +636,13 @@
                     contentHTML = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-10 h-10 text-slate-500"><path fill-rule="evenodd" d="M12 1.5a5.25 5.25 0 0 0-5.25 5.25v3a3 3 0 0 0-3 3v6.75a3 3 0 0 0 3 3h10.5a3 3 0 0 0 3-3v-6.75a3 3 0 0 0-3-3v-3c0-2.9-2.35-5.25-5.25-5.25Zm3.75 8.25v-3a3.75 3.75 0 1 0-7.5 0v3h7.5Z" clip-rule="evenodd" /></svg>`;
                 }
 
+                let iconHTML = '';
                 if (isQuiz) {
-                    const quizIcon = `<span class="absolute top-1 right-1 bg-white/30 rounded-full p-1"><svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-white" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd" /></svg></span>`;
-                    taskButton.innerHTML = contentHTML + quizIcon;
-                } else {
-                    taskButton.innerHTML = contentHTML;
+                    iconHTML = `<span class="absolute top-1 right-1 bg-white/30 rounded-full p-1" title="Cumulative Quiz"><svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-white" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd" /></svg></span>`;
+                } else if (isSprint) {
+                    iconHTML = `<span class="absolute top-1 right-1 bg-white/30 rounded-full p-1" title="Practice Sprint"><svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-white" viewBox="0 0 20 20" fill="currentColor"><path d="M11.94 2.412a.75.75 0 01.53 1.299l-2.25 3.375a.75.75 0 01-1.06 0L6.94 3.71A.75.75 0 118.47 2.41l.38.285a.75.75 0 00.9 0l.38-.285zM6.94 15.71l-2.25 3.375a.75.75 0 11-1.06-1.06l3.375-2.25a.75.75 0 011.06 1.06zM13.06 15.71a.75.75 0 011.06 1.06l-2.25 3.375a.75.75 0 11-1.06-1.06l2.25-3.375z" /><path fill-rule="evenodd" d="M6.25 10.5a.75.75 0 01.75-.75h6a.75.75 0 010 1.5h-6a.75.75 0 01-.75-.75z" clip-rule="evenodd" /></svg></span>`;
                 }
-
+                taskButton.innerHTML = contentHTML + iconHTML;
 
                 if (!withAnimation) {
                     taskButton.classList.add('visible');
@@ -706,6 +795,7 @@
 
         async function openModalForTask(task) {
             currentTaskId = task.id;
+
             if (task.task_format === 'quiz') {
                 try {
                     const response = await fetch(`/api/quiz/${task.id}`);
@@ -725,10 +815,8 @@
         function openTaskModal(task) {
             const modal = document.getElementById('taskModal');
             document.getElementById('modalTitle').textContent = `Step ${task.client_id}: Your Task`;
-
             document.getElementById('modalDescription').innerHTML = marked.parse(task.description);
             document.getElementById('modalReason').innerHTML = `<b>Why:</b> ${marked.parse(task.reason)}`;
-
 
             const dueDateEl = document.getElementById('modalDueDate');
             const deadlinePicker = document.getElementById('task-deadline-picker');
@@ -741,6 +829,22 @@
             }
 
             renderSubtasks(task.subtasks || []);
+
+            const defaultActions = document.getElementById('default-actions');
+            const sprintActions = document.getElementById('sprint-actions');
+
+            if (task.task_format === 'practice_sprint') {
+                defaultActions.classList.add('hidden');
+                sprintActions.classList.remove('hidden');
+                document.getElementById('view-strategy-btn').href = `/strategy_article/${task.id}`;
+                document.getElementById('start-sprint-btn').onclick = () => {
+                    closeTaskModal();
+                    openPracticeSprintModal(task);
+                };
+            } else {
+                sprintActions.classList.add('hidden');
+                defaultActions.classList.remove('hidden');
+            }
 
             modal.classList.remove('hidden');
         }
@@ -763,7 +867,7 @@
             document.getElementById('quizTitleInProgress').textContent = currentQuizData.title;
 
             displayQuestion();
-            startSprintTimer(12 * 60);
+            startQuizTimer(12 * 60);
         }
 
         function displayQuestion() {
@@ -829,31 +933,22 @@
             document.getElementById('quiz-end-screen').classList.remove('hidden');
             document.getElementById('final-score').textContent = score;
             document.getElementById('total-questions-end').textContent = currentQuizData.questions.length;
-            stopSprintTimer();
+            stopQuizTimer();
         }
 
         function closeQuizModal(markComplete = false) {
             document.getElementById('quizModal').classList.add('hidden');
-            stopSprintTimer();
-            const timerEl = document.getElementById('sprint-timer');
-            if (timerEl) timerEl.textContent = '';
-            const startScreen = document.getElementById('quiz-start-screen');
-            const mainScreen = document.getElementById('quiz-main-screen');
-            const endScreen = document.getElementById('quiz-end-screen');
-            if (startScreen) startScreen.classList.remove('hidden');
-            if (mainScreen) mainScreen.classList.add('hidden');
-            if (endScreen) endScreen.classList.add('hidden');
-
+            stopQuizTimer();
             if (markComplete) {
                 handleTaskAction('complete');
             }
         }
 
-        function startSprintTimer(duration) {
+        function startQuizTimer(duration) {
             let timer = duration, minutes, seconds;
-            const timerEl = document.getElementById('sprint-timer');
+            const timerEl = document.getElementById('quiz-timer-display');
 
-            sprintTimerInterval = setInterval(() => {
+            quizTimerInterval = setInterval(() => {
                 minutes = parseInt(timer / 60, 10);
                 seconds = parseInt(timer % 60, 10);
 
@@ -863,9 +958,140 @@
                 timerEl.textContent = minutes + ":" + seconds;
 
                 if (--timer < 0) {
-                    stopSprintTimer();
+                    stopQuizTimer();
                     timerEl.textContent = "Time's up!";
                     showEndScreen();
+                }
+            }, 1000);
+        }
+
+        function stopQuizTimer() {
+            clearInterval(quizTimerInterval);
+        }
+
+        async function openPracticeSprintModal(task) {
+            try {
+                const response = await fetch(`/api/practice_sprint/${task.id}`);
+                if (!response.ok) throw new Error('Failed to load sprint');
+                currentSprintData = await response.json();
+
+                currentSprintQuestionIndex = 0;
+                sprintScore = 0;
+                sprintResultsToSubmit = [];
+
+                document.getElementById('sprintTitle').textContent = currentSprintData.title;
+                document.getElementById('sprintReason').textContent = task.reason;
+
+                document.getElementById('sprint-start-screen').classList.remove('hidden');
+                document.getElementById('sprint-main-screen').classList.add('hidden');
+                document.getElementById('sprint-end-screen').classList.add('hidden');
+                document.getElementById('sprintModal').classList.remove('hidden');
+
+            } catch (error) {
+                console.error("Error fetching sprint:", error);
+                alert("Could not load the practice sprint. Please try again.");
+            }
+        }
+
+        function startSprint() {
+            document.getElementById('sprint-start-screen').classList.add('hidden');
+            document.getElementById('sprint-main-screen').classList.remove('hidden');
+            document.getElementById('sprintTitleInProgress').textContent = currentSprintData.title;
+            displaySprintQuestion();
+            startSprintTimer(5 * 60); // 5 minute timer for sprints
+        }
+
+        function displaySprintQuestion() {
+            const question = currentSprintData.questions[currentSprintQuestionIndex];
+            document.getElementById('sprint-question-counter').textContent = currentSprintQuestionIndex + 1;
+            document.getElementById('sprint-question-text').innerHTML = marked.parse(question.question_text);
+
+            const optionsContainer = document.getElementById('sprint-options-container');
+            optionsContainer.innerHTML = '';
+            question.options.forEach((option, index) => {
+                const button = document.createElement('button');
+                button.innerHTML = marked.parse(option); // Use marked for options too
+                button.className = 'w-full text-left p-3 border-2 border-slate-300/70 rounded-lg hover:bg-purple-100/50 hover:border-purple-400 transition';
+                button.onclick = () => selectSprintAnswer(index, button);
+                optionsContainer.appendChild(button);
+            });
+            document.getElementById('sprint-feedback-container').classList.add('hidden');
+        }
+
+        function selectSprintAnswer(selectedIndex, button) {
+            document.querySelectorAll('#sprint-options-container button').forEach(btn => btn.disabled = true);
+            const question = currentSprintData.questions[currentSprintQuestionIndex];
+            const isCorrect = selectedIndex === question.correct_option;
+
+            sprintResultsToSubmit.push({ question_id: question.id, is_correct: isCorrect });
+
+            const feedbackContent = document.getElementById('sprint-feedback-content');
+            const feedbackTitle = document.getElementById('sprint-feedback-title');
+            const feedbackExplanation = document.getElementById('sprint-feedback-explanation');
+
+            if (isCorrect) {
+                sprintScore++;
+                button.classList.add('border-emerald-500', 'bg-emerald-100/50');
+                feedbackContent.className = 'p-4 rounded-lg bg-emerald-100/70 border border-emerald-300/80';
+                feedbackTitle.textContent = "Correct!";
+                feedbackTitle.className = "font-bold text-lg text-emerald-800";
+            } else {
+                button.classList.add('border-red-500', 'bg-red-100/50');
+                document.querySelectorAll('#sprint-options-container button')[question.correct_option].classList.add('border-emerald-500', 'bg-emerald-100/50');
+                feedbackContent.className = 'p-4 rounded-lg bg-red-100/70 border border-red-300/80';
+                feedbackTitle.textContent = "Not quite!";
+                feedbackTitle.className = "font-bold text-lg text-red-800";
+            }
+            feedbackExplanation.innerHTML = marked.parse(question.explanation);
+            document.getElementById('sprint-feedback-container').classList.remove('hidden');
+        }
+
+        document.getElementById('sprint-next-question-btn').addEventListener('click', () => {
+            currentSprintQuestionIndex++;
+            if (currentSprintQuestionIndex < currentSprintData.questions.length) {
+                displaySprintQuestion();
+            } else {
+                showSprintEndScreen();
+            }
+        });
+
+        function showSprintEndScreen() {
+            document.getElementById('sprint-main-screen').classList.add('hidden');
+            document.getElementById('sprint-end-screen').classList.remove('hidden');
+            document.getElementById('sprint-final-score').textContent = sprintScore;
+            stopSprintTimer();
+            submitSprintResults(); // Submit results automatically
+        }
+
+        async function submitSprintResults() {
+            await fetch('/api/submit_sprint_results', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ results: sprintResultsToSubmit })
+            });
+        }
+
+        function closeSprintModal(markComplete = false) {
+            document.getElementById('sprintModal').classList.add('hidden');
+            stopSprintTimer();
+            if (markComplete) {
+                handleTaskAction('complete');
+            }
+        }
+
+        function startSprintTimer(duration) {
+            let timer = duration, minutes, seconds;
+            const timerEl = document.getElementById('sprint-timer-display');
+            sprintTimerInterval = setInterval(() => {
+                minutes = parseInt(timer / 60, 10);
+                seconds = parseInt(timer % 60, 10);
+                minutes = minutes < 10 ? "0" + minutes : minutes;
+                seconds = seconds < 10 ? "0" + seconds : seconds;
+                timerEl.textContent = minutes + ":" + seconds;
+                if (--timer < 0) {
+                    stopSprintTimer();
+                    timerEl.textContent = "Time's up!";
+                    showSprintEndScreen();
                 }
             }, 1000);
         }
@@ -873,7 +1099,6 @@
         function stopSprintTimer() {
             clearInterval(sprintTimerInterval);
         }
-
 
         function renderSubtasks(subtasks) {
             const subtasksList = document.getElementById('subtasks-list');
@@ -1049,54 +1274,16 @@
             const p = modal.querySelector('p');
 
             const statDetails = {
-                "sat_math": {
-                    name: "New SAT Math Score",
-                    placeholder: "Enter score (200-800)",
-                    min: 200,
-                    max: 800
-                },
-                "sat_ebrw": {
-                    name: "New SAT EBRW Score",
-                    placeholder: "Enter score (200-800)",
-                    min: 200,
-                    max: 800
-                },
-                "sat_total": {
-                    name: "Full SAT Practice Score",
-                    placeholder: "Enter total score (400-1600)",
-                    min: 400,
-                    max: 1600
-                },
-                "act_math": {
-                    name: "New ACT Math Score",
-                    placeholder: "Enter score (1-36)",
-                    min: 1,
-                    max: 36
-                },
-                "act_reading": {
-                    name: "New ACT Reading Score",
-                    placeholder: "Enter score (1-36)",
-                    min: 1,
-                    max: 36
-                },
-                "act_science": {
-                    name: "New ACT Science Score",
-                    placeholder: "Enter score (1-36)",
-                    min: 1,
-                    max: 36
-                },
-                "act_composite": {
-                    name: "Full ACT Practice Score",
-                    placeholder: "Enter composite score (1-36)",
-                    min: 1,
-                    max: 36
-                }
+                "sat_math": { name: "New SAT Math Score", placeholder: "Enter score (200-800)", min: 200, max: 800 },
+                "sat_ebrw": { name: "New SAT EBRW Score", placeholder: "Enter score (200-800)", min: 200, max: 800 },
+                "sat_total": { name: "Full SAT Practice Score", placeholder: "Enter total score (400-1600)", min: 400, max: 1600 },
+                "act_math": { name: "New ACT Math Score", placeholder: "Enter score (1-36)", min: 1, max: 36 },
+                "act_reading": { name: "New ACT Reading Score", placeholder: "Enter score (1-36)", min: 1, max: 36 },
+                "act_science": { name: "New ACT Science Score", placeholder: "Enter score (1-36)", min: 1, max: 36 },
+                "act_composite": { name: "Full ACT Practice Score", placeholder: "Enter composite score (1-36)", min: 1, max: 36 }
             };
 
-            const details = statDetails[statName] || {
-                name: "Update Score",
-                placeholder: "Enter value"
-            };
+            const details = statDetails[statName] || { name: "Update Score", placeholder: "Enter value" };
 
             modalTitle.textContent = `Update: ${details.name}`;
             modalLabel.textContent = details.name;
@@ -1107,11 +1294,9 @@
             statValueInput.value = "";
 
             if (statName === 'sat_total' || statName === 'act_composite') {
-                p.innerHTML =
-                    `This practice score will <strong>not</strong> be saved to your main Stats page. It will only be used on the <a href="/dashboard/tracker" class="text-purple-600 hover:underline font-semibold">Tracker</a> page to chart your progress and help improve future paths.`;
+                p.innerHTML = `This practice score will <strong>not</strong> be saved to your main Stats page. It will only be used on the <a href="/dashboard/tracker" class="text-purple-600 hover:underline font-semibold">Tracker</a> page to chart your progress and help improve future paths.`;
             } else {
-                p.innerHTML =
-                    `Great job on this milestone! The score you enter will be saved to your <a href="/dashboard/stats" class="text-purple-600 hover:underline font-semibold">Stats</a> page and will help tailor your future test prep paths.`;
+                p.innerHTML = `Great job on this milestone! The score you enter will be saved to your <a href="/dashboard/stats" class="text-purple-600 hover:underline font-semibold">Stats</a> page and will help tailor your future test prep paths.`;
             }
 
             modal.classList.remove('hidden');
@@ -1143,13 +1328,8 @@
             try {
                 const response = await fetch('/api/update_stats', {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({
-                        stat_name,
-                        stat_value
-                    })
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ stat_name, stat_value })
                 });
                 if (!response.ok) throw new Error('Failed to save stats.');
                 const result = await response.json();
@@ -1170,8 +1350,7 @@
             const chatInput = document.getElementById('userInput');
             const sendButton = document.getElementById('send-btn');
             let message = chatInput.value.trim();
-            const isInitialMessage = conversationHistory.length > 0 && conversationHistory[conversationHistory
-                .length - 1].content === 'INITIAL_MESSAGE';
+            const isInitialMessage = conversationHistory.length > 0 && conversationHistory[conversationHistory.length - 1].content === 'INITIAL_MESSAGE';
 
             if (isInitialMessage) {
                 chatInput.value = "";
@@ -1185,10 +1364,7 @@
 
             if (!isInitialMessage) {
                 appendChatMessage(message, 'user');
-                conversationHistory.push({
-                    role: 'user',
-                    content: message
-                });
+                conversationHistory.push({ role: 'user', content: message });
             }
 
             chatInput.value = "";
@@ -1204,12 +1380,8 @@
             try {
                 const response = await fetch(`/api/chat?category=${chatCategory}`, {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({
-                        history: conversationHistory
-                    })
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ history: conversationHistory })
                 });
                 if (!response.ok) throw new Error('AI response error.');
 
@@ -1222,10 +1394,7 @@
 
                 if (data.new_path) {
                     appendChatMessage("I've generated a new path for you based on our conversation.", 'bot');
-                    conversationHistory.push({
-                        role: 'assistant',
-                        content: "I've generated a new path for you based on our conversation."
-                    });
+                    conversationHistory.push({ role: 'assistant', content: "I've generated a new path for you based on our conversation." });
                     currentTasks = data.new_path.map((task, index) => ({
                         ...task,
                         client_id: index + 1,
@@ -1237,10 +1406,7 @@
                 } else {
                     const aiReply = data.reply;
                     appendChatMessage(aiReply, 'bot');
-                    conversationHistory.push({
-                        role: 'assistant',
-                        content: aiReply
-                    });
+                    conversationHistory.push({ role: 'assistant', content: aiReply });
                 }
 
             } catch (error) {
@@ -1259,12 +1425,8 @@
                 try {
                     const response = await fetch('/api/reset_chat', {
                         method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json'
-                        },
-                        body: JSON.stringify({
-                            category: chatCategory
-                        })
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ category: chatCategory })
                     });
                     if (!response.ok) throw new Error('Failed to reset chat.');
 
@@ -1301,9 +1463,7 @@
         }
 
         document.addEventListener('DOMContentLoaded', () => {
-            // --- START OF THE FIX ---
             localStorage.setItem('hasTestPath', 'true');
-            // --- END OF THE FIX ---
             fetchPath();
             loadChatHistory();
         });

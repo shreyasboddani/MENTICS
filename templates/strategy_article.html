@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <title>{{ article.title }} – Mentics</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Lalezar&display=swap"
+        rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='dashboard.css') }}">
+    <link rel="icon" href="{{ url_for('static', filename='favicon.svg') }}" type="image/svg+xml">
+    <style>
+        .prose h3 {
+            font-family: 'Lalezar', cursive;
+            color: #4338ca;
+            margin-top: 1.5em;
+        }
+
+        .prose ul>li::before {
+            background-color: #a78bfa;
+        }
+
+        .prose strong {
+            color: #1e293b;
+        }
+
+        .prose code {
+            background-color: #eef2ff;
+            color: #4338ca;
+            padding: 0.2em 0.4em;
+            border-radius: 0.25rem;
+            font-size: 0.9em;
+        }
+    </style>
+</head>
+
+<body class="bg-slate-50 font-sans text-slate-800 antialiased min-h-screen flex flex-col items-center p-4">
+    <div class="background-shapes">
+        <div class="shape-1"></div>
+        <div class="shape-2"></div>
+    </div>
+    <header class="absolute top-0 left-0 w-full z-10">
+        <div class="max-w-5xl mx-auto flex justify-between items-center px-6 py-4">
+            <a href="/dashboard" class="text-3xl font-bold text-purple-600 tracking-tight font-lalezar">MENTICS</a>
+            <nav>
+                <a href="{{ url_for('test_path_view') }}"
+                    class="text-sm font-semibold text-slate-600 hover:text-purple-600 transition-colors duration-200">
+                    &larr; Back to Path
+                </a>
+            </nav>
+        </div>
+    </header>
+
+    <main class="w-full max-w-3xl mt-24">
+        <div class="card p-8 md:p-12">
+            <h1 class="text-3xl md:text-4xl font-bold font-lalezar text-purple-700 mb-6">{{ article.title }}</h1>
+            <div id="article-content" class="prose max-w-none text-slate-700"></div>
+            <!-- Hidden textarea to safely transport markdown from Jinja to JS without breaking quoting -->
+            <textarea id="article-markdown" style="display:none;">{{ article.content or '' }}</textarea>
+        </div>
+    </main>
+
+    <script>
+        // Read markdown from hidden textarea to avoid template-to-JS quoting issues
+        const rawFromTextarea = document.getElementById('article-markdown') ? document.getElementById('article-markdown').value : '';
+        const rawArticleMarkdown = rawFromTextarea && rawFromTextarea.trim().length > 0 ? rawFromTextarea : '# Article unavailable\n\nThis article has no content yet. Try again later or contact support.';
+        document.getElementById('article-content').innerHTML = marked.parse(rawArticleMarkdown);
+    </script>
+</body>
+
+</html>
