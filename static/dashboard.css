@@ -712,3 +712,15 @@ body {
 .tab-content.active {
     display: block;
 }
+
+/* Add this rule to handle text wrapping in path history */
+.timeline-item ul li span {
+    overflow-wrap: break-word;
+    /* Allows breaking long words/URLs */
+    word-break: break-word;
+    /* Alternative property, often used together */
+    display: inline-block;
+    /* Helps with wrapping */
+    max-width: 100%;
+    /* Ensure it doesn't try to exceed parent width */
+}
