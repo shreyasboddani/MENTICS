@@ -16,20 +16,19 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 from authlib.integrations.flask_client import OAuth
 from werkzeug.utils import secure_filename
 
-# Explicitly load the .env file from the correct path
+
 env_path = Path('.') / '.env'
 load_dotenv(dotenv_path=env_path)
 
 app = Flask(__name__)
 app.secret_key = os.getenv("SECRET_KEY")
-# --- START: UPLOAD FOLDER CONFIGURATION ---
+
 app.config['UPLOAD_FOLDER'] = 'static/uploads'
 app.url_map.strict_slashes = False
 app.permanent_session_lifetime = timedelta(minutes=10)
 
-# Ensure the upload folder exists
+
 os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
-# --- END: UPLOAD FOLDER CONFIGURATION ---
 
 
 oauth = OAuth(app)
@@ -145,7 +144,7 @@ def init_db():
         "explanation": "TEXT",
         "FOREIGN KEY(quiz_id)": "REFERENCES quizzes(id) ON DELETE CASCADE"
     })
-    # --- NEW TABLE FOR QUIZ RESULTS ---
+
     db.create_table("quiz_results", {
         "id": "INTEGER PRIMARY KEY AUTOINCREMENT",
         "user_id": "INTEGER NOT NULL",
@@ -155,7 +154,6 @@ def init_db():
         "FOREIGN KEY(user_id)": "REFERENCES users(id) ON DELETE CASCADE",
         "FOREIGN KEY(question_id)": "REFERENCES quiz_questions(id) ON DELETE CASCADE"
     })
-    # In app.py, inside the init_db() function
 
     db.create_table("practice_sprints", {
         "id": "INTEGER PRIMARY KEY AUTOINCREMENT",
@@ -168,8 +166,8 @@ def init_db():
         "id": "INTEGER PRIMARY KEY AUTOINCREMENT",
         "sprint_id": "INTEGER NOT NULL",
         "question_text": "TEXT NOT NULL",
-        "options": "TEXT NOT NULL",  # JSON list of strings
-        "correct_option": "INTEGER NOT NULL",  # Index of correct option
+        "options": "TEXT NOT NULL",
+        "correct_option": "INTEGER NOT NULL",
         "explanation": "TEXT",
         "FOREIGN KEY(sprint_id)": "REFERENCES practice_sprints(id) ON DELETE CASCADE"
     })
@@ -188,28 +186,23 @@ def init_db():
         "id": "INTEGER PRIMARY KEY AUTOINCREMENT",
         "task_id": "INTEGER NOT NULL UNIQUE",
         "title": "TEXT NOT NULL",
-        "content": "TEXT NOT NULL",  # Markdown content
+        "content": "TEXT NOT NULL",
         "FOREIGN KEY(task_id)": "REFERENCES paths(id) ON DELETE CASCADE"
     })
 
-    # Add a new column to the paths table to store the article ID
     db.add_column("paths", "secondary_content_id", "INTEGER")
-    # --- START of the FIX ---
-    # Drop the old, inefficient index if it exists, to be safe.
+
     try:
         db.execute("DROP INDEX IF EXISTS idx_paths_user_category_active;")
     except Exception as e:
         print(f"Could not drop old index (this is likely fine): {e}")
 
-    # Create the new, correct, and highly performant index.
-    # This new index includes the 'created_at' column which is critical for performance.
     db.execute(
         """
         CREATE INDEX IF NOT EXISTS idx_paths_user_category_active_created
         ON paths (user_id, category, is_active, created_at DESC);
         """
     )
-    # --- END of the FIX ---
 
 
 # --- HELPER FUNCTIONS ---
@@ -235,13 +228,11 @@ def _get_stat_history_for_prompt(user_id):
     for record in history_records:
         stat_name, stat_value, recorded_at = record['stat_name'], record['stat_value'], record['recorded_at']
         date = recorded_at.split(" ")[0]
-        # Make stat names more readable
+
         readable_name = stat_name.replace('_', ' ').title()
         summary.append(
             f"- On {date}, their {readable_name} was recorded as {stat_value}.")
     return "\n".join(summary)
-
-# --- NEW HELPER FUNCTION TO GET QUIZ RESULTS ---
 
 
 def _get_quiz_results_for_prompt(user_id):
@@ -360,9 +351,6 @@ def _get_current_numbered_tasks(user_id, category):
     return "\n".join(numbered_tasks)
 
 
-# In app.py, add this new helper function before your _get_test_prep_ai_tasks function
-
-
 def _get_sprint_results_for_prompt(user_id):
     """Fetches and formats a summary of the user's recent incorrect sprint answers for AI prompts."""
     query = """
@@ -395,7 +383,7 @@ def _get_test_prep_ai_tasks(strengths, weaknesses, test_focus, current_scores={}
     def get_mock_tasks_reliably():
         """A fallback function to provide tasks if the AI service is unavailable."""
         print("--- DEBUG: Running fallback mock task generator for Test Prep. ---")
-        # (Keep the fallback content the same as before)
+
         return [
             {"task_format": "link", "description": "Take a full-length, timed SAT practice test from the [official College Board site](https://satsuite.collegeboard.org/sat/practice-preparation/practice-tests).",
              "reason": "This is a 'boss battle' to test your skills under pressure.", "type": "milestone", "stat_to_update": "sat_total", "category": "Test Prep", "difficulty": "hard"},
@@ -481,13 +469,13 @@ def _get_test_prep_ai_tasks(strengths, weaknesses, test_focus, current_scores={}
         f"3.  **Standard Generation:** Otherwise, generate a standard path that builds on their history.\n\n"
 
         f"# STUDENT ANALYSIS DATA\n"
-        f"- **Primary Test Focus:** {focus_desc}\n"  # NEW
+        f"- **Primary Test Focus:** {focus_desc}\n"
         f"- Strengths: {strengths}\n"
         f"- Weaknesses: {weaknesses} <== **Base your tasks primarily on these specific weaknesses.**\n"
-        f"- **Current Scores (Baseline):** {current_scores_str}\n"  # NEW
-        f"- Desired Scores: {desired_scores_str}\n"  # Updated
-        f"- Official Test Date: {test_date_info}\n"  # Updated
-        # NEW
+        f"- **Current Scores (Baseline):** {current_scores_str}\n"
+        f"- Desired Scores: {desired_scores_str}\n"
+        f"- Official Test Date: {test_date_info}\n"
+
         f"- Estimated Weekly Study Time: {hours_per_week or 'Not specified'} hours\n\n"
 
         f"## HISTORICAL & CONVERSATIONAL CONTEXT\n"
@@ -572,20 +560,19 @@ def _get_test_prep_ai_tasks(strengths, weaknesses, test_focus, current_scores={}
         response_data = None
         raw_text = None
 
-        # Try to access the text content reliably
         try:
-            # The structure might vary slightly depending on the exact Gemini library version
+
             if hasattr(response, 'text'):
                 raw_text = response.text
             elif hasattr(response, 'parts') and response.parts:
-                # Handle potential streaming or multi-part responses if applicable
+
                 raw_text = "".join(
                     part.text for part in response.parts if hasattr(part, 'text'))
             elif hasattr(response, 'content') and hasattr(response.content, 'parts') and response.content.parts:
                 raw_text = "".join(
                     part.text for part in response.content.parts if hasattr(part, 'text'))
             else:
-                # Fallback to string representation if unsure
+
                 raw_text = str(response)
         except Exception as e:
             print(f"--- Error accessing Gemini response text: {e} ---")
@@ -595,22 +582,17 @@ def _get_test_prep_ai_tasks(strengths, weaknesses, test_focus, current_scores={}
             raise ValueError(
                 "AI response was empty or text could not be extracted.")
 
-        # Clean the raw text FIRST
         import re
-        # Remove control characters that are invalid in JSON, keep \n, \r, \t
-        # Expanded range to catch potential issues like the one reported
         cleaned_text = re.sub(
             r'[\x00-\x08\x0b\x0c\x0e-\x1f\x7f-\x9f]', '', raw_text)
 
-        # Attempt to parse the cleaned text
         try:
-            # Attempt direct parsing first, as the mime_type should ensure it's JSON
+
             response_data = json.loads(cleaned_text)
         except json.JSONDecodeError as direct_e:
-            # If direct parsing fails, try extracting the JSON part (more robust fallback)
+
             print(
                 f"--- Direct JSON parsing failed: {direct_e}. Attempting extraction... ---")
-            # Look for the outermost '{...}' or '[...]' structure
             match = re.search(
                 r'^\s*(\{.*\}|\[.*\])\s*$', cleaned_text, re.DOTALL)
             if match:
@@ -619,18 +601,16 @@ def _get_test_prep_ai_tasks(strengths, weaknesses, test_focus, current_scores={}
                     response_data = json.loads(json_candidate)
                     print("--- Successfully parsed extracted JSON. ---")
                 except json.JSONDecodeError as extract_e:
-                    # If even extraction fails, raise the original error with context
+
                     raise ValueError(
                         f"Failed to parse cleaned AI JSON response even after extraction: {extract_e}\nCleaned text (first 2000 chars): {cleaned_text[:2000]}") from extract_e
             else:
-                # If no JSON structure is found after cleaning
+
                 raise ValueError(
                     f"No valid JSON structure found in the cleaned AI response.\nCleaned text (first 2000 chars): {cleaned_text[:2000]}") from direct_e
 
-        # --- (Proceed with task extraction and normalization as before) ---
         tasks = response_data.get("tasks", [])
 
-        # (Normalization logic remains the same - reusing the existing robust code block)
         def looks_like_practice(desc):
             if not desc:
                 return False
@@ -639,7 +619,6 @@ def _get_test_prep_ai_tasks(strengths, weaknesses, test_focus, current_scores={}
             desc_l = desc.lower()
             return any(k in desc_l for k in kws)
 
-        # ... (rest of the normalization helper functions: make_mock_sprint, make_strategy_article, make_mock_quiz) ...
         def make_mock_sprint(skill):
             questions = [{'question_text': f"SAT/ACT practice {qi+1} on {skill}.", 'options': ['A', 'B',
                                                                                                'C', 'D'], 'correct_option': 0, 'explanation': f"Key steps for {skill}."} for qi in range(5)]
@@ -656,14 +635,14 @@ def _get_test_prep_ai_tasks(strengths, weaknesses, test_focus, current_scores={}
             return {'title': f"Cumulative Quiz: {topic}", 'questions': questions}
 
         normalized = []
-        # (The normalization loop remains exactly the same as before)
+
         for t in tasks if isinstance(tasks, list) else []:
             try:
-                # ... (entire normalization logic for each task 't') ...
+
                 if not isinstance(t, dict):
                     continue
                 desc = t.get('description', '') or ''
-                t['category'] = 'Test Prep'  # Ensure category
+                t['category'] = 'Test Prep'
                 inferred_format = t.get('task_format') or (
                     'practice_sprint' if looks_like_practice(desc) else 'link')
                 t['task_format'] = inferred_format
@@ -728,23 +707,22 @@ def _get_test_prep_ai_tasks(strengths, weaknesses, test_focus, current_scores={}
             except Exception as norm_e:
                 print(
                     f"--- Error normalizing task: {norm_e} --- Task data: {t}")
-                continue  # Skip problematic task
+                continue
 
         if isinstance(normalized, list) and len(normalized) > 0:
             return normalized
         elif isinstance(normalized, list) and len(normalized) == 0 and tasks:
             print("--- WARNING: Normalization removed all tasks. Falling back. ---")
-            return get_mock_tasks_reliably()  # Fallback if normalization failed badly
-        else:  # tasks might not have been a list or was empty
+            return get_mock_tasks_reliably()
+        else:
             raise ValueError(
                 "AI response did not contain a valid 'tasks' list or normalization produced no tasks")
 
-    # --- ***** END OF CORRECTED PARSING LOGIC ***** ---
     except Exception as e:
-        # General catch-all for API errors or unexpected issues
+
         print(
             f"\n--- GEMINI API OR PROCESSING ERROR IN _get_test_prep_ai_tasks: {e} ---\n")
-        # Ensure raw_text is defined for logging, even if extraction failed earlier
+
         if 'raw_text' not in locals():
             raw_text = "Raw text extraction failed."
         print(
@@ -755,7 +733,7 @@ def _get_test_prep_ai_tasks(strengths, weaknesses, test_focus, current_scores={}
 @app.route('/strategy_article/<int:task_id>')
 @login_required
 def strategy_article(user, task_id):
-    # Ensure the user has access to this task
+
     task = db.select_one(
         "paths", where={"id": task_id, "user_id": user.data['id']})
     if not task:
@@ -798,7 +776,7 @@ def get_practice_sprint(user, task_id):
 @login_required
 def submit_sprint_results(user):
     data = request.get_json()
-    # Expecting list of {'question_id': id, 'is_correct': bool}
+
     results = data.get('results')
     if not results:
         return jsonify({"success": False, "error": "Invalid results format"}), 400
@@ -814,22 +792,18 @@ def submit_sprint_results(user):
     return jsonify({"success": True})
 
 
-# In app.py, REPLACE the entire _generate_and_save_new_test_path function
-
 def _generate_and_save_new_test_path(user_id, test_path_info, chat_history=[]):
     user_record = db.select_one("users", where={"id": user_id})
     user_stats = json.loads(user_record['stats']) if user_record else {
-    }  # Load main stats like GPA
+    }
 
-    # Extract info from test_path_info (which now contains more fields)
     strengths = test_path_info.get("strengths", "")
     weaknesses = test_path_info.get("weaknesses", "")
-    # Default to SAT if not provided
+
     test_focus = test_path_info.get("test_focus", "sat")
     test_date_str = test_path_info.get("test_date")
     hours_per_week = test_path_info.get("hours_per_week")
 
-    # Group current and desired scores for clarity
     current_scores = {
         "current_sat_ebrw": test_path_info.get("current_sat_ebrw"),
         "current_sat_math": test_path_info.get("current_sat_math"),
@@ -843,7 +817,6 @@ def _generate_and_save_new_test_path(user_id, test_path_info, chat_history=[]):
         "desired_act": test_path_info.get("desired_act"),
     }
 
-    # (Path history fetching remains the same)
     all_tasks = db.select(
         "paths", where={"user_id": user_id, "category": "Test Prep"})
     path_history = {
@@ -851,17 +824,13 @@ def _generate_and_save_new_test_path(user_id, test_path_info, chat_history=[]):
         "incomplete": [t for t in all_tasks if not t['is_completed']]
     }
 
-    # (Context data fetching remains the same)
     stat_history = _get_stat_history_for_prompt(user_id)
     quiz_results = _get_quiz_results_for_prompt(user_id)
-    sprint_results = _get_sprint_results_for_prompt(
-        user_id)  # Ensure this line exists
+    sprint_results = _get_sprint_results_for_prompt(user_id)
 
-    # Deactivate old path
     db.update("paths", {"is_active": False}, where={
               "user_id": user_id, "category": "Test Prep", "is_active": True})
 
-    # ***** UPDATED CALL *****
     tasks = _get_test_prep_ai_tasks(
         strengths=strengths,
         weaknesses=weaknesses,
@@ -876,11 +845,9 @@ def _generate_and_save_new_test_path(user_id, test_path_info, chat_history=[]):
         quiz_results=quiz_results,
         sprint_results=sprint_results
     )
-    # ***** END UPDATED CALL *****
 
-    tasks = tasks[:5]  # Limit to 5 tasks
+    tasks = tasks[:5]
 
-    # (Saving tasks logic remains the same, including quizzes, sprints, articles)
     saved_tasks = []
     for i, task in enumerate(tasks):
         task_format = task.get("task_format", "link")
@@ -917,12 +884,10 @@ def _generate_and_save_new_test_path(user_id, test_path_info, chat_history=[]):
     return saved_tasks
 
 
-# Added sprint_results parameter
 def _get_test_prep_ai_chat_response(history, user_stats, stat_history="", quiz_results="", sprint_results="", user_id=None):
     if not os.getenv("GEMINI_API_KEY"):
         return "I'm in testing mode, but I'm saving our conversation!"
 
-    # Extract test path info, including new fields
     test_path_info = user_stats.get("test_path", {})
     test_focus = test_path_info.get("test_focus", "not specified")
     desired_sat = test_path_info.get("desired_sat", "N/A")
@@ -930,15 +895,14 @@ def _get_test_prep_ai_chat_response(history, user_stats, stat_history="", quiz_r
     current_sat_ebrw = test_path_info.get("current_sat_ebrw", "N/A")
     current_sat_math = test_path_info.get("current_sat_math", "N/A")
     current_act_comp = test_path_info.get(
-        "current_act_composite", "N/A")  # Renamed for clarity
+        "current_act_composite", "N/A")
     hours_per_week = test_path_info.get("hours_per_week", "N/A")
     strengths = test_path_info.get("strengths", "Not provided")
     weaknesses = test_path_info.get("weaknesses", "Not provided")
 
-    # --- Test Date Formatting (same as before) ---
     test_date_info = "The student has not set a test date yet."
     test_date_str = test_path_info.get("test_date")
-    # ... (rest of date formatting logic is the same) ...
+
     if test_date_str:
         try:
             user_tz_str = session.get('timezone', 'UTC')
@@ -948,7 +912,7 @@ def _get_test_prep_ai_chat_response(history, user_stats, stat_history="", quiz_r
                 user_tz = ZoneInfo("UTC")
             test_date = datetime.strptime(
                 test_date_str, '%Y-%m-%d').date()  # Use .date()
-            # Compare dates directly
+
             delta = test_date - datetime.now(user_tz).date()
             formatted_date = test_date.strftime('%B %d, %Y')
             if delta.days >= 0:
@@ -958,11 +922,9 @@ def _get_test_prep_ai_chat_response(history, user_stats, stat_history="", quiz_r
         except ValueError:
             test_date_info = f"The student has set a test date, but it's in an invalid format: {test_date_str}."
 
-    # --- Current Task Info (same as before) ---
     current_tasks = "No tasks available." if user_id is None else _get_current_numbered_tasks(
         user_id, "Test Prep")
 
-    # Determine Test Focus Description
     focus_desc = "SAT"
     if test_focus == 'act':
         focus_desc = "ACT"
@@ -982,21 +944,21 @@ def _get_test_prep_ai_chat_response(history, user_stats, stat_history="", quiz_r
 
         f"## CURRENT STUDENT ANALYSIS (CONTEXT FOR YOUR RESPONSE)\n"
         f"This is the specific student you are currently coaching:\n"
-        f"- **Primary Test Focus:** {focus_desc}\n"  # NEW
-        # NEW
+        f"- **Primary Test Focus:** {focus_desc}\n"
+
         f"- Current SAT EBRW: {current_sat_ebrw}, Current SAT Math: {current_sat_math}\n"
-        # NEW (You can add section scores too if needed)
+
         f"- Current ACT Composite: {current_act_comp}\n"
-        # Updated
+
         f"- Desired SAT: {desired_sat}, Desired ACT: {desired_act}\n"
         f"- Strengths: {strengths}\n"
         f"- Weaknesses: {weaknesses}\n"
-        f"- Official Test Date Info: {test_date_info}\n"  # Updated name
-        f"- Estimated Weekly Study Time: {hours_per_week} hours\n"  # NEW
+        f"- Official Test Date Info: {test_date_info}\n"
+        f"- Estimated Weekly Study Time: {hours_per_week} hours\n"
         f"- Historical Performance Data (from Tracker): {stat_history}\n"
         f"- Current Active Tasks (numbered):\n{current_tasks}\n\n"
         f"## RECENT QUIZ PERFORMANCE (Incorrect Answers)\n{quiz_results}\n\n"
-        # Added sprint results here too
+
         f"## RECENT SPRINT PERFORMANCE (Incorrect Answers)\n{sprint_results}\n\n"
         f"This shows specific questions the user recently got wrong. Use this granular data to mentor them in their path."
 
@@ -1020,7 +982,7 @@ def _get_test_prep_ai_chat_response(history, user_stats, stat_history="", quiz_r
         gemini_history.append({"role": role, "parts": [message["content"]]})
 
     try:
-        # Initialize model
+
         model = genai.GenerativeModel(
             'gemini-2.5-flash', system_instruction=system_message)
         chat = model.start_chat(history=gemini_history[:-1])
@@ -1141,12 +1103,8 @@ def _get_college_planning_ai_chat_response(history, user_stats, stat_history="",
 
     college_info = user_stats.get("college_path", {})
 
-    # Get current active tasks
     current_tasks = "No tasks available." if user_id is None else _get_current_numbered_tasks(
         user_id, "College Planning")
-
-    # Get current active tasks
-    current_tasks = _get_current_numbered_tasks(user_id, "College Planning")
 
     system_message = (
         "# MISSION & IDENTITY\n"
@@ -1189,7 +1147,7 @@ def _get_college_planning_ai_chat_response(history, user_stats, stat_history="",
         "    - For simple questions, provide short, concise answers KEEP THESE UNDER 100 WORDS.\n"
         "    - For complex requests (e.g., essay brainstorming, advice on choosing colleges), provide detailed, structured responses using lists or bullet points KEEP THESE UNDER 250 WORDS.\n"
         "6.  **Proactive Advising**: If the student seems stuck on a task like 'write an essay', break it down into smaller, actionable steps (e.g., 'Let's start by brainstorming three key experiences you could write about.').\n"
-        "7.  **Mentorship Tone**: Always maintain a supportive, encouraging, and realistic tone to keep the student motivated throughout the often-stressful college application process."
+        "7.  **Mentorship Tone**: Always maintain a supportive, encouraging, and realistic tone to keep the student motivated throughout the often-stressful college application process.\n"
         "8. **Suggest Test Prep Path When Relevant**: If the student mentions standardized tests (SAT/ACT) or seems uncertain about test preparation, proactively suggest they explore the MENTICS Test Prep path for tailored study plans and resources.\n"
     )
 
@@ -1259,8 +1217,6 @@ def _generate_and_save_new_college_path(user_id, college_context, chat_history=[
         print(f"Error in _generate_and_save_new_college_path: {e}")
         return []
 
-# Add this new function inside app.py
-
 
 @app.route("/dashboard/tracker")
 @login_required
@@ -1271,7 +1227,6 @@ def tracker(user):
     stat_history_raw = db.select(
         "stat_history", where={"user_id": user_id}, order_by="recorded_at ASC")
 
-    # A dictionary to hold lists of {"date": d, "value": v} for each stat
     history_by_stat = {}
     for record in stat_history_raw:
         stat_name = record['stat_name']
@@ -1286,7 +1241,6 @@ def tracker(user):
             continue  # Skip records with non-numeric values
 
     # --- 2. Calculate Composite/Total Scores from Sectional History ---
-    # This ensures that practice test totals from the path view are included.
     sat_scores_by_date = {}
     for entry in history_by_stat.get('sat_math', []):
         sat_scores_by_date.setdefault(entry['date'], {})[
@@ -1299,7 +1253,7 @@ def tracker(user):
     for date, scores in sat_scores_by_date.items():
         if 'math' in scores and 'ebrw' in scores:
             total = scores['math'] + scores['ebrw']
-            # Avoid adding duplicate totals for the same day
+
             if not any(entry['date'] == date for entry in sat_total_history):
                 sat_total_history.append({"date": date, "value": total})
 
@@ -1316,9 +1270,9 @@ def tracker(user):
     act_composite_history = history_by_stat.get('act_composite', [])
     for date, scores in act_scores_by_date.items():
         if scores:
-            # ACT composite is the average of the sections
+
             composite = round(sum(scores) / len(scores))
-            # Avoid adding duplicate composites for the same day
+
             if not any(entry['date'] == date for entry in act_composite_history):
                 act_composite_history.append(
                     {"date": date, "value": composite})
@@ -1401,7 +1355,6 @@ def _get_tracker_ai_analysis(user):
         path_history_summary.append(
             f"Most Recent Path: A '{last_path_category}' path generated on {last_path_date}.")
 
-    # Better structured prompt focusing on trends, causes, and 3 actionable steps.
     prompt = (
         f"You are an expert education analyst. Produce a concise markdown report for the student.\n\n"
         f"CONTEXT:\n- Recent score history (latest 20 records):\n{stat_history_summary}\n\n"
@@ -1410,7 +1363,6 @@ def _get_tracker_ai_analysis(user):
         f"INSTRUCTIONS:\n1) Provide a 3-sentence overall progress snapshot.\n2) List 3 specific strengths with data references.\n3) List 3 specific weaknesses or patterns to address, referencing quiz examples when useful.\n4) Provide 3 prioritized, actionable next steps (short, doable, and measurable).\n5) Suggest one micro-quiz/task the student can do in the next 48 hours.\n6) Keep tone encouraging and avoid technical jargon.\n\n"
     )
 
-    # If a cloud AI key is available, call the model. Otherwise produce a safe local heuristic summary.
     if os.getenv("GEMINI_API_KEY"):
         try:
             model = genai.GenerativeModel('gemini-2.5-flash')
@@ -1418,13 +1370,11 @@ def _get_tracker_ai_analysis(user):
             return response.text
         except Exception as e:
             print(f"Error in tracker AI analysis (remote): {e}")
-            # fallthrough to local summary
 
-    # Local fallback: generate a simple heuristic analysis
     try:
-        # Build simple heuristics from stat_history_summary and quiz_results_summary
+
         analysis_lines = []
-        # Snapshot
+
         latest_scores = []
         try:
             for line in stat_history_summary.splitlines()[:6]:
@@ -1440,7 +1390,6 @@ Recent notable entries:
         else:
             analysis_lines.append("No recent score records available.")
 
-        # Strengths & Weaknesses via simple keyword checks
         analysis_lines.append("\n### 🏆 Key Strengths")
         if 'improved' in stat_history_summary.lower() or 'increase' in stat_history_summary.lower():
             analysis_lines.append(
@@ -1515,7 +1464,7 @@ def signup():
                     "act_reading": "", "act_science": "", "gpa": "", "milestones": 0
                 })
             })
-            # Initialize gamification stats for new user
+
             db.insert("gamification_stats", {
                       "user_id": user_id, "points": 0, "current_streak": 0})
 
@@ -1537,7 +1486,7 @@ def login():
     if request.method == "POST":
         email = request.form["email"]
         password = request.form["password"]
-        # Use the new, efficient select_one method
+
         user_record = db.select_one("users", where={"email": email})
         if user_record and check_password_hash(user_record['password'], password):
             session["user"] = user_record['email']
@@ -1558,22 +1507,20 @@ def google_login():
 # NEW: Google Authorize Route (Callback) - UPDATED
 
 
-# Replace the entire authorize function in app.py
 @app.route('/authorize')
 def authorize():
     token = oauth.google.authorize_access_token()
     user_info = oauth.google.parse_id_token(token, nonce=session.get('nonce'))
 
-    # Use the new, efficient select_one method
     user_record = db.select_one("users", where={"email": user_info['email']})
 
     if user_record:
-        # User exists, log them in
+
         session["user"] = user_record['email']
         session["user_id"] = user_record['id']
         session.permanent = True
     else:
-        # New user, create an account
+
         password_hash = generate_password_hash(os.urandom(16).hex())
         user_id = db.insert("users", {
             "email": user_info['email'],
@@ -1620,8 +1567,6 @@ def onboarding(user):
 
     return render_template('onboarding.html')
 
-# NEW: Add a route to set the user's timezone in the session
-
 
 @app.route('/set-timezone', methods=['POST'])
 def set_timezone():
@@ -1636,9 +1581,6 @@ def set_timezone():
         except ZoneInfoNotFoundError:
             return jsonify({"success": False, "error": "Invalid timezone"}), 400
     return jsonify({"success": False, "error": "Timezone not provided"}), 400
-
-# --- Dashboard & Path Routes ---
-
 
 # --- Dashboard & Path Routes ---
 
@@ -1721,7 +1663,6 @@ def dashboard(user):
             "timestamp": activity['created_at']
         })
 
-    # --- START OF FIX: Data for Activity Chart ---
     user_tz_str = session.get('timezone', 'UTC')
     try:
         user_tz = ZoneInfo(user_tz_str)
@@ -1731,7 +1672,6 @@ def dashboard(user):
     today = datetime.now(user_tz).date()
     seven_days_ago = today - timedelta(days=6)
 
-    # Use a dictionary with specific dates as keys to avoid ambiguity
     activity_counts = {}
     labels = []
     for i in range(7):
@@ -1748,10 +1688,9 @@ def dashboard(user):
         for log in recent_logs:
             utc_dt = datetime.strptime(
                 log['created_at'], '%Y-%m-%d %H:%M:%S').replace(tzinfo=ZoneInfo("UTC"))
-            # Get the date part in the user's local timezone
+
             user_local_date = utc_dt.astimezone(user_tz).date()
 
-            # Increment the count for that specific date
             if user_local_date in activity_counts:
                 activity_counts[user_local_date] += 1
 
@@ -1759,7 +1698,6 @@ def dashboard(user):
         "labels": labels,
         "data": list(activity_counts.values())
     }
-    # --- END OF FIX ---
 
     # --- Upcoming Test Date Logic ---
     test_date_info = {
@@ -1788,7 +1726,6 @@ def dashboard(user):
         except (ValueError, TypeError):
             pass
 
-    # --- EXPANDED Achievements Logic ---
     all_achievements = [
         {"id": "pioneer_test", "icon": "🚀", "title": "Test Prep Pioneer",
             "description": "Generated your first Test Prep path.", "is_earned": False},
@@ -1873,7 +1810,7 @@ def account(user):
             if not existing_user or existing_user[0]['id'] == user.data['id']:
                 db.update('users', {'email': new_email},
                           {'id': user.data['id']})
-                session['user'] = new_email  # Update session
+                session['user'] = new_email
 
         elif form_type == 'password':
             current_password = request.form.get('current_password')
@@ -1889,16 +1826,15 @@ def account(user):
             if 'pfp' in request.files:
                 file = request.files['pfp']
                 if file.filename != '':
-                    # --- START: DELETE OLD PFP LOGIC (Corrected) ---
+
                     old_pfp_path = user.get_profile_picture()
                     if old_pfp_path:
-                        # Construct the absolute path from the app's root
+
                         base_dir = os.path.abspath(os.path.dirname(__file__))
                         full_old_path = os.path.join(
                             base_dir, old_pfp_path.lstrip('/'))
                         if os.path.exists(full_old_path):
                             os.remove(full_old_path)
-                    # --- END: DELETE OLD PFP LOGIC (Corrected) ---
 
                     filename = secure_filename(file.filename)
                     timestamp = int(datetime.now().timestamp())
@@ -1919,42 +1855,41 @@ def account(user):
 @login_required
 def test_path_builder(user):
     stats = user.get_stats()
-    # Provide existing values to the template, defaulting to empty strings
+
     current_test_path_info = stats.get("test_path", {})
 
     if request.method == "POST":
-        # Collect all form data, including new fields
+
         test_path = {
-            # NEW: sat, act, or both
+
             "test_focus": request.form.get("test_focus"),
             "desired_sat": request.form.get("desired_sat", ""),
             "desired_act": request.form.get("desired_act", ""),
-            # NEW
+
             "current_sat_ebrw": request.form.get("current_sat_ebrw", ""),
-            # NEW
+
             "current_sat_math": request.form.get("current_sat_math", ""),
-            # NEW
+
             "current_act_composite": request.form.get("current_act_composite", ""),
-            # NEW
+
             "current_act_math": request.form.get("current_act_math", ""),
-            # NEW
+
             "current_act_reading": request.form.get("current_act_reading", ""),
-            # NEW
+
             "current_act_science": request.form.get("current_act_science", ""),
             "strengths": request.form.get("strengths", ""),
             "weaknesses": request.form.get("weaknesses", ""),
             "test_date": request.form.get("test_date", ""),
-            # NEW (renamed from test_time)
+
             "hours_per_week": request.form.get("hours_per_week", "")
         }
         stats["test_path"] = test_path
-        user.set_stats(stats)  # Save the updated info to the user's stats
+        user.set_stats(stats)
         _generate_and_save_new_test_path(
-            # Pass the full info to the generation function
+
             user.data['id'], test_path)
         return redirect(url_for("test_path_view"))
 
-    # Pass existing data to pre-fill the form on GET request
     return render_template("test_path_builder.html", **current_test_path_info)
 
 
@@ -1997,8 +1932,6 @@ def stats(user):
     user_id = user.data['id']
     all_tasks = db.select("paths", where={"user_id": user_id})
 
-    # --- SERVER-SIDE CALCULATION FIXES ---
-    # SAT Total
     sat_ebrw = stats.get("sat_ebrw")
     sat_math = stats.get("sat_math")
     sat_total = None
@@ -2006,9 +1939,8 @@ def stats(user):
         try:
             sat_total = int(sat_ebrw) + int(sat_math)
         except (ValueError, TypeError):
-            sat_total = None  # Handle case where values are not valid integers
+            sat_total = None
 
-    # ACT Average
     act_scores = []
     if stats.get("act_math"):
         act_scores.append(int(stats.get("act_math")))
@@ -2056,7 +1988,7 @@ def edit_stats(user):
         }
 
         for key, value in updated_stats.items():
-            # Log an activity only if the value has changed
+
             if stats.get(key) != value and value:
                 stats[key] = value
                 log_activity(user.data['id'], 'stat_updated', {
@@ -2074,9 +2006,6 @@ def edit_stats(user):
 
 
 # --- API ROUTES ---
-
-# ... (Previous API routes are unchanged)
-
 
 @app.route('/api/submit_quiz_results', methods=['POST'])
 @login_required
@@ -2103,22 +2032,20 @@ def submit_quiz_results(user):
 @login_required
 def test_path_status(user):
     user_id = user.data['id']
-    # This query is optimized to be extremely fast. It stops looking after finding just one match.
+
     query = "SELECT 1 FROM paths WHERE user_id=? AND is_active=True AND category='Test Prep' LIMIT 1"
-    # Use the new, highly efficient function from dbhelper
+
     result = db.execute_for_one(query, (user_id,))
     return jsonify({"has_path": bool(result)})
-
-# Replace the OLD college_path_status function with this NEW version
 
 
 @app.route('/api/college-path-status')
 @login_required
 def college_path_status(user):
     user_id = user.data['id']
-    # This query is also optimized for speed.
+
     query = "SELECT 1 FROM paths WHERE user_id=? AND is_active=True AND category='College Planning' LIMIT 1"
-    # Use the new, highly efficient function from dbhelper
+
     result = db.execute_for_one(query, (user_id,))
     return jsonify({"has_path": bool(result)})
 
@@ -2194,13 +2121,11 @@ def api_tasks(user):
         print(f"API tasks error for category {category}: {e}")
         return jsonify({"error": "An error occurred"}), 500
 
-# NEW: API Route to fetch quiz data
-
 
 @app.route('/api/quiz/<int:task_id>')
 @login_required
 def get_quiz(user, task_id):
-    # Ensure the task belongs to the user
+
     task_info = db.select(
         "paths", where={"id": task_id, "user_id": user.data['id']})
     if not task_info or task_info[0]['task_format'] != 'quiz':
@@ -2239,7 +2164,7 @@ def api_update_task_status(user):
     if status == 'complete' and task_id:
         task_info_list = db.select(
             "paths", where={"id": task_id, "user_id": user_id})
-        # Check if not already completed
+        #
         if task_info_list and not task_info_list[0]['is_completed']:
             task_info = task_info_list[0]
             description = task_info['description']
@@ -2273,13 +2198,13 @@ def api_update_task_status(user):
 
             new_streak = game_stats['streak']
             if last_completed_date == today:
-                # Already completed a task today, just add points
+
                 new_streak = game_stats['streak']
             elif last_completed_date == yesterday:
-                # Continuing a streak
+
                 new_streak += 1
             else:
-                # Reset streak
+
                 new_streak = 1
 
             db.update("gamification_stats", {
@@ -2321,7 +2246,6 @@ def api_chat(user):
             history.append(
                 {"role": "assistant", "content": "I've generated a new path for you based on our conversation."})
 
-            # UPDATED LOGIC: Use upsert for simplicity and reliability
             db.upsert("chat_conversations", {
                 "user_id": user_id,
                 "category": category,
@@ -2339,7 +2263,6 @@ def api_chat(user):
 
     history.append({"role": "assistant", "content": reply})
 
-    # UPDATED LOGIC: Use upsert for simplicity and reliability
     db.upsert("chat_conversations", {
         "user_id": user_id,
         "category": category,
@@ -2390,17 +2313,16 @@ def api_update_stats(user):
         return jsonify({"success": False, "error": "Missing stat name or value"}), 400
 
     try:
-        # Always record in history
+
         db.insert("stat_history", {
             "user_id": user.data['id'], "stat_name": stat_name, "stat_value": stat_value
         })
 
-        # Only update the main stats blob if it's not a temporary practice score
         if stat_name not in ["sat_total", "act_composite"]:
             stats = user.get_stats()
             stats[stat_name] = stat_value
             user.set_stats(stats)
-            # LOGGING for main stats
+
             log_activity(user.data['id'], 'stat_updated', {
                          'stat_name': stat_name.upper(), 'stat_value': stat_value})
 
@@ -2424,7 +2346,6 @@ def add_task(user):
     if not description or not category:
         return jsonify({"success": False, "error": "Description and category are required"}), 400
 
-    # Get the highest task order for the current active path
     latest_task_query = "SELECT MAX(task_order) as max_order FROM paths WHERE user_id=? AND category=? AND is_active=True"
     max_order_result = db.execute(latest_task_query, (user_id, category))
     new_order = (max_order_result[0]['max_order'] or 0) + 1
@@ -2435,7 +2356,7 @@ def add_task(user):
         "description": description,
         "is_completed": False,
         "is_active": True,
-        "type": "standard",  # User-added tasks are standard by default
+        "type": "standard",
         "category": category,
         "due_date": due_date,
         "is_user_added": True
@@ -2475,7 +2396,7 @@ def add_subtask(user):
 def update_task_deadline(user):
     data = request.get_json()
     task_id = data.get('taskId')
-    due_date = data.get('dueDate')  # Can be a date string or None
+    due_date = data.get('dueDate')
 
     db.update("paths", {"due_date": due_date}, where={"id": task_id})
     return jsonify({"success": True})
@@ -2552,7 +2473,6 @@ def _get_proactive_ai_suggestions(user):
     gamification_stats = gamification_stats_list[0] if gamification_stats_list else {
     }
 
-    # Get last 5 completed tasks
     completed_tasks_raw = db.select(
         "activity_log",
         where={"user_id": user_id, "activity_type": "task_completed"},
@@ -2594,7 +2514,7 @@ def _get_proactive_ai_suggestions(user):
 @app.route('/leaderboard')
 @login_required
 def leaderboard(user):
-    # Fetch top 10 users by points
+
     leaderboard_data = db.execute(
         """
         SELECT u.name, g.points
@@ -2688,24 +2608,19 @@ def init_db_command():
 
 # Determine the database path based on the environment
 if 'RENDER' in os.environ:
-    # On Render, use the persistent disk path provided.
-    # The 'RENDER_DISK_PATH' environment variable is set in your Render dashboard.
     db_dir = os.environ.get('RENDER_DISK_PATH', '/data')
     DB_PATH = os.path.join(db_dir, 'users.db')
 else:
-    # For local development, use the instance folder.
-    # This is a standard Flask practice and is ignored by Git.
+
     os.makedirs(app.instance_path, exist_ok=True)
     DB_PATH = os.path.join(app.instance_path, 'users.db')
 
-# Initialize the database handler with the correct path
+
 db = DatabaseHandler(DB_PATH)
-# --- Auto-Create AND Migrate Database on Startup ---
-# This block now runs on every deployment, ensuring the database schema is up-to-date.
+
 with app.app_context():
     print(f"Connecting to database at {DB_PATH}...")
     try:
-        # This will now create tables if they don't exist AND add the new columns if they are missing.
         init_db()
         print("Database schema check complete. All tables and columns are present.")
     except Exception as e:
