@@ -8,118 +8,288 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Lalezar&display=swap"
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Lalezar&display=swap"
         rel="stylesheet">
     <link href="https://unpkg.com/aos@2.3.1/dist/aos.css" rel="stylesheet">
-    <link rel="stylesheet" href="{{ url_for('static', filename='dashboard.css') }}">
-    <link rel="stylesheet" href="{{ url_for('static', filename='onboarding.css') }}">
     <link rel="icon" href="{{ url_for('static', filename='favicon.svg') }}" type="image/svg+xml">
+
+    <style>
+        .font-lalezar {
+            font-family: 'Lalezar', cursive !important;
+            letter-spacing: normal !important;
+        }
+
+        html {
+            font-size: 18px;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #fafbfc;
+            color: #0f172a;
+            -webkit-font-smoothing: antialiased;
+            overflow-x: hidden;
+            font-weight: 400;
+        }
+
+        .bg-grid {
+            position: fixed;
+            inset: 0;
+            z-index: -2;
+            background-image: radial-gradient(#cbd5e1 1px, transparent 1px);
+            background-size: 40px 40px;
+            opacity: 0.5;
+        }
+
+        .ambient-blob {
+            position: absolute;
+            filter: blur(140px);
+            z-index: -1;
+            border-radius: 50%;
+            animation: ambientPulse 25s infinite alternate ease-in-out;
+            opacity: 0.4;
+        }
+
+        .blob-purple {
+            top: -10%;
+            left: -10%;
+            width: 70vw;
+            height: 70vw;
+            background: #e9d5ff;
+        }
+
+        .blob-indigo {
+            bottom: -10%;
+            right: -10%;
+            width: 60vw;
+            height: 60vw;
+            background: #c7d2fe;
+        }
+
+        @keyframes ambientPulse {
+            0% {
+                transform: translate(0, 0) scale(1);
+            }
+
+            100% {
+                transform: translate(4%, 4%) scale(1.05);
+            }
+        }
+
+        .noise-overlay {
+            position: absolute;
+            inset: 0;
+            opacity: 0.03;
+            background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        .glass-card {
+            background: rgba(255, 255, 255, 0.65);
+            backdrop-filter: blur(24px) saturate(150%);
+            -webkit-backdrop-filter: blur(24px) saturate(150%);
+            border: 1px solid rgba(255, 255, 255, 0.9);
+            box-shadow: 0 10px 40px -10px rgba(15, 23, 42, 0.05), inset 0 0 0 1px rgba(255, 255, 255, 0.6);
+            border-radius: 1.5rem;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .hero-gradient {
+            background: linear-gradient(135deg, #0f172a 0%, #4f46e5 50%, #7c3aed 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        /* Onboarding Slides Logic */
+        .slide {
+            display: none;
+            animation: fadeIn 0.4s ease;
+        }
+
+        .slide.active {
+            display: block;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .option-card {
+            background: rgba(255, 255, 255, 0.6);
+            border: 1px solid rgba(226, 232, 240, 0.8);
+            border-radius: 1rem;
+            padding: 1.25rem;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            text-center: center;
+            gap: 0.5rem;
+        }
+
+        .option-card:hover {
+            background: rgba(255, 255, 255, 0.9);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.03);
+        }
+
+        .option-card.selected {
+            border-color: #7c3aed;
+            background: #f5f3ff;
+            box-shadow: 0 0 0 2px rgba(124, 58, 237, 0.1);
+        }
+
+        .dot {
+            width: 8px;
+            height: 8px;
+            background-color: #cbd5e1;
+            border-radius: 9999px;
+            transition: all 0.3s ease;
+        }
+
+        .dot.active {
+            width: 24px;
+            background-color: #7c3aed;
+        }
+    </style>
 </head>
 
-<body
-    class="bg-slate-50 font-sans text-slate-800 antialiased min-h-screen flex flex-col items-center justify-center p-4">
+<body class="min-h-screen flex flex-col items-center justify-center px-4 relative">
 
-    <div class="background-shapes">
-        <div class="shape-1"></div>
-        <div class="shape-2"></div>
-    </div>
+    <div class="bg-grid"></div>
+    <div class="ambient-blob blob-purple"></div>
+    <div class="ambient-blob blob-indigo"></div>
 
-    <main class="w-full max-w-2xl" data-aos="fade-up">
-        <div class="card p-6 md:p-8">
-            <div class="text-center mb-6">
-                <h1 class="text-3xl font-bold font-lalezar text-purple-700 mb-2">Welcome to Mentics</h1>
-                <p class="text-slate-600">Let's get to know you better to personalize your experience.</p>
+    <main class="w-full max-w-2xl z-10 my-8" data-aos="zoom-in" data-aos-duration="800">
+        <div class="glass-card p-10 relative">
+            <div class="noise-overlay"></div>
+
+            <div class="relative z-10 text-center mb-8">
+                <h1 class="text-4xl hero-gradient font-lalezar font-black mb-2">Welcome to Mentics</h1>
+                <p class="text-sm text-slate-500 font-medium">Let's get to know you better to personalize your
+                    experience.</p>
             </div>
 
-            <form method="POST" id="onboarding-form">
-                <div class="slides-container">
-                    <div class="slide active">
-                        <h2 class="text-xl font-bold text-center mb-4">What's your primary goal?</h2>
-                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <label class="option-card">
-                                <input type="radio" name="goal" value="test_prep" class="hidden">
-                                <span class="text-2xl">📖</span>
-                                <span class="font-semibold">Test Prep</span>
-                                <span class="text-sm text-slate-500">Ace the SAT/ACT</span>
-                            </label>
-                            <label class="option-card">
-                                <input type="radio" name="goal" value="college_planning" class="hidden">
-                                <span class="text-2xl">🎓</span>
-                                <span class="font-semibold">College Planning</span>
-                                <span class="text-sm text-slate-500">Get into your dream school</span>
-                            </label>
+            <div class="relative z-10">
+                <form method="POST" id="onboarding-form">
+                    <div class="slides-container min-h-[220px]">
+                        <div class="slide active">
+                            <h2 class="text-lg font-semibold text-center text-slate-900 mb-6">What's your primary goal?
+                            </h2>
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <label class="option-card">
+                                    <input type="radio" name="goal" value="test_prep" class="hidden">
+                                    <span class="text-3xl mb-1">📖</span>
+                                    <span class="font-semibold text-sm text-slate-800">Test Prep</span>
+                                    <span class="text-xs text-slate-500 text-center">Ace the SAT/ACT</span>
+                                </label>
+                                <label class="option-card">
+                                    <input type="radio" name="goal" value="college_planning" class="hidden">
+                                    <span class="text-3xl mb-1">🎓</span>
+                                    <span class="font-semibold text-sm text-slate-800">College Planning</span>
+                                    <span class="text-xs text-slate-500 text-center">Get into your dream school</span>
+                                </label>
+                            </div>
+                        </div>
+
+                        <div class="slide">
+                            <h2 class="text-lg font-semibold text-center text-slate-900 mb-6">How do you learn best?
+                            </h2>
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <label class="option-card">
+                                    <input type="radio" name="learning_style" value="visual" class="hidden">
+                                    <span class="text-2xl mb-1">🎨</span>
+                                    <span class="font-semibold text-sm text-slate-800">Visual</span>
+                                    <span class="text-xs text-slate-500">I learn by seeing</span>
+                                </label>
+                                <label class="option-card">
+                                    <input type="radio" name="learning_style" value="auditory" class="hidden">
+                                    <span class="text-2xl mb-1">🎧</span>
+                                    <span class="font-semibold text-sm text-slate-800">Auditory</span>
+                                    <span class="text-xs text-slate-500">I learn by hearing</span>
+                                </label>
+                                <label class="option-card">
+                                    <input type="radio" name="learning_style" value="reading_writing" class="hidden">
+                                    <span class="text-2xl mb-1">📝</span>
+                                    <span class="font-semibold text-sm text-slate-800">Reading/Writing</span>
+                                    <span class="text-xs text-slate-500">I learn by reading/writing</span>
+                                </label>
+                                <label class="option-card">
+                                    <input type="radio" name="learning_style" value="kinesthetic" class="hidden">
+                                    <span class="text-2xl mb-1">🏃‍♂️</span>
+                                    <span class="font-semibold text-sm text-slate-800">Kinesthetic</span>
+                                    <span class="text-xs text-slate-500">I learn by doing</span>
+                                </label>
+                            </div>
+                        </div>
+
+                        <div class="slide">
+                            <h2 class="text-lg font-semibold text-center text-slate-900 mb-6">What are you most anxious
+                                about?</h2>
+                            <textarea name="anxieties" rows="5"
+                                class="w-full bg-white/60 border border-slate-200/80 rounded-xl p-4 text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-purple-500/40 focus:border-purple-500 transition shadow-sm resize-none"
+                                placeholder="e.g., Not getting a good score, writing my college essay, managing my time..."></textarea>
                         </div>
                     </div>
 
-                    <div class="slide">
-                        <h2 class="text-xl font-bold text-center mb-4">How do you learn best?</h2>
-                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <label class="option-card">
-                                <input type="radio" name="learning_style" value="visual" class="hidden">
-                                <span class="text-2xl">🎨</span>
-                                <span class="font-semibold">Visual</span>
-                                <span class="text-sm text-slate-500">I learn by seeing</span>
-                            </label>
-                            <label class="option-card">
-                                <input type="radio" name="learning_style" value="auditory" class="hidden">
-                                <span class="text-2xl">🎧</span>
-                                <span class="font-semibold">Auditory</span>
-                                <span class="text-sm text-slate-500">I learn by hearing</span>
-                            </label>
-                            <label class="option-card">
-                                <input type="radio" name="learning_style" value="reading_writing" class="hidden">
-                                <span class="text-2xl">📝</span>
-                                <span class="font-semibold">Reading/Writing</span>
-                                <span class="text-sm text-slate-500">I learn by reading and writing</span>
-                            </label>
-                            <label class="option-card">
-                                <input type="radio" name="learning_style" value="kinesthetic" class="hidden">
-                                <span class="text-2xl">🏃‍♂️</span>
-                                <span class="font-semibold">Kinesthetic</span>
-                                <span class="text-sm text-slate-500">I learn by doing</span>
-                            </label>
+                    <div class="mt-10 pt-6 border-t border-slate-200/60 flex justify-between items-center">
+                        <button type="button" id="prev-btn"
+                            class="hidden text-sm font-medium text-slate-600 hover:text-slate-900 transition px-4 py-2">
+                            &larr; Back
+                        </button>
+
+                        <div class="flex items-center gap-2 mx-auto" id="dots-container">
+                            <span class="dot active"></span>
+                            <span class="dot"></span>
+                            <span class="dot"></span>
                         </div>
-                    </div>
 
-                    <div class="slide">
-                        <h2 class="text-xl font-bold text-center mb-4">What are you most anxious about?</h2>
-                        <textarea name="anxieties" rows="4"
-                            class="w-full bg-white/50 border border-slate-300/70 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition"
-                            placeholder="e.g., Not getting a good score, writing my college essay, managing my time..."></textarea>
+                        <button type="button" id="next-btn"
+                            class="bg-slate-900 text-white font-medium px-6 py-2.5 rounded-full hover:bg-slate-800 transition shadow-md text-sm">
+                            Next &rarr;
+                        </button>
+                        <button type="submit" id="submit-btn"
+                            class="hidden bg-purple-600 text-white font-medium px-6 py-2.5 rounded-full hover:bg-purple-700 transition shadow-md text-sm">
+                            Finish
+                        </button>
                     </div>
-                </div>
-
-                <div class="mt-8 pt-6 border-t border-slate-200/80 flex justify-between items-center">
-                    <button type="button" id="prev-btn" class="nav-btn hidden">
-                        &larr; Back
-                    </button>
-                    <div class="progress-dots">
-                        <span class="dot active"></span>
-                        <span class="dot"></span>
-                        <span class="dot"></span>
-                    </div>
-                    <button type="button" id="next-btn" class="nav-btn">
-                        Next &rarr;
-                    </button>
-                    <button type="submit" id="submit-btn" class="nav-btn hidden">
-                        Finish
-                    </button>
-                </div>
-            </form>
+                </form>
+            </div>
         </div>
     </main>
+
+    <footer class="text-center pb-8 text-xs text-slate-500 font-medium z-10 relative">
+        <p>
+            <span>&copy; 2026 Mentics. All Rights Reserved.</span>
+            <span class="mx-2">|</span>
+            <a href="{{ url_for('terms') }}" class="hover:text-slate-800 transition">Terms</a>
+            <span class="mx-2">|</span>
+            <a href="{{ url_for('privacy') }}" class="hover:text-slate-800 transition">Privacy</a>
+        </p>
+    </footer>
+
     <script src="https://unpkg.com/aos@2.3.1/dist/aos.js"></script>
     <script>
-        AOS.init({
-            once: true,
-            duration: 800
-        });
+        AOS.init({ once: true });
 
         const slides = document.querySelectorAll('.slide');
         const prevBtn = document.getElementById('prev-btn');
         const nextBtn = document.getElementById('next-btn');
         const submitBtn = document.getElementById('submit-btn');
         const dots = document.querySelectorAll('.dot');
+        const dotsContainer = document.getElementById('dots-container');
         let currentSlide = 0;
 
         function showSlide(n) {
@@ -128,9 +298,21 @@
             slides[n].classList.add('active');
             dots[n].classList.add('active');
 
-            prevBtn.classList.toggle('hidden', n === 0);
-            nextBtn.classList.toggle('hidden', n === slides.length - 1);
-            submitBtn.classList.toggle('hidden', n !== slides.length - 1);
+            if (n === 0) {
+                prevBtn.classList.add('hidden');
+                dotsContainer.style.marginLeft = "auto";
+            } else {
+                prevBtn.classList.remove('hidden');
+                dotsContainer.style.marginLeft = "0";
+            }
+
+            if (n === slides.length - 1) {
+                nextBtn.classList.add('hidden');
+                submitBtn.classList.remove('hidden');
+            } else {
+                nextBtn.classList.remove('hidden');
+                submitBtn.classList.add('hidden');
+            }
         }
 
         nextBtn.addEventListener('click', () => {
@@ -147,28 +329,19 @@
             }
         });
 
+        // Handle Option Card selection
         document.querySelectorAll('.option-card').forEach(card => {
             card.addEventListener('click', () => {
                 const radio = card.querySelector('input[type="radio"]');
                 radio.checked = true;
-                // Remove selected class from all cards in the same group
+                // Remove selected class from all siblings
                 document.querySelectorAll(`input[name="${radio.name}"]`).forEach(r => {
                     r.closest('.option-card').classList.remove('selected');
                 });
                 card.classList.add('selected');
             });
         });
-
     </script>
-    <footer class="text-center p-8 text-sm text-slate-500">
-        <p>
-            <span>&copy; 2025 Mentics. All Rights Reserved.</span>
-            <span class="mx-2">|</span>
-            <a href="{{ url_for('terms') }}" class="hover:text-purple-600 hover:underline">Terms of Service</a>
-            <span class="mx-2">|</span>
-            <a href="{{ url_for('privacy') }}" class="hover:text-purple-600 hover:underline">Privacy Policy</a>
-        </p>
-    </footer>
 </body>
 
 </html>
