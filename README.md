@@ -121,7 +121,9 @@ User data is stored in PostgreSQL so it survives serverless restarts.
    as an authorized redirect URI for the production OAuth client.
 
 Do not commit these values in `.env`. Vercel supplies them securely at runtime.
-The included `vercel.json` sends all routes to the Flask app.
+Vercel detects the top-level Flask `app` in `app.py` automatically; no catch-all
+rewrite is needed. Adding a rewrite to `/app.py` changes the path Flask receives
+and causes valid application URLs such as `/` to return Flask's 404 page.
 
 Cloudflare Pages/Workers cannot run this Flask/Python server directly. Using
 Cloudflare would require rewriting the backend as a Worker; Vercel preserves the
