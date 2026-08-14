@@ -6,6 +6,7 @@ from dbhelper import DatabaseHandler
 from userhelper import User
 from functools import wraps
 import json
+import base64
 import google.generativeai as genai
 import os
 from dotenv import load_dotenv
@@ -14,7 +15,6 @@ from pathlib import Path
 from datetime import datetime, timedelta, date
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 from authlib.integrations.flask_client import OAuth
-from werkzeug.utils import secure_filename
 
 
 env_path = Path('.') / '.env'
@@ -23,12 +23,9 @@ load_dotenv(dotenv_path=env_path)
 app = Flask(__name__)
 app.secret_key = os.getenv("SECRET_KEY")
 
-app.config['UPLOAD_FOLDER'] = 'static/uploads'
+app.config['MAX_CONTENT_LENGTH'] = 2 * 1024 * 1024
 app.url_map.strict_slashes = False
 app.permanent_session_lifetime = timedelta(minutes=10)
-
-
-os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 
 
 oauth = OAuth(app)
@@ -1826,25 +1823,14 @@ def account(user):
             if 'pfp' in request.files:
                 file = request.files['pfp']
                 if file.filename != '':
-
-                    old_pfp_path = user.get_profile_picture()
-                    if old_pfp_path:
-
-                        base_dir = os.path.abspath(os.path.dirname(__file__))
-                        full_old_path = os.path.join(
-                            base_dir, old_pfp_path.lstrip('/'))
-                        if os.path.exists(full_old_path):
-                            os.remove(full_old_path)
-
-                    filename = secure_filename(file.filename)
-                    timestamp = int(datetime.now().timestamp())
-                    unique_filename = f"{user.data['id']}_{timestamp}_{filename}"
-                    filepath = os.path.join(
-                        app.config['UPLOAD_FOLDER'], unique_filename)
-                    file.save(filepath)
-
-                    db_filepath = f"/{app.config['UPLOAD_FOLDER']}/{unique_filename}"
-                    db.update('users', {'profile_picture': db_filepath}, {
+                    allowed_types = {'image/jpeg', 'image/png', 'image/gif', 'image/webp'}
+                    if file.mimetype not in allowed_types:
+                        return render_template('account.html', user=user,
+                                               profile_picture=user.data.get('profile_picture'),
+                                               error='Please upload a JPEG, PNG, GIF, or WebP image.'), 400
+                    encoded = base64.b64encode(file.read()).decode('ascii')
+                    profile_picture = f"data:{file.mimetype};base64,{encoded}"
+                    db.update('users', {'profile_picture': profile_picture}, {
                               'id': user.data['id']})
 
     user.load_user()
@@ -2606,20 +2592,16 @@ def init_db_command():
     print("Initialized the database.")
 
 
-# Determine the database path based on the environment
-if 'RENDER' in os.environ:
-    db_dir = os.environ.get('RENDER_DISK_PATH', '/data')
-    DB_PATH = os.path.join(db_dir, 'users.db')
-else:
-
+# Use hosted Postgres in production and zero-config SQLite for development.
+DATABASE = os.getenv('DATABASE_URL')
+if not DATABASE:
     os.makedirs(app.instance_path, exist_ok=True)
-    DB_PATH = os.path.join(app.instance_path, 'users.db')
+    DATABASE = os.path.join(app.instance_path, 'users.db')
 
-
-db = DatabaseHandler(DB_PATH)
+db = DatabaseHandler(DATABASE)
 
 with app.app_context():
-    print(f"Connecting to database at {DB_PATH}...")
+    print(f"Connecting to {'PostgreSQL' if db.is_postgres else DATABASE}...")
     try:
         init_db()
         print("Database schema check complete. All tables and columns are present.")

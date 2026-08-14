@@ -53,7 +53,7 @@ Mentics has evolved to become a holistic platform for student success, incorpora
 Mentics is built with a modern and robust technology stack:
 
 * **Backend**: Python, Flask
-* **Database**: SQLite
+* **Database**: PostgreSQL in production, SQLite for local development
 * **AI**: Google Gemini API (`google-generativeai`)
 * **Authentication**: Werkzeug Security (for password hashing), Authlib (for Google OAuth)
 * **Frontend**: HTML, Tailwind CSS, Vanilla JavaScript
@@ -93,12 +93,40 @@ To get a local copy up and running, follow these simple steps.
     GEMINI_API_KEY='YOUR_API_KEY_HERE'
     GOOGLE_CLIENT_ID='YOUR_GOOGLE_CLIENT_ID'
     GOOGLE_CLIENT_SECRET='YOUR_GOOGLE_CLIENT_SECRET'
+    SECRET_KEY='A_LONG_RANDOM_VALUE'
     ```
 5.  **Initialize the database and run the application:**
     ```sh
     flask run
     ```
     The application will be available at `http://127.0.0.1:5000`.
+
+---
+
+## Free serverless deployment (Vercel + Neon)
+
+The app no longer needs a persistent disk. It automatically uses local SQLite
+when `DATABASE_URL` is absent and PostgreSQL when that variable is present.
+Uploaded profile pictures are stored in the database too, so they survive
+serverless restarts.
+
+1. Create a free Neon Postgres project and copy its **pooled** connection string.
+2. Import this repository into Vercel.
+3. In **Vercel -> Project Settings -> Environment Variables**, add:
+   - `DATABASE_URL`: the pooled Neon connection string
+   - `SECRET_KEY`: generate one with `python -c "import secrets; print(secrets.token_hex(32))"`
+   - `GEMINI_API_KEY`
+   - `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` if using Google sign-in
+4. Deploy. The database tables are created automatically on the first start.
+5. In Google Cloud Console, add `https://YOUR-DOMAIN/login/google/authorize`
+   as an authorized redirect URI for the production OAuth client.
+
+Do not commit these values in `.env`. Vercel supplies them securely at runtime.
+The included `vercel.json` sends all routes to the Flask app.
+
+Cloudflare Pages/Workers cannot run this Flask/Python server directly. Using
+Cloudflare would require rewriting the backend as a Worker; Vercel preserves the
+existing application and is therefore the recommended no-fee hosting route.
 
 ---
 
