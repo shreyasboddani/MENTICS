@@ -4,7 +4,7 @@ import DOMPurify from 'dompurify'
 import { marked } from 'marked'
 import {
   ArrowLeft, ArrowRight, Award, BarChart3, BookOpen, Brain, CalendarDays,
-  Check, ChevronRight, Clock3, Flame,
+  Check, Clock3, Flame,
   GraduationCap, Hand, Headphones, House, LayoutDashboard, LineChart,
   LockKeyhole, LogOut, Mail, Menu, MessageCircle, PenLine, Plus, RotateCcw,
   Search, Send, Settings, ShieldCheck, Sparkles, Target, Trophy, UserRound,
@@ -71,12 +71,43 @@ function Landing() {
 
       <section className="trust-strip"><span>A path that adapts</span><span>Focused daily action</span><span>Progress you can see</span><span>Guidance when you need it</span></section>
 
+      <section className="landing-facts" aria-label="Mentics at a glance">
+        <div><strong>5</strong><span><b>steps at a time</b><small>Enough direction to move. Never enough noise to freeze.</small></span></div>
+        <div><strong>2</strong><span><b>connected tracks</b><small>Test preparation and college planning, finally in one rhythm.</small></span></div>
+        <div><strong>1</strong><span><b>place to keep moving</b><small>Your plan, practice, feedback, progress, and people.</small></span></div>
+      </section>
+
       <section className="section process" id="how-it-works">
         <div className="section-heading"><div className="eyebrow"><span /> THE MENTICS METHOD</div><h2>Clarity changes everything.</h2><p>Mentics turns a distant goal into the next right move—then learns from what happens.</p></div>
         <div className="process-grid">
           <article><b>01</b><Target/><h3>Tell us where you are</h3><p>Share your goals, timing, strengths, and the areas that need attention.</p></article>
           <article><b>02</b><Sparkles/><h3>Get a five-step path</h3><p>Receive a focused roadmap built around your actual priorities—not a generic checklist.</p></article>
           <article><b>03</b><BarChart3/><h3>Improve with evidence</h3><p>Complete work, track results, and let every new path build on real progress.</p></article>
+        </div>
+      </section>
+
+      <section className="journey-showcase" aria-labelledby="journey-title">
+        <div className="journey-showcase-copy">
+          <div className="eyebrow eyebrow--light"><span/> A PATH YOU CAN FEEL</div>
+          <h2 id="journey-title">Progress should feel alive.</h2>
+          <p>Your next move stays obvious. Finish a step, watch the route open up, and keep your attention on what is ready now—not a wall of future obligations.</p>
+          <ul>
+            <li><Check/> One active step keeps the day focused</li>
+            <li><Zap/> Practice and feedback live inside the route</li>
+            <li><Trophy/> Milestones make the work worth celebrating</li>
+          </ul>
+          <a href={loggedIn ? '/dashboard/test-path-view' : '/signup'}>See your path <ArrowRight size={17}/></a>
+        </div>
+        <div className="journey-demo" aria-hidden="true">
+          <div className="journey-demo-glow"/>
+          <svg viewBox="0 0 420 650"><path className="demo-route-base" d="M210 58 C210 120 105 128 105 200 S315 280 315 350 S105 430 105 500 S210 550 210 598"/><path className="demo-route-live" d="M210 58 C210 120 105 128 105 200 S315 280 315 350"/></svg>
+          {[
+            {x:50,y:9,state:'done',label:'Set your baseline',icon:<Check/>},
+            {x:25,y:31,state:'done',label:'Build the skill',icon:<Check/>},
+            {x:75,y:54,state:'current',label:'Focused sprint',icon:<Zap/>},
+            {x:25,y:77,state:'locked',label:'Review the evidence',icon:<LockKeyhole/>},
+            {x:50,y:92,state:'milestone',label:'Milestone',icon:<Trophy/>}
+          ].map((step,index)=><div className={`demo-step ${step.state}`} style={{left:`${step.x}%`,top:`${step.y}%`}} key={step.label}><i>{step.icon}</i><span>{index===2&&<small>UP NEXT</small>}{step.label}</span></div>)}
         </div>
       </section>
 
@@ -98,6 +129,19 @@ function Landing() {
           <article className="suite-essay"><PenLine/><small>ESSAY FEEDBACK</small><h3>Make every word stronger.</h3><p>Get structured feedback while keeping your voice, story, and ideas unmistakably yours.</p></article>
           <article className="suite-progress"><LineChart/><small>VISIBLE PROGRESS</small><h3>See the work adding up.</h3><p>Scores, milestones, history, points, and streaks reveal the pattern behind improvement.</p></article>
           <article className="suite-community"><UsersRound/><small>COMMUNITY</small><h3>Move forward together.</h3><p>Ask questions, share approaches, and celebrate real consistency on the leaderboard.</p></article>
+        </div>
+      </section>
+
+      <section className="week-section">
+        <div className="week-heading"><div className="eyebrow"><span/> MOMENTUM, NOT BUSYWORK</div><h2>A week inside Mentics.</h2><p>The plan bends around real student life. Each session has a purpose, a finish line, and a visible place in the bigger picture.</p></div>
+        <div className="week-flow">
+          {[
+            ['MON','Find the signal','Check your path and start with the highest-impact move.',Target],
+            ['TUE','Practice on purpose','Run a short sprint, then understand every missed question.',Zap],
+            ['WED','Make the story stronger','Shape an essay without sanding away your own voice.',PenLine],
+            ['THU','Ask while it is fresh','Get guidance with the context of your path still attached.',MessageCircle],
+            ['FRI','See what changed','Log the result, close the loop, and unlock what comes next.',LineChart]
+          ].map(([day,title,copy,Icon],index)=><article key={day}><span>{day}</span><i><Icon/></i><div><small>0{index+1}</small><h3>{title}</h3><p>{copy}</p></div></article>)}
         </div>
       </section>
 
@@ -278,6 +322,10 @@ function PathPage() {
   },[category])
   const completed = tasks.filter(t=>t.is_completed).length
   const activeIndex = tasks.findIndex(t=>!t.is_completed)
+  const journeyHeight=Math.max(790,180+(tasks.length-1)*155)
+  const journeyXs=[320,170,320,470,320]
+  const journeyPoints=tasks.map((_,index)=>({x:journeyXs[index%journeyXs.length],y:90+index*155}))
+  const journeyCurve=journeyPoints.reduce((path,point,index)=>{if(index===0)return`M ${point.x} ${point.y}`;const previous=journeyPoints[index-1];const mid=(previous.y+point.y)/2;return`${path} C ${previous.x} ${mid}, ${point.x} ${mid}, ${point.x} ${point.y}`},'')
   const finishTask = (next) => {
     const updated = tasks.map(t=>t.id===next.id?next:t)
     setTasks(updated)
@@ -292,12 +340,13 @@ function PathPage() {
     <div className="path-header"><div><div className="eyebrow"><span/> {category.toUpperCase()}</div><h1>Your five-step path.</h1><p>Finish what is in front of you. The path adapts from there.</p></div><div className="path-header-actions">{!isTest&&<button className="button button--quiet" onClick={()=>setEssayOpen(true)}><PenLine size={17}/> Essay feedback</button>}<button className="button button--quiet" onClick={()=>setChatOpen(true)}><MessageCircle size={17}/> Ask Mentics</button><a className="button button--dark" href={builder}>Edit goals <ArrowRight size={16}/></a></div></div>
     <div className="path-progress"><span style={{width:`${tasks.length ? completed/tasks.length*100 : 0}%`}}/><p><b>{completed} of {tasks.length || 5}</b> steps complete</p></div>
     {error && <div className="error-banner">{error}<button onClick={()=>loadTasks()}>Try again</button></div>}
-    {loading ? <PathSkeleton/> : <section className="roadmap" aria-label={`${category} roadmap`}>
-      <div className="road-line" />
-      {tasks.map((task,index)=><button key={task.id || index} className={`road-step ${task.is_completed ? 'done' : index === activeIndex ? 'current' : 'upcoming'} ${index % 2 ? 'road-step--right' : ''}`} onClick={()=>setSelected(task)}>
-        <span className="road-node">{task.is_completed ? <Check/> : index > activeIndex && activeIndex !== -1 ? <LockKeyhole/> : String(index+1).padStart(2,'0')}</span>
-        <span className="road-card"><span className="road-card-top"><small>{task.is_completed ? 'COMPLETE' : index === activeIndex ? 'UP NEXT' : `STEP ${index+1}`}</small>{task.due_date && <i><CalendarDays/> {task.due_date}</i>}</span><b><PlainText value={task.description}/></b><small>{task.reason || 'A focused step toward your goal.'}</small><span className="road-meta">{task.task_format === 'practice_sprint' ? 'Focused practice' : task.task_format === 'quiz' ? 'Knowledge check' : task.type === 'milestone' ? 'Milestone' : 'Action step'} <ChevronRight/></span></span>
-      </button>)}
+    {loading ? <PathSkeleton/> : <section className="journey-map" style={{height:journeyHeight}} aria-label={`${category} learning journey`}>
+      <svg className="journey-route" viewBox={`0 0 640 ${journeyHeight}`} preserveAspectRatio="none" aria-hidden="true"><defs><linearGradient id="journey-gradient" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#8b5cf6"/><stop offset="1" stopColor="#4f46e5"/></linearGradient></defs><path className="journey-route-shadow" d={journeyCurve}/><path className="journey-route-progress" d={journeyCurve} pathLength="100" style={{strokeDasharray:`${tasks.length?Math.min(100,completed/tasks.length*100):0} 100`}}/></svg>
+      {tasks.map((task,index)=>{const locked=index>activeIndex&&activeIndex!==-1;const milestone=task.type==='milestone'||String(task.description).toLowerCase().includes('boss battle');const point=journeyPoints[index];return <button key={task.id||index} disabled={locked} style={{left:`${point.x/640*100}%`,top:point.y}} className={`journey-step ${task.is_completed?'done':index===activeIndex?'current':'locked'} ${milestone?'milestone':''}`} onClick={()=>setSelected(task)} aria-label={`Step ${index+1}: ${task.description}`}>
+        {index===activeIndex&&!task.is_completed&&<span className="journey-next">START</span>}
+        <span className="journey-node"><i>{task.is_completed?<Check/>:locked?<LockKeyhole/>:milestone?<Trophy/>:task.task_format==='quiz'?<Brain/>:task.task_format==='practice_sprint'?<Zap/>:index+1}</i></span>
+        <span className={`journey-label ${point.x<320?'label-right':point.x>320?'label-left':index%2?'label-left':'label-right'}`}><small>{task.is_completed?'COMPLETED':milestone?'MILESTONE':`STEP ${index+1}`}</small><b><PlainText value={task.description}/></b>{task.due_date&&<em><CalendarDays/> {task.due_date}</em>}</span>
+      </button>})}
     </section>}
     <div className="path-footer-actions"><button className="button button--quiet" onClick={()=>setAdding(true)}><Plus/> Add your own step</button><button className="text-button" onClick={()=>loadTasks(true)}><RotateCcw/> Regenerate five steps</button></div>
     {selected && <TaskModal task={selected} category={category} onClose={()=>setSelected(null)} onUpdate={(next)=>{setTasks(items=>items.map(t=>t.id===next.id?next:t));setSelected(next)}} onCompleted={finishTask}/>}
@@ -311,7 +360,7 @@ function PathPage() {
 function PlainText({value}) { return <>{String(value || '').replace(/\[([^\]]+)\]\([^)]+\)/g,'$1').replace(/[*_#`]/g,'')}</> }
 function normalizeTask(t){return {...t,is_completed:Boolean(t.is_completed),subtasks:Array.isArray(t.subtasks)?t.subtasks:[],task_format:t.task_format||'link'}}
 
-function PathSkeleton(){return <section className="roadmap roadmap--loading"><div className="road-line"/>{[0,1,2,3,4].map(i=><div className={`road-step ${i%2?'road-step--right':''}`} key={i}><span className="road-node skeleton"/><span className="road-card skeleton"/></div>)}</section>}
+function PathSkeleton(){return <section className="journey-map journey-map--loading">{[0,1,2,3,4].map(i=><span className="journey-skeleton skeleton" style={{left:`${[50,27,50,73,50][i]}%`,top:90+i*155}} key={i}/>)}</section>}
 
 function Modal({children,onClose,wide=false}) { useEffect(()=>{const fn=e=>e.key==='Escape'&&onClose();document.addEventListener('keydown',fn);return()=>document.removeEventListener('keydown',fn)},[onClose]); return <div className="modal-wrap" role="dialog" aria-modal="true" onMouseDown={e=>e.target===e.currentTarget&&onClose()}><div className={`modal ${wide?'modal--wide':''}`}><button className="modal-close" onClick={onClose} aria-label="Close"><X/></button>{children}</div></div> }
 
