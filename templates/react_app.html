@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#f8f7ff">
+  <meta name="description" content="Mentics turns high school ambition into a focused, personalized path.">
+  <title>{% if page == 'landing' %}Mentics | Stop Guessing. Start Achieving.{% elif page == 'path' %}Your Path | Mentics{% else %}Dashboard | Mentics{% endif %}</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Lalezar&display=swap" rel="stylesheet">
+  <link rel="icon" href="{{ url_for('static', filename='favicon.svg') }}" type="image/svg+xml">
+  <link rel="stylesheet" href="{{ url_for('static', filename='react/app.css') }}">
+</head>
+<body>
+  <div id="root"></div>
+  <script>
+    window.__MENTICS__ = {{ {"page": page, "data": bootstrap}|tojson }};
+  </script>
+  <script type="module" src="{{ url_for('static', filename='react/app.js') }}"></script>
+</body>
+</html>

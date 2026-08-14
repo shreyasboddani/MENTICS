@@ -434,24 +434,14 @@ def _generate_chat_reply(history, system_instruction):
 
 def _get_current_numbered_tasks(user_id, category):
     """Helper function to get current active tasks with numbering for a specific category."""
-    latest_task_query = """
-        SELECT created_at FROM paths
-        WHERE user_id=? AND category=? AND is_active=True
-        ORDER BY created_at DESC LIMIT 1
-    """
-    latest_task_timestamp_result = db.execute(
-        latest_task_query, (user_id, category))
-    if not latest_task_timestamp_result:
-        return "No active tasks at the moment."
-    latest_timestamp = latest_task_timestamp_result[0]['created_at']
     active_tasks = db.select(
         "paths",
         where={
             "user_id": user_id,
             "is_active": True,
-            "category": category,
-            "created_at": latest_timestamp
-        }
+            "category": category
+        },
+        order_by="task_order ASC"
     )
     if not active_tasks:
         return "No active tasks at the moment."
@@ -461,6 +451,34 @@ def _get_current_numbered_tasks(user_id, category):
         status = "✅ (Completed)" if task['is_completed'] else "⏳ (In Progress)"
         numbered_tasks.append(f"Task {i}: {task['description']} - {status}")
     return "\n".join(numbered_tasks)
+
+
+def _complete_five_step_plan(tasks, category):
+    """Guarantee a usable five-step path even when an AI response is partial."""
+    defaults = {
+        "Test Prep": [
+            {"task_format": "link", "description": "Review one weak skill with an official SAT or ACT lesson and write down three takeaways.", "reason": "A focused review gives the rest of this path a clear foundation.", "type": "standard", "stat_to_update": None, "category": "Test Prep", "difficulty": "easy"},
+            {"task_format": "link", "description": "Complete a timed set of ten official practice questions in your weakest section.", "reason": "A short timed set reveals the exact mistakes worth fixing next.", "type": "standard", "stat_to_update": None, "category": "Test Prep", "difficulty": "medium"},
+            {"task_format": "review", "description": "Build an error log for every missed question and label each mistake by concept, process, or timing.", "reason": "An error log turns practice results into a repeatable improvement system.", "type": "standard", "stat_to_update": None, "category": "Test Prep", "difficulty": "medium"},
+            {"task_format": "link", "description": "Redo the missed questions without notes and explain the correct method in your own words.", "reason": "Retrieval and explanation confirm that the correction will stick.", "type": "standard", "stat_to_update": None, "category": "Test Prep", "difficulty": "medium"},
+            {"task_format": "link", "description": "Boss Battle: Take a timed official practice module and record your updated score.", "reason": "A timed checkpoint measures whether this cycle improved accuracy and pacing.", "type": "milestone", "stat_to_update": "sat_total", "category": "Test Prep", "difficulty": "hard"},
+        ],
+        "College Planning": [
+            {"description": "Define your three non-negotiables for college fit and rank them in order.", "reason": "Clear criteria keep your college search focused on schools that genuinely fit you.", "type": "standard", "stat_to_update": None, "category": "College Planning", "difficulty": "easy"},
+            {"description": "Research five colleges against your fit criteria and save one concrete note about each.", "reason": "Evidence-based research creates a balanced, intentional school list.", "type": "standard", "stat_to_update": None, "category": "College Planning", "difficulty": "medium"},
+            {"description": "Create a deadline tracker for applications, financial aid, testing, and recommendations.", "reason": "One source of truth reduces missed deadlines and application stress.", "type": "standard", "stat_to_update": None, "category": "College Planning", "difficulty": "easy"},
+            {"description": "Draft a one-page activities inventory with impact, scope, and time commitment for each activity.", "reason": "A strong inventory makes future application writing faster and more specific.", "type": "standard", "stat_to_update": None, "category": "College Planning", "difficulty": "medium"},
+            {"description": "Write a first personal-statement outline built around one specific experience and what changed because of it.", "reason": "A focused narrative foundation prevents a generic personal statement.", "type": "milestone", "stat_to_update": None, "category": "College Planning", "difficulty": "hard"},
+        ],
+    }
+    normalized = [task for task in (tasks or []) if isinstance(task, dict) and task.get("description")][:5]
+    seen = {task["description"].strip().lower() for task in normalized}
+    for fallback in defaults[category]:
+        if len(normalized) == 5:
+            break
+        if fallback["description"].lower() not in seen:
+            normalized.append(dict(fallback))
+    return normalized[:5]
 
 
 def _get_sprint_results_for_prompt(user_id):
@@ -942,7 +960,7 @@ def _generate_and_save_new_test_path(user_id, test_path_info, chat_history=None)
         sprint_results=sprint_results
     )
 
-    tasks = tasks[:5]
+    tasks = _complete_five_step_plan(tasks, "Test Prep")
 
     saved_tasks = []
     for i, task in enumerate(tasks):
@@ -1270,7 +1288,7 @@ def _generate_and_save_new_college_path(user_id, college_context, chat_history=N
         tasks = _get_college_planning_ai_tasks(
             college_context, user_stats, path_history, chat_history, stat_history)
 
-        tasks = tasks[:5]
+        tasks = _complete_five_step_plan(tasks, "College Planning")
 
         if not tasks or len(tasks) == 0:
             raise ValueError(
@@ -1522,7 +1540,11 @@ def terms():
 @app.route("/")
 def home():
     is_logged_in = "user" in session
-    return render_template("index.html", is_logged_in=is_logged_in)
+    return render_template(
+        "react_app.html",
+        page="landing",
+        bootstrap={"isLoggedIn": is_logged_in}
+    )
 
 
 @app.route("/signup", methods=["GET", "POST"])
@@ -1863,18 +1885,21 @@ def dashboard(user):
     earned_achievements = [a for a in all_achievements if a['is_earned']]
 
     return render_template(
-        "dashboard.html",
-        name=name,
-        test_prep_completed=test_prep_completed_current,
-        college_planning_completed=college_planning_completed_current,
-        gpa=stats.get("gpa") or "—",
-        sat_total=sat_total or "—",
-        act_average=act_average or "—",
-        recent_activities=recent_activities,
-        activity_data=json.dumps(activity_data),
-        test_date_info=test_date_info,
-        earned_achievements=earned_achievements,
-        game_stats=game_stats,
+        "react_app.html",
+        page="dashboard",
+        bootstrap={
+            "name": name,
+            "testPrepCompleted": test_prep_completed_current,
+            "collegePlanningCompleted": college_planning_completed_current,
+            "gpa": stats.get("gpa") or "—",
+            "satTotal": sat_total or "—",
+            "actAverage": act_average or "—",
+            "recentActivities": recent_activities,
+            "activityData": activity_data,
+            "testDateInfo": test_date_info,
+            "earnedAchievements": earned_achievements,
+            "gameStats": game_stats,
+        },
     )
 
 
@@ -1987,7 +2012,10 @@ def test_path_builder(user):
 @app.route("/dashboard/test-path-view")
 @login_required
 def test_path_view(user):
-    return render_template("test_path_view.html")
+    return render_template(
+        "react_app.html", page="path",
+        bootstrap={"category": "Test Prep", "name": user.get_name()}
+    )
 
 
 @app.route("/dashboard/college-path-builder", methods=["GET", "POST"])
@@ -2011,7 +2039,10 @@ def college_path_builder(user):
 @app.route('/dashboard/college-path-view')
 @login_required
 def college_path_view(user):
-    return render_template("college_path_view.html")
+    return render_template(
+        "react_app.html", page="path",
+        bootstrap={"category": "College Planning", "name": user.get_name()}
+    )
 
 # --- Stats & Tracker Routes ---
 
@@ -2148,24 +2179,18 @@ def api_tasks(user):
     stats = user.get_stats()
     category = request.args.get('category', 'Test Prep')
     try:
-        latest_task_query = """
-            SELECT created_at FROM paths
-            WHERE user_id=? AND category=? AND is_active=True
-            ORDER BY created_at DESC LIMIT 1
-        """
-        latest_task_timestamp_result = db.execute(
-            latest_task_query, (user_id, category))
+        if category not in {'Test Prep', 'College Planning'}:
+            return jsonify({"error": "Invalid category"}), 400
 
-        active_path = []
-        if latest_task_timestamp_result:
-            latest_timestamp = latest_task_timestamp_result[0]['created_at']
-            active_path = db.select(
-                "paths", where={
-                    "user_id": user_id,
-                    "is_active": True,
-                    "category": category,
-                    "created_at": latest_timestamp
-                })
+        active_path = db.select(
+            "paths",
+            where={
+                "user_id": user_id,
+                "is_active": True,
+                "category": category,
+            },
+            order_by="task_order ASC"
+        )
 
         if request.method == "POST" or not active_path:
             chat_record_list = db.select("chat_conversations", where={

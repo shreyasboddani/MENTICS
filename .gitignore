@@ -197,6 +197,8 @@ cython_debug/
 .cursorindexingignore
 .neon
 
+node_modules/
+
 .vercel
 .env
 .env.local

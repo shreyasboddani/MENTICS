@@ -1,11 +1,11 @@
-# 🧠 Mentics: Your AI-Powered Path to Success
+# Mentics: Your AI-Powered Path to Success
 
 <p align="center">
   <img alt="Python" src="https://img.shields.io/badge/Python-3.11+-blue?logo=python&logoColor=white">
   <img alt="Flask" src="https://img.shields.io/badge/Flask-3.0.0-black?logo=flask&logoColor=white">
   <img alt="Google Gemini" src="https://img.shields.io/badge/Google%20Gemini-AI%20Powered-blueviolet?logo=google&logoColor=white">
   <img alt="SQLite" src="https://img.shields.io/badge/SQLite-3-blue?logo=sqlite&logoColor=white">
-  <img alt="TailwindCSS" src="https://img.shields.io/badge/Tailwind%20CSS-3-green?logo=tailwindcss&logoColor=white">
+  <img alt="React" src="https://img.shields.io/badge/React-19-149eca?logo=react&logoColor=white">
 </p>
 
 <p align="center">
@@ -14,7 +14,7 @@
 
 ---
 
-## ✨ Key Features
+## Key Features
 
 Mentics has evolved to become a holistic platform for student success, incorporating a wide range of features to guide, motivate, and connect users.
 
@@ -48,7 +48,7 @@ Mentics has evolved to become a holistic platform for student success, incorpora
 
 ---
 
-## 💻 Technology Stack
+## Technology Stack
 
 Mentics is built with a modern and robust technology stack:
 
@@ -56,20 +56,21 @@ Mentics is built with a modern and robust technology stack:
 * **Database**: PostgreSQL in production, SQLite for local development
 * **AI**: Google Gemini API (`google-genai`)
 * **Authentication**: Werkzeug Security (for password hashing), Authlib (for Google OAuth)
-* **Frontend**: HTML, Tailwind CSS, Vanilla JavaScript
-* **Charting**: ApexCharts.js for dynamic and beautiful progress charts.
+* **Frontend**: React 19, Vite, and a responsive custom design system
+* **Icons**: Lucide React
 
 ---
 
-## 🚀 Getting Started
+## Getting Started
 
 To get a local copy up and running, follow these simple steps.
 
 ### Prerequisites
 
 * Python 3.9+
+* Node.js 22+
 * An environment variable manager (like `python-dotenv`)
-* Google Gemini API Key
+* Google Gemini API Key (optional for local fallback mode)
 
 ### Installation
 
@@ -83,9 +84,11 @@ To get a local copy up and running, follow these simple steps.
     python -m .venv venv
     source .venv/bin/activate  # On Windows use `venv\Scripts\activate`
     ```
-3.  **Install the dependencies:**
+3.  **Install dependencies and build the React frontend:**
     ```sh
     pip install -r requirements.txt
+    npm ci
+    npm run build
     ```
 4.  **Set up your environment variables:**
     Create a `.env` file in the root directory and add your Google Gemini API key:
@@ -137,7 +140,7 @@ existing application and is therefore the recommended no-fee hosting route.
 
 ---
 
-## 👥 Contributors
+## Contributors
 
 * Shreyas Boddani
 * Brandon Potter
