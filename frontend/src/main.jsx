@@ -4,14 +4,15 @@ import DOMPurify from 'dompurify'
 import { marked } from 'marked'
 import {
   ArrowLeft, ArrowRight, Award, BarChart3, BookOpen, Brain, CalendarDays,
-  Check, ChevronRight, CircleUserRound, Clock3, Flame,
+  Check, ChevronRight, Clock3, Flame,
   GraduationCap, Hand, Headphones, House, LayoutDashboard, LineChart,
-  LockKeyhole, Mail, Menu, MessageCircle, PenLine, Plus, RotateCcw,
+  LockKeyhole, LogOut, Mail, Menu, MessageCircle, PenLine, Plus, RotateCcw,
   Search, Send, Settings, ShieldCheck, Sparkles, Target, Trophy, UserRound,
   UsersRound, X, Zap
 } from 'lucide-react'
 import './styles.css'
 import './experience.css'
+import './brand-system.css'
 
 const boot = window.__MENTICS__ || { page: 'landing', data: {} }
 
@@ -22,6 +23,7 @@ function Brand({ inverse = false }) {
 function Landing() {
   const loggedIn = boot.data.isLoggedIn
   return <div className="landing">
+    <Starfield/>
     <header className="public-nav">
       <Brand />
       <nav aria-label="Main navigation">
@@ -120,53 +122,111 @@ const navItems = [
   ['/account', Settings, 'Settings']
 ]
 
+function Starfield({warp=false,tone='violet'}) {
+  const ref=useRef(null)
+  useEffect(()=>{
+    const canvas=ref.current
+    const ctx=canvas?.getContext('2d')
+    if(!ctx)return
+    const reduced=window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    let frame;let width=0;let height=0;let points=[]
+    const color=tone==='indigo'?[79,70,229]:[124,58,237]
+    const resize=()=>{
+      const ratio=Math.min(window.devicePixelRatio||1,2)
+      width=canvas.clientWidth; height=canvas.clientHeight
+      canvas.width=width*ratio;canvas.height=height*ratio;ctx.setTransform(ratio,0,0,ratio,0,0)
+      const count=warp?Math.min(720,Math.floor(width*height/1200)):Math.min(120,Math.floor(width*height/10000))
+      points=Array.from({length:count},()=>warp?{x:(Math.random()-.5)*width,y:(Math.random()-.5)*height,z:Math.random()*.9+.1}:{x:Math.random()*width,y:Math.random()*height,r:Math.random()*1.4+.3,v:Math.random()*.12+.03,a:Math.random()*.55+.15})
+    }
+    const draw=()=>{
+      ctx.clearRect(0,0,width,height)
+      if(warp){
+        const cx=width/2,cy=height/2
+        points.forEach(p=>{p.z-=.012;if(p.z<.02){p.x=(Math.random()-.5)*width;p.y=(Math.random()-.5)*height;p.z=1}const scale=1/p.z;const x=cx+p.x*scale*.25;const y=cy+p.y*scale*.25;const tail=8+(1-p.z)*36;ctx.beginPath();ctx.moveTo(x,y);ctx.lineTo(cx+(x-cx)*(1+tail/Math.max(width,height)),cy+(y-cy)*(1+tail/Math.max(width,height)));ctx.strokeStyle=`rgba(${color.join(',')},${Math.min(1,1-p.z+.2)})`;ctx.lineWidth=Math.max(.5,(1-p.z)*2.4);ctx.stroke()})
+      }else{
+        points.forEach(p=>{p.y-=p.v;if(p.y<0)p.y=height;ctx.beginPath();ctx.arc(p.x,p.y,p.r,0,Math.PI*2);ctx.fillStyle=`rgba(${color.join(',')},${p.a})`;ctx.fill()})
+      }
+      if(!reduced)frame=requestAnimationFrame(draw)
+    }
+    resize();draw();window.addEventListener('resize',resize)
+    return()=>{cancelAnimationFrame(frame);window.removeEventListener('resize',resize)}
+  },[warp,tone])
+  return <canvas ref={ref} className={warp?'warp-field':'star-field'} aria-hidden="true"/>
+}
+
 function AppShell({ children, name }) {
-  const [menu, setMenu] = useState(false)
-  const current = window.location.pathname
-  return <div className="app-shell">
-    <aside className={`side-nav ${menu ? 'side-nav--open' : ''}`}>
-      <div className="side-nav-head"><Brand/><button className="icon-button mobile-only" onClick={()=>setMenu(false)} aria-label="Close menu"><X/></button></div>
-      <nav>{navItems.map(([href, Icon, label])=><a key={href} className={current === href ? 'active' : ''} href={href}><Icon size={19}/><span>{label}</span></a>)}</nav>
-      <div className="side-account"><div>{(name || 'M').slice(0,1).toUpperCase()}</div><span><b>{name || 'Mentics student'}</b><a href="/account">View account</a></span><a href="/logout" aria-label="Log out"><ChevronRight size={18}/></a></div>
-    </aside>
-    {menu && <button className="menu-scrim" onClick={()=>setMenu(false)} aria-label="Close menu"/>}
-    <div className="app-stage">
-      <header className="mobile-header"><button className="icon-button" onClick={()=>setMenu(true)} aria-label="Open menu"><Menu/></button><Brand/><a href="/account"><CircleUserRound/></a></header>
-      {children}
-    </div>
+  const [menu,setMenu]=useState(false)
+  const current=window.location.pathname
+  const active=href=>current===href||(href==='/dashboard/test-path-view'&&current.startsWith('/dashboard/test-path'))||(href==='/dashboard/college-path-view'&&current.startsWith('/dashboard/college-path'))||(href!=='/dashboard'&&current.startsWith(`${href}/`))
+  return <div className="app-shell app-shell--tabs">
+    <Starfield/>
+    <header className="product-nav">
+      <Brand/>
+      <nav className={menu?'open':''} aria-label="Product navigation">{navItems.map(([href,Icon,label])=><a key={href} className={active(href)?'active':''} href={href}><Icon size={17}/><span>{label}</span></a>)}</nav>
+      <div className="product-account"><a href="/account"><i>{(name||'M').slice(0,1).toUpperCase()}</i><span>{name||'Mentics student'}</span></a><a href="/logout" aria-label="Log out"><LogOut size={17}/></a></div>
+      <button className="product-menu" onClick={()=>setMenu(!menu)} aria-label="Toggle navigation">{menu?<X/>:<Menu/>}</button>
+    </header>
+    {menu&&<button className="menu-scrim" onClick={()=>setMenu(false)} aria-label="Close navigation"/>}
+    <div className="app-stage">{children}</div>
   </div>
 }
 
-function ProgressRing({ value, label }) {
-  const pct = Math.min(100, Math.round((value / 5) * 100))
-  return <div className="progress-ring" style={{'--progress': `${pct * 3.6}deg`}}><span><b>{value}</b><small>{label}</small></span></div>
+function PortalSelector({open,onClose}) {
+  const [warping,setWarping]=useState('')
+  const [error,setError]=useState('')
+  useEffect(()=>{document.body.style.overflow=open?'hidden':'';return()=>{document.body.style.overflow=''}},[open])
+  const choose=async type=>{
+    setError('');setWarping(type)
+    const test=type==='test'
+    const request=fetch(test?'/api/test-path-status':'/api/college-path-status').then(r=>r.ok?r.json():Promise.reject(new Error('Could not check this path.')))
+    try{
+      const [data]=await Promise.all([request,new Promise(resolve=>window.setTimeout(resolve,1450))])
+      window.location.href=data.has_path?(test?'/dashboard/test-path-view':'/dashboard/college-path-view'):(test?'/dashboard/test-path-builder':'/dashboard/college-path-builder')
+    }catch(e){setWarping('');setError(e.message)}
+  }
+  if(!open&&!warping)return null
+  return <>
+    <div className={`portal-overlay ${open?'visible':''}`} role="dialog" aria-modal="true" aria-label="Choose your path">
+      <div className="portal-heading"><small>MENTICS PATH BUILDER</small><h2>Choose your path</h2><p>Step through the portal that matches what you want to move forward.</p></div>
+      <div className="portal-pair">
+        <button className="portal portal--test" onClick={()=>choose('test')} disabled={Boolean(warping)}><svg viewBox="0 0 220 220" aria-hidden="true"><defs><radialGradient id="portal-test"><stop offset="0" stopColor="#c084fc"/><stop offset=".48" stopColor="#7c3aed"/><stop offset="1" stopColor="#312e81"/></radialGradient></defs><circle cx="110" cy="110" r="92"/><circle cx="110" cy="110" r="76"/><circle cx="110" cy="110" r="62" fill="url(#portal-test)"/></svg><span><BookOpen/><b>Test Prep</b><small>SAT / ACT journey</small></span></button>
+        <button className="portal portal--college" onClick={()=>choose('college')} disabled={Boolean(warping)}><svg viewBox="0 0 220 220" aria-hidden="true"><defs><radialGradient id="portal-college"><stop offset="0" stopColor="#818cf8"/><stop offset=".48" stopColor="#4f46e5"/><stop offset="1" stopColor="#172554"/></radialGradient></defs><circle cx="110" cy="110" r="92"/><circle cx="110" cy="110" r="76"/><circle cx="110" cy="110" r="62" fill="url(#portal-college)"/></svg><span><GraduationCap/><b>College Plan</b><small>Applications and more</small></span></button>
+      </div>
+      {error&&<p className="portal-error">{error}</p>}
+      <button className="portal-close" onClick={onClose} aria-label="Close path selector"><X/></button>
+    </div>
+    {warping&&<div className="warp-overlay"><Starfield warp tone={warping==='college'?'indigo':'violet'}/><div><Brand inverse/><p>Connecting to your path</p></div></div>}
+  </>
 }
 
 function Dashboard() {
-  const d = boot.data
-  const [suggestion, setSuggestion] = useState('Reviewing your latest progress…')
-  useEffect(()=>{fetch('/api/get-suggestion').then(r=>r.json()).then(x=>setSuggestion(x.suggestion || 'Your next clear step is waiting.')).catch(()=>setSuggestion('Keep the next step small, specific, and finishable.'))},[])
-  const hour = new Date().getHours()
-  const greeting = hour < 12 ? 'Good morning' : hour < 18 ? 'Good afternoon' : 'Good evening'
-  const chart = d.activityData?.data || [0,0,0,0,0,0,0]
-  const max = Math.max(...chart, 1)
-  return <AppShell name={d.name}><main className="app-main dashboard-page">
-    <div className="page-intro"><div><div className="eyebrow"><span/> YOUR WORKSPACE</div><h1>{greeting}, {String(d.name || 'there').split(' ')[0]}.</h1><p>Keep the momentum. Your next move is ready.</p></div><div className="header-stats"><span><Flame size={17}/><b>{d.gameStats?.streak || 0}</b> day focus</span><span><Zap size={17}/><b>{d.gameStats?.points || 0}</b> points</span></div></div>
-
-    <section className="dashboard-grid">
-      <article className="focus-card"><div className="card-top"><div><small>YOUR ACTIVE PATH</small><h2>Make today count.</h2></div><Sparkles/></div><p>{suggestion}</p><div className="path-choices">
-        <a href="/dashboard/test-path-view"><ProgressRing value={d.testPrepCompleted || 0} label="of 5"/><span><b>Test preparation</b><small>{d.testPrepCompleted || 0} steps complete</small></span><ArrowRight/></a>
-        <a href="/dashboard/college-path-view"><ProgressRing value={d.collegePlanningCompleted || 0} label="of 5"/><span><b>College planning</b><small>{d.collegePlanningCompleted || 0} steps complete</small></span><ArrowRight/></a>
-      </div></article>
-
-      <article className="metrics-card"><div className="card-top"><div><small>CURRENT SNAPSHOT</small><h2>Your numbers</h2></div><a href="/dashboard/stats/edit">Update</a></div><div className="metrics-row"><div><span>GPA</span><b>{d.gpa}</b></div><div><span>SAT</span><b>{d.satTotal}</b></div><div><span>ACT</span><b>{d.actAverage}</b></div></div>{d.testDateInfo?.days_left != null && <div className="test-date"><CalendarDays/><span><b>{d.testDateInfo.test_type} in {d.testDateInfo.days_left} days</b><small>{d.testDateInfo.date_str}</small></span></div>}</article>
-
-      <article className="activity-card"><div className="card-top"><div><small>LAST 7 DAYS</small><h2>Consistency</h2></div><BarChart3/></div><div className="bar-chart">{chart.map((v,i)=><div key={i}><i style={{height:`${Math.max(8,(v/max)*100)}%`}}/><small>{d.activityData?.labels?.[i]}</small></div>)}</div></article>
-
-      <article className="recent-card"><div className="card-top"><div><small>LATEST</small><h2>Recent activity</h2></div><Clock3/></div><div className="activity-list">{d.recentActivities?.length ? d.recentActivities.map((a,i)=><div key={i}><span><Check/></span><p><b>{activityTitle(a)}</b><small>{activityDetail(a)}</small></p></div>) : <div className="empty-state"><Target/><p>Your completed work will show up here.</p></div>}</div></article>
-      <article className="achievement-card"><div className="card-top"><div><small>MILESTONES</small><h2>Your trophies</h2></div><Award/></div><div className="achievement-list">{d.earnedAchievements?.length ? d.earnedAchievements.map((item)=><div key={item.id}><span><Trophy/></span><p><b>{item.title}</b><small>{item.description}</small></p></div>) : <div className="empty-state"><Award/><p>Complete your first path step to unlock a trophy.</p></div>}</div><a className="text-button" href="/leaderboard">View leaderboard <ArrowRight/></a></article>
+  const d=boot.data
+  const [suggestion,setSuggestion]=useState('Reviewing your latest progress…')
+  const [portalOpen,setPortalOpen]=useState(false)
+  useEffect(()=>{fetch('/api/get-suggestion').then(r=>r.json()).then(x=>setSuggestion(x.suggestion||'Your next clear step is waiting.')).catch(()=>setSuggestion('Keep the next step small, specific, and finishable.'))},[])
+  const chart=d.activityData?.data||[0,0,0,0,0,0,0]
+  const max=Math.max(...chart,1)
+  const first=String(d.name||'Student').split(' ')[0]
+  const today=new Intl.DateTimeFormat(undefined,{weekday:'long',month:'long',day:'numeric',year:'numeric'}).format(new Date())
+  return <AppShell name={d.name}><main className="app-main dashboard-page dashboard-original">
+    <section className="dashboard-welcome"><div><small>{today}</small><h1>Welcome back, <span>{first}</span></h1><p>Your dashboard is ready. Let’s build momentum.</p></div><div className="dashboard-totals"><span><Flame/><b>{d.gameStats?.streak||0}</b><small>DAY STREAK</small></span><span><Zap/><b>{d.gameStats?.points||0}</b><small>POINTS</small></span></div></section>
+    <section className="command-grid">
+      <button className="path-launcher" onClick={()=>setPortalOpen(true)}><span className="path-launcher-grid"/><div><small>THE CORE EXPERIENCE</small><h2>Path Builder</h2><p>Launch the Mentics portal to generate or update your personalized roadmap.</p><b>Open portal <ArrowRight/></b></div><div className="path-radar"><i/><i/><i/><Target/></div></button>
+      <ProgressTile type="test" value={d.testPrepCompleted||0}/><ProgressTile type="college" value={d.collegePlanningCompleted||0}/>
+      <article className="dash-module activity-module"><header><div><small>ACTIVITY TREND</small><h2>Focus intensity</h2></div><BarChart3/></header><div className="command-chart">{chart.map((v,i)=><div key={i}><b>{v}</b><i style={{height:`${Math.max(7,v/max*100)}%`}}/><small>{d.activityData?.labels?.[i]}</small></div>)}</div></article>
+      <article className="dash-module vital-module"><header><small>VITAL STATS</small><a href="/dashboard/stats/edit">Update</a></header><dl><div><dt>GPA</dt><dd>{d.gpa}</dd></div><div><dt>SAT</dt><dd>{d.satTotal}</dd></div><div><dt>ACT</dt><dd>{d.actAverage}</dd></div></dl></article>
+      <article className="dash-module insight-module"><div className="countdown">{d.testDateInfo?.days_left!=null?<><strong>{d.testDateInfo.days_left}</strong><span>DAYS TO {d.testDateInfo.test_type}</span><small>{d.testDateInfo.date_str}</small></>:<><CalendarDays/><span>NO TEST DATE SET</span><a href="/dashboard/test-path-builder">Set your date</a></>}</div><div className="insight"><Brain/><small>MENTICS INSIGHT</small><p>{suggestion}</p></div></article>
+      <article className="dash-module updates-module"><header><div><small>LATEST SIGNALS</small><h2>Recent updates</h2></div><Clock3/></header><div>{d.recentActivities?.length?d.recentActivities.slice(0,4).map((a,i)=><span key={i}><i><Check/></i><p><b>{activityTitle(a)}</b><small>{activityDetail(a)}</small></p></span>):<div className="empty-state"><Target/><p>Your completed work will show up here.</p></div>}</div></article>
+      <article className="dash-module trophies-module"><header><div><small>MILESTONES</small><h2>Trophies</h2></div><Award/></header><div>{d.earnedAchievements?.length?d.earnedAchievements.slice(0,6).map(item=><span key={item.id} title={`${item.title}: ${item.description}`}><Trophy/></span>):<p>Complete tasks to unlock trophies.</p>}</div><a href="/leaderboard">View leaderboard <ArrowRight/></a></article>
     </section>
+    <PortalSelector open={portalOpen} onClose={()=>setPortalOpen(false)}/>
   </main></AppShell>
+}
+
+function ProgressTile({type,value}) {
+  const test=type==='test'
+  const Icon=test?BookOpen:GraduationCap
+  return <a className={`dash-module progress-tile progress-tile--${type}`} href={test?'/dashboard/test-path-view':'/dashboard/college-path-view'}><header><Icon/><small>{test?'TEST PREP':'COLLEGE PLAN'}</small></header><div><strong>{value}<i>/5</i></strong><span>{value===5?'PATH COMPLETE':'TASKS DONE'}</span></div><em><i style={{width:`${value/5*100}%`}}/></em></a>
 }
 
 function activityTitle(a) {
@@ -307,7 +367,7 @@ function PageIntro({kicker,title,copy,actions}) {
 
 function AuthPage({mode}) {
   const signup = mode === 'signup'
-  return <div className="auth-page"><a href="/" className="auth-brand"><Brand/></a><div className="auth-art"><span className="shape shape--peach"/><span className="shape shape--mint"/><div><small>YOUR NEXT CHAPTER</small><h1>Ambition feels better with a plan.</h1><p>Build momentum across test prep, college planning, and every goal between.</p></div></div><main className="auth-panel"><div className="auth-copy"><small>{signup?'START YOUR PATH':'WELCOME BACK'}</small><h2>{signup?'Join Mentics.':'Continue building.'}</h2><p>{signup?'Your focused workspace is a minute away.':'Your goals and progress are waiting.'}</p></div>{boot.data.error&&<div className="form-error" role="alert">{boot.data.error}</div>}<form method="POST" className="react-form">{signup&&<label>Full name<input name="name" autoComplete="name" required maxLength="100" placeholder="Your name"/></label>}<label>Email address<input type="email" name="email" autoComplete="email" required placeholder="you@example.com"/></label><label>Password<input type="password" name="password" autoComplete={signup?'new-password':'current-password'} minLength={signup?8:undefined} required placeholder={signup?'At least 8 characters':'Your password'}/></label><button className="button button--primary" type="submit">{signup?'Create my account':'Sign in'} <ArrowRight/></button></form><div className="form-divider"><span>or</span></div><a className="google-button" href="/google-login"><span>G</span> Continue with Google</a><p className="auth-switch">{signup?'Already have an account?':'New to Mentics?'} <a href={signup?'/login':'/signup'}>{signup?'Sign in':'Create an account'}</a></p></main></div>
+  return <div className="auth-page"><div className="auth-brand"><Brand/></div><div className="auth-art"><span className="shape shape--peach"/><span className="shape shape--mint"/><div><small>YOUR NEXT CHAPTER</small><h1>Ambition feels better with a plan.</h1><p>Build momentum across test prep, college planning, and every goal between.</p></div></div><main className="auth-panel"><div className="auth-copy"><small>{signup?'START YOUR PATH':'WELCOME BACK'}</small><h2>{signup?'Join Mentics.':'Continue building.'}</h2><p>{signup?'Your focused workspace is a minute away.':'Your goals and progress are waiting.'}</p></div>{boot.data.error&&<div className="form-error" role="alert">{boot.data.error}</div>}<form method="POST" className="react-form">{signup&&<label>Full name<input name="name" autoComplete="name" required maxLength="100" placeholder="Your name"/></label>}<label>Email address<input type="email" name="email" autoComplete="email" required placeholder="you@example.com"/></label><label>Password<input type="password" name="password" autoComplete={signup?'new-password':'current-password'} minLength={signup?8:undefined} required placeholder={signup?'At least 8 characters':'Your password'}/></label><button className="button button--primary" type="submit">{signup?'Create my account':'Sign in'} <ArrowRight/></button></form><div className="form-divider"><span>or</span></div><a className="google-button" href="/google-login"><span>G</span> Continue with Google</a><p className="auth-switch">{signup?'Already have an account?':'New to Mentics?'} <a href={signup?'/login':'/signup'}>{signup?'Sign in':'Create an account'}</a></p></main></div>
 }
 
 const learningOptions = [['visual','Visual',Sparkles,'I learn by seeing'],['auditory','Auditory',Headphones,'I learn by hearing'],['reading_writing','Reading / writing',PenLine,'I learn through words'],['kinesthetic','Hands-on',Hand,'I learn by doing']]
@@ -328,7 +388,18 @@ function Field({name,label,textarea=false,value,...props}){return <label>{label}
 function BuilderPage({kind}){const d=boot.data;const test=kind==='test';const [focus,setFocus]=useState(d.test_focus||'');return <AppShell name={d.name}><main className="app-main form-page"><PageIntro kicker={test?'TEST PREPARATION':'COLLEGE PLANNING'} title={test?'Design your next five steps.':'Build a college plan that fits.'} copy={test?'Tell Mentics what the score alone cannot show.':'Turn a wide-open process into focused, personal action.'}/><form method="POST" className="settings-form builder-form">{test?<><fieldset><legend>Which test are you preparing for?</legend><div className="choice-grid choice-grid--three">{[['sat','SAT only'],['act','ACT only'],['both','SAT + ACT']].map(([value,label])=><label className={focus===value?'selected':''} key={value}><input type="radio" name="test_focus" value={value} required checked={focus===value} onChange={()=>setFocus(value)}/><BookOpen/><b>{label}</b></label>)}</div></fieldset><div className="form-field-grid"><Field name="desired_sat" label="Desired SAT" type="number" min="400" max="1600" step="10" value={d.desired_sat}/><Field name="desired_act" label="Desired ACT" type="number" min="1" max="36" value={d.desired_act}/><Field name="current_sat_ebrw" label="Current SAT reading & writing" type="number" min="200" max="800" value={d.current_sat_ebrw}/><Field name="current_sat_math" label="Current SAT math" type="number" min="200" max="800" value={d.current_sat_math}/><Field name="current_act_composite" label="Current ACT composite" type="number" min="1" max="36" value={d.current_act_composite}/><Field name="current_act_math" label="Current ACT math" type="number" min="1" max="36" value={d.current_act_math}/><Field name="current_act_reading" label="Current ACT reading" type="number" min="1" max="36" value={d.current_act_reading}/><Field name="current_act_science" label="Current ACT science" type="number" min="1" max="36" value={d.current_act_science}/><Field name="hours_per_week" label="Hours available each week" type="number" min="1" max="40" value={d.hours_per_week}/></div><Field name="strengths" label="Your strengths" textarea value={d.strengths}/><Field name="weaknesses" label="Where you need the most help" textarea required value={d.weaknesses}/><Field name="test_date" label="Test date" type="date" value={d.test_date}/></>:<><div className="form-field-grid"><label>Current grade<select name="current_grade" required defaultValue={d.grade||''}><option value="">Choose grade</option>{['9','10','11','12'].map(v=><option value={v} key={v}>{v}th grade</option>)}</select></label><label>Planning stage<select name="planning_stage" required defaultValue={d.planning_stage||''}><option value="">Choose stage</option><option value="exploring">Exploring options</option><option value="researching">Researching colleges</option><option value="applying">Ready to apply</option></select></label></div><Field name="interested_majors" label="Interested majors" textarea value={d.majors}/><Field name="target_colleges" label="Target colleges" textarea value={d.target_colleges}/></>}<div className="form-actions"><a className="button button--quiet" href="/dashboard">Cancel</a><button className="button button--primary" type="submit">Build my five-step path <ArrowRight/></button></div></form></main></AppShell>}
 
 function HistoryBars({records=[]}){const vals=records.map(r=>Number(r.value)||0);const max=Math.max(...vals,1);return <div className="history-bars">{records.slice(-12).map((r,i)=><div key={`${r.date}-${i}`}><i style={{height:`${Math.max(8,(Number(r.value)||0)/max*100)}%`}}/><small>{String(r.date).slice(5)}</small></div>)}</div>}
-function TrackerPage(){const d=boot.data;const [analysis,setAnalysis]=useState('');const [loading,setLoading]=useState(false);const analyze=async()=>{setLoading(true);try{setAnalysis((await api('/api/tracker-analysis')).analysis)}catch(e){setAnalysis(e.message)}finally{setLoading(false)}};const primary=d.statHistory?.sat_total?.length?'sat_total':d.statHistory?.gpa?.length?'gpa':Object.keys(d.statHistory||{})[0];const records=d.statHistory?.[primary]||[];return <AppShell name={d.name}><main className="app-main"><PageIntro kicker="PROGRESS TRACKER" title="See the shape of your effort." copy="Scores, paths, and patterns come together here." actions={<button className="button button--primary" onClick={analyze} disabled={loading}><Brain/> {loading?'Analyzing…':'Analyze my progress'}</button>}/>{analysis&&<article className="analysis-panel"><div><Sparkles/><small>MENTICS ANALYSIS</small></div><Markdown>{analysis}</Markdown></article>}<section className="tracker-layout"><article className="trend-panel"><div className="card-top"><div><small>PRIMARY TREND</small><h2>{primary?.replaceAll('_',' ')||'No history yet'}</h2></div><LineChart/></div>{records.length?<HistoryBars records={records}/>:<div className="empty-state"><LineChart/><p>Update your scores to begin a trend line.</p></div>}</article><article className="kpi-panel"><small>KEY METRICS</small>{Object.entries(d.kpis||{}).slice(0,6).map(([key,v])=><div key={key}><span>{key.replaceAll('_',' ')}</span><b>{v.latest}</b><small>{v.improvement>0?`+${v.improvement}`:v.improvement||'No change'}</small></div>)}</article></section><section className="history-section"><h2>Path history</h2><div>{[['Test preparation',d.testPrepHistory],['College planning',d.collegePlanningHistory]].map(([label,items])=><article key={label}><h3>{label}</h3>{items?.length?items.slice(0,5).map((gen,i)=><details key={i}><summary>{String(gen.date).slice(0,10)} <span>{gen.tasks?.filter(t=>t.is_completed).length||0}/{gen.tasks?.length||0} complete</span></summary><ol>{gen.tasks?.map(t=><li key={t.id} className={t.is_completed?'done':''}>{t.description}</li>)}</ol></details>):<p>No paths yet.</p>}</article>)}</div></section></main></AppShell>}
+function TrackerPage(){
+  const d=boot.data
+  const metricKeys=Object.keys(d.statHistory||{}).filter(key=>d.statHistory[key]?.length)
+  const preferred=d.statHistory?.sat_total?.length?'sat_total':d.statHistory?.gpa?.length?'gpa':metricKeys[0]
+  const [metric,setMetric]=useState(preferred)
+  const [historyTab,setHistoryTab]=useState('test')
+  const [analysis,setAnalysis]=useState('');const [loading,setLoading]=useState(false)
+  const analyze=async()=>{setLoading(true);try{setAnalysis((await api('/api/tracker-analysis')).analysis)}catch(e){setAnalysis(e.message)}finally{setLoading(false)}}
+  const records=d.statHistory?.[metric]||[]
+  const history=historyTab==='test'?d.testPrepHistory:d.collegePlanningHistory
+  return <AppShell name={d.name}><main className="app-main"><PageIntro kicker="PROGRESS TRACKER" title="See the shape of your effort." copy="Scores, paths, and patterns come together here." actions={<button className="button button--primary" onClick={analyze} disabled={loading}><Brain/> {loading?'Analyzing…':'Analyze my progress'}</button>}/>{analysis&&<article className="analysis-panel"><div><Sparkles/><small>MENTICS ANALYSIS</small></div><Markdown>{analysis}</Markdown></article>}<section className="tracker-layout"><article className="trend-panel"><div className="tracker-metric-tabs">{metricKeys.length?metricKeys.slice(0,7).map(key=><button className={metric===key?'active':''} onClick={()=>setMetric(key)} key={key}>{key.replaceAll('_',' ')}</button>):<span>No score history yet</span>}</div><div className="card-top"><div><small>PRIMARY TREND</small><h2>{metric?.replaceAll('_',' ')||'No history yet'}</h2></div><LineChart/></div>{records.length?<HistoryBars records={records}/>:<div className="empty-state"><LineChart/><p>Update your scores to begin a trend line.</p></div>}</article><article className="kpi-panel"><small>KEY METRICS</small>{Object.entries(d.kpis||{}).slice(0,6).map(([key,v])=><div key={key}><span>{key.replaceAll('_',' ')}</span><b>{v.latest}</b><small>{v.improvement>0?`+${v.improvement}`:v.improvement||'No change'}</small></div>)}</article></section><section className="history-section history-section--tabs"><header><h2>Path history</h2><div><button className={historyTab==='test'?'active':''} onClick={()=>setHistoryTab('test')}>Test Prep</button><button className={historyTab==='college'?'active':''} onClick={()=>setHistoryTab('college')}>College Planning</button></div></header><article>{history?.length?history.slice(0,8).map((gen,i)=><details key={i}><summary>{String(gen.date).slice(0,10)} <span>{gen.tasks?.filter(t=>t.is_completed).length||0}/{gen.tasks?.length||0} complete</span></summary><ol>{gen.tasks?.map(t=><li key={t.id} className={t.is_completed?'done':''}>{t.description}</li>)}</ol></details>):<p>No paths yet.</p>}</article></section></main></AppShell>
+}
 
 function ForumPage(){const d=boot.data;const [creating,setCreating]=useState(false);const [busy,setBusy]=useState(false);const submitPost=async e=>{e.preventDefault();setBusy(true);const form=new FormData(e.currentTarget);try{await api('/api/posts',{method:'POST',body:JSON.stringify({title:form.get('title'),content:form.get('content')})});window.location.reload()}finally{setBusy(false)}};const reply=async(postId,e)=>{e.preventDefault();setBusy(true);const form=new FormData(e.currentTarget);try{await api('/api/replies',{method:'POST',body:JSON.stringify({post_id:postId,content:form.get('content')})});window.location.reload()}finally{setBusy(false)}};return <AppShell name={d.name}><main className="app-main"><PageIntro kicker="MENTICS COMMUNITY" title="Students helping students." copy="Compare approaches, ask better questions, and move forward together." actions={<button className="button button--primary" onClick={()=>setCreating(!creating)}><Plus/> New discussion</button>}/>{creating&&<form className="new-post-panel" onSubmit={submitPost}><Field name="title" label="Discussion title" required/><Field name="content" label="What do you want to share or ask?" textarea required/><button className="button button--primary" disabled={busy}>Publish discussion</button></form>}<form className="forum-search" method="GET"><Search/><input name="search" defaultValue={d.searchQuery||''} placeholder="Search discussions"/><button>Search</button></form><section className="forum-layout"><div className="thread-list">{d.posts?.length?d.posts.map(post=><article className="thread" key={post.id}><header><span>{String(post.user_name||'M').slice(0,1)}</span><div><b>{post.title}</b><small>{post.user_name} · {String(post.created_at).slice(0,10)}</small></div></header><p>{post.content}</p>{post.replies?.length>0&&<div className="replies">{post.replies.map(r=><div key={r.id}><b>{r.user_name}</b><p>{r.content}</p></div>)}</div>}<form onSubmit={e=>reply(post.id,e)}><input name="content" required placeholder="Add a thoughtful reply"/><button disabled={busy}><Send/></button></form></article>):<div className="empty-state"><MessageCircle/><p>No discussions match this search yet.</p></div>}</div><aside className="community-aside"><UsersRound/><h3>Today in Mentics</h3><strong>{d.todaysThreads?.length||0}</strong><span>new discussions</span><p>Keep posts specific, respectful, and useful to the next student.</p></aside></section></main></AppShell>}
 
