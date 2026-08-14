@@ -140,4 +140,76 @@
     toastRegion.appendChild(toast);
     window.setTimeout(() => toast.remove(), 4200);
   };
+
+  /* Progressive visual layer. These elements are decorative and never own app state. */
+  const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const progress = document.createElement("div");
+  progress.className = "mentics-scroll-progress";
+  progress.setAttribute("aria-hidden", "true");
+  body.appendChild(progress);
+
+  const updateScrollProgress = () => {
+    const available = document.documentElement.scrollHeight - window.innerHeight;
+    const amount = available > 0 ? Math.min(window.scrollY / available, 1) : 0;
+    progress.style.transform = `scaleX(${amount})`;
+  };
+  updateScrollProgress();
+  window.addEventListener("scroll", updateScrollProgress, { passive: true });
+
+  if (isMarketing) {
+    const hero = main?.querySelector(":scope > section:first-child");
+    if (hero) {
+      hero.classList.add("mentics-landing-hero");
+      const atmosphere = document.createElement("div");
+      atmosphere.className = "mentics-hero-atmosphere";
+      atmosphere.setAttribute("aria-hidden", "true");
+      atmosphere.innerHTML = '<span class="hero-orbit hero-orbit-one"></span><span class="hero-orbit hero-orbit-two"></span><span class="hero-glow-dot hero-glow-dot-one"></span><span class="hero-glow-dot hero-glow-dot-two"></span>';
+      hero.prepend(atmosphere);
+    }
+
+    main?.querySelectorAll(":scope > section").forEach((section, index) => {
+      section.style.setProperty("--section-index", index);
+    });
+
+    document.querySelectorAll(".glass-card, .dark-bento, details").forEach((element, index) => {
+      element.style.setProperty("--card-index", index % 6);
+    });
+
+    const marketingHeader = document.querySelector("body.marketing-page > header");
+    const updateHeader = () => marketingHeader?.classList.toggle("is-scrolled", window.scrollY > 24);
+    updateHeader();
+    window.addEventListener("scroll", updateHeader, { passive: true });
+  } else {
+    const atmosphere = document.createElement("div");
+    atmosphere.className = "mentics-app-atmosphere";
+    atmosphere.setAttribute("aria-hidden", "true");
+    body.prepend(atmosphere);
+
+    document.querySelectorAll(".card, .bento-card, .glass-card").forEach((card, index) => {
+      card.style.setProperty("--card-index", index % 8);
+    });
+
+    if (body.dataset.productPage === "dashboard") {
+      main?.querySelector(":scope > div:first-child")?.classList.add("mentics-dashboard-hero");
+      main?.querySelector(":scope > .grid")?.classList.add("mentics-dashboard-grid");
+    }
+
+    if (body.dataset.productPage === "path-view") {
+      const panels = main?.querySelectorAll(":scope > .grid > .card");
+      panels?.[0]?.classList.add("mentics-chat-panel");
+      panels?.[1]?.classList.add("mentics-path-panel");
+    }
+  }
+
+  if (!reducedMotion && window.matchMedia("(pointer: fine)").matches) {
+    let pointerFrame = 0;
+    window.addEventListener("pointermove", (event) => {
+      if (pointerFrame) return;
+      pointerFrame = window.requestAnimationFrame(() => {
+        body.style.setProperty("--pointer-x", `${event.clientX}px`);
+        body.style.setProperty("--pointer-y", `${event.clientY}px`);
+        pointerFrame = 0;
+      });
+    }, { passive: true });
+  }
 })();

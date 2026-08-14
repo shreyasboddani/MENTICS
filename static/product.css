@@ -715,3 +715,934 @@ textarea::placeholder {
     padding-inline: 1rem !important;
   }
 }
+
+/* --------------------------------------------------------------------------
+   MENTICS / AMBITION IN MOTION
+   A high-impact visual layer built around the original product architecture.
+   -------------------------------------------------------------------------- */
+
+:root {
+  --m-ink: #15101d;
+  --m-muted: #716879;
+  --m-line: rgba(67, 44, 82, .13);
+  --m-canvas: #f7f4fb;
+  --m-brand: #7c3aed;
+  --m-brand-dark: #5920b8;
+  --m-violet: #9b5cff;
+  --m-indigo: #5548ff;
+  --m-pink: #e66bd4;
+  --m-brand-soft: #f1eaff;
+  --m-night: #120b1b;
+  --m-night-soft: #21142f;
+  --m-glow: 0 32px 90px -36px rgba(92, 34, 168, .48);
+  --m-ease: cubic-bezier(.2, .8, .2, 1);
+}
+
+body {
+  --pointer-x: 50vw;
+  --pointer-y: 20vh;
+}
+
+.mentics-scroll-progress {
+  position: fixed;
+  z-index: 100000;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 3px;
+  pointer-events: none;
+  transform: scaleX(0);
+  transform-origin: left center;
+  background: linear-gradient(90deg, #a668ff, #6d5dfc 58%, #ec7ed8);
+  box-shadow: 0 0 18px rgba(145, 81, 255, .75);
+}
+
+/* Landing page: make the brand feel like a product, not a template. */
+.marketing-page {
+  background:
+    radial-gradient(circle at var(--pointer-x) var(--pointer-y), rgba(151, 91, 255, .06), transparent 22rem),
+    #f8f5fb !important;
+}
+
+.marketing-page .bg-grid,
+.marketing-page > .ambient-blob {
+  display: none !important;
+}
+
+.marketing-page .glass-nav {
+  width: min(82rem, calc(100% - 2.5rem));
+  top: 1.15rem;
+  padding: 0 !important;
+  overflow: hidden;
+  border: 1px solid rgba(255,255,255,.2) !important;
+  border-radius: 1.15rem;
+  color: white;
+  background: rgba(24, 13, 36, .54) !important;
+  box-shadow: 0 18px 60px -28px rgba(0,0,0,.62) !important;
+  backdrop-filter: blur(26px) saturate(145%) !important;
+  -webkit-backdrop-filter: blur(26px) saturate(145%) !important;
+  transition: top .3s var(--m-ease), width .3s var(--m-ease), background .3s ease, box-shadow .3s ease !important;
+}
+
+.marketing-page .glass-nav.is-scrolled {
+  top: .55rem;
+  width: min(74rem, calc(100% - 1.25rem));
+  background: rgba(20, 11, 30, .88) !important;
+  box-shadow: 0 16px 50px -22px rgba(15, 7, 24, .7) !important;
+}
+
+.marketing-page .glass-nav > div {
+  max-width: none !important;
+  padding: .82rem 1rem .82rem 1.25rem !important;
+}
+
+.marketing-page .glass-nav .font-lalezar {
+  color: #fff !important;
+  background: none !important;
+  -webkit-text-fill-color: currentColor !important;
+  text-shadow: 0 0 28px rgba(174, 120, 255, .35);
+}
+
+.marketing-page .glass-nav nav a,
+.marketing-page .glass-nav a[href="/login"] {
+  color: rgba(255,255,255,.67) !important;
+}
+
+.marketing-page .glass-nav nav a:hover,
+.marketing-page .glass-nav a[href="/login"]:hover {
+  color: white !important;
+}
+
+.marketing-page .glass-nav a[class*="bg-slate-900"] {
+  color: #21112f !important;
+  background: #fff !important;
+  box-shadow: 0 8px 26px -12px rgba(255,255,255,.5) !important;
+}
+
+.marketing-page main {
+  overflow: clip;
+}
+
+.marketing-page .mentics-landing-hero {
+  isolation: isolate;
+  min-height: 970px;
+  width: calc(100% - 1.5rem);
+  margin: .75rem auto 0;
+  padding-top: 12rem !important;
+  border-radius: 2.5rem 2.5rem 4.5rem 4.5rem;
+  overflow: hidden;
+  color: white;
+  background:
+    linear-gradient(180deg, rgba(255,255,255,.035), transparent 24%),
+    radial-gradient(circle at 50% 63%, rgba(130, 68, 242, .42), transparent 30%),
+    radial-gradient(circle at 14% 18%, rgba(109, 91, 252, .32), transparent 26%),
+    radial-gradient(circle at 88% 26%, rgba(230, 107, 212, .2), transparent 22%),
+    linear-gradient(145deg, #100917 0%, #1d102a 48%, #100919 100%);
+  box-shadow: inset 0 -1px rgba(255,255,255,.08), 0 42px 100px -62px rgba(44,19,68,.9);
+}
+
+.marketing-page .mentics-landing-hero::before {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  inset: 0;
+  opacity: .32;
+  background-image: linear-gradient(rgba(255,255,255,.07) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.07) 1px, transparent 1px);
+  background-size: 70px 70px;
+  mask-image: radial-gradient(circle at 50% 44%, #000, transparent 68%);
+}
+
+.marketing-page .mentics-landing-hero::after {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  left: 50%;
+  bottom: -25rem;
+  width: min(90vw, 85rem);
+  aspect-ratio: 1;
+  transform: translateX(-50%);
+  border: 1px solid rgba(204, 171, 255, .2);
+  border-radius: 50%;
+  box-shadow: 0 0 0 5rem rgba(169, 115, 255, .035), 0 0 0 10rem rgba(169, 115, 255, .025), inset 0 0 100px rgba(153, 88, 255, .12);
+}
+
+.mentics-hero-atmosphere,
+.mentics-hero-atmosphere span {
+  position: absolute;
+  pointer-events: none;
+}
+
+.mentics-hero-atmosphere {
+  inset: 0;
+  z-index: -1;
+}
+
+.hero-orbit {
+  left: 50%;
+  top: 53%;
+  border: 1px solid rgba(217, 193, 255, .18);
+  border-radius: 50%;
+  transform: translate(-50%, -50%) rotate(-10deg);
+  animation: mentics-orbit 22s linear infinite;
+}
+
+.hero-orbit-one { width: 53rem; height: 16rem; }
+.hero-orbit-two { width: 70rem; height: 24rem; animation-direction: reverse; animation-duration: 31s; }
+
+.hero-glow-dot {
+  width: .6rem;
+  height: .6rem;
+  border-radius: 50%;
+  background: #dbb9ff;
+  box-shadow: 0 0 12px #c48dff, 0 0 36px #9b5cff;
+  animation: mentics-float-dot 7s ease-in-out infinite;
+}
+
+.hero-glow-dot-one { left: 18%; top: 34%; }
+.hero-glow-dot-two { right: 17%; top: 59%; animation-delay: -3.5s; }
+
+@keyframes mentics-orbit {
+  to { transform: translate(-50%, -50%) rotate(350deg); }
+}
+
+@keyframes mentics-float-dot {
+  50% { transform: translate3d(1rem, -1.5rem, 0); opacity: .55; }
+}
+
+.marketing-page .mentics-landing-hero > h1 {
+  font-size: clamp(7.5rem, 17vw, 15rem) !important;
+  line-height: .68 !important;
+  margin: 0 0 3.5rem !important;
+  padding: .12em .12em .2em !important;
+  color: white !important;
+  background: linear-gradient(180deg, #fff 8%, #e9ddff 62%, #ab83e9 108%) !important;
+  background-clip: text !important;
+  -webkit-background-clip: text !important;
+  -webkit-text-fill-color: transparent !important;
+  filter: drop-shadow(0 22px 36px rgba(0,0,0,.25));
+  letter-spacing: -.035em !important;
+}
+
+.marketing-page .mentics-landing-hero > p {
+  max-width: 48rem !important;
+  color: rgba(244, 237, 251, .7) !important;
+  font-size: clamp(1.18rem, 2vw, 1.55rem) !important;
+  line-height: 1.5 !important;
+}
+
+.marketing-page .mentics-landing-hero > p span {
+  color: #fff !important;
+}
+
+.marketing-page .mentics-landing-hero > div[class*="flex-col"] a {
+  min-width: 12.5rem;
+  border-radius: 1rem !important;
+  padding: 1rem 1.55rem !important;
+}
+
+.marketing-page .mentics-landing-hero > div[class*="flex-col"] a:first-child {
+  color: #29143b !important;
+  background: #fff !important;
+  box-shadow: 0 18px 42px -18px rgba(255,255,255,.6) !important;
+}
+
+.marketing-page .mentics-landing-hero > div[class*="flex-col"] a:last-child {
+  color: #fff !important;
+  border: 1px solid rgba(255,255,255,.22) !important;
+  background: rgba(255,255,255,.08) !important;
+  box-shadow: none !important;
+  backdrop-filter: blur(16px) !important;
+}
+
+.marketing-page .mentics-landing-hero .badge-float {
+  border: 1px solid rgba(255,255,255,.18) !important;
+  color: white;
+  background: rgba(255,255,255,.09) !important;
+  box-shadow: 0 26px 70px -34px rgba(0,0,0,.7) !important;
+  backdrop-filter: blur(20px) saturate(150%) !important;
+}
+
+.marketing-page .mentics-landing-hero .badge-float [class*="text-slate-900"] { color: white !important; }
+.marketing-page .mentics-landing-hero .badge-float [class*="text-slate-500"] { color: rgba(255,255,255,.52) !important; }
+
+.marketing-page main > section:not(:first-child) {
+  position: relative;
+  border: 0 !important;
+}
+
+.marketing-page #process {
+  padding-block: 9.5rem !important;
+  background:
+    radial-gradient(circle at 80% 18%, rgba(163, 104, 255, .18), transparent 22rem),
+    linear-gradient(180deg, #f7f1ff, #fbf9fd) !important;
+  backdrop-filter: none !important;
+}
+
+.marketing-page #process::before {
+  content: "01  /  FROM AMBITION TO ACTION";
+  display: block;
+  width: min(80rem, calc(100% - 3rem));
+  margin: 0 auto 2rem;
+  color: #8151bd;
+  font-size: .68rem;
+  font-weight: 800;
+  letter-spacing: .18em;
+}
+
+.marketing-page #process h2,
+.marketing-page #platform > div > div:first-child h2,
+.marketing-page #faq > div > h2 {
+  font-size: clamp(3rem, 6vw, 5.4rem) !important;
+  font-weight: 600 !important;
+  letter-spacing: -.065em !important;
+  line-height: .96 !important;
+}
+
+.marketing-page #process .grid {
+  gap: 1.2rem !important;
+}
+
+.marketing-page #process .glass-card {
+  min-height: 31rem;
+  border: 1px solid rgba(94, 50, 125, .13) !important;
+  border-radius: 1.8rem !important;
+  background: rgba(255,255,255,.82) !important;
+  box-shadow: 0 28px 80px -52px rgba(76, 35, 105, .5) !important;
+  transform: translateY(calc(var(--card-index) * 5px));
+}
+
+.marketing-page #process .glass-card:nth-child(2) {
+  color: white;
+  background: linear-gradient(150deg, #7138ce, #4e35b5) !important;
+  border-color: rgba(255,255,255,.17) !important;
+  box-shadow: 0 32px 70px -35px rgba(92, 42, 173, .72) !important;
+}
+
+.marketing-page #process .glass-card:nth-child(2) h3,
+.marketing-page #process .glass-card:nth-child(2) p { color: white !important; }
+.marketing-page #process .glass-card:nth-child(2) p { opacity: .68; }
+
+.marketing-page #process .glass-card > div:last-child {
+  border-radius: 1.35rem;
+  margin: 0 .75rem .75rem;
+}
+
+.marketing-page #platform {
+  padding-block: 8rem !important;
+  background: #fff !important;
+}
+
+.marketing-page #platform::before {
+  content: "02  /  THE MENTICS SYSTEM";
+  position: absolute;
+  top: 6rem;
+  left: max(1.5rem, calc((100% - 80rem) / 2 + 1.5rem));
+  color: #8151bd;
+  font-size: .68rem;
+  font-weight: 800;
+  letter-spacing: .18em;
+}
+
+.marketing-page #platform .story-block {
+  min-height: 34rem;
+  height: 68vh;
+  padding: 2.5rem;
+  border-left: 1px solid #e9e1ed;
+  opacity: .22;
+}
+
+.marketing-page #platform .story-block.active {
+  border-left: 3px solid #8b5cf6;
+  opacity: 1;
+}
+
+.marketing-page #platform .story-block h2 {
+  font-size: clamp(2.8rem, 4vw, 4.5rem) !important;
+  letter-spacing: -.055em !important;
+  line-height: 1 !important;
+}
+
+.marketing-page #platform .app-visual {
+  border: 1px solid rgba(53, 30, 71, .16) !important;
+  border-radius: 2rem !important;
+  box-shadow: 0 45px 120px -55px rgba(52, 24, 79, .58) !important;
+}
+
+.marketing-page #platform .app-visual::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  border-radius: inherit;
+  box-shadow: inset 0 1px rgba(255,255,255,.75);
+}
+
+.marketing-page #features {
+  isolation: isolate;
+  padding-block: 9.5rem !important;
+  background:
+    radial-gradient(circle at 12% 10%, rgba(132, 77, 238, .38), transparent 28rem),
+    radial-gradient(circle at 87% 85%, rgba(226, 93, 199, .16), transparent 27rem),
+    #130b1d !important;
+}
+
+.marketing-page #features::before {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  inset: 0;
+  background-image: linear-gradient(rgba(255,255,255,.035) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.035) 1px, transparent 1px);
+  background-size: 52px 52px;
+  mask-image: linear-gradient(to bottom, #000, transparent);
+}
+
+.marketing-page #features .dark-bento {
+  min-height: 24rem !important;
+  border: 1px solid rgba(255,255,255,.12) !important;
+  border-radius: 1.8rem !important;
+  background:
+    radial-gradient(circle at 88% 10%, rgba(157, 91, 255, .22), transparent 12rem),
+    linear-gradient(145deg, rgba(255,255,255,.08), rgba(255,255,255,.035)) !important;
+  box-shadow: inset 0 1px rgba(255,255,255,.08), 0 28px 70px -48px #000 !important;
+  backdrop-filter: blur(16px);
+}
+
+.marketing-page #features .dark-bento:nth-child(2),
+.marketing-page #features .dark-bento:nth-child(5) {
+  background:
+    radial-gradient(circle at 80% 18%, rgba(234, 102, 210, .23), transparent 13rem),
+    linear-gradient(145deg, rgba(124, 58, 237, .22), rgba(255,255,255,.04)) !important;
+}
+
+.marketing-page #features .dark-bento:hover {
+  border-color: rgba(199, 160, 255, .48) !important;
+  transform: translateY(-8px) scale(1.008) !important;
+  box-shadow: 0 35px 80px -40px rgba(113, 55, 196, .55) !important;
+}
+
+.marketing-page #features .dark-bento > div:first-child:not(.relative) {
+  box-shadow: 0 0 0 8px rgba(139,92,246,.08), 0 16px 35px -18px rgba(139,92,246,.7);
+}
+
+.marketing-page #faq {
+  padding-block: 9rem !important;
+  background:
+    radial-gradient(circle at 10% 20%, rgba(158, 94, 255, .12), transparent 23rem),
+    #f8f5fb !important;
+}
+
+.marketing-page #faq details {
+  border-color: rgba(77, 44, 98, .13) !important;
+  border-radius: 1.35rem !important;
+  background: rgba(255,255,255,.78) !important;
+  box-shadow: 0 18px 50px -42px rgba(53, 29, 70, .48);
+  backdrop-filter: blur(12px);
+}
+
+.marketing-page #faq details[open] {
+  border-color: rgba(124,58,237,.32) !important;
+  background: #fff !important;
+  box-shadow: 0 28px 70px -45px rgba(89,32,184,.4);
+}
+
+.marketing-page main > section:last-child {
+  width: calc(100% - 1.5rem);
+  margin: 0 auto 1rem;
+  padding-block: 7rem !important;
+  border-radius: 4rem 4rem 2rem 2rem;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 16% 12%, rgba(255,255,255,.2), transparent 18rem),
+    radial-gradient(circle at 88% 85%, rgba(237, 120, 219, .25), transparent 20rem),
+    linear-gradient(135deg, #6830c4, #4f36c5 58%, #7028b7) !important;
+}
+
+.marketing-page main > section:last-child .glass-card {
+  border: 0 !important;
+  color: white;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+.marketing-page main > section:last-child h2,
+.marketing-page main > section:last-child p { color: white !important; }
+.marketing-page main > section:last-child p { opacity: .68; }
+.marketing-page main > section:last-child a { color: #2a153c !important; background: white !important; }
+
+.marketing-page footer {
+  color: #817889;
+  background: #f8f5fb;
+}
+
+/* App shell: energetic, legible and distinctly Mentics. */
+.product-app {
+  background:
+    radial-gradient(circle at var(--pointer-x) var(--pointer-y), rgba(145, 83, 235, .075), transparent 22rem),
+    linear-gradient(180deg, #f7f3fb, #fbfafc 32rem) !important;
+}
+
+.mentics-app-atmosphere {
+  position: fixed;
+  z-index: -3;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  background:
+    radial-gradient(circle at 5% 0%, rgba(152, 91, 245, .18), transparent 25rem),
+    radial-gradient(circle at 100% 35%, rgba(82, 71, 234, .1), transparent 28rem),
+    linear-gradient(rgba(78, 43, 101, .025) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(78, 43, 101, .025) 1px, transparent 1px);
+  background-size: auto, auto, 44px 44px, 44px 44px;
+  mask-image: linear-gradient(to bottom, #000 0%, rgba(0,0,0,.65) 72%, transparent);
+}
+
+.product-app .background-shapes,
+.product-app #topo-canvas { opacity: .16 !important; }
+
+.product-app .top-nav {
+  top: .8rem !important;
+  width: calc(100% - 1.5rem);
+  max-width: 94rem;
+  min-height: 4.35rem;
+  margin: .8rem auto 2.25rem !important;
+  padding: .68rem .8rem !important;
+  border: 1px solid rgba(73, 45, 89, .13) !important;
+  border-radius: 1.15rem !important;
+  background: rgba(255,255,255,.78) !important;
+  box-shadow: 0 18px 60px -40px rgba(49, 21, 68, .55) !important;
+  backdrop-filter: blur(24px) saturate(150%) !important;
+  -webkit-backdrop-filter: blur(24px) saturate(150%) !important;
+}
+
+.product-app .top-nav .font-lalezar {
+  font-size: 2.15rem !important;
+  color: #6326c3 !important;
+  text-shadow: 0 8px 25px rgba(124,58,237,.15);
+}
+
+.product-app .nav-item {
+  padding: .62rem .82rem !important;
+  border-radius: .78rem !important;
+}
+
+.product-app .nav-item.active,
+.product-app .nav-item[aria-current="page"] {
+  color: white !important;
+  border-color: transparent !important;
+  background: linear-gradient(135deg, #7d3ee4, #5b4ae4) !important;
+  box-shadow: 0 10px 24px -12px rgba(96,52,201,.65) !important;
+}
+
+.product-app main {
+  position: relative;
+  z-index: 1;
+  max-width: 94rem !important;
+}
+
+.product-app .card,
+.product-app .glass-card,
+.product-app .bento-card {
+  border: 1px solid rgba(74, 45, 91, .12) !important;
+  border-radius: 1.65rem !important;
+  background: rgba(255,255,255,.86) !important;
+  box-shadow: 0 24px 70px -52px rgba(51, 25, 68, .58), inset 0 1px rgba(255,255,255,.85) !important;
+  backdrop-filter: blur(15px) saturate(120%) !important;
+  -webkit-backdrop-filter: blur(15px) saturate(120%) !important;
+}
+
+.product-app .card:hover,
+.product-app .glass-card:hover,
+.product-app .bento-card:hover {
+  border-color: rgba(124,58,237,.28) !important;
+  transform: translateY(-5px) !important;
+  box-shadow: 0 34px 80px -48px rgba(82, 34, 119, .42), inset 0 1px white !important;
+}
+
+.product-app .card::after,
+.product-app .bento-card::after {
+  content: "" !important;
+  display: block !important;
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  border-radius: inherit;
+  opacity: .6;
+  background: radial-gradient(circle at 95% 0%, rgba(155,92,255,.13), transparent 10rem);
+}
+
+.product-app .mentics-dashboard-hero {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  align-items: center !important;
+  margin: 0 0 1.5rem !important;
+  padding: clamp(2rem, 5vw, 4rem) !important;
+  border: 1px solid rgba(255,255,255,.12);
+  border-radius: 2.25rem;
+  color: white;
+  background:
+    radial-gradient(circle at 85% 25%, rgba(207, 135, 255, .34), transparent 15rem),
+    radial-gradient(circle at 15% 120%, rgba(82, 73, 241, .4), transparent 24rem),
+    linear-gradient(135deg, #160c21, #2c1640 58%, #4e218d);
+  box-shadow: 0 38px 100px -62px rgba(45, 14, 68, .88);
+}
+
+.product-app .mentics-dashboard-hero::before {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  inset: 0;
+  background-image: linear-gradient(rgba(255,255,255,.05) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.05) 1px, transparent 1px);
+  background-size: 52px 52px;
+  mask-image: radial-gradient(circle at 80% 40%, #000, transparent 70%);
+}
+
+.product-app .mentics-dashboard-hero h1 { color: white !important; }
+.product-app .mentics-dashboard-hero h1 .text-gradient {
+  background: linear-gradient(100deg, #fff, #d6b6ff 60%, #f0bde7) !important;
+  background-clip: text !important;
+  -webkit-background-clip: text !important;
+}
+.product-app .mentics-dashboard-hero p { color: rgba(255,255,255,.62) !important; }
+.product-app .mentics-dashboard-hero > div:last-child > div {
+  border: 1px solid rgba(255,255,255,.13) !important;
+  background: rgba(255,255,255,.08) !important;
+  box-shadow: none !important;
+  backdrop-filter: blur(12px) !important;
+}
+.product-app .mentics-dashboard-hero > div:last-child [class*="text-slate-800"] { color: white !important; }
+.product-app .mentics-dashboard-hero > div:last-child [class*="text-slate-400"] { color: rgba(255,255,255,.48) !important; }
+.product-app .mentics-dashboard-hero .mentics-icon { color: #e3c5ff !important; background: rgba(255,255,255,.09) !important; border-color: rgba(255,255,255,.12) !important; }
+
+.product-app .mentics-dashboard-grid {
+  gap: 1.15rem !important;
+}
+
+.product-app .mentics-dashboard-grid > .bento-card {
+  min-height: 15rem;
+}
+
+.product-app .mentics-dashboard-grid > .hero-card {
+  min-height: 20rem;
+  background:
+    radial-gradient(circle at 86% 14%, rgba(225, 160, 255, .35), transparent 13rem),
+    linear-gradient(140deg, #6d2dc9, #4736b8) !important;
+  border-color: rgba(255,255,255,.16) !important;
+  box-shadow: 0 30px 80px -45px rgba(86,39,168,.85), inset 0 1px rgba(255,255,255,.16) !important;
+}
+
+.product-app .mentics-dashboard-grid > .hero-card:hover {
+  background:
+    radial-gradient(circle at 84% 12%, rgba(234, 180, 255, .42), transparent 14rem),
+    linear-gradient(140deg, #7432d2, #4c3bc1) !important;
+}
+
+.product-app .mentics-dashboard-grid > .bento-card:nth-child(2) {
+  background: linear-gradient(150deg, #fff, #f4eaff) !important;
+}
+.product-app .mentics-dashboard-grid > .bento-card:nth-child(3) {
+  background: linear-gradient(150deg, #fff, #edf0ff) !important;
+}
+.product-app .mentics-dashboard-grid > .bento-card:nth-child(6) {
+  background:
+    radial-gradient(circle at 80% 10%, rgba(221,158,255,.38), transparent 10rem),
+    linear-gradient(145deg, #f3e8ff, #ebe9ff) !important;
+}
+
+.product-app .mentics-dashboard-grid .icon-box,
+.product-app .mentics-dashboard-grid .mentics-icon {
+  border: 1px solid rgba(124,58,237,.15);
+  background: rgba(255,255,255,.6);
+  box-shadow: 0 12px 30px -18px rgba(82,36,136,.4);
+}
+
+.product-app .progress-bar-bg,
+.product-app [class*="bg-slate-100"][class*="rounded-full"] {
+  overflow: hidden;
+  background: rgba(71,47,86,.09) !important;
+  box-shadow: inset 0 1px 2px rgba(51,29,66,.08);
+}
+
+.product-app .progress-bar-fill,
+.product-app [class*="bg-purple-500"][class*="rounded-full"],
+.product-app [class*="bg-indigo-500"][class*="rounded-full"] {
+  background: linear-gradient(90deg, #9758f3, #5b4be6) !important;
+  box-shadow: 0 0 18px rgba(124,58,237,.35);
+}
+
+.product-app[data-product-page="path-view"] main > .grid {
+  gap: 1rem !important;
+}
+
+.product-app[data-product-page="path-view"] .mentics-chat-panel,
+.product-app[data-product-page="path-view"] .mentics-path-panel {
+  height: min(49rem, calc(100vh - 7.2rem)) !important;
+  background: rgba(255,255,255,.9) !important;
+}
+
+.product-app[data-product-page="path-view"] .mentics-chat-panel {
+  border-top: 4px solid #9b5cff !important;
+}
+
+.product-app[data-product-page="path-view"] .mentics-path-panel {
+  border-top: 4px solid #5548ff !important;
+  background:
+    radial-gradient(circle at 50% 20%, rgba(139,92,246,.1), transparent 18rem),
+    rgba(255,255,255,.92) !important;
+}
+
+.product-app[data-product-page="path-view"] #chat-history {
+  border-radius: 1rem;
+  background: linear-gradient(180deg, rgba(248,245,252,.7), rgba(255,255,255,.2));
+}
+
+.product-app[data-product-page="path-view"] #path-nodes-container {
+  background-image: radial-gradient(rgba(111,73,144,.1) .8px, transparent .8px);
+  background-size: 24px 24px;
+}
+
+/* Standard pages and forms share the same premium surfaces. */
+.product-app[data-product-page="standard"] main > h1,
+.product-app[data-product-page="standard"] main h1:first-child {
+  letter-spacing: -.045em;
+}
+
+.product-auth {
+  isolation: isolate;
+  background:
+    radial-gradient(circle at 14% 10%, rgba(157,90,245,.32), transparent 26rem),
+    radial-gradient(circle at 92% 84%, rgba(85,72,255,.2), transparent 28rem),
+    linear-gradient(145deg, #130b1c, #2b1740) !important;
+}
+
+.product-auth::before {
+  content: "MENTICS";
+  position: fixed;
+  z-index: -1;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  color: rgba(255,255,255,.028);
+  font: 400 min(25vw, 22rem)/1 Lalezar, cursive;
+  letter-spacing: -.04em;
+  white-space: nowrap;
+}
+
+.product-auth .bg-grid {
+  display: block !important;
+  opacity: .14 !important;
+  background-image: linear-gradient(rgba(255,255,255,.08) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.08) 1px, transparent 1px) !important;
+  background-size: 50px 50px !important;
+}
+
+.product-auth .ambient-blob { opacity: .3 !important; }
+
+.product-auth main > .glass-card {
+  border: 1px solid rgba(255,255,255,.5) !important;
+  border-radius: 2rem !important;
+  background: rgba(255,255,255,.94) !important;
+  box-shadow: 0 40px 120px -45px rgba(0,0,0,.85), inset 0 1px white !important;
+  backdrop-filter: blur(28px) saturate(135%) !important;
+}
+
+.product-auth .hero-gradient {
+  background: linear-gradient(110deg, #24112f, #7431c5 64%, #5548e8) !important;
+  background-clip: text !important;
+  -webkit-background-clip: text !important;
+}
+
+.product-auth button[type="submit"] {
+  min-height: 3.2rem;
+  border-radius: .9rem !important;
+  background: linear-gradient(135deg, #7b36d7, #5142cf) !important;
+  box-shadow: 0 18px 35px -18px rgba(93,48,196,.75) !important;
+}
+
+.product-auth .option-card {
+  border-radius: 1.1rem !important;
+  border-color: rgba(70,42,88,.14) !important;
+}
+
+.product-auth .option-card:hover,
+.product-auth .option-card.selected {
+  border-color: #8b5cf6 !important;
+  background: #f4edff !important;
+  box-shadow: 0 15px 38px -24px rgba(93,48,196,.48) !important;
+}
+
+@media (max-width: 1023px) {
+  .marketing-page .mentics-landing-hero {
+    min-height: 850px;
+  }
+
+  .marketing-page #platform .story-block {
+    min-height: auto;
+    height: auto;
+    margin-bottom: 1rem;
+    padding: 2rem;
+    border: 1px solid #e8e0ed;
+    border-radius: 1.5rem;
+    opacity: 1;
+    background: #fff;
+  }
+
+  .product-app .mentics-dashboard-hero {
+    align-items: flex-start !important;
+  }
+}
+
+@media (max-width: 767px) {
+  .mentics-scroll-progress { height: 2px; }
+
+  .marketing-page .glass-nav,
+  .marketing-page .glass-nav.is-scrolled {
+    top: .45rem;
+    width: calc(100% - .8rem);
+    border-radius: .95rem;
+  }
+
+  .marketing-page .glass-nav > div {
+    padding: .65rem .7rem .65rem .9rem !important;
+  }
+
+  .marketing-page .glass-nav .font-lalezar { font-size: 1.75rem !important; }
+  .marketing-page .glass-nav a[href="/login"] { display: none; }
+
+  .marketing-page .mentics-landing-hero {
+    width: calc(100% - .6rem);
+    min-height: 760px;
+    margin-top: .3rem;
+    padding: 10rem 1rem 6rem !important;
+    border-radius: 1.4rem 1.4rem 2.5rem 2.5rem;
+  }
+
+  .marketing-page .mentics-landing-hero > h1 {
+    font-size: clamp(5.8rem, 29vw, 8rem) !important;
+    margin-bottom: 2.4rem !important;
+  }
+
+  .marketing-page .mentics-landing-hero > p {
+    font-size: 1.08rem !important;
+    margin-bottom: 2rem !important;
+  }
+
+  .marketing-page .mentics-landing-hero > div[class*="flex-col"] {
+    width: 100% !important;
+    max-width: 24rem;
+  }
+
+  .marketing-page .mentics-landing-hero > div[class*="flex-col"] a {
+    width: 100%;
+  }
+
+  .hero-orbit-one { width: 31rem; height: 10rem; }
+  .hero-orbit-two { width: 42rem; height: 16rem; }
+
+  .marketing-page #process,
+  .marketing-page #platform,
+  .marketing-page #features,
+  .marketing-page #faq { padding-block: 6.5rem !important; }
+
+  .marketing-page #process::before {
+    width: calc(100% - 2rem);
+  }
+
+  .marketing-page #process h2,
+  .marketing-page #faq > div > h2 {
+    font-size: 3.25rem !important;
+  }
+
+  .marketing-page #process .glass-card,
+  .marketing-page #process .glass-card:nth-child(2) {
+    min-height: auto;
+    transform: none;
+  }
+
+  .marketing-page #platform::before { left: 1.5rem; top: 4.5rem; }
+
+  .marketing-page #features .dark-bento {
+    min-height: 20rem !important;
+    padding: 2rem !important;
+  }
+
+  .marketing-page main > section:last-child {
+    width: calc(100% - .6rem);
+    padding-block: 4rem !important;
+    border-radius: 2.5rem 2.5rem 1.5rem 1.5rem;
+  }
+
+  .marketing-page main > section:last-child .glass-card {
+    padding: 1rem !important;
+  }
+
+  .product-app .top-nav {
+    width: calc(100% - .8rem);
+    margin: .45rem auto 1rem !important;
+    min-height: 3.65rem;
+    border-radius: .95rem !important;
+  }
+
+  .product-app .top-nav .font-lalezar { font-size: 1.8rem !important; }
+
+  .product-app main {
+    padding-inline: .75rem !important;
+  }
+
+  .product-app .mentics-dashboard-hero {
+    margin-inline: 0 !important;
+    padding: 2rem 1.25rem !important;
+    border-radius: 1.5rem;
+  }
+
+  .product-app .mentics-dashboard-hero h1 {
+    font-size: clamp(2.8rem, 13vw, 4.2rem) !important;
+  }
+
+  .product-app .mentics-dashboard-hero > div:last-child {
+    width: 100%;
+    display: grid !important;
+    grid-template-columns: 1fr 1fr;
+    gap: .6rem !important;
+  }
+
+  .product-app .mentics-dashboard-hero > div:last-child > div {
+    min-width: 0;
+    padding: .75rem !important;
+    gap: .55rem !important;
+    border-radius: 1rem !important;
+  }
+
+  .product-app .mentics-dashboard-grid {
+    gap: .85rem !important;
+  }
+
+  .product-app .mentics-dashboard-grid > .bento-card {
+    min-height: auto;
+    padding: 1.35rem !important;
+    border-radius: 1.35rem !important;
+  }
+
+  .product-app .mentics-dashboard-grid > .hero-card {
+    min-height: 19rem;
+    flex-direction: column !important;
+    align-items: flex-start !important;
+    justify-content: center !important;
+  }
+
+  .product-app[data-product-page="path-view"] .mentics-chat-panel,
+  .product-app[data-product-page="path-view"] .mentics-path-panel {
+    height: auto !important;
+    min-height: 34rem;
+    padding: 1rem !important;
+  }
+
+  .product-auth main > .glass-card {
+    padding: 1.7rem !important;
+    border-radius: 1.45rem !important;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hero-orbit,
+  .hero-glow-dot { animation: none !important; }
+}
