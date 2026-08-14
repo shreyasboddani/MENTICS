@@ -54,7 +54,7 @@ Mentics is built with a modern and robust technology stack:
 
 * **Backend**: Python, Flask
 * **Database**: PostgreSQL in production, SQLite for local development
-* **AI**: Google Gemini API (`google-generativeai`)
+* **AI**: Google Gemini API (`google-genai`)
 * **Authentication**: Werkzeug Security (for password hashing), Authlib (for Google OAuth)
 * **Frontend**: HTML, Tailwind CSS, Vanilla JavaScript
 * **Charting**: ApexCharts.js for dynamic and beautiful progress charts.
@@ -107,8 +107,7 @@ To get a local copy up and running, follow these simple steps.
 
 The app no longer needs a persistent disk. It automatically uses local SQLite
 when `DATABASE_URL` is absent and PostgreSQL when that variable is present.
-Uploaded profile pictures are stored in the database too, so they survive
-serverless restarts.
+User data is stored in PostgreSQL so it survives serverless restarts.
 
 1. Create a free Neon Postgres project and copy its **pooled** connection string.
 2. Import this repository into Vercel.

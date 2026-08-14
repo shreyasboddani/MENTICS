@@ -6,26 +6,50 @@ from dbhelper import DatabaseHandler
 from userhelper import User
 from functools import wraps
 import json
-import base64
-import google.generativeai as genai
+from google import genai
 import os
+import secrets
 from dotenv import load_dotenv
 import random
 from pathlib import Path
 from datetime import datetime, timedelta, date
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 from authlib.integrations.flask_client import OAuth
+from werkzeug.middleware.proxy_fix import ProxyFix
 
 
 env_path = Path('.') / '.env'
 load_dotenv(dotenv_path=env_path)
 
 app = Flask(__name__)
-app.secret_key = os.getenv("SECRET_KEY")
+is_production = bool(os.getenv("VERCEL") or os.getenv("FLASK_ENV") == "production")
+configured_secret = os.getenv("SECRET_KEY")
+if is_production and not configured_secret:
+    raise RuntimeError("SECRET_KEY must be configured in production.")
+app.secret_key = configured_secret or secrets.token_hex(32)
+app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1)
 
-app.config['MAX_CONTENT_LENGTH'] = 2 * 1024 * 1024
+app.config.update(
+    SESSION_COOKIE_HTTPONLY=True,
+    SESSION_COOKIE_SAMESITE='Lax',
+    SESSION_COOKIE_SECURE=is_production,
+)
 app.url_map.strict_slashes = False
 app.permanent_session_lifetime = timedelta(minutes=10)
+
+gemini_api_key = os.getenv("GEMINI_API_KEY")
+gemini_client = genai.Client(api_key=gemini_api_key) if gemini_api_key else None
+
+
+@app.after_request
+def add_security_headers(response):
+    response.headers.setdefault('X-Content-Type-Options', 'nosniff')
+    response.headers.setdefault('X-Frame-Options', 'DENY')
+    response.headers.setdefault('Referrer-Policy', 'strict-origin-when-cross-origin')
+    response.headers.setdefault('Permissions-Policy', 'camera=(), microphone=(), geolocation=()')
+    if is_production:
+        response.headers.setdefault('Strict-Transport-Security', 'max-age=31536000; includeSubDomains')
+    return response
 
 
 oauth = OAuth(app)
@@ -46,13 +70,11 @@ def init_db():
         "stats": "TEXT NOT NULL",
         "name": "TEXT NOT NULL DEFAULT ''",
         "onboarding_completed": "BOOLEAN DEFAULT FALSE",
-        "onboarding_data": "TEXT",
-        "profile_picture": "TEXT"
+        "onboarding_data": "TEXT"
     })
     db.add_column("users", "name", "TEXT NOT NULL DEFAULT ''")
     db.add_column("users", "onboarding_completed", "BOOLEAN DEFAULT FALSE")
     db.add_column("users", "onboarding_data", "TEXT")
-    db.add_column("users", "profile_picture", "TEXT")
 
     db.create_table("paths", {
         "id": "INTEGER PRIMARY KEY AUTOINCREMENT",
@@ -200,17 +222,27 @@ def init_db():
         ON paths (user_id, category, is_active, created_at DESC);
         """
     )
+    indexes = {
+        'idx_subtasks_parent': 'subtasks (parent_task_id)',
+        'idx_stat_history_user_recorded': 'stat_history (user_id, recorded_at DESC)',
+        'idx_activity_user_created': 'activity_log (user_id, created_at DESC)',
+        'idx_quiz_results_user': 'quiz_results (user_id)',
+        'idx_sprint_results_user': 'sprint_results (user_id)',
+        'idx_forum_replies_post': 'forum_replies (post_id, created_at)',
+    }
+    for index_name, index_target in indexes.items():
+        db.execute(f"CREATE INDEX IF NOT EXISTS {index_name} ON {index_target}")
 
 
 # --- HELPER FUNCTIONS ---
 
 
-def log_activity(user_id, activity_type, details={}):
+def log_activity(user_id, activity_type, details=None):
     """Helper function to log user activities into the database."""
     db.insert("activity_log", {
         "user_id": user_id,
         "activity_type": activity_type,
-        "details": json.dumps(details)
+        "details": json.dumps(details or {})
     })
 
 
@@ -374,8 +406,13 @@ def _get_sprint_results_for_prompt(user_id):
     return "\n".join(summary)
 
 
-def _get_test_prep_ai_tasks(strengths, weaknesses, test_focus, current_scores={}, desired_scores={}, test_date_str=None, hours_per_week=None, chat_history=[], path_history={}, stat_history="", quiz_results="", sprint_results=""):
+def _get_test_prep_ai_tasks(strengths, weaknesses, test_focus, current_scores=None, desired_scores=None, test_date_str=None, hours_per_week=None, chat_history=None, path_history=None, stat_history="", quiz_results="", sprint_results=""):
     """Generates hyper-intelligent, adaptive test prep tasks, now including interactive Practice Sprints, Strategy Articles, and better context."""
+
+    current_scores = current_scores or {}
+    desired_scores = desired_scores or {}
+    chat_history = chat_history or []
+    path_history = path_history or {}
 
     def get_mock_tasks_reliably():
         """A fallback function to provide tasks if the AI service is unavailable."""
@@ -548,11 +585,11 @@ def _get_test_prep_ai_tasks(strengths, weaknesses, test_focus, current_scores={}
         f'}}'
     )
     try:
-        model = genai.GenerativeModel(
-            'gemini-2.5-flash',  # Using 2.5-flash as it's generally good with JSON
-            generation_config={"response_mime_type": "application/json"}
+        response = gemini_client.models.generate_content(
+            model='gemini-2.5-flash',
+            contents=prompt,
+            config={"response_mime_type": "application/json"}
         )
-        response = model.generate_content(prompt)
 
         response_data = None
         raw_text = None
@@ -772,7 +809,7 @@ def get_practice_sprint(user, task_id):
 @app.route('/api/submit_sprint_results', methods=['POST'])
 @login_required
 def submit_sprint_results(user):
-    data = request.get_json()
+    data = request.get_json(silent=True) or {}
 
     results = data.get('results')
     if not results:
@@ -789,7 +826,8 @@ def submit_sprint_results(user):
     return jsonify({"success": True})
 
 
-def _generate_and_save_new_test_path(user_id, test_path_info, chat_history=[]):
+def _generate_and_save_new_test_path(user_id, test_path_info, chat_history=None):
+    chat_history = chat_history or []
     user_record = db.select_one("users", where={"id": user_id})
     user_stats = json.loads(user_record['stats']) if user_record else {
     }
@@ -976,14 +1014,16 @@ def _get_test_prep_ai_chat_response(history, user_stats, stat_history="", quiz_r
     gemini_history = []
     for message in history:
         role = "model" if message["role"] == "assistant" else "user"
-        gemini_history.append({"role": role, "parts": [message["content"]]})
+        gemini_history.append({"role": role, "parts": [{"text": message["content"]}]})
 
     try:
 
-        model = genai.GenerativeModel(
-            'gemini-2.5-flash', system_instruction=system_message)
-        chat = model.start_chat(history=gemini_history[:-1])
-        last_user_message = gemini_history[-1]['parts'][0] if gemini_history else "Hello"
+        chat = gemini_client.chats.create(
+            model='gemini-2.5-flash',
+            history=gemini_history[:-1],
+            config={"system_instruction": system_message}
+        )
+        last_user_message = gemini_history[-1]['parts'][0]['text'] if gemini_history else "Hello"
         response = chat.send_message(last_user_message)
         return response.text
     except Exception as e:
@@ -992,8 +1032,10 @@ def _get_test_prep_ai_chat_response(history, user_stats, stat_history="", quiz_r
         return "Sorry, I encountered an error connecting to the AI."
 
 
-def _get_college_planning_ai_tasks(college_context, user_stats, path_history, chat_history=[], stat_history=""):
+def _get_college_planning_ai_tasks(college_context, user_stats, path_history, chat_history=None, stat_history=""):
     """Generates hyper-intelligent, adaptive college planning tasks with a detailed, gamified prompt."""
+
+    chat_history = chat_history or []
 
     def get_mock_tasks_reliably():
         print("--- DEBUG: Running corrected College Planning mock generator. ---")
@@ -1077,11 +1119,11 @@ def _get_college_planning_ai_tasks(college_context, user_stats, path_history, ch
         f'}}'
     )
     try:
-        model = genai.GenerativeModel(
-            'gemini-2.5-flash',
-            generation_config={"response_mime_type": "application/json"}
+        response = gemini_client.models.generate_content(
+            model='gemini-2.5-flash',
+            contents=prompt,
+            config={"response_mime_type": "application/json"}
         )
-        response = model.generate_content(prompt)
         response_data = json.loads(response.text)
         tasks = response_data.get("tasks", [])
         if isinstance(tasks, list) and len(tasks) > 0:
@@ -1151,13 +1193,15 @@ def _get_college_planning_ai_chat_response(history, user_stats, stat_history="",
     gemini_history = []
     for message in history:
         role = "model" if message["role"] == "assistant" else "user"
-        gemini_history.append({"role": role, "parts": [message["content"]]})
+        gemini_history.append({"role": role, "parts": [{"text": message["content"]}]})
 
     try:
-        model = genai.GenerativeModel(
-            'gemini-2.5-flash', system_instruction=system_message)
-        chat = model.start_chat(history=gemini_history[:-1])
-        last_user_message = gemini_history[-1]['parts'][0] if gemini_history else "Hello"
+        chat = gemini_client.chats.create(
+            model='gemini-2.5-flash',
+            history=gemini_history[:-1],
+            config={"system_instruction": system_message}
+        )
+        last_user_message = gemini_history[-1]['parts'][0]['text'] if gemini_history else "Hello"
         response = chat.send_message(last_user_message)
         return response.text
     except Exception as e:
@@ -1166,8 +1210,9 @@ def _get_college_planning_ai_chat_response(history, user_stats, stat_history="",
         return "Sorry, I encountered an error connecting to the AI."
 
 
-def _generate_and_save_new_college_path(user_id, college_context, chat_history=[]):
+def _generate_and_save_new_college_path(user_id, college_context, chat_history=None):
     """Gathers all context, generates, and saves a new college planning path."""
+    chat_history = chat_history or []
     try:
         user_record = db.select("users", where={"id": user_id})
         if not user_record:
@@ -1362,8 +1407,8 @@ def _get_tracker_ai_analysis(user):
 
     if os.getenv("GEMINI_API_KEY"):
         try:
-            model = genai.GenerativeModel('gemini-2.5-flash')
-            response = model.generate_content(prompt)
+            response = gemini_client.models.generate_content(
+                model='gemini-2.5-flash', contents=prompt)
             return response.text
         except Exception as e:
             print(f"Error in tracker AI analysis (remote): {e}")
@@ -1450,9 +1495,17 @@ def home():
 @app.route("/signup", methods=["GET", "POST"])
 def signup():
     if request.method == "POST":
-        email = request.form["email"]
-        name = request.form["name"]
-        password = generate_password_hash(request.form["password"])
+        email = request.form.get("email", "").strip().lower()
+        name = request.form.get("name", "").strip()
+        raw_password = request.form.get("password", "")
+        if not email or not name or len(raw_password) < 8:
+            return render_template(
+                "signup.html",
+                error="Enter your name, a valid email, and a password of at least 8 characters."
+            ), 400
+        if db.select_one("users", where={"email": email}):
+            return render_template("signup.html", error="Email already exists!"), 409
+        password = generate_password_hash(raw_password)
         try:
             user_id = db.insert("users", {
                 "email": email, "password": password, "name": name,
@@ -1471,7 +1524,7 @@ def signup():
             return redirect(url_for("onboarding"))
         except Exception as e:
             print(f"Signup error: {e}")
-            return render_template("signup.html", error="Email already exists!")
+            return render_template("signup.html", error="Unable to create the account right now."), 500
     return render_template("signup.html")
 
 
@@ -1481,8 +1534,8 @@ def login():
         return redirect(url_for("dashboard"))
     error = None
     if request.method == "POST":
-        email = request.form["email"]
-        password = request.form["password"]
+        email = request.form.get("email", "").strip().lower()
+        password = request.form.get("password", "")
 
         user_record = db.select_one("users", where={"email": email})
         if user_record and check_password_hash(user_record['password'], password):
@@ -1567,7 +1620,7 @@ def onboarding(user):
 
 @app.route('/set-timezone', methods=['POST'])
 def set_timezone():
-    data = request.get_json()
+    data = request.get_json(silent=True) or {}
     timezone = data.get('timezone')
     if timezone:
         try:
@@ -1819,22 +1872,8 @@ def account(user):
                 db.update('users', {'password': hashed_password}, {
                           'id': user.data['id']})
 
-        elif form_type == 'pfp':
-            if 'pfp' in request.files:
-                file = request.files['pfp']
-                if file.filename != '':
-                    allowed_types = {'image/jpeg', 'image/png', 'image/gif', 'image/webp'}
-                    if file.mimetype not in allowed_types:
-                        return render_template('account.html', user=user,
-                                               profile_picture=user.data.get('profile_picture'),
-                                               error='Please upload a JPEG, PNG, GIF, or WebP image.'), 400
-                    encoded = base64.b64encode(file.read()).decode('ascii')
-                    profile_picture = f"data:{file.mimetype};base64,{encoded}"
-                    db.update('users', {'profile_picture': profile_picture}, {
-                              'id': user.data['id']})
-
     user.load_user()
-    return render_template('account.html', user=user, profile_picture=user.data.get('profile_picture'))
+    return render_template('account.html', user=user)
 
 
 @app.route("/dashboard/test-path-builder", methods=["GET", "POST"])
@@ -1996,7 +2035,7 @@ def edit_stats(user):
 @app.route('/api/submit_quiz_results', methods=['POST'])
 @login_required
 def submit_quiz_results(user):
-    data = request.get_json()
+    data = request.get_json(silent=True) or {}
     # Expecting a list of {'question_id': id, 'is_correct': bool}
     results = data.get('results')
     if not results or not isinstance(results, list):
@@ -2143,7 +2182,7 @@ def get_quiz(user, task_id):
 @login_required
 def api_update_task_status(user):
     user_id = user.data['id']
-    data = request.get_json()
+    data = request.get_json(silent=True) or {}
     status = data.get("status")
     task_id = data.get("taskId")
 
@@ -2207,9 +2246,22 @@ def api_update_task_status(user):
 def api_chat(user):
     user_id = user.data['id']
     stats = user.get_stats()
-    data = request.get_json()
+    data = request.get_json(silent=True) or {}
     history = data.get("history", [])
     category = request.args.get('category', 'Test Prep')
+
+    if category not in {'Test Prep', 'College Planning'} or not isinstance(history, list):
+        return jsonify({"error": "Invalid chat request"}), 400
+    if len(history) > 50:
+        history = history[-50:]
+    if any(
+        not isinstance(message, dict)
+        or message.get('role') not in {'user', 'assistant'}
+        or not isinstance(message.get('content'), str)
+        or len(message['content']) > 4000
+        for message in history
+    ):
+        return jsonify({"error": "Invalid chat history"}), 400
 
     if not history or (len(history) == 1 and history[0]['role'] == 'user' and history[0]['content'] == 'INITIAL_MESSAGE'):
         history = []
@@ -2275,7 +2327,7 @@ def get_chat_history(user):
 @login_required
 def reset_chat_history(user):
     user_id = user.data['id']
-    data = request.get_json()
+    data = request.get_json(silent=True) or {}
     category = data.get('category')
     if not category:
         return jsonify({"success": False, "error": "Category is required"}), 400
@@ -2291,11 +2343,16 @@ def reset_chat_history(user):
 @app.route("/api/update_stats", methods=['POST'])
 @login_required
 def api_update_stats(user):
-    data = request.get_json()
+    data = request.get_json(silent=True) or {}
     stat_name = data.get("stat_name")
     stat_value = data.get("stat_value")
 
-    if not stat_name or stat_value is None:
+    allowed_stats = {
+        'gpa', 'sat_ebrw', 'sat_math', 'sat_total', 'act_math',
+        'act_reading', 'act_science', 'act_composite'
+    }
+
+    if stat_name not in allowed_stats or stat_value is None:
         return jsonify({"success": False, "error": "Missing stat name or value"}), 400
 
     try:
@@ -2324,13 +2381,14 @@ def api_update_stats(user):
 @login_required
 def add_task(user):
     user_id = user.data['id']
-    data = request.get_json()
+    data = request.get_json(silent=True) or {}
     description = data.get('description')
     category = data.get('category')
     due_date = data.get('due_date')
 
-    if not description or not category:
+    if not description or category not in {'Test Prep', 'College Planning'}:
         return jsonify({"success": False, "error": "Description and category are required"}), 400
+    description = str(description).strip()[:500]
 
     latest_task_query = "SELECT MAX(task_order) as max_order FROM paths WHERE user_id=? AND category=? AND is_active=True"
     max_order_result = db.execute(latest_task_query, (user_id, category))
@@ -2360,12 +2418,19 @@ def add_task(user):
 @app.route('/api/add_subtask', methods=['POST'])
 @login_required
 def add_subtask(user):
-    data = request.get_json()
+    data = request.get_json(silent=True) or {}
     parent_task_id = data.get('parent_task_id')
     description = data.get('description')
 
     if not parent_task_id or not description:
         return jsonify({"success": False, "error": "Parent task ID and description are required"}), 400
+
+    parent_task = db.select_one('paths', where={
+        'id': parent_task_id, 'user_id': user.data['id']
+    })
+    if not parent_task:
+        return jsonify({"success": False, "error": "Task not found"}), 404
+    description = str(description).strip()[:500]
 
     subtask_id = db.insert("subtasks", {
         "parent_task_id": parent_task_id,
@@ -2380,21 +2445,33 @@ def add_subtask(user):
 @app.route('/api/update_task_deadline', methods=['POST'])
 @login_required
 def update_task_deadline(user):
-    data = request.get_json()
+    data = request.get_json(silent=True) or {}
     task_id = data.get('taskId')
     due_date = data.get('dueDate')
 
-    db.update("paths", {"due_date": due_date}, where={"id": task_id})
+    if not task_id or not db.select_one('paths', where={
+            'id': task_id, 'user_id': user.data['id']}):
+        return jsonify({"success": False, "error": "Task not found"}), 404
+    db.update("paths", {"due_date": due_date}, where={
+              "id": task_id, "user_id": user.data['id']})
     return jsonify({"success": True})
 
 
 @app.route('/api/update_subtask', methods=['POST'])
 @login_required
 def update_subtask(user):
-    data = request.get_json()
+    data = request.get_json(silent=True) or {}
     subtask_id = data.get('subtaskId')
     is_completed = data.get('is_completed')
 
+    owned_subtask = db.execute_for_one(
+        """SELECT subtasks.id FROM subtasks
+           JOIN paths ON paths.id = subtasks.parent_task_id
+           WHERE subtasks.id=? AND paths.user_id=?""",
+        (subtask_id, user.data['id'])
+    )
+    if not owned_subtask:
+        return jsonify({"success": False, "error": "Subtask not found"}), 404
     db.update("subtasks", {"is_completed": is_completed},
               where={"id": subtask_id})
     return jsonify({"success": True})
@@ -2405,13 +2482,15 @@ def update_subtask(user):
 @app.route('/api/analyze_essay', methods=['POST'])
 @login_required
 def analyze_essay(user):
-    data = request.get_json()
+    data = request.get_json(silent=True) or {}
     essay_text = data.get('essay_text')
     essay_prompt = data.get(
         'essay_prompt', 'a general college application essay')
 
     if not essay_text:
         return jsonify({"error": "Essay text is required."}), 400
+    if len(essay_text) > 20000:
+        return jsonify({"error": "Essay text must be 20,000 characters or fewer."}), 400
 
     prompt = (
         f"You are an expert college admissions essay coach. Your goal is to provide constructive, actionable, and granular feedback on a student's essay. "
@@ -2435,8 +2514,8 @@ def analyze_essay(user):
     )
 
     try:
-        model = genai.GenerativeModel('gemini-2.5-flash')
-        response = model.generate_content(prompt)
+        response = gemini_client.models.generate_content(
+            model='gemini-2.5-flash', contents=prompt)
         return jsonify({"feedback": response.text})
     except Exception as e:
         print(f"Error in essay analysis: {e}")
@@ -2488,8 +2567,8 @@ def _get_proactive_ai_suggestions(user):
     )
 
     try:
-        model = genai.GenerativeModel('gemini-2.5-flash')
-        response = model.generate_content(prompt)
+        response = gemini_client.models.generate_content(
+            model='gemini-2.5-flash', contents=prompt)
         return response.text.strip()
     except Exception as e:
         print(f"Error in proactive suggestion generation: {e}")
@@ -2554,10 +2633,12 @@ def forum(user):
 @app.route('/api/posts', methods=['POST'])
 @login_required
 def create_post(user):
-    data = request.get_json()
+    data = request.get_json(silent=True) or {}
     title = data.get('title')
     content = data.get('content')
     if title and content:
+        title = str(title).strip()[:200]
+        content = str(content).strip()[:5000]
         db.insert('forum_posts', {
             'user_id': user.data['id'],
             'user_name': user.get_name(),
@@ -2571,10 +2652,13 @@ def create_post(user):
 @app.route('/api/replies', methods=['POST'])
 @login_required
 def create_reply(user):
-    data = request.get_json()
+    data = request.get_json(silent=True) or {}
     post_id = data.get('post_id')
     content = data.get('content')
     if post_id and content:
+        if not db.select_one('forum_posts', where={'id': post_id}):
+            return jsonify({'success': False, 'error': 'Post not found'}), 404
+        content = str(content).strip()[:5000]
         db.insert('forum_replies', {
             'post_id': post_id,
             'user_id': user.data['id'],
@@ -2594,6 +2678,8 @@ def init_db_command():
 
 # Use hosted Postgres in production and zero-config SQLite for development.
 DATABASE = os.getenv('DATABASE_URL')
+if is_production and not DATABASE:
+    raise RuntimeError("DATABASE_URL must be configured in production; local SQLite is not persistent.")
 if not DATABASE:
     os.makedirs(app.instance_path, exist_ok=True)
     DATABASE = os.path.join(app.instance_path, 'users.db')
@@ -2607,5 +2693,7 @@ with app.app_context():
         print("Database schema check complete. All tables and columns are present.")
     except Exception as e:
         print(f"!!! CRITICAL: FAILED TO INITIALIZE OR MIGRATE DATABASE: {e}")
+        if is_production:
+            raise
 if __name__ == "__main__":
-    app.run(debug=True)
+    app.run(debug=os.getenv("FLASK_DEBUG") == "1")
