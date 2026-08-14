@@ -427,3 +427,291 @@ textarea::placeholder {
     transition-duration: 0.01ms !important;
   }
 }
+
+/* Mentics interface system: visual polish without changing product structure. */
+.marketing-page,
+.product-app,
+.product-auth {
+  --m-canvas: #f8f8f6;
+  --m-surface-subtle: #f4f3f7;
+  --m-ink: #17131f;
+  --m-muted: #6e6877;
+  --m-line: #e7e3eb;
+  --m-brand-soft: #f0ebff;
+}
+
+.marketing-page {
+  background: #fbfbf9 !important;
+}
+
+.marketing-page .bg-grid {
+  background-image: linear-gradient(rgba(40, 32, 54, .035) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(40, 32, 54, .035) 1px, transparent 1px) !important;
+  background-size: 52px 52px !important;
+  opacity: .62 !important;
+  mask-image: linear-gradient(to bottom, #000 0%, transparent 88%);
+}
+
+.marketing-page .ambient-blob {
+  opacity: .2 !important;
+  filter: blur(190px) !important;
+  animation-duration: 36s !important;
+}
+
+.marketing-page .glass-nav {
+  width: min(78rem, calc(100% - 2rem));
+  left: 50% !important;
+  right: auto !important;
+  transform: translateX(-50%);
+  top: .8rem;
+  margin-inline: auto;
+  border: 1px solid rgba(229, 225, 235, .94) !important;
+  border-radius: 1rem;
+  background: rgba(253, 253, 251, .9) !important;
+  box-shadow: 0 12px 38px -28px rgba(30, 23, 41, .48) !important;
+}
+
+.marketing-page .glass-nav .font-lalezar {
+  font-size: 2rem !important;
+  line-height: 1 !important;
+}
+
+.marketing-page .glass-card {
+  background: rgba(255, 255, 255, .94) !important;
+  border: 1px solid var(--m-line) !important;
+  border-radius: 1.35rem !important;
+  box-shadow: 0 20px 60px -42px rgba(25, 17, 38, .45) !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+.marketing-page .glass-card:hover {
+  background: #fff !important;
+  border-color: #cec6d7 !important;
+  box-shadow: 0 30px 70px -44px rgba(62, 36, 91, .42) !important;
+  transform: translateY(-3px) !important;
+}
+
+.marketing-page .dark-bento {
+  border-radius: 1.35rem !important;
+  border-color: rgba(255,255,255,.09) !important;
+  background: #18131f !important;
+  box-shadow: 0 22px 55px -38px rgba(0,0,0,.8) !important;
+}
+
+.marketing-page .dark-bento:hover {
+  transform: translateY(-3px) !important;
+  border-color: rgba(188, 160, 255, .28) !important;
+}
+
+.marketing-page main > section {
+  border-bottom: 1px solid rgba(231, 227, 235, .72);
+}
+
+.marketing-page main > section:last-child,
+.marketing-page #features {
+  border-bottom: 0;
+}
+
+.marketing-page a[class*="rounded-full"] {
+  border-radius: .9rem !important;
+  font-weight: 650 !important;
+  letter-spacing: -.01em;
+}
+
+.marketing-page .app-visual {
+  border-radius: 1.25rem !important;
+  border-color: #e1dce6 !important;
+  box-shadow: 0 30px 75px -38px rgba(29, 19, 43, .32) !important;
+}
+
+.marketing-page .story-block {
+  min-height: 44rem;
+  height: 82vh;
+}
+
+.marketing-page details > summary {
+  letter-spacing: -.02em;
+}
+
+.product-app {
+  background: #f7f7f5 !important;
+}
+
+.product-app .background-shapes {
+  opacity: .1 !important;
+}
+
+.product-app #topo-canvas {
+  opacity: .12 !important;
+}
+
+.product-app .top-nav {
+  max-width: 96rem;
+  min-height: 4.5rem;
+  border-radius: 1rem !important;
+  border-color: #e4e0e8 !important;
+  background: rgba(252, 252, 250, .94) !important;
+  box-shadow: 0 14px 36px -30px rgba(22,16,31,.55) !important;
+}
+
+.product-app .top-nav .font-lalezar {
+  color: var(--m-brand) !important;
+  letter-spacing: .015em !important;
+}
+
+.product-app .nav-item {
+  border-radius: .65rem !important;
+  font-weight: 600 !important;
+}
+
+.product-app .card,
+.product-app .glass-card,
+.product-app .bento-card {
+  border-radius: 1.2rem !important;
+  border-color: #e5e1e8 !important;
+  background: #fff !important;
+  box-shadow: 0 1px 2px rgba(22,16,31,.025), 0 16px 40px -36px rgba(22,16,31,.4) !important;
+}
+
+.product-app .card:hover,
+.product-app .glass-card:hover,
+.product-app .bento-card:hover {
+  transform: translateY(-2px) !important;
+  border-color: #d3ccd9 !important;
+  box-shadow: 0 22px 55px -38px rgba(44,26,64,.38) !important;
+}
+
+.product-app .bento-card::after {
+  display: none !important;
+}
+
+.product-app .hero-card,
+.product-app .card.card-actions {
+  background: #1b1523 !important;
+  border-color: #2c2337 !important;
+  box-shadow: inset 4px 0 0 #8b5cf6, 0 22px 60px -40px rgba(36, 19, 52, .72) !important;
+}
+
+.product-app .hero-card:hover,
+.product-app .card.card-actions:hover {
+  background: #21182c !important;
+  transform: translateY(-2px) !important;
+}
+
+.product-app main > .grid,
+.product-app main > div > .grid {
+  gap: 1.25rem !important;
+}
+
+.product-app .icon-box,
+.product-app .activity-icon,
+.mentics-icon {
+  width: 2.65rem;
+  height: 2.65rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  border: 1px solid #e1d9ef;
+  border-radius: .75rem;
+  background: #f3effb;
+  color: #6d38b5;
+}
+
+.mentics-icon svg {
+  width: 1.25rem;
+  height: 1.25rem;
+  stroke-width: 1.8;
+}
+
+.portal-icon svg {
+  width: 3rem;
+  height: 3rem;
+  stroke-width: 1.5;
+}
+
+.product-auth .option-card .mentics-icon {
+  width: 2.5rem;
+  height: 2.5rem;
+  margin-inline: auto;
+}
+
+.product-app .progress-bar-bg,
+.product-app [class*="bg-slate-100"][class*="rounded-full"] {
+  height: .5rem !important;
+}
+
+.product-app [class*="tracking-widest"] {
+  letter-spacing: .11em !important;
+}
+
+.product-app [class*="rounded-2xl"] {
+  border-radius: .9rem !important;
+}
+
+.product-app[data-product-page="path-view"] main {
+  max-width: 94rem;
+  margin-inline: auto;
+}
+
+@media (min-width: 1280px) {
+  .product-app[data-product-page="path-view"] main > .grid {
+    grid-template-columns: minmax(18rem, .78fr) minmax(0, 1.72fr) !important;
+  }
+
+  .product-app[data-product-page="path-view"] main > .grid > :first-child,
+  .product-app[data-product-page="path-view"] main > .grid > :nth-child(2) {
+    grid-column: auto !important;
+    height: min(47rem, calc(100vh - 7.5rem)) !important;
+  }
+}
+
+.product-app[data-product-page="path-view"] #chat-history {
+  font-size: .86rem;
+}
+
+.product-app[data-product-page="path-view"] #path-nodes-container {
+  padding-inline: 1.1rem !important;
+}
+
+.product-app [id$="Modal"] > div,
+.product-app #pathModal > div {
+  border: 1px solid #dfd9e5 !important;
+  box-shadow: 0 34px 100px -40px rgba(19,12,28,.58) !important;
+}
+
+.product-auth .glass-card {
+  background: rgba(255,255,255,.97) !important;
+  border-color: #e3dfe7 !important;
+  border-radius: 1.25rem !important;
+  box-shadow: 0 28px 75px -45px rgba(31,19,45,.52) !important;
+}
+
+.product-auth .hero-gradient,
+.marketing-page .hero-gradient {
+  background: linear-gradient(120deg, #191321 8%, #5637b6 58%, #7c3aed 100%) !important;
+  background-clip: text !important;
+  -webkit-background-clip: text !important;
+  -webkit-text-fill-color: transparent !important;
+}
+
+@media (max-width: 767px) {
+  .marketing-page .glass-nav {
+    width: calc(100% - 1rem);
+    top: .5rem;
+  }
+
+  .marketing-page .story-block {
+    min-height: auto;
+    height: auto;
+  }
+
+  .product-app .top-nav {
+    min-height: 3.75rem;
+  }
+
+  .product-app main {
+    padding-inline: 1rem !important;
+  }
+}

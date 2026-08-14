@@ -416,7 +416,7 @@
             <div class="flex gap-6 mt-6 md:mt-0">
                 <div
                     class="flex items-center gap-4 bg-white/80 backdrop-blur-md px-6 py-3 rounded-2xl border border-white shadow-sm hover:shadow-md transition">
-                    <div class="text-3xl">🔥</div>
+                    <div class="mentics-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 3c.5 3-1.5 4.5-1.5 6.5 0 1.5 1 2.5 2.5 2.5 2.5 0 3.5-3 2.5-5.5 3 2 4.5 5 3.7 8.2A7.5 7.5 0 1 1 7 7.2C6.8 10 8 11.5 9.5 12 8.8 8.5 10 5.5 12 3Z"/></svg></div>
                     <div>
                         <div class="text-2xl font-bold text-slate-800 leading-none">{{ game_stats.streak }}</div>
                         <div class="text-[11px] uppercase font-bold text-slate-400 tracking-wider">Day Streak</div>
@@ -424,7 +424,7 @@
                 </div>
                 <div
                     class="flex items-center gap-4 bg-white/80 backdrop-blur-md px-6 py-3 rounded-2xl border border-white shadow-sm hover:shadow-md transition">
-                    <div class="text-3xl">💎</div>
+                    <div class="mentics-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="m4 8 3-4h10l3 4-8 12L4 8Z"/><path d="M4 8h16M8 4l4 16 4-16"/></svg></div>
                     <div>
                         <div class="text-2xl font-bold text-slate-800 leading-none">{{ game_stats.points }}</div>
                         <div class="text-[11px] uppercase font-bold text-slate-400 tracking-wider">Points</div>
@@ -465,7 +465,7 @@
 
             <div class="bento-card p-8" data-aos="fade-up" data-aos-delay="100">
                 <div class="flex justify-between items-start mb-6">
-                    <div class="icon-box bg-purple-50 text-purple-600 border border-purple-100">📖</div>
+                    <div class="icon-box bg-purple-50 text-purple-600 border border-purple-100" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M4 5.5A2.5 2.5 0 0 1 6.5 3H11v16H6.5A2.5 2.5 0 0 0 4 21.5v-16ZM20 5.5A2.5 2.5 0 0 0 17.5 3H13v16h4.5a2.5 2.5 0 0 1 2.5 2.5v-16Z"/></svg></div>
                     <span
                         class="text-xs font-bold text-slate-400 uppercase tracking-widest bg-white px-2 py-1 rounded-md shadow-sm">Test
                         Prep</span>
@@ -487,7 +487,7 @@
 
             <div class="bento-card p-8" data-aos="fade-up" data-aos-delay="200">
                 <div class="flex justify-between items-start mb-6">
-                    <div class="icon-box bg-indigo-50 text-indigo-600 border border-indigo-100">🎓</div>
+                    <div class="icon-box bg-indigo-50 text-indigo-600 border border-indigo-100" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="m3 9 9-5 9 5-9 5-9-5Z"/><path stroke-linecap="round" d="M7 12v4.5c2.8 2 7.2 2 10 0V12M21 9v6"/></svg></div>
                     <span
                         class="text-xs font-bold text-slate-400 uppercase tracking-widest bg-white px-2 py-1 rounded-md shadow-sm">College
                         Plan</span>
@@ -555,7 +555,7 @@
                     <div class="absolute left-0 top-0 bottom-0 w-1.5 bg-gradient-to-b from-purple-400 to-indigo-400">
                     </div>
                     <div class="flex items-center gap-2 mb-3">
-                        <span class="text-xl bg-purple-100 p-1.5 rounded-lg shadow-sm">💡</span>
+                        <span class="mentics-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9 18h6M10 22h4M8.5 14.5A6 6 0 1 1 16 14c-1.2.9-1.5 1.6-1.5 2.5h-5c0-.8-.2-1.3-1-2Z"/></svg></span>
                         <span class="text-xs font-bold text-purple-600 uppercase tracking-wider">AI Insight</span>
                     </div>
                     <p id="ai-suggestion-text" class="text-base text-slate-700 font-medium leading-relaxed">"Consistency
@@ -614,7 +614,7 @@
                     {% for achievement in earned_achievements[:6] %}
                     <div
                         class="tooltip-container aspect-square rounded-2xl bg-gradient-to-br from-slate-50 to-white flex flex-col items-center justify-center border border-slate-100 shadow-sm hover:shadow-md hover:-translate-y-1 transition duration-300 cursor-help">
-                        <span class="text-4xl filter drop-shadow-sm">{{ achievement.icon }}</span>
+                        <span class="mentics-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 3 15 8.5l6 .9-4.3 4.2 1 5.9-5.7-2.8-5.7 2.8 1-5.9L3 9.4l6-.9L12 3Z"/></svg></span>
                         <div class="tooltip-box">
                             <strong>{{ achievement.title }}</strong><br>
                             <span class="text-xs font-normal opacity-80">{{ achievement.description }}</span>
@@ -668,7 +668,7 @@
                         </g>
                     </svg>
                     <div class="portal-content">
-                        <div class="portal-icon">📖</div>
+                        <div class="portal-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M4 5.5A2.5 2.5 0 0 1 6.5 3H11v16H6.5A2.5 2.5 0 0 0 4 21.5v-16ZM20 5.5A2.5 2.5 0 0 0 17.5 3H13v16h4.5a2.5 2.5 0 0 1 2.5 2.5v-16Z"/></svg></div>
                         <div class="portal-title">Test Prep</div>
                         <p class="portal-subtitle">SAT/ACT Journey</p>
                     </div>
@@ -693,7 +693,7 @@
                         </g>
                     </svg>
                     <div class="portal-content">
-                        <div class="portal-icon">🎓</div>
+                        <div class="portal-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="m3 9 9-5 9 5-9 5-9-5Z"/><path stroke-linecap="round" d="M7 12v4.5c2.8 2 7.2 2 10 0V12M21 9v6"/></svg></div>
                         <div class="portal-title">College Plan</div>
                         <p class="portal-subtitle">Applications & More</p>
                     </div>

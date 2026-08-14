@@ -6,6 +6,11 @@
   const isMarketing = path === "/";
   const isAuth = ["/login", "/signup", "/onboarding"].includes(path);
   body.classList.add(isMarketing ? "marketing-page" : isAuth ? "product-auth" : "product-app");
+  body.dataset.productPage = path.includes("path-view") ? "path-view"
+    : path === "/dashboard" ? "dashboard"
+    : isMarketing ? "marketing"
+    : isAuth ? "auth"
+    : "standard";
 
   const main = document.querySelector("main");
   if (main && !main.id) main.id = "main-content";
