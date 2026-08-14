@@ -316,6 +316,9 @@
             padding: 0.75rem 1.25rem;
         }
     </style>
+  <link rel="stylesheet" href="{{ url_for('static', filename='product.css') }}">
+  <script defer src="{{ url_for('static', filename='js/product.js') }}"></script>
+  <script src="{{ url_for('static', filename='js/markdown.js') }}"></script>
 </head>
 
 <body class="antialiased min-h-screen flex flex-col">
@@ -403,10 +406,10 @@
                     <script>document.write(new Date().toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' }));</script>
                 </p>
                 <h1 class="text-5xl md:text-6xl font-bold font-lalezar text-slate-900 leading-none">
-                    Welcome Back, <span class="text-gradient">{% if name %}{{ name.split(' ')[0] }}{% else %}Student{%
+                    Your next move, <span class="text-gradient">{% if name %}{{ name.split(' ')[0] }}{% else %}Student{%
                         endif %}</span>
                 </h1>
-                <p class="text-slate-600 mt-3 text-xl font-medium">Your dashbaord is ready. Let's build momentum.
+                <p class="text-slate-600 mt-3 text-xl font-medium">A focused view of what matters now—without the noise.
                 </p>
             </div>
 
@@ -436,12 +439,12 @@
                 onclick="handlePathBuilderClick()" data-aos="fade-up">
                 <div class="z-10 relative">
 
-                    <h2 class="text-4xl font-bold font-lalezar mb-3 tracking-wide">Path Builder</h2>
-                    <p class="text-indigo-100 text-lg max-w-md leading-relaxed">Launch the AI portal to generate or
-                        update your personalized roadmap to success.</p>
+                    <h2 class="text-4xl font-bold font-lalezar mb-3 tracking-wide">Build your next plan</h2>
+                    <p class="text-indigo-100 text-lg max-w-md leading-relaxed">Turn your current goals into a clear,
+                        personalized sequence of next steps.</p>
                     <button
                         class="mt-8 bg-white text-indigo-900 px-8 py-3 rounded-2xl font-bold text-base hover:bg-indigo-50 transition shadow-lg flex items-center gap-3 group-hover:scale-105 transform duration-300">
-                        Open Portal
+                        Choose a path
                         <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24"
                             stroke="currentColor">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -516,7 +519,7 @@
             </div>
 
             <div class="bento-card p-8 flex flex-col justify-center gap-6" data-aos="fade-up" data-aos-delay="400">
-                <h3 class="text-lg font-bold text-slate-400 uppercase tracking-widest mb-2">Vital Stats</h3>
+                <h3 class="text-lg font-bold text-slate-400 uppercase tracking-widest mb-2">Current snapshot</h3>
                 <div class="flex items-center justify-between border-b border-slate-100 pb-4">
                     <span class="text-base font-semibold text-slate-500">GPA</span>
                     <span class="text-2xl font-bold text-slate-800">{{ gpa }}</span>
@@ -562,7 +565,7 @@
 
             <div class="bento-card md:col-span-2 lg:col-span-2 p-8" data-aos="fade-up" data-aos-delay="600">
                 <div class="flex justify-between items-center mb-6">
-                    <h3 class="text-xl font-bold text-slate-700 font-lalezar">Recent Updates</h3>
+                    <h3 class="text-xl font-bold text-slate-700 font-lalezar">Recent activity</h3>
                     <button class="text-xs font-bold text-purple-600 hover:text-purple-800 transition">View All</button>
                 </div>
                 <div class="space-y-4">
@@ -605,7 +608,7 @@
             </div>
 
             <div class="bento-card md:col-span-1 lg:col-span-1 p-8" data-aos="fade-up" data-aos-delay="700">
-                <h3 class="text-xl font-bold text-slate-700 font-lalezar mb-6">Trophies</h3>
+                <h3 class="text-xl font-bold text-slate-700 font-lalezar mb-6">Milestones</h3>
                 <div class="grid grid-cols-3 gap-4">
                     {% if earned_achievements %}
                     {% for achievement in earned_achievements[:6] %}

@@ -3,7 +3,7 @@
 
 <head>
   <meta charset="UTF-8">
-  <title>Login – Mentics</title>
+  <title>Sign in — Mentics</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -103,6 +103,9 @@
       background-clip: text;
     }
   </style>
+  <link rel="stylesheet" href="{{ url_for('static', filename='product.css') }}">
+  <script defer src="{{ url_for('static', filename='js/product.js') }}"></script>
+  <script src="{{ url_for('static', filename='js/markdown.js') }}"></script>
 </head>
 
 <body class="min-h-screen flex flex-col items-center justify-center px-4 relative">
@@ -118,28 +121,28 @@
       <div class="relative z-10 flex flex-col items-center mb-8">
         <a href="/"
           class="text-4xl hero-gradient font-lalezar font-black mb-4 hover:opacity-80 transition-opacity">MENTICS</a>
-        <h2 class="text-2xl font-semibold text-slate-900 tracking-tight">Welcome Back 👋</h2>
-        <p class="text-sm text-slate-500 mt-2 font-medium">Log in to your Mentics account</p>
+        <h2 class="text-2xl font-semibold text-slate-900 tracking-tight">Welcome back.</h2>
+        <p class="text-sm text-slate-500 mt-2 font-medium">Pick up where you left off.</p>
       </div>
 
       <div class="relative z-10">
         {% if error %}
         <div
-          class="mb-5 text-sm bg-red-50 border border-red-200 text-red-600 rounded-xl p-3.5 text-center font-medium shadow-sm">
+          role="alert" class="mb-5 text-sm bg-red-50 border border-red-200 text-red-600 rounded-xl p-3.5 text-center font-medium shadow-sm">
           {{ error }}
         </div>
         {% endif %}
 
         <form method="POST" class="space-y-4">
-          <input type="email" name="email" placeholder="Email" required
+          <input type="email" name="email" placeholder="Email address" autocomplete="email" required
             class="w-full px-5 py-3.5 bg-white/60 border border-slate-200/80 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-purple-500/40 focus:border-purple-500 transition shadow-sm text-sm" />
 
-          <input type="password" name="password" placeholder="Password" required
+          <input type="password" name="password" placeholder="Password" autocomplete="current-password" required
             class="w-full px-5 py-3.5 bg-white/60 border border-slate-200/80 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-purple-500/40 focus:border-purple-500 transition shadow-sm text-sm" />
 
           <button type="submit"
             class="w-full bg-slate-900 hover:bg-slate-800 text-white font-medium py-3.5 rounded-xl transition shadow-lg mt-2">
-            Log In
+            Sign in
           </button>
         </form>
 

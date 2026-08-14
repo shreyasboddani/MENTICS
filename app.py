@@ -7,6 +7,7 @@ from userhelper import User
 from functools import wraps
 import json
 from google import genai
+from google.genai import types
 import os
 import secrets
 from dotenv import load_dotenv
@@ -39,6 +40,9 @@ app.permanent_session_lifetime = timedelta(minutes=10)
 
 gemini_api_key = os.getenv("GEMINI_API_KEY")
 gemini_client = genai.Client(api_key=gemini_api_key) if gemini_api_key else None
+GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-3.5-flash-lite")
+GEMINI_CHAT_MESSAGES = 12
+GEMINI_CHAT_CHARACTERS = 12000
 
 
 @app.after_request
@@ -349,6 +353,85 @@ def time_ago_filter(s):
 # --- AI HELPER FUNCTIONS (UPDATED) ---
 
 
+def _gemini_config(max_output_tokens, *, system_instruction=None,
+                   json_output=False, thinking_level="minimal"):
+    """Return a conservative generation config tuned for latency and cost."""
+    config = types.GenerateContentConfig(
+        max_output_tokens=max_output_tokens,
+        thinking_config=types.ThinkingConfig(thinking_level=thinking_level),
+        system_instruction=system_instruction,
+    )
+    if json_output:
+        config.response_mime_type = "application/json"
+    return config
+
+
+def _generate_text(prompt, *, max_output_tokens=800, json_output=False,
+                   thinking_level="minimal", system_instruction=None):
+    """Generate validated text through the single configured Gemini model."""
+    if gemini_client is None:
+        raise RuntimeError("Gemini is not configured.")
+    response = gemini_client.models.generate_content(
+        model=GEMINI_MODEL,
+        contents=prompt,
+        config=_gemini_config(
+            max_output_tokens,
+            system_instruction=system_instruction,
+            json_output=json_output,
+            thinking_level=thinking_level,
+        ),
+    )
+    text = (response.text or "").strip()
+    if not text:
+        raise ValueError("Gemini returned an empty response.")
+    return text
+
+
+def _compact_chat_history(history):
+    """Keep recent conversational context while bounding input-token spend."""
+    compact = []
+    remaining_characters = GEMINI_CHAT_CHARACTERS
+    for message in reversed(history[-GEMINI_CHAT_MESSAGES:]):
+        content = message.get("content", "").strip()
+        if not content or remaining_characters <= 0:
+            continue
+        content = content[-min(len(content), 2500, remaining_characters):]
+        compact.append({
+            "role": "model" if message.get("role") == "assistant" else "user",
+            "parts": [{"text": content}],
+        })
+        remaining_characters -= len(content)
+    return list(reversed(compact))
+
+
+def _generate_chat_reply(history, system_instruction):
+    """Generate a concise mentor reply using only the useful recent context."""
+    if gemini_client is None:
+        raise RuntimeError("Gemini is not configured.")
+    gemini_history = _compact_chat_history(history)
+    if not gemini_history:
+        last_user_message = "Hello"
+        prior_history = []
+    else:
+        last_user_message = gemini_history[-1]["parts"][0]["text"]
+        prior_history = gemini_history[:-1]
+
+    chat = gemini_client.chats.create(
+        model=GEMINI_MODEL,
+        history=prior_history,
+        config=_gemini_config(
+            700,
+            system_instruction=system_instruction,
+            thinking_level="minimal",
+        ),
+    )
+    response = chat.send_message(last_user_message)
+    text = (response.text or "").strip()
+    if not text:
+        raise ValueError("Gemini returned an empty chat response.")
+    return text
+
+
 def _get_current_numbered_tasks(user_id, category):
     """Helper function to get current active tasks with numbering for a specific category."""
     latest_task_query = """
@@ -585,36 +668,14 @@ def _get_test_prep_ai_tasks(strengths, weaknesses, test_focus, current_scores=No
         f'}}'
     )
     try:
-        response = gemini_client.models.generate_content(
-            model='gemini-2.5-flash',
-            contents=prompt,
-            config={"response_mime_type": "application/json"}
+        raw_text = _generate_text(
+            prompt,
+            max_output_tokens=6000,
+            json_output=True,
+            thinking_level="low",
         )
 
         response_data = None
-        raw_text = None
-
-        try:
-
-            if hasattr(response, 'text'):
-                raw_text = response.text
-            elif hasattr(response, 'parts') and response.parts:
-
-                raw_text = "".join(
-                    part.text for part in response.parts if hasattr(part, 'text'))
-            elif hasattr(response, 'content') and hasattr(response.content, 'parts') and response.content.parts:
-                raw_text = "".join(
-                    part.text for part in response.content.parts if hasattr(part, 'text'))
-            else:
-
-                raw_text = str(response)
-        except Exception as e:
-            print(f"--- Error accessing Gemini response text: {e} ---")
-            raw_text = str(response)  # Fallback again
-
-        if not raw_text:
-            raise ValueError(
-                "AI response was empty or text could not be extracted.")
 
         import re
         cleaned_text = re.sub(
@@ -1010,22 +1071,8 @@ def _get_test_prep_ai_chat_response(history, user_stats, stat_history="", quiz_r
         "7.  **Mentorship Tone**: Always maintain a supportive, motivating, and realistic tone. Your goal is to empower the student and encourage consistent effort and progress."
     )
 
-    # Build Gemini chat history
-    gemini_history = []
-    for message in history:
-        role = "model" if message["role"] == "assistant" else "user"
-        gemini_history.append({"role": role, "parts": [{"text": message["content"]}]})
-
     try:
-
-        chat = gemini_client.chats.create(
-            model='gemini-2.5-flash',
-            history=gemini_history[:-1],
-            config={"system_instruction": system_message}
-        )
-        last_user_message = gemini_history[-1]['parts'][0]['text'] if gemini_history else "Hello"
-        response = chat.send_message(last_user_message)
-        return response.text
+        return _generate_chat_reply(history, system_message)
     except Exception as e:
         print(
             f"\n--- GEMINI API ERROR IN _get_test_prep_ai_chat_response: {e} ---\n")
@@ -1119,12 +1166,13 @@ def _get_college_planning_ai_tasks(college_context, user_stats, path_history, ch
         f'}}'
     )
     try:
-        response = gemini_client.models.generate_content(
-            model='gemini-2.5-flash',
-            contents=prompt,
-            config={"response_mime_type": "application/json"}
+        response_text = _generate_text(
+            prompt,
+            max_output_tokens=2500,
+            json_output=True,
+            thinking_level="low",
         )
-        response_data = json.loads(response.text)
+        response_data = json.loads(response_text)
         tasks = response_data.get("tasks", [])
         if isinstance(tasks, list) and len(tasks) > 0:
             return tasks
@@ -1173,7 +1221,6 @@ def _get_college_planning_ai_chat_response(history, user_stats, stat_history="",
         f"- Incomplete/Failed Tasks: {college_info.get('incomplete_tasks', 'None')}\n"
         f"- Historical Performance Data (from Tracker): {stat_history}\n"
         f"- Current Active Tasks (numbered for reference):\n{current_tasks}\n"
-        f"- Current Active Tasks:\n{current_tasks}\n"
 
 
         "## CORE COACHING DIRECTIVES (Your Rules of Engagement)\n"
@@ -1190,20 +1237,8 @@ def _get_college_planning_ai_chat_response(history, user_stats, stat_history="",
         "8. **Suggest Test Prep Path When Relevant**: If the student mentions standardized tests (SAT/ACT) or seems uncertain about test preparation, proactively suggest they explore the MENTICS Test Prep path for tailored study plans and resources.\n"
     )
 
-    gemini_history = []
-    for message in history:
-        role = "model" if message["role"] == "assistant" else "user"
-        gemini_history.append({"role": role, "parts": [{"text": message["content"]}]})
-
     try:
-        chat = gemini_client.chats.create(
-            model='gemini-2.5-flash',
-            history=gemini_history[:-1],
-            config={"system_instruction": system_message}
-        )
-        last_user_message = gemini_history[-1]['parts'][0]['text'] if gemini_history else "Hello"
-        response = chat.send_message(last_user_message)
-        return response.text
+        return _generate_chat_reply(history, system_message)
     except Exception as e:
         print(
             f"\n--- GEMINI API ERROR IN _get_college_planning_ai_chat_response: {e} ---\n")
@@ -1407,9 +1442,7 @@ def _get_tracker_ai_analysis(user):
 
     if os.getenv("GEMINI_API_KEY"):
         try:
-            response = gemini_client.models.generate_content(
-                model='gemini-2.5-flash', contents=prompt)
-            return response.text
+            return _generate_text(prompt, max_output_tokens=1000)
         except Exception as e:
             print(f"Error in tracker AI analysis (remote): {e}")
 
@@ -1604,9 +1637,18 @@ def onboarding(user):
         return redirect(url_for('dashboard'))
 
     if request.method == 'POST':
+        goal = request.form.get('goal')
+        learning_style = request.form.get('learning_style')
+        if goal not in {'test_prep', 'college_planning'} or learning_style not in {
+            'visual', 'auditory', 'reading_writing', 'kinesthetic'
+        }:
+            return render_template(
+                'onboarding.html',
+                error="Choose a primary goal and learning style to continue."
+            ), 400
         onboarding_data = {
-            'goal': request.form.get('goal'),
-            'learning_style': request.form.get('learning_style'),
+            'goal': goal,
+            'learning_style': learning_style,
             'anxieties': request.form.get('anxieties')
         }
         db.update('users', {
@@ -1840,7 +1882,12 @@ def dashboard(user):
 @login_required
 def get_suggestion(user):
     """A new route to fetch the AI suggestion asynchronously."""
+    today = datetime.now(ZoneInfo("UTC")).date().isoformat()
+    cached = session.get("daily_ai_suggestion")
+    if isinstance(cached, dict) and cached.get("date") == today:
+        return jsonify({"suggestion": cached.get("value", "")})
     suggestion = _get_proactive_ai_suggestions(user)
+    session["daily_ai_suggestion"] = {"date": today, "value": suggestion[:500]}
     return jsonify({"suggestion": suggestion})
 
 
@@ -1850,27 +1897,46 @@ def account(user):
     if request.method == 'POST':
         form_type = request.form.get('form_type')
 
+        def account_error(message, status=400):
+            user.load_user()
+            return render_template('account.html', user=user, error=message), status
+
         if form_type == 'name':
-            new_name = request.form.get('name')
+            new_name = request.form.get('name', '').strip()[:100]
+            if not new_name:
+                return account_error("Name cannot be empty.")
             db.update('users', {'name': new_name}, {'id': user.data['id']})
 
         elif form_type == 'email':
-            new_email = request.form.get('email')
+            new_email = request.form.get('email', '').strip().lower()[:254]
+            if '@' not in new_email or new_email.startswith('@') or new_email.endswith('@'):
+                return account_error("Enter a valid email address.")
             existing_user = db.select('users', where={'email': new_email})
             if not existing_user or existing_user[0]['id'] == user.data['id']:
                 db.update('users', {'email': new_email},
                           {'id': user.data['id']})
                 session['user'] = new_email
+            else:
+                return account_error("That email address is already in use.", 409)
 
         elif form_type == 'password':
-            current_password = request.form.get('current_password')
-            new_password = request.form.get('new_password')
-            confirm_password = request.form.get('confirm_password')
+            current_password = request.form.get('current_password', '')
+            new_password = request.form.get('new_password', '')
+            confirm_password = request.form.get('confirm_password', '')
 
-            if check_password_hash(user.data['password'], current_password) and new_password == confirm_password:
-                hashed_password = generate_password_hash(new_password)
-                db.update('users', {'password': hashed_password}, {
-                          'id': user.data['id']})
+            if not check_password_hash(user.data['password'], current_password):
+                return account_error("Your current password is incorrect.")
+            if len(new_password) < 8:
+                return account_error("New password must be at least 8 characters.")
+            if new_password != confirm_password:
+                return account_error("New passwords do not match.")
+            hashed_password = generate_password_hash(new_password)
+            db.update('users', {'password': hashed_password}, {
+                      'id': user.data['id']})
+        else:
+            return account_error("Unknown account update.")
+
+        return redirect(url_for('account', updated='1'))
 
     user.load_user()
     return render_template('account.html', user=user)
@@ -2315,6 +2381,8 @@ def api_chat(user):
 def get_chat_history(user):
     user_id = user.data['id']
     category = request.args.get('category')
+    if category not in {'Test Prep', 'College Planning'}:
+        return jsonify({"error": "Invalid category"}), 400
     chat_record_list = db.select("chat_conversations", where={
         "user_id": user_id, "category": category})
     if chat_record_list:
@@ -2329,8 +2397,8 @@ def reset_chat_history(user):
     user_id = user.data['id']
     data = request.get_json(silent=True) or {}
     category = data.get('category')
-    if not category:
-        return jsonify({"success": False, "error": "Category is required"}), 400
+    if category not in {'Test Prep', 'College Planning'}:
+        return jsonify({"success": False, "error": "Invalid category"}), 400
     try:
         db.delete("chat_conversations", where={
                   "user_id": user_id, "category": category})
@@ -2347,13 +2415,31 @@ def api_update_stats(user):
     stat_name = data.get("stat_name")
     stat_value = data.get("stat_value")
 
-    allowed_stats = {
-        'gpa', 'sat_ebrw', 'sat_math', 'sat_total', 'act_math',
-        'act_reading', 'act_science', 'act_composite'
+    stat_ranges = {
+        'gpa': (0, 5),
+        'sat_ebrw': (200, 800),
+        'sat_math': (200, 800),
+        'sat_total': (400, 1600),
+        'act_math': (1, 36),
+        'act_reading': (1, 36),
+        'act_science': (1, 36),
+        'act_composite': (1, 36),
     }
 
-    if stat_name not in allowed_stats or stat_value is None:
+    if stat_name not in stat_ranges or stat_value is None:
         return jsonify({"success": False, "error": "Missing stat name or value"}), 400
+
+    try:
+        numeric_value = float(stat_value)
+    except (TypeError, ValueError):
+        return jsonify({"success": False, "error": "Stat value must be a number"}), 400
+    minimum, maximum = stat_ranges[stat_name]
+    if not minimum <= numeric_value <= maximum:
+        return jsonify({
+            "success": False,
+            "error": f"{stat_name.replace('_', ' ').title()} must be between {minimum} and {maximum}"
+        }), 400
+    stat_value = round(numeric_value, 2) if stat_name == 'gpa' else int(numeric_value)
 
     try:
 
@@ -2389,6 +2475,13 @@ def add_task(user):
     if not description or category not in {'Test Prep', 'College Planning'}:
         return jsonify({"success": False, "error": "Description and category are required"}), 400
     description = str(description).strip()[:500]
+    if not description:
+        return jsonify({"success": False, "error": "Description is required"}), 400
+    if due_date:
+        try:
+            date.fromisoformat(str(due_date))
+        except ValueError:
+            return jsonify({"success": False, "error": "Due date must be a valid date"}), 400
 
     latest_task_query = "SELECT MAX(task_order) as max_order FROM paths WHERE user_id=? AND category=? AND is_active=True"
     max_order_result = db.execute(latest_task_query, (user_id, category))
@@ -2431,6 +2524,8 @@ def add_subtask(user):
     if not parent_task:
         return jsonify({"success": False, "error": "Task not found"}), 404
     description = str(description).strip()[:500]
+    if not description:
+        return jsonify({"success": False, "error": "Description is required"}), 400
 
     subtask_id = db.insert("subtasks", {
         "parent_task_id": parent_task_id,
@@ -2452,6 +2547,11 @@ def update_task_deadline(user):
     if not task_id or not db.select_one('paths', where={
             'id': task_id, 'user_id': user.data['id']}):
         return jsonify({"success": False, "error": "Task not found"}), 404
+    if due_date:
+        try:
+            date.fromisoformat(str(due_date))
+        except ValueError:
+            return jsonify({"success": False, "error": "Due date must be a valid date"}), 400
     db.update("paths", {"due_date": due_date}, where={
               "id": task_id, "user_id": user.data['id']})
     return jsonify({"success": True})
@@ -2491,6 +2591,9 @@ def analyze_essay(user):
         return jsonify({"error": "Essay text is required."}), 400
     if len(essay_text) > 20000:
         return jsonify({"error": "Essay text must be 20,000 characters or fewer."}), 400
+    essay_prompt = str(essay_prompt).strip()[:500]
+    if gemini_client is None:
+        return jsonify({"error": "AI essay feedback is not configured."}), 503
 
     prompt = (
         f"You are an expert college admissions essay coach. Your goal is to provide constructive, actionable, and granular feedback on a student's essay. "
@@ -2514,9 +2617,12 @@ def analyze_essay(user):
     )
 
     try:
-        response = gemini_client.models.generate_content(
-            model='gemini-2.5-flash', contents=prompt)
-        return jsonify({"feedback": response.text})
+        feedback = _generate_text(
+            prompt,
+            max_output_tokens=1800,
+            thinking_level="low",
+        )
+        return jsonify({"feedback": feedback})
     except Exception as e:
         print(f"Error in essay analysis: {e}")
         return jsonify({"error": "Failed to analyze the essay."}), 500
@@ -2567,9 +2673,7 @@ def _get_proactive_ai_suggestions(user):
     )
 
     try:
-        response = gemini_client.models.generate_content(
-            model='gemini-2.5-flash', contents=prompt)
-        return response.text.strip()
+        return _generate_text(prompt, max_output_tokens=120)
     except Exception as e:
         print(f"Error in proactive suggestion generation: {e}")
         return "Welcome to Mentics! Let's get started on your path to success."
@@ -2639,6 +2743,8 @@ def create_post(user):
     if title and content:
         title = str(title).strip()[:200]
         content = str(content).strip()[:5000]
+        if not title or not content:
+            return jsonify({'success': False, 'error': 'Title and content are required'}), 400
         db.insert('forum_posts', {
             'user_id': user.data['id'],
             'user_name': user.get_name(),
@@ -2659,6 +2765,8 @@ def create_reply(user):
         if not db.select_one('forum_posts', where={'id': post_id}):
             return jsonify({'success': False, 'error': 'Post not found'}), 404
         content = str(content).strip()[:5000]
+        if not content:
+            return jsonify({'success': False, 'error': 'Reply content is required'}), 400
         db.insert('forum_replies', {
             'post_id': post_id,
             'user_id': user.data['id'],

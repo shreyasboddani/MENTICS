@@ -63,6 +63,9 @@
             padding-left: 1.5rem;
         }
     </style>
+  <link rel="stylesheet" href="{{ url_for('static', filename='product.css') }}">
+  <script defer src="{{ url_for('static', filename='js/product.js') }}"></script>
+  <script src="{{ url_for('static', filename='js/markdown.js') }}"></script>
 </head>
 
 <body class="bg-slate-50 font-sans text-slate-800 antialiased">
@@ -380,7 +383,7 @@
                         <ul class="mt-2 text-xs space-y-1.5 pl-1">${gen.tasks.map(task => `
                             <li class="flex items-start gap-2">
                                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" class="w-4 h-4 flex-shrink-0 mt-px ${task.is_completed ? 'text-emerald-500' : 'text-slate-300'}"><path fill-rule="evenodd" d="M8 15A7 7 0 1 0 8 1a7 7 0 0 0 0 14Zm3.84-9.43a.75.75 0 0 0-1.18-.94l-2.65 3.16-1.1-1.1a.75.75 0 0 0-1.06 1.06l1.5 1.5a.75.75 0 0 0 1.05-.01l3.25-4-1.81.22Z" clip-rule="evenodd" /></svg>
-                                <span class="${task.is_completed ? 'text-slate-500 line-through' : ''}">${task.description}</span>
+                                <span class="${task.is_completed ? 'text-slate-500 line-through' : ''}">${renderMenticsMarkdown(task.description)}</span>
                             </li>
                         `).join('')}</ul>
                     </div>`;
@@ -411,10 +414,10 @@
                 const response = await fetch('/api/tracker-analysis');
                 const data = await response.json();
                 if (response.ok) {
-                    analysisOutput.innerHTML = marked.parse(data.analysis);
+                    analysisOutput.innerHTML = renderMenticsMarkdown(data.analysis);
                 } else { throw new Error(data.error || 'Failed to get analysis'); }
             } catch (error) {
-                analysisOutput.innerHTML = `<p class="text-red-500">Error: ${error.message}</p>`;
+                analysisOutput.innerHTML = renderMenticsMarkdown(`**Error:** ${error.message}`);
             } finally {
                 analyzeBtn.disabled = false;
             }

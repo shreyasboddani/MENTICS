@@ -93,6 +93,9 @@
             padding-left: 1.5rem;
         }
     </style>
+  <link rel="stylesheet" href="{{ url_for('static', filename='product.css') }}">
+  <script defer src="{{ url_for('static', filename='js/product.js') }}"></script>
+  <script src="{{ url_for('static', filename='js/markdown.js') }}"></script>
 </head>
 
 <body class="bg-slate-50 font-sans text-slate-800 antialiased">
@@ -711,8 +714,8 @@
             document.getElementById('modalTitle').textContent = `Step ${task.client_id}: Your Task`;
 
             // Use marked.js to render markdown links
-            document.getElementById('modalDescription').innerHTML = marked.parse(task.description);
-            document.getElementById('modalReason').innerHTML = `<b>Why:</b> ${marked.parse(task.reason)}`;
+            document.getElementById('modalDescription').innerHTML = renderMenticsMarkdown(task.description);
+            document.getElementById('modalReason').innerHTML = `<b>Why:</b> ${renderMenticsMarkdown(task.reason)}`;
 
 
             const dueDateEl = document.getElementById('modalDueDate');
@@ -740,10 +743,17 @@
             subtasks.forEach(subtask => {
                 const item = document.createElement('div');
                 item.className = 'subtask-item';
-                item.innerHTML = `
-                    <input type="checkbox" id="subtask-${subtask.id}" onchange="handleToggleSubtask(${subtask.id}, this.checked)" ${subtask.is_completed ? 'checked' : ''} class="w-4 h-4 text-indigo-600 bg-gray-100 border-gray-300 rounded focus:ring-indigo-500">
-                    <label for="subtask-${subtask.id}" class="text-sm text-slate-700 ${subtask.is_completed ? 'line-through text-slate-500' : ''}">${subtask.description}</label>
-                `;
+                const checkbox = document.createElement('input');
+                checkbox.type = 'checkbox';
+                checkbox.id = `subtask-${subtask.id}`;
+                checkbox.checked = Boolean(subtask.is_completed);
+                checkbox.className = 'w-4 h-4 text-indigo-600 bg-gray-100 border-gray-300 rounded focus:ring-indigo-500';
+                checkbox.addEventListener('change', () => handleToggleSubtask(subtask.id, checkbox.checked));
+                const label = document.createElement('label');
+                label.htmlFor = checkbox.id;
+                label.className = `text-sm text-slate-700 ${subtask.is_completed ? 'line-through text-slate-500' : ''}`;
+                label.textContent = subtask.description;
+                item.append(checkbox, label);
                 subtasksList.appendChild(item);
             });
         }
@@ -1121,12 +1131,12 @@
 
                 const result = await response.json();
                 if (response.ok) {
-                    feedbackOutput.innerHTML = marked.parse(result.feedback);
+                    feedbackOutput.innerHTML = renderMenticsMarkdown(result.feedback);
                 } else {
                     throw new Error(result.error || 'An unknown error occurred.');
                 }
             } catch (error) {
-                feedbackOutput.innerHTML = `<p class="text-red-500">Error: ${error.message}</p>`;
+                feedbackOutput.innerHTML = renderMenticsMarkdown(`**Error:** ${error.message}`);
             } finally {
                 analyzeBtn.disabled = false;
                 analyzeBtn.textContent = 'Analyze Essay';
@@ -1173,7 +1183,7 @@
             }
             messageDiv.className = cssClass;
             // Use marked.js to render markdown links in chat
-            messageDiv.innerHTML = marked.parse(text);
+            messageDiv.innerHTML = renderMenticsMarkdown(text);
             messageWrapper.appendChild(messageDiv);
             chatHistory.appendChild(messageWrapper);
             chatHistory.scrollTop = chatHistory.scrollHeight;

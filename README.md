@@ -91,6 +91,7 @@ To get a local copy up and running, follow these simple steps.
     Create a `.env` file in the root directory and add your Google Gemini API key:
     ```
     GEMINI_API_KEY='YOUR_API_KEY_HERE'
+    GEMINI_MODEL='gemini-3.5-flash-lite'  # Optional; this is the default
     GOOGLE_CLIENT_ID='YOUR_GOOGLE_CLIENT_ID'
     GOOGLE_CLIENT_SECRET='YOUR_GOOGLE_CLIENT_SECRET'
     SECRET_KEY='A_LONG_RANDOM_VALUE'
@@ -115,15 +116,20 @@ User data is stored in PostgreSQL so it survives serverless restarts.
    - `DATABASE_URL`: the pooled Neon connection string
    - `SECRET_KEY`: generate one with `python -c "import secrets; print(secrets.token_hex(32))"`
    - `GEMINI_API_KEY`
+   - `GEMINI_MODEL` (optional; defaults to `gemini-3.5-flash-lite`)
    - `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` if using Google sign-in
 4. Deploy. The database tables are created automatically on the first start.
-5. In Google Cloud Console, add `https://YOUR-DOMAIN/login/google/authorize`
+5. In Google Cloud Console, add `https://YOUR-DOMAIN/authorize`
    as an authorized redirect URI for the production OAuth client.
 
 Do not commit these values in `.env`. Vercel supplies them securely at runtime.
 Vercel detects the top-level Flask `app` in `app.py` automatically; no catch-all
 rewrite is needed. Adding a rewrite to `/app.py` changes the path Flask receives
 and causes valid application URLs such as `/` to return Flask's 404 page.
+
+Gemini calls use the stable `gemini-3.5-flash-lite` model by default. The app
+caps output sizes, limits chat context to recent useful turns, and caches the
+dashboard coaching insight once per day per session to control latency and cost.
 
 Cloudflare Pages/Workers cannot run this Flask/Python server directly. Using
 Cloudflare would require rewriting the backend as a Worker; Vercel preserves the

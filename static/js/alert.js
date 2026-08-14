@@ -42,7 +42,7 @@
     const messageEl = modal.querySelector('#custom-alert-message');
     
     titleEl.textContent = title;
-    messageEl.innerHTML = message; // Use innerHTML to allow for simple formatting
+    messageEl.textContent = String(message);
 
     modal.classList.remove('hidden');
   };

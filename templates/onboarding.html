@@ -164,6 +164,9 @@
             background-color: #7c3aed;
         }
     </style>
+  <link rel="stylesheet" href="{{ url_for('static', filename='product.css') }}">
+  <script defer src="{{ url_for('static', filename='js/product.js') }}"></script>
+  <script src="{{ url_for('static', filename='js/markdown.js') }}"></script>
 </head>
 
 <body class="min-h-screen flex flex-col items-center justify-center px-4 relative">
@@ -177,12 +180,17 @@
             <div class="noise-overlay"></div>
 
             <div class="relative z-10 text-center mb-8">
-                <h1 class="text-4xl hero-gradient font-lalezar font-black mb-2">Welcome to Mentics</h1>
-                <p class="text-sm text-slate-500 font-medium">Let's get to know you better to personalize your
-                    experience.</p>
+                <h1 class="text-4xl hero-gradient font-lalezar font-black mb-2">Let’s make this yours.</h1>
+                <p class="text-sm text-slate-500 font-medium">Three quick answers help Mentics build a plan that fits
+                    how you learn and what matters most right now.</p>
             </div>
 
             <div class="relative z-10">
+                {% if error %}
+                <div role="alert" class="mb-5 text-sm bg-red-50 border border-red-200 text-red-600 rounded-xl p-3.5 text-center font-medium shadow-sm">
+                    {{ error }}
+                </div>
+                {% endif %}
                 <form method="POST" id="onboarding-form">
                     <div class="slides-container min-h-[220px]">
                         <div class="slide active">
@@ -190,13 +198,13 @@
                             </h2>
                             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <label class="option-card">
-                                    <input type="radio" name="goal" value="test_prep" class="hidden">
+                                    <input type="radio" name="goal" value="test_prep" class="hidden" required>
                                     <span class="text-3xl mb-1">📖</span>
                                     <span class="font-semibold text-sm text-slate-800">Test Prep</span>
                                     <span class="text-xs text-slate-500 text-center">Ace the SAT/ACT</span>
                                 </label>
                                 <label class="option-card">
-                                    <input type="radio" name="goal" value="college_planning" class="hidden">
+                                    <input type="radio" name="goal" value="college_planning" class="hidden" required>
                                     <span class="text-3xl mb-1">🎓</span>
                                     <span class="font-semibold text-sm text-slate-800">College Planning</span>
                                     <span class="text-xs text-slate-500 text-center">Get into your dream school</span>
@@ -209,25 +217,25 @@
                             </h2>
                             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <label class="option-card">
-                                    <input type="radio" name="learning_style" value="visual" class="hidden">
+                                    <input type="radio" name="learning_style" value="visual" class="hidden" required>
                                     <span class="text-2xl mb-1">🎨</span>
                                     <span class="font-semibold text-sm text-slate-800">Visual</span>
                                     <span class="text-xs text-slate-500">I learn by seeing</span>
                                 </label>
                                 <label class="option-card">
-                                    <input type="radio" name="learning_style" value="auditory" class="hidden">
+                                    <input type="radio" name="learning_style" value="auditory" class="hidden" required>
                                     <span class="text-2xl mb-1">🎧</span>
                                     <span class="font-semibold text-sm text-slate-800">Auditory</span>
                                     <span class="text-xs text-slate-500">I learn by hearing</span>
                                 </label>
                                 <label class="option-card">
-                                    <input type="radio" name="learning_style" value="reading_writing" class="hidden">
+                                    <input type="radio" name="learning_style" value="reading_writing" class="hidden" required>
                                     <span class="text-2xl mb-1">📝</span>
                                     <span class="font-semibold text-sm text-slate-800">Reading/Writing</span>
                                     <span class="text-xs text-slate-500">I learn by reading/writing</span>
                                 </label>
                                 <label class="option-card">
-                                    <input type="radio" name="learning_style" value="kinesthetic" class="hidden">
+                                    <input type="radio" name="learning_style" value="kinesthetic" class="hidden" required>
                                     <span class="text-2xl mb-1">🏃‍♂️</span>
                                     <span class="font-semibold text-sm text-slate-800">Kinesthetic</span>
                                     <span class="text-xs text-slate-500">I learn by doing</span>
@@ -262,7 +270,7 @@
                         </button>
                         <button type="submit" id="submit-btn"
                             class="hidden bg-purple-600 text-white font-medium px-6 py-2.5 rounded-full hover:bg-purple-700 transition shadow-md text-sm">
-                            Finish
+                            Build my workspace
                         </button>
                     </div>
                 </form>
@@ -317,6 +325,11 @@
 
         nextBtn.addEventListener('click', () => {
             if (currentSlide < slides.length - 1) {
+                const requiredChoice = slides[currentSlide].querySelector('input[type="radio"][required]');
+                if (requiredChoice && !document.querySelector(`input[name="${requiredChoice.name}"]:checked`)) {
+                    window.menticsToast?.('Choose the option that feels closest to you.');
+                    return;
+                }
                 currentSlide++;
                 showSlide(currentSlide);
             }

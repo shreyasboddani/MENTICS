@@ -36,6 +36,9 @@
             font-size: 0.9em;
         }
     </style>
+  <link rel="stylesheet" href="{{ url_for('static', filename='product.css') }}">
+  <script defer src="{{ url_for('static', filename='js/product.js') }}"></script>
+  <script src="{{ url_for('static', filename='js/markdown.js') }}"></script>
 </head>
 
 <body class="bg-slate-50 font-sans text-slate-800 antialiased min-h-screen flex flex-col items-center p-4">
@@ -68,7 +71,7 @@
         // Read markdown from hidden textarea to avoid template-to-JS quoting issues
         const rawFromTextarea = document.getElementById('article-markdown') ? document.getElementById('article-markdown').value : '';
         const rawArticleMarkdown = rawFromTextarea && rawFromTextarea.trim().length > 0 ? rawFromTextarea : '# Article unavailable\n\nThis article has no content yet. Try again later or contact support.';
-        document.getElementById('article-content').innerHTML = marked.parse(rawArticleMarkdown);
+        document.getElementById('article-content').innerHTML = renderMenticsMarkdown(rawArticleMarkdown);
     </script>
 </body>
 

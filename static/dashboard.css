@@ -663,9 +663,7 @@ body {
     filter: grayscale(50%);
 }
 
-//* MENTICS/static/dashboard.css */
-
-/* Add these new styles to your existing dashboard.css file */
+/* Chart and path history controls */
 
 .chart-main-btn {
     padding: 0.5rem 1rem;
