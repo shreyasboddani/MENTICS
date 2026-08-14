@@ -3,9 +3,8 @@
 
 <head>
   <meta charset="UTF-8">
-  <title>Mentics — A clearer path to college</title>
+  <title>Mentics | Stop Guessing. Start Achieving.</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="description" content="A personalized college and test-prep plan that turns big goals into clear weekly actions.">
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -259,7 +258,7 @@
   <script src="{{ url_for('static', filename='js/markdown.js') }}"></script>
 </head>
 
-<body class="marketing-page">
+<body>
 
   <div class="bg-grid"></div>
   <div class="ambient-blob blob-purple"></div>
@@ -272,9 +271,9 @@
         MENTICS
       </a>
       <nav class="hidden md:flex items-center space-x-10">
-        <a href="#process" class="text-sm font-medium text-slate-600 hover:text-purple-600 transition">How it works</a>
+        <a href="#process" class="text-sm font-medium text-slate-600 hover:text-purple-600 transition">Process</a>
         <a href="#platform" class="text-sm font-medium text-slate-600 hover:text-purple-600 transition">Platform</a>
-        <a href="#features" class="text-sm font-medium text-slate-600 hover:text-purple-600 transition">Features</a>
+        <a href="#features" class="text-sm font-medium text-slate-600 hover:text-purple-600 transition">Suite</a>
         <a href="#faq" class="text-sm font-medium text-slate-600 hover:text-purple-600 transition">FAQ</a>
       </nav>
       <div class="flex items-center space-x-4">
@@ -287,14 +286,14 @@
         <a href="/login" class="text-sm font-medium text-slate-600 hover:text-slate-900 transition">Sign in</a>
         <a href="/signup"
           class="bg-slate-900 text-white text-sm font-medium px-6 py-2.5 rounded-full hover:bg-slate-800 transition shadow-sm">Get
-          started</a>
+          Started</a>
         {% endif %}
       </div>
     </div>
   </header>
 
   <main>
-    <section class="product-hero min-h-screen flex flex-col justify-center items-center text-center px-4 relative pt-32 pb-20">
+    <section class="min-h-screen flex flex-col justify-center items-center text-center px-4 relative pt-32 pb-20">
 
       <div class="absolute badge-float hidden lg:flex items-center gap-4 glass-card p-3 pr-5 top-1/4 left-[5%]">
         <div class="noise-overlay rounded-xl"></div>
@@ -306,8 +305,8 @@
           </svg>
         </div>
         <div class="text-left relative z-10">
-          <div class="text-xl font-semibold text-slate-900 tracking-tight leading-none">3 focused moves</div>
-          <div class="text-[10px] font-medium text-slate-500 uppercase tracking-widest mt-1">This week</div>
+          <div class="text-2xl font-semibold text-slate-900 tracking-tight leading-none">1530</div>
+          <div class="text-[10px] font-medium text-slate-500 uppercase tracking-widest mt-1">SAT Verified</div>
         </div>
       </div>
 
@@ -316,50 +315,45 @@
         <div class="noise-overlay rounded-xl"></div>
         <div
           class="w-12 h-12 rounded-full bg-gradient-to-br from-indigo-100 to-indigo-50 flex items-center justify-center text-indigo-600 border border-indigo-200 shadow-inner relative z-10">
-          <span class="font-semibold text-sm mt-0">LIVE</span>
+          <span class="font-semibold text-xl mt-1">A+</span>
         </div>
         <div class="text-left relative z-10">
-          <div class="text-xl font-semibold text-slate-900 tracking-tight leading-none">On track</div>
-          <div class="text-[10px] font-medium text-slate-500 uppercase tracking-widest mt-1">Your plan adapts</div>
+          <div class="text-2xl font-semibold text-slate-900 tracking-tight leading-none">4.3</div>
+          <div class="text-[10px] font-medium text-slate-500 uppercase tracking-widest mt-1">GPA Goal</div>
         </div>
       </div>
 
-      <div class="product-eyebrow relative z-10" data-aos="fade-up">Built for real student schedules</div>
-
       <h1 data-aos="fade-up" data-aos-duration="1000"
-        class="product-headline font-lalezar font-black leading-none mb-8 relative z-10 pb-2">
-        Turn big goals into a plan you can <em>actually follow.</em>
+        class="font-lalezar font-black text-7xl md:text-8xl lg:text-[11rem] leading-none hero-gradient mb-8 relative z-10 pb-2">
+        MENTICS
       </h1>
 
       <p data-aos="fade-up" data-aos-duration="1000" data-aos-delay="100"
-        class="product-subhead text-lg md:text-2xl text-slate-600 max-w-2xl mx-auto font-normal leading-relaxed relative z-10 mb-10 tracking-tight">
-        Mentics turns your scores, deadlines, and ambitions into a personalized weekly roadmap—then helps you adjust when life changes.
+        class="text-lg md:text-2xl text-slate-600 max-w-2xl mx-auto font-normal leading-relaxed relative z-10 mb-12 tracking-tight">
+        Your high school ambition, clarified. <br class="hidden md:block" />
+        Stop guessing. <span class="text-slate-900 font-semibold">Start achieving.</span>
       </p>
 
       <div data-aos="fade-up" data-aos-duration="1000" data-aos-delay="200"
         class="flex flex-col sm:flex-row gap-4 w-full sm:w-auto justify-center px-4 relative z-10">
         <a href="{% if is_logged_in %}/dashboard{% else %}/signup{% endif %}"
           class="bg-slate-900 text-white text-base font-medium px-8 py-4 rounded-full hover:bg-slate-800 transition shadow-lg flex items-center justify-center gap-2">
-          Build my free plan
+          Start for free
         </a>
         <a href="#process"
           class="glass-card text-slate-900 text-base font-medium px-8 py-4 rounded-full transition flex items-center justify-center">
-          See the product
+          See how it works
         </a>
-      </div>
-      <div class="product-trust-line relative z-10" data-aos="fade-up" data-aos-delay="250">
-        <span>No credit card</span>
-        <span>Private by default</span>
-        <span>Personalized in minutes</span>
       </div>
     </section>
 
     <section id="process" class="py-32 relative z-10 bg-white/50 border-y border-slate-200/50 backdrop-blur-md">
       <div class="max-w-[80rem] mx-auto px-6">
         <div class="text-center mb-20">
-          <h2 class="text-4xl md:text-5xl font-semibold tracking-tight text-slate-900 mb-4" data-aos="fade-up">From overwhelmed to clear—in three steps</h2>
+          <h2 class="text-4xl md:text-5xl font-semibold tracking-tight text-slate-900 mb-4" data-aos="fade-up">The
+            Process</h2>
           <p class="text-lg text-slate-500 max-w-xl mx-auto font-normal" data-aos="fade-up" data-aos-delay="100">
-            Start with where you are. Leave with a plan that feels realistic, specific, and yours.
+            Three simple steps to transition from scattered studying to absolute clarity.
           </p>
         </div>
 
@@ -760,12 +754,13 @@
           <div class="noise-overlay"></div>
           <div class="absolute inset-0 bg-gradient-to-br from-purple-100/50 to-indigo-100/50 z-0"></div>
           <div class="relative z-10">
-            <h2 class="text-4xl md:text-5xl font-semibold tracking-tight mb-4 text-slate-900">Ready for a plan that feels doable?
+            <h2 class="text-4xl md:text-5xl font-semibold tracking-tight mb-4 text-slate-900">Ready to stop guessing?
             </h2>
-            <p class="text-base text-slate-600 mb-10 max-w-xl mx-auto font-normal">Bring your goals, your current scores, and the schedule you actually live with. Mentics will help you make the next move clear.</p>
+            <p class="text-base text-slate-600 mb-10 max-w-xl mx-auto font-normal">Join thousands of students who have
+              clarified their ambitions and boosted their scores.</p>
             <a href="/signup"
               class="inline-block bg-slate-900 text-white font-medium px-10 py-4 rounded-full text-base hover:bg-slate-800 transition shadow-lg">
-              Build my free plan
+              Create Free Account
             </a>
           </div>
         </div>
