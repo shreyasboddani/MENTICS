@@ -1646,3 +1646,363 @@ body {
   .hero-orbit,
   .hero-glow-dot { animation: none !important; }
 }
+
+/* --------------------------------------------------------------------------
+   EDITORIAL REFINEMENT
+   Less glow, fewer containers, more hierarchy from type, rhythm and whitespace.
+   -------------------------------------------------------------------------- */
+
+.marketing-page,
+.product-app {
+  background: #f7f6f3 !important;
+}
+
+.mentics-hero-atmosphere,
+.mentics-app-atmosphere,
+.hero-orbit,
+.hero-glow-dot {
+  display: none !important;
+}
+
+.mentics-scroll-progress {
+  height: 2px;
+  background: var(--m-brand);
+  box-shadow: none;
+}
+
+/* Marketing — an editorial brand site, not a stack of glass UI cards. */
+.marketing-page .mentics-landing-hero {
+  min-height: 900px;
+  color: #fff;
+  background:
+    radial-gradient(ellipse at 50% 108%, rgba(124, 58, 237, .2), transparent 38%),
+    linear-gradient(155deg, #161318, #211d24) !important;
+  box-shadow: none;
+}
+
+.marketing-page .mentics-landing-hero::before {
+  opacity: .12;
+  background-image: linear-gradient(90deg, transparent 49.9%, rgba(255,255,255,.22) 50%, transparent 50.1%);
+  background-size: 100% 100%;
+  mask-image: linear-gradient(to bottom, transparent 8%, #000 38%, transparent 92%);
+}
+
+.marketing-page .mentics-landing-hero::after {
+  content: none !important;
+}
+
+.marketing-page .mentics-landing-hero > h1 {
+  background: linear-gradient(180deg, #fff, #d9d2de) !important;
+  background-clip: text !important;
+  -webkit-background-clip: text !important;
+  filter: none;
+  text-shadow: none;
+}
+
+.marketing-page .glass-nav,
+.marketing-page .glass-nav.is-scrolled {
+  border-color: rgba(255,255,255,.14) !important;
+  background: rgba(22, 19, 24, .86) !important;
+  box-shadow: none !important;
+}
+
+.marketing-page .glass-nav .font-lalezar {
+  text-shadow: none;
+}
+
+.marketing-page .mentics-landing-hero .badge-float {
+  border-color: rgba(255,255,255,.14) !important;
+  border-radius: .85rem !important;
+  background: rgba(255,255,255,.065) !important;
+  box-shadow: none !important;
+  backdrop-filter: blur(14px) !important;
+}
+
+.marketing-page #process {
+  background: #f7f6f3 !important;
+}
+
+.marketing-page #process .grid {
+  gap: 0 !important;
+  border-top: 1px solid #dcd8df;
+  border-bottom: 1px solid #dcd8df;
+}
+
+.marketing-page #process .glass-card,
+.marketing-page #process .glass-card:nth-child(2) {
+  min-height: 32rem;
+  margin: 0;
+  border: 0 !important;
+  border-right: 1px solid #dcd8df !important;
+  border-radius: 0 !important;
+  color: var(--m-ink) !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  transform: none !important;
+}
+
+.marketing-page #process .glass-card:last-child {
+  border-right: 0 !important;
+}
+
+.marketing-page #process .glass-card:hover,
+.marketing-page #process .glass-card:nth-child(2):hover {
+  border-color: #dcd8df !important;
+  background: rgba(255,255,255,.5) !important;
+  box-shadow: none !important;
+  transform: none !important;
+}
+
+.marketing-page #process .glass-card:nth-child(2) h3,
+.marketing-page #process .glass-card:nth-child(2) p {
+  color: inherit !important;
+  opacity: 1;
+}
+
+.marketing-page #process .glass-card > div:last-child {
+  margin: auto 1.2rem 1.2rem;
+  border: 1px solid #e5e1e8 !important;
+  border-radius: 1rem;
+  background: #fff !important;
+}
+
+.marketing-page #platform::before,
+.marketing-page #process::before {
+  color: #6e39ab;
+}
+
+.marketing-page #platform .story-block {
+  border-left-color: #d9d5db;
+}
+
+.marketing-page #platform .story-block.active {
+  border-left-color: var(--m-brand);
+}
+
+.marketing-page #platform .app-visual {
+  border-color: #d8d3db !important;
+  border-radius: 1.15rem !important;
+  box-shadow: 0 28px 70px -44px rgba(31, 25, 34, .34) !important;
+}
+
+.marketing-page #features {
+  background: #19161b !important;
+}
+
+.marketing-page #features::before {
+  display: none;
+}
+
+.marketing-page #features .grid {
+  gap: 0 !important;
+  border-top: 1px solid rgba(255,255,255,.16);
+}
+
+.marketing-page #features .dark-bento,
+.marketing-page #features .dark-bento:nth-child(2),
+.marketing-page #features .dark-bento:nth-child(5) {
+  min-height: 24rem !important;
+  border: 0 !important;
+  border-right: 1px solid rgba(255,255,255,.14) !important;
+  border-bottom: 1px solid rgba(255,255,255,.14) !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+}
+
+.marketing-page #features .dark-bento:hover {
+  border-color: rgba(255,255,255,.14) !important;
+  background: rgba(255,255,255,.035) !important;
+  box-shadow: none !important;
+  transform: none !important;
+}
+
+.marketing-page #features .dark-bento > div:first-child:not(.relative) {
+  box-shadow: none;
+}
+
+.marketing-page #faq {
+  background: #f7f6f3 !important;
+}
+
+.marketing-page #faq details,
+.marketing-page #faq details[open] {
+  border: 0 !important;
+  border-bottom: 1px solid #d8d4da !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+}
+
+.marketing-page #faq details:first-of-type {
+  border-top: 1px solid #d8d4da !important;
+}
+
+.marketing-page main > section:last-child {
+  background: #242026 !important;
+}
+
+/* Product — reserve cards for actual grouped controls and data. */
+.product-app .top-nav {
+  border-color: #dedade !important;
+  background: rgba(250,249,247,.93) !important;
+  box-shadow: 0 10px 30px -28px rgba(33,27,37,.55) !important;
+}
+
+.product-app .mentics-dashboard-hero {
+  overflow: visible;
+  margin-bottom: 2.5rem !important;
+  padding: 2.2rem 0 2.6rem !important;
+  border: 0;
+  border-bottom: 1px solid #dcd8df;
+  border-radius: 0;
+  color: var(--m-ink);
+  background: transparent !important;
+  box-shadow: none;
+}
+
+.product-app .mentics-dashboard-hero::before {
+  display: none;
+}
+
+.product-app .mentics-dashboard-hero h1 {
+  color: var(--m-ink) !important;
+}
+
+.product-app .mentics-dashboard-hero h1 .text-gradient {
+  background: none !important;
+  color: var(--m-brand) !important;
+  -webkit-text-fill-color: currentColor !important;
+}
+
+.product-app .mentics-dashboard-hero p {
+  color: #706977 !important;
+}
+
+.product-app .mentics-dashboard-hero > div:last-child > div {
+  border: 0 !important;
+  border-left: 1px solid #d5d0d8 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  backdrop-filter: none !important;
+}
+
+.product-app .mentics-dashboard-hero > div:last-child [class*="text-slate-800"] { color: var(--m-ink) !important; }
+.product-app .mentics-dashboard-hero > div:last-child [class*="text-slate-400"] { color: #817987 !important; }
+.product-app .mentics-dashboard-hero .mentics-icon {
+  color: var(--m-brand) !important;
+  border: 0 !important;
+  background: transparent !important;
+}
+
+.product-app .card,
+.product-app .glass-card,
+.product-app .bento-card,
+.product-app .mentics-dashboard-grid > .bento-card:nth-child(2),
+.product-app .mentics-dashboard-grid > .bento-card:nth-child(3),
+.product-app .mentics-dashboard-grid > .bento-card:nth-child(6) {
+  border-color: #dedade !important;
+  border-radius: 1.05rem !important;
+  background: rgba(255,255,255,.68) !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+}
+
+.product-app .card::after,
+.product-app .bento-card::after {
+  display: none !important;
+}
+
+.product-app .card:hover,
+.product-app .glass-card:hover,
+.product-app .bento-card:hover {
+  border-color: #c7c1ca !important;
+  background: rgba(255,255,255,.92) !important;
+  box-shadow: 0 12px 28px -26px rgba(39,30,45,.42) !important;
+  transform: translateY(-1px) !important;
+}
+
+.product-app .mentics-dashboard-grid {
+  gap: .9rem !important;
+}
+
+.product-app .mentics-dashboard-grid > .hero-card,
+.product-app .mentics-dashboard-grid > .hero-card:hover {
+  border: 0 !important;
+  color: white !important;
+  background: #28222d !important;
+  box-shadow: none !important;
+}
+
+.product-app .mentics-dashboard-grid .icon-box,
+.product-app .mentics-dashboard-grid .mentics-icon {
+  border: 0;
+  background: #eee8f4;
+  box-shadow: none;
+}
+
+.product-app[data-product-page="path-view"] .mentics-chat-panel,
+.product-app[data-product-page="path-view"] .mentics-path-panel {
+  border-top-width: 1px !important;
+  border-top-color: #d8d3dc !important;
+  background: rgba(255,255,255,.78) !important;
+}
+
+.product-app[data-product-page="path-view"] #path-nodes-container {
+  background-image: none;
+}
+
+.product-auth {
+  background: #211d23 !important;
+}
+
+.product-auth::before,
+.product-auth .bg-grid,
+.product-auth .ambient-blob {
+  display: none !important;
+}
+
+.product-auth main > .glass-card {
+  border-color: #e3dfe4 !important;
+  border-radius: 1.25rem !important;
+  box-shadow: 0 28px 80px -52px rgba(0,0,0,.75) !important;
+}
+
+@media (max-width: 767px) {
+  .marketing-page .mentics-landing-hero {
+    min-height: 720px;
+  }
+
+  .marketing-page #process .grid,
+  .marketing-page #features .grid {
+    border-top: 0;
+  }
+
+  .marketing-page #process .glass-card,
+  .marketing-page #process .glass-card:nth-child(2),
+  .marketing-page #features .dark-bento,
+  .marketing-page #features .dark-bento:nth-child(2),
+  .marketing-page #features .dark-bento:nth-child(5) {
+    min-height: auto !important;
+    border-right: 0 !important;
+    border-bottom: 1px solid currentColor !important;
+    border-bottom-color: rgba(78,62,87,.18) !important;
+  }
+
+  .marketing-page #features .dark-bento,
+  .marketing-page #features .dark-bento:nth-child(2),
+  .marketing-page #features .dark-bento:nth-child(5) {
+    border-bottom-color: rgba(255,255,255,.14) !important;
+  }
+
+  .product-app .mentics-dashboard-hero {
+    padding-inline: .4rem !important;
+    border-radius: 0;
+  }
+
+  .product-app .mentics-dashboard-hero > div:last-child > div:first-child {
+    border-left: 0 !important;
+  }
+}

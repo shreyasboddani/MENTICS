@@ -142,7 +142,6 @@
   };
 
   /* Progressive visual layer. These elements are decorative and never own app state. */
-  const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   const progress = document.createElement("div");
   progress.className = "mentics-scroll-progress";
   progress.setAttribute("aria-hidden", "true");
@@ -160,11 +159,6 @@
     const hero = main?.querySelector(":scope > section:first-child");
     if (hero) {
       hero.classList.add("mentics-landing-hero");
-      const atmosphere = document.createElement("div");
-      atmosphere.className = "mentics-hero-atmosphere";
-      atmosphere.setAttribute("aria-hidden", "true");
-      atmosphere.innerHTML = '<span class="hero-orbit hero-orbit-one"></span><span class="hero-orbit hero-orbit-two"></span><span class="hero-glow-dot hero-glow-dot-one"></span><span class="hero-glow-dot hero-glow-dot-two"></span>';
-      hero.prepend(atmosphere);
     }
 
     main?.querySelectorAll(":scope > section").forEach((section, index) => {
@@ -180,11 +174,6 @@
     updateHeader();
     window.addEventListener("scroll", updateHeader, { passive: true });
   } else {
-    const atmosphere = document.createElement("div");
-    atmosphere.className = "mentics-app-atmosphere";
-    atmosphere.setAttribute("aria-hidden", "true");
-    body.prepend(atmosphere);
-
     document.querySelectorAll(".card, .bento-card, .glass-card").forEach((card, index) => {
       card.style.setProperty("--card-index", index % 8);
     });
@@ -201,15 +190,4 @@
     }
   }
 
-  if (!reducedMotion && window.matchMedia("(pointer: fine)").matches) {
-    let pointerFrame = 0;
-    window.addEventListener("pointermove", (event) => {
-      if (pointerFrame) return;
-      pointerFrame = window.requestAnimationFrame(() => {
-        body.style.setProperty("--pointer-x", `${event.clientX}px`);
-        body.style.setProperty("--pointer-y", `${event.clientY}px`);
-        pointerFrame = 0;
-      });
-    }, { passive: true });
-  }
 })();
