@@ -11,6 +11,7 @@
     : isMarketing ? "marketing"
     : isAuth ? "auth"
     : "standard";
+  body.dataset.productRoute = path.replace(/^\/+|\/+$/g, "").replace(/[^a-z0-9]+/gi, "-") || "home";
 
   const main = document.querySelector("main");
   if (main && !main.id) main.id = "main-content";
@@ -174,8 +175,10 @@
     updateHeader();
     window.addEventListener("scroll", updateHeader, { passive: true });
   } else {
+    const cardTones = ["paper", "lavender", "sky", "mint", "peach"];
     document.querySelectorAll(".card, .bento-card, .glass-card").forEach((card, index) => {
       card.style.setProperty("--card-index", index % 8);
+      if (!card.classList.contains("hero-card")) card.dataset.cardTone = cardTones[index % cardTones.length];
     });
 
     if (body.dataset.productPage === "dashboard") {

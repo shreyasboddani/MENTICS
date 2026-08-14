@@ -1654,7 +1654,7 @@ body {
 
 .marketing-page,
 .product-app {
-  background: #f7f6f3 !important;
+  background: #faf8fc !important;
 }
 
 .mentics-hero-atmosphere,
@@ -1673,26 +1673,47 @@ body {
 /* Marketing — an editorial brand site, not a stack of glass UI cards. */
 .marketing-page .mentics-landing-hero {
   min-height: 900px;
-  color: #fff;
+  color: var(--m-ink);
   background:
-    radial-gradient(ellipse at 50% 108%, rgba(124, 58, 237, .2), transparent 38%),
-    linear-gradient(155deg, #161318, #211d24) !important;
+    linear-gradient(115deg, rgba(255,255,255,.72), transparent 48%),
+    linear-gradient(145deg, #fffaf5 0%, #f2e9ff 48%, #e5e6ff 100%) !important;
   box-shadow: none;
 }
 
 .marketing-page .mentics-landing-hero::before {
-  opacity: .12;
-  background-image: linear-gradient(90deg, transparent 49.9%, rgba(255,255,255,.22) 50%, transparent 50.1%);
-  background-size: 100% 100%;
-  mask-image: linear-gradient(to bottom, transparent 8%, #000 38%, transparent 92%);
+  display: block;
+  inset: auto auto -18rem -12rem;
+  width: 38rem;
+  height: 38rem;
+  border-radius: 38% 62% 58% 42%;
+  opacity: 1;
+  background: #d9ffcf;
+  transform: rotate(18deg);
+  mask-image: none;
 }
 
 .marketing-page .mentics-landing-hero::after {
-  content: none !important;
+  content: "" !important;
+  position: absolute;
+  z-index: -1;
+  top: 9rem;
+  right: 4%;
+  bottom: auto;
+  left: auto;
+  width: 13rem;
+  height: 13rem;
+  aspect-ratio: auto;
+  border: 0;
+  border-radius: 0;
+  transform: rotate(8deg);
+  background-image: radial-gradient(#7c3aed 1.5px, transparent 1.5px);
+  background-size: 16px 16px;
+  opacity: .24;
+  box-shadow: none;
 }
 
 .marketing-page .mentics-landing-hero > h1 {
-  background: linear-gradient(180deg, #fff, #d9d2de) !important;
+  background: linear-gradient(105deg, #35104e 8%, #6f2fc1 56%, #4b4bd1 100%) !important;
   background-clip: text !important;
   -webkit-background-clip: text !important;
   filter: none;
@@ -1701,25 +1722,60 @@ body {
 
 .marketing-page .glass-nav,
 .marketing-page .glass-nav.is-scrolled {
-  border-color: rgba(255,255,255,.14) !important;
-  background: rgba(22, 19, 24, .86) !important;
-  box-shadow: none !important;
+  border-color: rgba(74, 48, 92, .14) !important;
+  background: rgba(255,255,255,.82) !important;
+  box-shadow: 0 12px 38px -30px rgba(52,27,71,.42) !important;
 }
 
 .marketing-page .glass-nav .font-lalezar {
+  color: #6d28d9 !important;
   text-shadow: none;
 }
 
-.marketing-page .mentics-landing-hero .badge-float {
-  border-color: rgba(255,255,255,.14) !important;
-  border-radius: .85rem !important;
-  background: rgba(255,255,255,.065) !important;
+.marketing-page .glass-nav nav a,
+.marketing-page .glass-nav a[href="/login"] {
+  color: #6b6272 !important;
+}
+
+.marketing-page .glass-nav nav a:hover,
+.marketing-page .glass-nav a[href="/login"]:hover {
+  color: #5f20b7 !important;
+}
+
+.marketing-page .glass-nav a[class*="bg-slate-900"] {
+  color: white !important;
+  background: #6d28d9 !important;
   box-shadow: none !important;
-  backdrop-filter: blur(14px) !important;
+}
+
+.marketing-page .mentics-landing-hero .badge-float {
+  border-color: rgba(81, 47, 102, .13) !important;
+  border-radius: .85rem !important;
+  background: rgba(255,255,255,.86) !important;
+  box-shadow: 0 18px 38px -30px rgba(69,37,91,.42) !important;
+  backdrop-filter: blur(12px) !important;
+}
+
+.marketing-page .mentics-landing-hero .badge-float:first-of-type { border-bottom: 4px solid #a56cf1 !important; }
+.marketing-page .mentics-landing-hero .badge-float:nth-of-type(2) { border-bottom: 4px solid #635be5 !important; }
+.marketing-page .mentics-landing-hero .badge-float [class*="text-slate-900"] { color: #24182d !important; }
+.marketing-page .mentics-landing-hero .badge-float [class*="text-slate-500"] { color: #756a7d !important; }
+
+.marketing-page .mentics-landing-hero > p { color: #6a5e70 !important; }
+.marketing-page .mentics-landing-hero > p span { color: #25162f !important; }
+.marketing-page .mentics-landing-hero > div[class*="flex-col"] a:first-child {
+  color: white !important;
+  background: #6d28d9 !important;
+  box-shadow: 0 16px 30px -20px rgba(78,30,143,.52) !important;
+}
+.marketing-page .mentics-landing-hero > div[class*="flex-col"] a:last-child {
+  color: #33243e !important;
+  border-color: rgba(73,44,91,.16) !important;
+  background: rgba(255,255,255,.72) !important;
 }
 
 .marketing-page #process {
-  background: #f7f6f3 !important;
+  background: #fff9f1 !important;
 }
 
 .marketing-page #process .grid {
@@ -1759,6 +1815,10 @@ body {
   opacity: 1;
 }
 
+.marketing-page #process .glass-card:nth-child(1) { background: rgba(255, 218, 190, .22) !important; }
+.marketing-page #process .glass-card:nth-child(2) { background: rgba(223, 208, 255, .32) !important; }
+.marketing-page #process .glass-card:nth-child(3) { background: rgba(206, 241, 220, .34) !important; }
+
 .marketing-page #process .glass-card > div:last-child {
   margin: auto 1.2rem 1.2rem;
   border: 1px solid #e5e1e8 !important;
@@ -1785,8 +1845,18 @@ body {
   box-shadow: 0 28px 70px -44px rgba(31, 25, 34, .34) !important;
 }
 
+.marketing-page #platform {
+  background:
+    linear-gradient(90deg, transparent 0 49.9%, rgba(124,58,237,.045) 50%, transparent 50.1%),
+    #fff !important;
+}
+
+.marketing-page #platform .story-block:nth-child(1) > div:first-child { background: #fff0df !important; color: #b75b20 !important; }
+.marketing-page #platform .story-block:nth-child(2) > div:first-child { background: #eee4ff !important; color: #6d28d9 !important; }
+.marketing-page #platform .story-block:nth-child(3) > div:first-child { background: #e5efff !important; color: #315ec5 !important; }
+
 .marketing-page #features {
-  background: #19161b !important;
+  background: #eee6fb !important;
 }
 
 .marketing-page #features::before {
@@ -1795,7 +1865,7 @@ body {
 
 .marketing-page #features .grid {
   gap: 0 !important;
-  border-top: 1px solid rgba(255,255,255,.16);
+  border-top: 1px solid rgba(77,45,98,.18);
 }
 
 .marketing-page #features .dark-bento,
@@ -1803,8 +1873,8 @@ body {
 .marketing-page #features .dark-bento:nth-child(5) {
   min-height: 24rem !important;
   border: 0 !important;
-  border-right: 1px solid rgba(255,255,255,.14) !important;
-  border-bottom: 1px solid rgba(255,255,255,.14) !important;
+  border-right: 1px solid rgba(77,45,98,.16) !important;
+  border-bottom: 1px solid rgba(77,45,98,.16) !important;
   border-radius: 0 !important;
   background: transparent !important;
   box-shadow: none !important;
@@ -1812,18 +1882,27 @@ body {
 }
 
 .marketing-page #features .dark-bento:hover {
-  border-color: rgba(255,255,255,.14) !important;
-  background: rgba(255,255,255,.035) !important;
+  border-color: rgba(77,45,98,.16) !important;
+  background: rgba(255,255,255,.38) !important;
   box-shadow: none !important;
   transform: none !important;
 }
+
+.marketing-page #features h2,
+.marketing-page #features h3 { color: #25162f !important; }
+.marketing-page #features p { color: #6b5d73 !important; }
+.marketing-page #features .dark-bento:nth-child(1) { background: rgba(255,255,255,.34) !important; }
+.marketing-page #features .dark-bento:nth-child(2) { background: rgba(255,225,200,.42) !important; }
+.marketing-page #features .dark-bento:nth-child(3) { background: rgba(204,229,255,.38) !important; }
+.marketing-page #features .dark-bento:nth-child(4) { background: rgba(210,246,220,.38) !important; }
+.marketing-page #features .dark-bento:nth-child(5) { background: rgba(255,255,255,.34) !important; }
 
 .marketing-page #features .dark-bento > div:first-child:not(.relative) {
   box-shadow: none;
 }
 
 .marketing-page #faq {
-  background: #f7f6f3 !important;
+  background: #eef7f4 !important;
 }
 
 .marketing-page #faq details,
@@ -1841,7 +1920,17 @@ body {
 }
 
 .marketing-page main > section:last-child {
-  background: #242026 !important;
+  background:
+    radial-gradient(circle at 10% 110%, rgba(217,255,207,.85), transparent 22rem),
+    linear-gradient(135deg, #f4e6ff, #e3e7ff 58%, #ffe8d6) !important;
+}
+
+.marketing-page main > section:last-child h2,
+.marketing-page main > section:last-child p { color: #281631 !important; }
+.marketing-page main > section:last-child p { opacity: .68; }
+.marketing-page main > section:last-child a {
+  color: white !important;
+  background: #6d28d9 !important;
 }
 
 /* Product — reserve cards for actual grouped controls and data. */
@@ -1852,19 +1941,26 @@ body {
 }
 
 .product-app .mentics-dashboard-hero {
-  overflow: visible;
+  overflow: hidden;
   margin-bottom: 2.5rem !important;
-  padding: 2.2rem 0 2.6rem !important;
-  border: 0;
-  border-bottom: 1px solid #dcd8df;
-  border-radius: 0;
+  padding: 2.6rem 2.8rem !important;
+  border: 1px solid #dfd1ef;
+  border-bottom: 1px solid #d8c8eb;
+  border-radius: 1.5rem;
   color: var(--m-ink);
-  background: transparent !important;
+  background: linear-gradient(125deg, #fffafd, #eee4ff 58%, #e2e8ff) !important;
   box-shadow: none;
 }
 
 .product-app .mentics-dashboard-hero::before {
-  display: none;
+  display: block;
+  inset: -25% -4rem auto auto;
+  width: 18rem;
+  height: 18rem;
+  border-radius: 35% 65% 46% 54%;
+  background: rgba(200, 255, 190, .62);
+  transform: rotate(16deg);
+  mask-image: none;
 }
 
 .product-app .mentics-dashboard-hero h1 {
@@ -1932,9 +2028,15 @@ body {
 .product-app .mentics-dashboard-grid > .hero-card:hover {
   border: 0 !important;
   color: white !important;
-  background: #28222d !important;
+  background: linear-gradient(135deg, #7132c5, #5a50d6) !important;
   box-shadow: none !important;
 }
+
+.product-app .mentics-dashboard-grid > .bento-card:nth-child(2) { background: #f4ecff !important; }
+.product-app .mentics-dashboard-grid > .bento-card:nth-child(3) { background: #edf2ff !important; }
+.product-app .mentics-dashboard-grid > .bento-card:nth-child(5) { background: #fff4e8 !important; }
+.product-app .mentics-dashboard-grid > .bento-card:nth-child(6) { background: #eef8f1 !important; }
+.product-app .mentics-dashboard-grid > .bento-card:nth-child(8) { background: #faf0f8 !important; }
 
 .product-app .mentics-dashboard-grid .icon-box,
 .product-app .mentics-dashboard-grid .mentics-icon {
@@ -1955,7 +2057,9 @@ body {
 }
 
 .product-auth {
-  background: #211d23 !important;
+  background:
+    linear-gradient(135deg, rgba(255,255,255,.38), transparent 45%),
+    linear-gradient(145deg, #eee3ff, #e5eaff 60%, #fff0e5) !important;
 }
 
 .product-auth::before,
@@ -1968,6 +2072,169 @@ body {
   border-color: #e3dfe4 !important;
   border-radius: 1.25rem !important;
   box-shadow: 0 28px 80px -52px rgba(0,0,0,.75) !important;
+}
+
+/* The lively system continues through every signed-in surface. */
+.product-app {
+  background:
+    radial-gradient(circle at 0% 18%, rgba(224, 207, 255, .42), transparent 24rem),
+    radial-gradient(circle at 100% 76%, rgba(210, 238, 255, .34), transparent 26rem),
+    #faf8fc !important;
+}
+
+.product-app main > h1,
+.product-app main > div:first-child h1,
+.product-app main section:first-child h1 {
+  letter-spacing: -.045em !important;
+}
+
+.product-app .card[data-card-tone="paper"],
+.product-app .bento-card[data-card-tone="paper"],
+.product-app .glass-card[data-card-tone="paper"] {
+  background: rgba(255,255,255,.84) !important;
+  box-shadow: inset 0 4px #d9c8ed !important;
+}
+
+.product-app .card[data-card-tone="lavender"],
+.product-app .bento-card[data-card-tone="lavender"],
+.product-app .glass-card[data-card-tone="lavender"] {
+  background: #f4edff !important;
+  box-shadow: inset 0 4px #a875e4 !important;
+}
+
+.product-app .card[data-card-tone="sky"],
+.product-app .bento-card[data-card-tone="sky"],
+.product-app .glass-card[data-card-tone="sky"] {
+  background: #edf4ff !important;
+  box-shadow: inset 0 4px #7395e8 !important;
+}
+
+.product-app .card[data-card-tone="mint"],
+.product-app .bento-card[data-card-tone="mint"],
+.product-app .glass-card[data-card-tone="mint"] {
+  background: #eef9f2 !important;
+  box-shadow: inset 0 4px #73bd8d !important;
+}
+
+.product-app .card[data-card-tone="peach"],
+.product-app .bento-card[data-card-tone="peach"],
+.product-app .glass-card[data-card-tone="peach"] {
+  background: #fff3e8 !important;
+  box-shadow: inset 0 4px #e9a66f !important;
+}
+
+.product-app .card[data-card-tone]:hover,
+.product-app .bento-card[data-card-tone]:hover,
+.product-app .glass-card[data-card-tone]:hover {
+  filter: saturate(1.05);
+  box-shadow: inset 0 4px var(--m-brand), 0 16px 32px -28px rgba(55,34,68,.45) !important;
+}
+
+.product-app .card-header,
+.product-app h2.font-lalezar,
+.product-app h3.font-lalezar {
+  color: #35243f !important;
+}
+
+.product-app .icon-box,
+.product-app .activity-icon,
+.product-app .mentics-icon {
+  color: #6d28d9;
+  border: 1px solid rgba(109,40,217,.12) !important;
+  background: rgba(255,255,255,.66) !important;
+}
+
+.product-app button[class*="bg-purple-600"],
+.product-app a[class*="bg-purple-600"],
+.product-app button[class*="bg-indigo-600"],
+.product-app a[class*="bg-indigo-600"] {
+  border-color: transparent !important;
+  background: #6d28d9 !important;
+  box-shadow: 0 12px 24px -18px rgba(77,29,143,.58) !important;
+}
+
+.product-app table {
+  overflow: hidden;
+  border: 1px solid #ded4e5;
+  border-radius: 1rem;
+  background: rgba(255,255,255,.7);
+}
+
+.product-app thead {
+  color: #4c315f;
+  background: #eee4f8 !important;
+}
+
+.product-app tbody tr:nth-child(even) {
+  background: rgba(243,238,248,.52);
+}
+
+.product-app .proactive-alert,
+.product-app .suggestion-card {
+  border-left: 4px solid #7c3aed !important;
+  background: linear-gradient(90deg, #f0e7ff, #f7f1ff) !important;
+}
+
+.product-app [id$="Modal"],
+.product-app #pathModal {
+  background-color: rgba(50,30,63,.42) !important;
+}
+
+.product-app [id$="Modal"] > div,
+.product-app #pathModal > div {
+  border-color: #d8c9e4 !important;
+  background: #fffafd !important;
+}
+
+.product-app[data-product-page="path-view"] .mentics-chat-panel {
+  box-shadow: inset 0 4px #a875e4 !important;
+}
+
+.product-app[data-product-page="path-view"] .mentics-path-panel {
+  box-shadow: inset 0 4px #667ee3 !important;
+}
+
+.product-app[data-product-page="path-view"] #path-nodes-container {
+  background:
+    linear-gradient(rgba(124,58,237,.035) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(124,58,237,.035) 1px, transparent 1px),
+    rgba(250,248,252,.56);
+  background-size: 34px 34px;
+}
+
+.product-app[data-product-route="dashboard-stats"] main,
+.product-app[data-product-route="dashboard-tracker"] main,
+.product-app[data-product-route="forum"] main,
+.product-app[data-product-route="leaderboard"] main,
+.product-app[data-product-route="account"] main {
+  padding-top: 1rem;
+}
+
+.product-app[data-product-route="forum"] .post-card {
+  border-left: 5px solid #8b5cf6 !important;
+}
+
+.product-app[data-product-route="forum"] .reply-card {
+  border-color: #dcd0e8 !important;
+  background: rgba(255,255,255,.62) !important;
+}
+
+.product-app[data-product-route="leaderboard"] main > .card,
+.product-app[data-product-route="account"] main > .card {
+  border: 1px solid rgba(88,53,109,.14) !important;
+  background:
+    linear-gradient(145deg, rgba(255,255,255,.84), rgba(242,233,255,.78)) !important;
+}
+
+.product-auth main > .glass-card {
+  background: rgba(255,255,255,.9) !important;
+  box-shadow: 0 26px 70px -45px rgba(61,32,83,.38) !important;
+}
+
+.product-auth input:not([type="checkbox"]):not([type="radio"]),
+.product-auth select,
+.product-auth textarea {
+  background: rgba(255,255,255,.82) !important;
 }
 
 @media (max-width: 767px) {
