@@ -13,6 +13,7 @@ import {
 import './styles.css'
 import './experience.css'
 import './brand-system.css'
+import './liquid-glass.css'
 
 const boot = window.__MENTICS__ || { page: 'landing', data: {} }
 
@@ -200,18 +201,26 @@ function Starfield({warp=false,tone='violet'}) {
 
 function AppShell({ children, name }) {
   const [menu,setMenu]=useState(false)
+  const [navWarp,setNavWarp]=useState(null)
   const current=window.location.pathname
   const active=href=>current===href||(href==='/dashboard/test-path-view'&&current.startsWith('/dashboard/test-path'))||(href==='/dashboard/college-path-view'&&current.startsWith('/dashboard/college-path'))||(href!=='/dashboard'&&current.startsWith(`${href}/`))
+  const travel=(event,href,label)=>{
+    if(event.defaultPrevented||event.button!==0||event.metaKey||event.ctrlKey||event.shiftKey||event.altKey||current===href)return
+    event.preventDefault();setMenu(false);setNavWarp({href,label})
+    const reduced=window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    window.setTimeout(()=>{window.location.href=href},reduced?80:720)
+  }
   return <div className="app-shell app-shell--tabs">
     <Starfield/>
     <header className="product-nav">
       <Brand/>
-      <nav className={menu?'open':''} aria-label="Product navigation">{navItems.map(([href,Icon,label])=><a key={href} className={active(href)?'active':''} href={href}><Icon size={17}/><span>{label}</span></a>)}</nav>
-      <div className="product-account"><a href="/account"><i>{(name||'M').slice(0,1).toUpperCase()}</i><span>{name||'Mentics student'}</span></a><a href="/logout" aria-label="Log out"><LogOut size={17}/></a></div>
+      <nav className={menu?'open':''} aria-label="Product navigation">{navItems.map(([href,Icon,label])=><a key={href} className={active(href)?'active':''} href={href} onClick={event=>travel(event,href,label)}><Icon size={17}/><span>{label}</span></a>)}</nav>
+      <div className="product-account"><a href="/account" onClick={event=>travel(event,'/account','Settings')}><i>{(name||'M').slice(0,1).toUpperCase()}</i><span>{name||'Mentics student'}</span></a><a href="/logout" aria-label="Log out"><LogOut size={17}/></a></div>
       <button className="product-menu" onClick={()=>setMenu(!menu)} aria-label="Toggle navigation">{menu?<X/>:<Menu/>}</button>
     </header>
     {menu&&<button className="menu-scrim" onClick={()=>setMenu(false)} aria-label="Close navigation"/>}
     <div className="app-stage">{children}</div>
+    {navWarp&&<div className="warp-overlay warp-overlay--nav" aria-live="polite"><Starfield warp tone="violet"/><div><Brand inverse/><p>Opening {navWarp.label}</p></div></div>}
   </div>
 }
 
@@ -297,7 +306,7 @@ function PathPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [selected, setSelected] = useState(null)
-  const [chatOpen, setChatOpen] = useState(false)
+  const [chatOpen, setChatOpen] = useState(()=>window.matchMedia('(min-width: 1100px)').matches)
   const [adding, setAdding] = useState(false)
   const [essayOpen, setEssayOpen] = useState(false)
   const builder = isTest ? '/dashboard/test-path-builder' : '/dashboard/college-path-builder'
@@ -336,8 +345,8 @@ function PathPage() {
       }, 250)
     }
   }
-  return <AppShell name={boot.data.name}><main className="app-main path-page">
-    <div className="path-header"><div><div className="eyebrow"><span/> {category.toUpperCase()}</div><h1>Your five-step path.</h1><p>Finish what is in front of you. The path adapts from there.</p></div><div className="path-header-actions">{!isTest&&<button className="button button--quiet" onClick={()=>setEssayOpen(true)}><PenLine size={17}/> Essay feedback</button>}<button className="button button--quiet" onClick={()=>setChatOpen(true)}><MessageCircle size={17}/> Ask Mentics</button><a className="button button--dark" href={builder}>Edit goals <ArrowRight size={16}/></a></div></div>
+  return <AppShell name={boot.data.name}><main className={`app-main path-page ${chatOpen?'chat-docked':''}`}>
+    <div className="path-header"><div><div className="eyebrow"><span/> {category.toUpperCase()}</div><h1>Your five-step path.</h1><p>Finish what is in front of you. The path adapts from there.</p></div><div className="path-header-actions">{!isTest&&<button className="button button--quiet" onClick={()=>setEssayOpen(true)}><PenLine size={17}/> Essay feedback</button>}{!chatOpen&&<button className="button button--quiet" onClick={()=>setChatOpen(true)}><MessageCircle size={17}/> Ask Mentics</button>}<a className="button button--dark" href={builder}>Edit goals <ArrowRight size={16}/></a></div></div>
     <div className="path-progress"><span style={{width:`${tasks.length ? completed/tasks.length*100 : 0}%`}}/><p><b>{completed} of {tasks.length || 5}</b> steps complete</p></div>
     {error && <div className="error-banner">{error}<button onClick={()=>loadTasks()}>Try again</button></div>}
     {loading ? <PathSkeleton/> : <section className="journey-map" style={{height:journeyHeight}} aria-label={`${category} learning journey`}>
@@ -353,7 +362,7 @@ function PathPage() {
     {adding && <AddTask category={category} onClose={()=>setAdding(false)} onAdded={t=>{setTasks(items=>[...items,normalizeTask(t)]);setAdding(false)}}/>}
     {essayOpen&&<EssayCoach onClose={()=>setEssayOpen(false)}/>}
     <ChatPanel open={chatOpen} onClose={()=>setChatOpen(false)} category={category} onNewPath={items=>setTasks(items.map(normalizeTask))}/>
-    <button className="floating-chat" onClick={()=>setChatOpen(true)}><MessageCircle/><span>Ask Mentics</span></button>
+    {!chatOpen&&<button className="floating-chat" onClick={()=>setChatOpen(true)}><MessageCircle/><span>Ask Mentics</span></button>}
   </main></AppShell>
 }
 
@@ -402,12 +411,12 @@ function Assessment({data,onClose}) { const [answers,setAnswers]=useState({});co
 function EssayCoach({onClose}){const [prompt,setPrompt]=useState('');const [essay,setEssay]=useState('');const [feedback,setFeedback]=useState('');const [busy,setBusy]=useState(false);const analyze=async()=>{if(essay.trim().length<50)return;setBusy(true);try{setFeedback((await api('/api/analyze_essay',{method:'POST',body:JSON.stringify({essay_text:essay,essay_prompt:prompt||'a general college application essay'})})).feedback)}catch(e){setFeedback(e.message)}finally{setBusy(false)}};return <Modal onClose={onClose} wide><div className="modal-kicker">MENTICS ESSAY COACH</div><h2>Strengthen the essay without losing your voice.</h2><div className="essay-workspace"><label>Essay prompt<input value={prompt} onChange={e=>setPrompt(e.target.value)} placeholder="Common App prompt or supplemental question"/></label><label>Essay draft<textarea value={essay} onChange={e=>setEssay(e.target.value)} rows="12" maxLength="20000" placeholder="Paste your draft here..."/></label><button className="button button--primary" onClick={analyze} disabled={busy||essay.trim().length<50}>{busy?'Analyzing…':'Get structured feedback'} <Sparkles/></button>{feedback&&<div className="essay-feedback"><Markdown>{feedback}</Markdown></div>}</div></Modal>}
 
 function ChatPanel({open,onClose,category,onNewPath}) {
-  const [messages,setMessages]=useState([]);const [input,setInput]=useState('');const [busy,setBusy]=useState(false);const end=useRef(null)
-  useEffect(()=>{if(open&&messages.length===0)api(`/api/chat_history?category=${encodeURIComponent(category)}`).then(h=>setMessages(Array.isArray(h)&&h.length?h:[{role:'assistant',content:`I know this ${category.toLowerCase()} path. Ask me about a step, a concept, or what to do when you are stuck.`}])).catch(()=>{})},[open,category,messages.length])
+  const [messages,setMessages]=useState([]);const [input,setInput]=useState('');const [busy,setBusy]=useState(false);const [historyError,setHistoryError]=useState('');const end=useRef(null)
+  useEffect(()=>{if(open&&messages.length===0){api(`/api/chat_history?category=${encodeURIComponent(category)}`).then(h=>setMessages(Array.isArray(h)&&h.length?h:[{role:'assistant',content:`I’m here with your ${category.toLowerCase()} path. Ask about any step, concept, or roadblock.`}])).catch(()=>{setHistoryError('I couldn’t restore the earlier conversation, but you can start a new one here.');setMessages([{role:'assistant',content:`I’m ready to help with your ${category.toLowerCase()} path.`}])})}},[open,category,messages.length])
   useEffect(()=>end.current?.scrollIntoView({behavior:'smooth'}),[messages,busy])
   const send=async e=>{e.preventDefault();if(!input.trim()||busy)return;const next=[...messages,{role:'user',content:input.trim()}];setMessages(next);setInput('');setBusy(true);try{const r=await api(`/api/chat?category=${encodeURIComponent(category)}`,{method:'POST',body:JSON.stringify({history:next})});if(r.new_path){onNewPath(r.new_path);setMessages([...next,{role:'assistant',content:'Your new five-step path is ready. I used our conversation to shape it.'}])}else setMessages([...next,{role:'assistant',content:r.reply}])}catch(x){setMessages([...next,{role:'assistant',content:x.message}])}finally{setBusy(false)}}
-  const reset=async()=>{await api('/api/reset_chat',{method:'POST',body:JSON.stringify({category})});setMessages([{role:'assistant',content:`Fresh start. What would you like help with on your ${category.toLowerCase()} path?`}])}
-  return <aside className={`chat-panel ${open?'chat-panel--open':''}`} aria-hidden={!open}><header><span><i><Sparkles/></i><b>Mentics guide</b><small>Knows your current path</small></span><div><button onClick={reset} aria-label="Reset chat"><RotateCcw/></button><button onClick={onClose} aria-label="Close chat"><X/></button></div></header><div className="chat-messages">{messages.map((m,i)=><div className={`chat-message chat-message--${m.role}`} key={i}>{m.role==='assistant'?<Markdown>{m.content}</Markdown>:m.content}</div>)}{busy&&<div className="chat-thinking"><i/><i/><i/></div>}<div ref={end}/></div><form onSubmit={send}><textarea value={input} onChange={e=>setInput(e.target.value)} onKeyDown={e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();send(e)}}} placeholder="Ask about your path…" rows={1}/><button disabled={!input.trim()||busy} aria-label="Send"><Send/></button></form><p>Mentics can make mistakes. Check important information.</p></aside>
+  const reset=async()=>{try{await api('/api/reset_chat',{method:'POST',body:JSON.stringify({category})});setHistoryError('');setMessages([{role:'assistant',content:`Fresh start. What would you like help with on your ${category.toLowerCase()} path?`}])}catch(error){setHistoryError(error.message)}}
+  return <aside className={`chat-panel ${open?'chat-panel--open':''}`} aria-hidden={!open}><header><span><i><Sparkles/></i><b>Mentics guide</b><small>Present with your current path</small></span><div><button onClick={reset} aria-label="Reset chat"><RotateCcw/></button><button onClick={onClose} aria-label="Close chat"><X/></button></div></header>{historyError&&<div className="chat-notice" role="status">{historyError}</div>}<div className="chat-messages">{messages.map((m,i)=><div className={`chat-message chat-message--${m.role}`} key={i}>{m.role==='assistant'?<Markdown>{m.content}</Markdown>:m.content}</div>)}{busy&&<div className="chat-thinking"><i/><i/><i/></div>}<div ref={end}/></div><form onSubmit={send}><textarea value={input} onChange={e=>setInput(e.target.value)} onKeyDown={e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();send(e)}}} placeholder="Ask about your path…" rows={1}/><button disabled={!input.trim()||busy} aria-label="Send"><Send/></button></form><p>Mentics can make mistakes. Check important information.</p></aside>
 }
 
 function PageIntro({kicker,title,copy,actions}) {

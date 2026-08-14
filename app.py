@@ -411,7 +411,21 @@ def _compact_chat_history(history):
             "parts": [{"text": content}],
         })
         remaining_characters -= len(content)
-    return list(reversed(compact))
+    compact = list(reversed(compact))
+
+    # The interface displays a local assistant welcome before the first user
+    # message. Gemini history must begin with a user and alternate roles.
+    while compact and compact[0]["role"] == "model":
+        compact.pop(0)
+    normalized = []
+    for message in compact:
+        if normalized and normalized[-1]["role"] == message["role"]:
+            normalized[-1]["parts"][0]["text"] += "\n\n" + message["parts"][0]["text"]
+        else:
+            normalized.append(message)
+    while normalized and normalized[-1]["role"] == "model":
+        normalized.pop()
+    return normalized
 
 
 def _generate_chat_reply(history, system_instruction):
@@ -2391,7 +2405,11 @@ def api_chat(user):
     stat_history = _get_stat_history_for_prompt(user_id)
 
     user_message = history[-1]['content'].lower() if history else ""
-    if "regenerate" in user_message or "new path" in user_message or "change" in user_message:
+    regeneration_phrases = (
+        "regenerate my path", "regenerate the path", "generate a new path",
+        "build a new path", "rebuild my path", "change my path", "new path",
+    )
+    if any(phrase in user_message for phrase in regeneration_phrases):
         if category == 'College Planning':
             college_context = stats.get("college_path", {})
             new_tasks = _generate_and_save_new_college_path(
