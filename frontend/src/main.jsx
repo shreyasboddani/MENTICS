@@ -4,9 +4,9 @@ import DOMPurify from 'dompurify'
 import { marked } from 'marked'
 import {
   ArrowRight, BarChart3, BookOpen, CalendarDays, Check, ChevronRight,
-  CircleUserRound, Clock3, Flame, GraduationCap, House, LayoutDashboard,
-  LockKeyhole, Menu, MessageCircle, Plus, RotateCcw, Send, Settings,
-  Sparkles, Target, Trophy, X, Zap
+  CircleUserRound, Clock3, Compass, FileText, Flame, GraduationCap, House,
+  LayoutDashboard, LineChart, ListChecks, LockKeyhole, Menu, MessageCircle,
+  Plus, RotateCcw, Send, Settings, Sparkles, Target, Trophy, X, Zap
 } from 'lucide-react'
 import './styles.css'
 
@@ -16,6 +16,23 @@ function Brand({ inverse = false }) {
   return <a className={`brand ${inverse ? 'brand--inverse' : ''}`} href="/" aria-label="Mentics home">MENTICS</a>
 }
 
+function Reveal({ as: Tag = 'div', className = '', children, delay = 0, ...props }) {
+  const ref = useRef(null)
+  useEffect(()=>{
+    const node = ref.current
+    if (!node) return
+    const observer = new IntersectionObserver(([entry])=>{
+      if (entry.isIntersecting) {
+        node.classList.add('is-visible')
+        observer.disconnect()
+      }
+    }, {threshold:.12, rootMargin:'0px 0px -40px'})
+    observer.observe(node)
+    return ()=>observer.disconnect()
+  },[])
+  return <Tag ref={ref} className={`reveal ${className}`} style={{'--reveal-delay':`${delay}ms`}} {...props}>{children}</Tag>
+}
+
 function Landing() {
   const loggedIn = boot.data.isLoggedIn
   return <div className="landing">
@@ -23,6 +40,7 @@ function Landing() {
       <Brand />
       <nav aria-label="Main navigation">
         <a href="#how-it-works">How it works</a>
+        <a href="#inside-mentics">Inside Mentics</a>
         <a href="#platform">Platform</a>
         <a href="#faq">Questions</a>
       </nav>
@@ -35,17 +53,17 @@ function Landing() {
       <section className="hero">
         <div className="hero-glow hero-glow--one" />
         <div className="hero-glow hero-glow--two" />
-        <div className="eyebrow"><span /> Built for high school ambition</div>
-        <h1>MENTICS</h1>
-        <p className="hero-tagline">Your high school ambition, clarified.<br />Stop guessing. <strong>Start achieving.</strong></p>
-        <div className="hero-actions">
+        <div className="eyebrow hero-enter hero-enter--one"><span /> Built for high school ambition</div>
+        <h1 className="hero-enter hero-enter--two">MENTICS</h1>
+        <p className="hero-tagline hero-enter hero-enter--three">Your high school ambition, clarified.<br />Stop guessing. <strong>Start achieving.</strong></p>
+        <div className="hero-actions hero-enter hero-enter--four">
           <a className="button button--primary" href={loggedIn ? '/dashboard' : '/signup'}>
             {loggedIn ? 'Continue your path' : 'Build your free path'} <ArrowRight size={18} />
           </a>
           <a className="button button--quiet" href="#how-it-works">See how it works</a>
         </div>
 
-        <div className="product-frame" aria-label="Mentics product preview">
+        <div className="product-frame hero-enter hero-enter--five" aria-label="Mentics product preview">
           <div className="frame-top"><span /><span /><span /><div>app.mentics</div></div>
           <div className="preview-shell">
             <aside className="preview-rail"><Brand /><div className="preview-nav active"><House size={16}/> Home</div><div className="preview-nav"><Target size={16}/> My path</div><div className="preview-nav"><BarChart3 size={16}/> Progress</div></aside>
@@ -63,18 +81,54 @@ function Landing() {
         </div>
       </section>
 
-      <section className="trust-strip"><span>A path that adapts</span><span>Focused daily action</span><span>Progress you can see</span><span>Guidance when you need it</span></section>
+      <section className="trust-strip"><div className="trust-track">{[0,1].map(copy=><React.Fragment key={copy}><span>A path that adapts</span><span>Focused daily action</span><span>Progress you can see</span><span>Guidance when you need it</span></React.Fragment>)}</div></section>
 
-      <section className="section process" id="how-it-works">
+      <Reveal as="section" className="section process" id="how-it-works">
         <div className="section-heading"><div className="eyebrow"><span /> THE MENTICS METHOD</div><h2>Clarity changes everything.</h2><p>Mentics turns a distant goal into the next right move—then learns from what happens.</p></div>
         <div className="process-grid">
           <article><b>01</b><Target/><h3>Tell us where you are</h3><p>Share your goals, timing, strengths, and the areas that need attention.</p></article>
           <article><b>02</b><Sparkles/><h3>Get a five-step path</h3><p>Receive a focused roadmap built around your actual priorities—not a generic checklist.</p></article>
           <article><b>03</b><BarChart3/><h3>Improve with evidence</h3><p>Complete work, track results, and let every new path build on real progress.</p></article>
         </div>
-      </section>
+      </Reveal>
 
-      <section className="section platform" id="platform">
+      <Reveal as="section" className="section journey" id="inside-mentics">
+        <div className="journey-copy">
+          <div className="eyebrow"><span /> A PLAN THAT MOVES WITH YOU</div>
+          <h2>Five steps.<br/>One clear direction.</h2>
+          <p>Your path is short enough to act on and smart enough to evolve. Finish a step, log what happened, and Mentics uses that evidence to shape what comes next.</p>
+          <div className="journey-proof"><span><Check/> Specific to your goal</span><span><Check/> Grounded in your progress</span><span><Check/> Built to be finishable</span></div>
+          <a className="text-link" href={loggedIn ? '/dashboard/test-path-view' : '/signup'}>See your first five steps <ArrowRight/></a>
+        </div>
+        <div className="journey-visual">
+          <div className="journey-line"/>
+          {[
+            ['01','Find the signal','Turn your current scores and goals into a focused starting point.'],
+            ['02','Build the skill','Work on one specific gap with the right resource or strategy.'],
+            ['03','Practice with purpose','Use a targeted sprint to apply the idea under pressure.'],
+            ['04','Learn from misses','Capture why mistakes happened instead of simply moving on.'],
+            ['05','Measure the change','Use a meaningful checkpoint to decide what comes next.']
+          ].map((step,i)=><div className={`journey-step ${i===0?'active':''}`} key={step[0]} style={{'--step-delay':`${i*110}ms`}}><b>{step[0]}</b><span><strong>{step[1]}</strong><small>{step[2]}</small></span></div>)}
+        </div>
+      </Reveal>
+
+      <Reveal as="section" className="section bento-section">
+        <div className="section-heading"><div className="eyebrow"><span /> MORE THAN A CHECKLIST</div><h2>Everything has a reason.</h2><p>Each part of Mentics is designed to turn uncertainty into a decision you can act on today.</p></div>
+        <div className="landing-bento">
+          <article className="bento-path"><div><Compass/><small>ADAPTIVE PLANNING</small></div><h3>A roadmap that remembers where you have been.</h3><div className="bento-mini-path"><i/><i/><i/><i/><i/></div></article>
+          <article className="bento-chat"><div><MessageCircle/><small>CONTEXTUAL GUIDANCE</small></div><div className="mini-conversation"><p>Why is this my next step?</p><p>Because timing—not content—caused most of your recent misses. Let’s fix pacing before adding new material.</p></div></article>
+          <article className="bento-essay"><div><FileText/><small>ESSAY FEEDBACK</small></div><h3>Feedback that points to the sentence, not just the problem.</h3><div className="essay-lines"><i/><i/><i/><i/></div></article>
+          <article className="bento-data"><div><LineChart/><small>VISIBLE PROGRESS</small></div><strong>+140</strong><span>Projected score movement</span><div className="bento-bars"><i/><i/><i/><i/><i/></div></article>
+        </div>
+      </Reveal>
+
+      <Reveal as="section" className="momentum-band">
+        <div><small>THE REAL ADVANTAGE</small><h2>Momentum you can feel.</h2></div>
+        <p>Not more tabs. Not more noise. Just a clear system for deciding, doing, learning, and moving forward.</p>
+        <div className="momentum-loop"><span><ListChecks/> Decide</span><i/><span><Target/> Do</span><i/><span><BarChart3/> Learn</span><i/><span><ArrowRight/> Advance</span></div>
+      </Reveal>
+
+      <Reveal as="section" className="section platform" id="platform">
         <div className="platform-copy"><div className="eyebrow eyebrow--light"><span /> ONE FOCUSED WORKSPACE</div><h2>Less noise.<br/>More momentum.</h2><p>Test prep, college planning, progress, and contextual guidance belong in one calm place.</p><a href={loggedIn ? '/dashboard' : '/signup'}>Explore the platform <ArrowRight size={17}/></a></div>
         <div className="feature-stack">
           <div><Target/><span><b>Adaptive paths</b><small>Five clear steps that respond to your goals and performance.</small></span></div>
@@ -82,13 +136,13 @@ function Landing() {
           <div><GraduationCap/><span><b>College planning</b><small>Turn applications, essays, and deadlines into manageable progress.</small></span></div>
           <div><BarChart3/><span><b>Visible progress</b><small>Track scores, streaks, milestones, and the work behind them.</small></span></div>
         </div>
-      </section>
+      </Reveal>
 
-      <section className="section faq" id="faq"><div className="section-heading"><h2>Good questions.</h2></div>
+      <Reveal as="section" className="section faq" id="faq"><div className="section-heading"><h2>Good questions.</h2></div>
         {[['Is Mentics free to use?','Yes. The current early-access product is free and does not require a credit card.'],['Does it support both SAT and ACT?','Yes. Your test-prep path can focus on the SAT, ACT, or both.'],['Can my plan change as I improve?','Yes. Regenerate a path after new scores, completed work, or a change in goals. Mentics uses that context to plan the next five steps.']].map(([q,a])=><details key={q}><summary>{q}<Plus size={18}/></summary><p>{a}</p></details>)}
-      </section>
+      </Reveal>
 
-      <section className="closing"><div><Brand inverse/><h2>Know what to do next.</h2><p>Build a path that makes your ambition feel possible.</p><a className="button button--light" href={loggedIn ? '/dashboard' : '/signup'}>{loggedIn ? 'Open dashboard' : 'Get started free'} <ArrowRight size={18}/></a></div></section>
+      <Reveal as="section" className="closing"><div><Brand inverse/><h2>Know what to do next.</h2><p>Build a path that makes your ambition feel possible.</p><a className="button button--light" href={loggedIn ? '/dashboard' : '/signup'}>{loggedIn ? 'Open dashboard' : 'Get started free'} <ArrowRight size={18}/></a></div></Reveal>
     </main>
     <footer><Brand/><span>© 2026 Mentics. All rights reserved.</span><div><a href="/terms">Terms</a><a href="/privacy">Privacy</a><a href="mailto:support@mentics.com">Contact</a></div></footer>
   </div>

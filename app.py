@@ -298,6 +298,18 @@ def _get_quiz_results_for_prompt(user_id):
 # --- DECORATORS & FILTERS ---
 
 
+def _parse_db_datetime(value):
+    """Parse SQLite and PostgreSQL timestamp values without assuming precision."""
+    if isinstance(value, datetime):
+        parsed = value
+    else:
+        timestamp = str(value or "").strip()
+        if not timestamp:
+            raise ValueError("Timestamp is empty")
+        parsed = datetime.fromisoformat(timestamp.replace("Z", "+00:00"))
+    return parsed if parsed.tzinfo else parsed.replace(tzinfo=ZoneInfo("UTC"))
+
+
 def login_required(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
@@ -319,8 +331,7 @@ def format_date_filter(s):
     try:
         user_tz_str = session.get('timezone', 'UTC')
         user_tz = ZoneInfo(user_tz_str)
-        naive_dt = datetime.strptime(s, '%Y-%m-%d %H:%M:%S')
-        utc_dt = naive_dt.replace(tzinfo=ZoneInfo("UTC"))
+        utc_dt = _parse_db_datetime(s).astimezone(ZoneInfo("UTC"))
         user_local_dt = utc_dt.astimezone(user_tz)
         return user_local_dt.strftime('%b %d, %Y')
     except (ZoneInfoNotFoundError, ValueError, TypeError):
@@ -332,8 +343,7 @@ def time_ago_filter(s):
     if not s:
         return ""
     try:
-        naive_dt = datetime.strptime(s, '%Y-%m-%d %H:%M:%S')
-        utc_dt = naive_dt.replace(tzinfo=ZoneInfo("UTC"))
+        utc_dt = _parse_db_datetime(s).astimezone(ZoneInfo("UTC"))
         now = datetime.now(ZoneInfo("UTC"))
         diff = now - utc_dt
         seconds = diff.total_seconds()
@@ -1800,8 +1810,7 @@ def dashboard(user):
 
     if recent_logs:
         for log in recent_logs:
-            utc_dt = datetime.strptime(
-                log['created_at'], '%Y-%m-%d %H:%M:%S').replace(tzinfo=ZoneInfo("UTC"))
+            utc_dt = _parse_db_datetime(log['created_at']).astimezone(ZoneInfo("UTC"))
 
             user_local_date = utc_dt.astimezone(user_tz).date()
 
