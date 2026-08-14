@@ -1,0 +1,195 @@
+.suite-section {
+  padding: 140px max(28px, calc((100vw - 1200px) / 2));
+  background: #fff;
+}
+
+.suite-heading { max-width: 850px; }
+.suite-heading h2 {
+  font-size: clamp(3rem, 6vw, 5.8rem);
+  letter-spacing: -.07em;
+  line-height: .94;
+  margin: 1.5rem 0;
+}
+.suite-heading > p { color: var(--muted); font-size: 1.05rem; }
+.suite-grid {
+  display: grid;
+  grid-template-columns: 1.35fr .65fr 1fr;
+  margin-top: 70px;
+  border-top: 1px solid #d9cfe0;
+  border-left: 1px solid #d9cfe0;
+}
+.suite-grid article {
+  min-height: 310px;
+  padding: 32px;
+  border-right: 1px solid #d9cfe0;
+  border-bottom: 1px solid #d9cfe0;
+  position: relative;
+  overflow: hidden;
+}
+.suite-grid article > svg { width: 34px; height: 34px; margin-bottom: 55px; color: #712bc4; }
+.suite-grid small { display: block; font-size: .62rem; letter-spacing: .14em; font-weight: 800; color: #796b82; }
+.suite-grid h3 { font-size: 1.65rem; letter-spacing: -.04em; margin: 12px 0; }
+.suite-grid p { color: var(--muted); font-size: .82rem; line-height: 1.65; max-width: 430px; }
+.suite-path { grid-column: span 2; background: #eee2ff; }
+.suite-sprint { background: #fff1e5; }
+.suite-essay { background: #eef8f1; }
+.suite-progress { background: #edf4ff; }
+.suite-community { background: #fff8d9; }
+.mini-road { display: flex; align-items: center; margin-top: 35px; }
+.mini-road i { width: 31px; height: 31px; border-radius: 50%; background: #fff; display: grid; place-items: center; font-style: normal; font-size: .68rem; font-weight: 800; color: #712bc4; }
+.mini-road span { width: 45px; height: 2px; background: #bca1dc; }
+.suite-grid article:hover { filter: saturate(1.08); }
+
+.essay-workspace { display: grid; gap: 14px; }
+.essay-workspace label { display: grid; gap: 7px; color: #4f4357; font-size: .75rem; font-weight: 800; }
+.essay-workspace input,
+.essay-workspace textarea { width: 100%; border: 1px solid #d8cfe0; border-radius: 10px; padding: 13px 14px; outline: none; resize: vertical; }
+.essay-workspace input:focus,
+.essay-workspace textarea:focus { border-color: #8a51cb; box-shadow: 0 0 0 4px #f0e6fb; }
+.essay-feedback { margin-top: 8px; padding: 24px; border-left: 5px solid #712bc4; background: #f1e7ff; }
+
+@media (max-width: 1100px) {
+  .suite-grid { grid-template-columns: 1fr 1fr; }
+  .suite-path { grid-column: span 2; }
+}
+
+@media (max-width: 760px) {
+  .suite-section { padding: 90px 20px; }
+  .suite-grid { grid-template-columns: 1fr; }
+  .suite-path { grid-column: auto; }
+  .suite-grid article { min-height: 280px; }
+}
+
+.task-deadline {
+  display: flex;
+  align-items: end;
+  gap: 10px;
+  margin: 22px 0;
+  padding: 16px;
+  background: #f4edff;
+  border-left: 4px solid var(--brand);
+}
+
+.task-deadline label {
+  display: grid;
+  gap: 7px;
+  flex: 1;
+  font-size: .68rem;
+  font-weight: 800;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  color: #6f6177;
+}
+
+.task-deadline input,
+.milestone-input input {
+  width: 100%;
+  border: 1px solid #d5c9dd;
+  border-radius: 9px;
+  background: #fff;
+  padding: 11px 12px;
+  color: var(--ink);
+  font: inherit;
+}
+
+.task-deadline button {
+  border: 0;
+  border-radius: 9px;
+  background: #3a2348;
+  color: #fff;
+  padding: 12px 15px;
+  font-size: .72rem;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.milestone-mark {
+  width: 64px;
+  height: 64px;
+  display: grid;
+  place-items: center;
+  margin-bottom: 20px;
+  background: #fff0c7;
+  color: #a06c00;
+  border-radius: 50%;
+}
+
+.milestone-mark svg { width: 28px; height: 28px; }
+.milestone-copy { color: var(--muted); line-height: 1.65; }
+.milestone-input { display: grid; gap: 8px; margin: 24px 0; font-size: .75rem; font-weight: 800; }
+.milestone-input input { font-size: 1rem; }
+
+.hero > .eyebrow { animation: mentics-rise .65s both .05s; }
+.hero h1 { animation: mentics-rise .8s both .12s; }
+.hero-tagline { animation: mentics-rise .8s both .22s; }
+.hero-actions { animation: mentics-rise .8s both .3s; }
+.product-frame { animation: mentics-frame-in 1s cubic-bezier(.2,.75,.2,1) both .38s; }
+.hero-glow--one { animation: mentics-drift-one 10s ease-in-out infinite alternate; }
+.hero-glow--two { animation: mentics-drift-two 12s ease-in-out infinite alternate; }
+.mini-chart i { transform-origin: bottom; animation: mentics-bar-in .75s cubic-bezier(.2,.75,.2,1) both; }
+.mini-chart i:nth-child(2) { animation-delay: .08s; }
+.mini-chart i:nth-child(3) { animation-delay: .16s; }
+.mini-chart i:nth-child(4) { animation-delay: .24s; }
+.mini-chart i:nth-child(5) { animation-delay: .32s; }
+.mini-chart i:nth-child(6) { animation-delay: .4s; }
+
+@keyframes mentics-rise {
+  from { opacity: 0; transform: translateY(22px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes mentics-frame-in {
+  from { opacity: 0; transform: perspective(1400px) rotateX(4deg) translateY(45px) scale(.975); }
+  to { opacity: 1; transform: perspective(1400px) rotateX(1.5deg) translateY(0) scale(1); }
+}
+
+@keyframes mentics-drift-one {
+  to { transform: translate(28px, -18px) rotate(8deg); }
+}
+
+@keyframes mentics-drift-two {
+  to { transform: translate(-24px, 20px) rotate(-7deg); }
+}
+
+@keyframes mentics-bar-in {
+  from { transform: scaleY(.08); opacity: .3; }
+  to { transform: scaleY(1); opacity: 1; }
+}
+
+@supports (animation-timeline: view()) {
+  .process-grid article,
+  .feature-stack > div,
+  .suite-grid article,
+  .faq details,
+  .closing > div {
+    animation: mentics-scroll-reveal linear both;
+    animation-timeline: view();
+    animation-range: entry 5% cover 28%;
+  }
+
+  @keyframes mentics-scroll-reveal {
+    from { opacity: .2; transform: translateY(28px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+}
+
+@media (max-width: 520px) {
+  .task-deadline { align-items: stretch; flex-direction: column; }
+  .task-deadline button { width: 100%; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hero > .eyebrow,
+  .hero h1,
+  .hero-tagline,
+  .hero-actions,
+  .product-frame,
+  .hero-glow--one,
+  .hero-glow--two,
+  .mini-chart i,
+  .process-grid article,
+  .feature-stack > div,
+  .suite-grid article,
+  .faq details,
+  .closing > div { animation: none !important; }
+}

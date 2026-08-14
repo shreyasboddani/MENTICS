@@ -866,7 +866,10 @@ def strategy_article(user, task_id):
     if not article:
         return "Article not found for this task.", 404
 
-    return render_template("strategy_article.html", article=article)
+    return render_react("article", {
+        "name": user.get_name(),
+        "article": dict(article),
+    }, f"{article.get('title', 'Strategy')} | Mentics")
 
 
 @app.route('/api/practice_sprint/<int:task_id>')
@@ -1428,13 +1431,13 @@ def tracker(user):
     for gen in college_planning_history:
         gen['tasks'].sort(key=lambda x: x['task_order'])
 
-    return render_template(
-        "tracker.html",
-        stat_history=history_by_stat,
-        kpis=kpis,
-        test_prep_history=test_prep_history,
-        college_planning_history=college_planning_history
-    )
+    return render_react("tracker", {
+        "name": user.get_name(),
+        "statHistory": history_by_stat,
+        "kpis": kpis,
+        "testPrepHistory": test_prep_history,
+        "collegePlanningHistory": college_planning_history,
+    }, "Tracker | Mentics")
 
 
 def _get_tracker_ai_analysis(user):
@@ -1537,20 +1540,30 @@ def tracker_analysis(user):
 # --- Standard Routes ---
 
 
+def render_react(page, bootstrap=None, title=None, status=200):
+    """Render the React application with server-verified bootstrap data."""
+    return render_template(
+        "react_app.html",
+        page=page,
+        bootstrap=bootstrap or {},
+        title=title or "Mentics",
+    ), status
+
+
 @app.route("/privacy")
 def privacy():
-    return render_template("privacy.html")
+    return render_react("privacy", title="Privacy Policy | Mentics")
 
 
 @app.route("/terms")
 def terms():
-    return render_template("terms.html")
+    return render_react("terms", title="Terms of Service | Mentics")
 
 
 @app.route("/")
 def home():
     is_logged_in = "user" in session
-    return render_template("index.html", is_logged_in=is_logged_in)
+    return render_react("landing", {"isLoggedIn": is_logged_in}, "Mentics | Stop Guessing. Start Achieving.")
 
 
 @app.route("/signup", methods=["GET", "POST"])
@@ -1560,12 +1573,11 @@ def signup():
         name = request.form.get("name", "").strip()
         raw_password = request.form.get("password", "")
         if not email or not name or len(raw_password) < 8:
-            return render_template(
-                "signup.html",
-                error="Enter your name, a valid email, and a password of at least 8 characters."
-            ), 400
+            return render_react("signup", {
+                "error": "Enter your name, a valid email, and a password of at least 8 characters."
+            }, "Create Account | Mentics", 400)
         if db.select_one("users", where={"email": email}):
-            return render_template("signup.html", error="Email already exists!"), 409
+            return render_react("signup", {"error": "Email already exists!"}, "Create Account | Mentics", 409)
         password = generate_password_hash(raw_password)
         try:
             user_id = db.insert("users", {
@@ -1585,8 +1597,8 @@ def signup():
             return redirect(url_for("onboarding"))
         except Exception as e:
             print(f"Signup error: {e}")
-            return render_template("signup.html", error="Unable to create the account right now."), 500
-    return render_template("signup.html")
+            return render_react("signup", {"error": "Unable to create the account right now."}, "Create Account | Mentics", 500)
+    return render_react("signup", title="Create Account | Mentics")
 
 
 @app.route("/login", methods=["GET", "POST"])
@@ -1605,7 +1617,7 @@ def login():
             session.permanent = True
             return redirect(url_for("dashboard"))
         error = "Invalid credentials"
-    return render_template("login.html", error=error)
+    return render_react("login", {"error": error}, "Sign In | Mentics")
 
 # NEW: Google Login Route
 
@@ -1670,10 +1682,10 @@ def onboarding(user):
         if goal not in {'test_prep', 'college_planning'} or learning_style not in {
             'visual', 'auditory', 'reading_writing', 'kinesthetic'
         }:
-            return render_template(
-                'onboarding.html',
-                error="Choose a primary goal and learning style to continue."
-            ), 400
+            return render_react("onboarding", {
+                "error": "Choose a primary goal and learning style to continue.",
+                "name": user.get_name(),
+            }, "Welcome | Mentics", 400)
         onboarding_data = {
             'goal': goal,
             'learning_style': learning_style,
@@ -1685,7 +1697,7 @@ def onboarding(user):
         }, {'id': user.data['id']})
         return redirect(url_for('dashboard'))
 
-    return render_template('onboarding.html')
+    return render_react("onboarding", {"name": user.get_name()}, "Welcome | Mentics")
 
 
 @app.route('/set-timezone', methods=['POST'])
@@ -1889,20 +1901,19 @@ def dashboard(user):
 
     earned_achievements = [a for a in all_achievements if a['is_earned']]
 
-    return render_template(
-        "dashboard.html",
-        name=name,
-        test_prep_completed=test_prep_completed_current,
-        college_planning_completed=college_planning_completed_current,
-        gpa=stats.get("gpa") or "—",
-        sat_total=sat_total or "—",
-        act_average=act_average or "—",
-        recent_activities=recent_activities,
-        activity_data=json.dumps(activity_data),
-        test_date_info=test_date_info,
-        earned_achievements=earned_achievements,
-        game_stats=game_stats,
-    )
+    return render_react("dashboard", {
+        "name": name,
+        "testPrepCompleted": test_prep_completed_current,
+        "collegePlanningCompleted": college_planning_completed_current,
+        "gpa": stats.get("gpa") or "—",
+        "satTotal": sat_total or "—",
+        "actAverage": act_average or "—",
+        "recentActivities": recent_activities,
+        "activityData": activity_data,
+        "testDateInfo": test_date_info,
+        "earnedAchievements": earned_achievements,
+        "gameStats": game_stats,
+    }, "Dashboard | Mentics")
 
 
 @app.route("/api/get-suggestion")
@@ -1926,7 +1937,11 @@ def account(user):
 
         def account_error(message, status=400):
             user.load_user()
-            return render_template('account.html', user=user, error=message), status
+            return render_react("account", {
+                "name": user.data.get("name", ""),
+                "email": user.data.get("email", ""),
+                "error": message,
+            }, "Account | Mentics", status)
 
         if form_type == 'name':
             new_name = request.form.get('name', '').strip()[:100]
@@ -1966,7 +1981,11 @@ def account(user):
         return redirect(url_for('account', updated='1'))
 
     user.load_user()
-    return render_template('account.html', user=user)
+    return render_react("account", {
+        "name": user.data.get("name", ""),
+        "email": user.data.get("email", ""),
+        "updated": request.args.get("updated") == "1",
+    }, "Account | Mentics")
 
 
 @app.route("/dashboard/test-path-builder", methods=["GET", "POST"])
@@ -2008,13 +2027,19 @@ def test_path_builder(user):
             user.data['id'], test_path)
         return redirect(url_for("test_path_view"))
 
-    return render_template("test_path_builder.html", **current_test_path_info)
+    return render_react("test-builder", {
+        "name": user.get_name(),
+        **current_test_path_info,
+    }, "Build Test Path | Mentics")
 
 
 @app.route("/dashboard/test-path-view")
 @login_required
 def test_path_view(user):
-    return render_template("test_path_view.html")
+    return render_react("path", {
+        "category": "Test Prep",
+        "name": user.get_name(),
+    }, "Test Path | Mentics")
 
 
 @app.route("/dashboard/college-path-builder", methods=["GET", "POST"])
@@ -2032,13 +2057,19 @@ def college_path_builder(user):
         user.set_stats(stats)
         _generate_and_save_new_college_path(user.data['id'], college_context)
         return redirect(url_for('college_path_view'))
-    return render_template("college_path_builder.html", **stats.get('college_path', {}))
+    return render_react("college-builder", {
+        "name": user.get_name(),
+        **stats.get('college_path', {}),
+    }, "Build College Path | Mentics")
 
 
 @app.route('/dashboard/college-path-view')
 @login_required
 def college_path_view(user):
-    return render_template("college_path_view.html")
+    return render_react("path", {
+        "category": "College Planning",
+        "name": user.get_name(),
+    }, "College Path | Mentics")
 
 # --- Stats & Tracker Routes ---
 
@@ -2076,19 +2107,19 @@ def stats(user):
     total_college_planning_completed = sum(
         1 for t in all_tasks if t['is_completed'] and t['category'] == 'College Planning')
 
-    return render_template(
-        "stats.html",
-        gpa=stats.get("gpa", ""),
-        sat_ebrw=sat_ebrw,
-        sat_math=sat_math,
-        sat_total=sat_total,
-        act_math=stats.get("act_math", ""),
-        act_reading=stats.get("act_reading", ""),
-        act_science=stats.get("act_science", ""),
-        act_average=act_average,
-        total_test_prep_completed=total_test_prep_completed,
-        total_college_planning_completed=total_college_planning_completed
-    )
+    return render_react("stats", {
+        "name": user.get_name(),
+        "gpa": stats.get("gpa", ""),
+        "satEbrw": sat_ebrw,
+        "satMath": sat_math,
+        "satTotal": sat_total,
+        "actMath": stats.get("act_math", ""),
+        "actReading": stats.get("act_reading", ""),
+        "actScience": stats.get("act_science", ""),
+        "actAverage": act_average,
+        "totalTestPrepCompleted": total_test_prep_completed,
+        "totalCollegePlanningCompleted": total_college_planning_completed,
+    }, "Progress | Mentics")
 
 
 @app.route("/dashboard/stats/edit", methods=["GET", "POST"])
@@ -2115,12 +2146,15 @@ def edit_stats(user):
         user.set_stats(stats)
         return redirect(url_for("stats"))
 
-    return render_template(
-        "edit_stats.html",
-        sat_ebrw=stats.get("sat_ebrw", ""), sat_math=stats.get("sat_math", ""),
-        act_math=stats.get("act_math", ""), act_reading=stats.get("act_reading", ""),
-        act_science=stats.get("act_science", ""), gpa=stats.get("gpa", "")
-    )
+    return render_react("edit-stats", {
+        "name": user.get_name(),
+        "satEbrw": stats.get("sat_ebrw", ""),
+        "satMath": stats.get("sat_math", ""),
+        "actMath": stats.get("act_math", ""),
+        "actReading": stats.get("act_reading", ""),
+        "actScience": stats.get("act_science", ""),
+        "gpa": stats.get("gpa", ""),
+    }, "Update Progress | Mentics")
 
 
 # --- API ROUTES ---
@@ -2445,6 +2479,9 @@ def api_update_stats(user):
         'act_reading': (1, 36),
         'act_science': (1, 36),
         'act_composite': (1, 36),
+        'colleges_researched': (0, 1000),
+        'applications_submitted': (0, 1000),
+        'essay_progress': (1, 2),
     }
 
     if stat_name not in stat_ranges or stat_value is None:
@@ -2714,7 +2751,10 @@ def leaderboard(user):
         LIMIT 10
         """
     )
-    return render_template('leaderboard.html', leaderboard=leaderboard_data)
+    return render_react("leaderboard", {
+        "name": user.get_name(),
+        "leaderboard": [dict(row) for row in leaderboard_data],
+    }, "Leaderboard | Mentics")
 
 
 @app.route('/forum')
@@ -2748,11 +2788,12 @@ def forum(user):
         "SELECT * FROM forum_posts WHERE date(created_at) = ? ORDER BY created_at DESC", (today_str,))
     todays_threads = [dict(row) for row in todays_threads_raw]
 
-    return render_template('forum.html',
-                           posts=posts_with_replies,
-                           user_name=user.get_name(),
-                           todays_threads=todays_threads,
-                           search_query=search_query)
+    return render_react("forum", {
+        "name": user.get_name(),
+        "posts": posts_with_replies,
+        "todaysThreads": todays_threads,
+        "searchQuery": search_query,
+    }, "Community | Mentics")
 
 
 @app.route('/api/posts', methods=['POST'])

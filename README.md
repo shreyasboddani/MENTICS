@@ -56,8 +56,8 @@ Mentics is built with a modern and robust technology stack:
 * **Database**: PostgreSQL in production, SQLite for local development
 * **AI**: Google Gemini API (`google-genai`)
 * **Authentication**: Werkzeug Security (for password hashing), Authlib (for Google OAuth)
-* **Frontend**: HTML, Tailwind CSS, Vanilla JavaScript
-* **Charting**: ApexCharts.js for dynamic and beautiful progress charts.
+* **Frontend**: React 19, Vite, responsive CSS, Lucide icons
+* **Backend rendering**: Flask serves the React shell and secure route bootstrap data
 
 ---
 
@@ -123,9 +123,11 @@ User data is stored in PostgreSQL so it survives serverless restarts.
    as an authorized redirect URI for the production OAuth client.
 
 Do not commit these values in `.env`. Vercel supplies them securely at runtime.
-Vercel detects the top-level Flask `app` in `app.py` automatically; no catch-all
-rewrite is needed. Adding a rewrite to `/app.py` changes the path Flask receives
-and causes valid application URLs such as `/` to return Flask's 404 page.
+Vercel is explicitly pinned to its Flask framework preset in `vercel.json` so the
+React build tooling cannot be mistaken for a static-only Vite deployment. The
+top-level Flask `app` in `app.py` owns all routes; no catch-all rewrite is needed.
+Adding a rewrite to `/app.py` changes the path Flask receives and causes valid
+application URLs such as `/` to return Flask's 404 page.
 
 Gemini calls use the stable `gemini-3.5-flash-lite` model by default. The app
 caps output sizes, limits chat context to recent useful turns, and caches the
