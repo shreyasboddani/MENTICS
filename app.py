@@ -299,7 +299,7 @@ def _get_quiz_results_for_prompt(user_id):
 
 
 def _parse_db_datetime(value):
-    """Parse SQLite and PostgreSQL timestamp values without assuming precision."""
+    """Parse SQLite and Neon/PostgreSQL timestamps without assuming precision."""
     if isinstance(value, datetime):
         parsed = value
     else:
@@ -464,14 +464,14 @@ def _get_current_numbered_tasks(user_id, category):
 
 
 def _complete_five_step_plan(tasks, category):
-    """Guarantee a usable five-step path even when an AI response is partial."""
+    """Guarantee five usable tasks when an AI response is incomplete."""
     defaults = {
         "Test Prep": [
             {"task_format": "link", "description": "Review one weak skill with an official SAT or ACT lesson and write down three takeaways.", "reason": "A focused review gives the rest of this path a clear foundation.", "type": "standard", "stat_to_update": None, "category": "Test Prep", "difficulty": "easy"},
             {"task_format": "link", "description": "Complete a timed set of ten official practice questions in your weakest section.", "reason": "A short timed set reveals the exact mistakes worth fixing next.", "type": "standard", "stat_to_update": None, "category": "Test Prep", "difficulty": "medium"},
             {"task_format": "review", "description": "Build an error log for every missed question and label each mistake by concept, process, or timing.", "reason": "An error log turns practice results into a repeatable improvement system.", "type": "standard", "stat_to_update": None, "category": "Test Prep", "difficulty": "medium"},
             {"task_format": "link", "description": "Redo the missed questions without notes and explain the correct method in your own words.", "reason": "Retrieval and explanation confirm that the correction will stick.", "type": "standard", "stat_to_update": None, "category": "Test Prep", "difficulty": "medium"},
-            {"task_format": "link", "description": "Boss Battle: Take a timed official practice module and record your updated score.", "reason": "A timed checkpoint measures whether this cycle improved accuracy and pacing.", "type": "milestone", "stat_to_update": "sat_total", "category": "Test Prep", "difficulty": "hard"},
+            {"task_format": "link", "description": "Boss Battle: Take a timed official practice module and record your updated score.", "reason": "A timed checkpoint measures whether this cycle improved accuracy and pacing.", "type": "milestone", "stat_to_update": None, "category": "Test Prep", "difficulty": "hard"},
         ],
         "College Planning": [
             {"description": "Define your three non-negotiables for college fit and rank them in order.", "reason": "Clear criteria keep your college search focused on schools that genuinely fit you.", "type": "standard", "stat_to_update": None, "category": "College Planning", "difficulty": "easy"},
@@ -1550,11 +1550,7 @@ def terms():
 @app.route("/")
 def home():
     is_logged_in = "user" in session
-    return render_template(
-        "react_app.html",
-        page="landing",
-        bootstrap={"isLoggedIn": is_logged_in}
-    )
+    return render_template("index.html", is_logged_in=is_logged_in)
 
 
 @app.route("/signup", methods=["GET", "POST"])
@@ -1894,21 +1890,18 @@ def dashboard(user):
     earned_achievements = [a for a in all_achievements if a['is_earned']]
 
     return render_template(
-        "react_app.html",
-        page="dashboard",
-        bootstrap={
-            "name": name,
-            "testPrepCompleted": test_prep_completed_current,
-            "collegePlanningCompleted": college_planning_completed_current,
-            "gpa": stats.get("gpa") or "—",
-            "satTotal": sat_total or "—",
-            "actAverage": act_average or "—",
-            "recentActivities": recent_activities,
-            "activityData": activity_data,
-            "testDateInfo": test_date_info,
-            "earnedAchievements": earned_achievements,
-            "gameStats": game_stats,
-        },
+        "dashboard.html",
+        name=name,
+        test_prep_completed=test_prep_completed_current,
+        college_planning_completed=college_planning_completed_current,
+        gpa=stats.get("gpa") or "—",
+        sat_total=sat_total or "—",
+        act_average=act_average or "—",
+        recent_activities=recent_activities,
+        activity_data=json.dumps(activity_data),
+        test_date_info=test_date_info,
+        earned_achievements=earned_achievements,
+        game_stats=game_stats,
     )
 
 
@@ -2021,10 +2014,7 @@ def test_path_builder(user):
 @app.route("/dashboard/test-path-view")
 @login_required
 def test_path_view(user):
-    return render_template(
-        "react_app.html", page="path",
-        bootstrap={"category": "Test Prep", "name": user.get_name()}
-    )
+    return render_template("test_path_view.html")
 
 
 @app.route("/dashboard/college-path-builder", methods=["GET", "POST"])
@@ -2048,10 +2038,7 @@ def college_path_builder(user):
 @app.route('/dashboard/college-path-view')
 @login_required
 def college_path_view(user):
-    return render_template(
-        "react_app.html", page="path",
-        bootstrap={"category": "College Planning", "name": user.get_name()}
-    )
+    return render_template("college_path_view.html")
 
 # --- Stats & Tracker Routes ---
 
