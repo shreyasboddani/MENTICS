@@ -14,6 +14,7 @@ import './styles.css'
 import './experience.css'
 import './brand-system.css'
 import './liquid-glass.css'
+import './mentics-redesign.css'
 
 const boot = window.__MENTICS__ || { page: 'landing', data: {} }
 const csrfToken = boot.data.csrfToken || ''
@@ -59,14 +60,23 @@ function Landing() {
       <section className="hero">
         <div className="hero-glow hero-glow--one" />
         <div className="hero-glow hero-glow--two" />
-        <div className="eyebrow"><span /> Built for high school ambition</div>
-        <h1>MENTICS</h1>
-        <p className="hero-tagline">Your high school ambition, clarified.<br />Stop guessing. <strong>Start achieving.</strong></p>
-        <div className="hero-actions">
-          <a className="button button--primary" href={loggedIn ? '/dashboard' : '/signup'}>
-            {loggedIn ? 'Continue your path' : 'Build your free path'} <ArrowRight size={18} />
-          </a>
-          <a className="button button--quiet" href="#how-it-works">See how it works</a>
+        <div className="hero-copy">
+          <div className="eyebrow"><span /> Built for high school ambition</div>
+          <h1>MENTICS</h1>
+          <p className="hero-tagline">Your high school ambition, clarified.<br />Stop guessing. <strong>Start achieving.</strong></p>
+          <div className="hero-actions">
+            <a className="button button--primary" href={loggedIn ? '/dashboard' : '/signup'}>
+              {loggedIn ? 'Continue your path' : 'Build your free path'} <ArrowRight size={18} />
+            </a>
+            <a className="button button--quiet" href="#how-it-works">See how it works</a>
+          </div>
+          <div className="hero-signal" aria-label="How Mentics keeps you moving">
+            <span><b>01</b> Find the signal</span>
+            <i />
+            <span><b>02</b> Do the work</span>
+            <i />
+            <span><b>03</b> Adapt the path</span>
+          </div>
         </div>
 
         <div className="product-frame" aria-label="Mentics product preview">
@@ -225,13 +235,13 @@ function AppShell({ children, name }) {
     if(event.defaultPrevented||event.button!==0||event.metaKey||event.ctrlKey||event.shiftKey||event.altKey||current===href)return
     event.preventDefault();setMenu(false);setNavWarp({href,label})
     const reduced=window.matchMedia('(prefers-reduced-motion: reduce)').matches
-    window.setTimeout(()=>{window.location.href=href},reduced?80:720)
+    window.setTimeout(()=>{window.location.href=href},reduced?60:420)
   }
   return <div className="app-shell app-shell--tabs">
     <Starfield/>
     <header className="product-nav">
       <Brand/>
-      <nav className={menu?'open':''} aria-label="Product navigation">{navItems.map(([href,Icon,label])=><a key={href} className={active(href)?'active':''} href={href} onClick={event=>travel(event,href,label)}><Icon size={17}/><span>{label}</span></a>)}</nav>
+      <nav className={menu?'open':''} aria-label="Product navigation">{navItems.map(([href,Icon,label])=><a key={href} className={active(href)?'active':''} href={href} aria-current={active(href)?'page':undefined} title={label} onClick={event=>travel(event,href,label)}><Icon size={17}/><span>{label}</span></a>)}</nav>
       <div className="product-account"><a href="/account" onClick={event=>travel(event,'/account','Settings')}><i>{(name||'M').slice(0,1).toUpperCase()}</i><span>{name||'Mentics student'}</span></a><form className="product-logout" method="POST" action="/logout"><CsrfField/><button type="submit" aria-label="Log out"><LogOut size={17}/></button></form></div>
       <button className="product-menu" onClick={()=>setMenu(!menu)} aria-label="Toggle navigation">{menu?<X/>:<Menu/>}</button>
     </header>
@@ -325,7 +335,7 @@ function PathPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [selected, setSelected] = useState(null)
-  const [chatOpen, setChatOpen] = useState(()=>window.matchMedia('(min-width: 1280px)').matches)
+  const [chatOpen, setChatOpen] = useState(()=>window.matchMedia('(min-width: 1050px)').matches)
   const [adding, setAdding] = useState(false)
   const [essayOpen, setEssayOpen] = useState(false)
   const builder = isTest ? '/dashboard/test-path-builder' : '/dashboard/college-path-builder'
