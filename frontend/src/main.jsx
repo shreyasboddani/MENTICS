@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { createRoot } from 'react-dom/client'
 import DOMPurify from 'dompurify'
 import { marked } from 'marked'
@@ -41,6 +42,14 @@ function Brand({ inverse = false }) {
 
 function Landing() {
   const loggedIn = boot.data.isLoggedIn
+  useEffect(()=>{
+    const nodes=[...document.querySelectorAll('.landing-facts > div,.section-heading,.process-grid article,.journey-showcase-copy,.journey-demo,.platform-copy,.feature-stack > div,.suite-heading,.suite-grid article,.week-heading,.week-flow article,.faq details,.closing')]
+    nodes.forEach(node=>node.classList.add('mx-reveal'))
+    if(window.matchMedia('(prefers-reduced-motion: reduce)').matches){nodes.forEach(node=>node.classList.add('is-visible'));return}
+    const observer=new IntersectionObserver(entries=>entries.forEach(entry=>{if(entry.isIntersecting){entry.target.classList.add('is-visible');observer.unobserve(entry.target)}}),{threshold:.12,rootMargin:'0px 0px -7% 0px'})
+    nodes.forEach(node=>observer.observe(node))
+    return()=>observer.disconnect()
+  },[])
   return <div className="landing">
     <Starfield/>
     <header className="public-nav">
@@ -247,7 +256,7 @@ function AppShell({ children, name }) {
     </header>
     {menu&&<button className="menu-scrim" onClick={()=>setMenu(false)} aria-label="Close navigation"/>}
     <div className="app-stage">{['test-builder','college-builder','edit-stats'].includes(boot.page)&&boot.data.error&&<div className="shell-error" role="alert">{boot.data.error}</div>}{children}</div>
-    {navWarp&&<div className="warp-overlay warp-overlay--nav" aria-live="polite"><Starfield warp tone="violet"/><div><Brand inverse/><p>Opening {navWarp.label}</p></div></div>}
+    {navWarp&&createPortal(<div className="warp-overlay warp-overlay--nav" aria-live="polite"><Starfield warp tone="violet"/><div><Brand inverse/><p>Opening {navWarp.label}</p></div></div>,document.body)}
   </div>
 }
 
@@ -265,7 +274,7 @@ function PortalSelector({open,onClose}) {
     }catch(e){setWarping('');setError(e.message)}
   }
   if(!open&&!warping)return null
-  return <>
+  return createPortal(<>
     <div className={`portal-overlay ${open?'visible':''}`} role="dialog" aria-modal="true" aria-label="Choose your path">
       <div className="portal-heading"><small>MENTICS PATH BUILDER</small><h2>Choose your path</h2><p>Step through the portal that matches what you want to move forward.</p></div>
       <div className="portal-pair">
@@ -276,7 +285,7 @@ function PortalSelector({open,onClose}) {
       <button className="portal-close" onClick={onClose} aria-label="Close path selector"><X/></button>
     </div>
     {warping&&<div className="warp-overlay"><Starfield warp tone={warping==='college'?'indigo':'violet'}/><div><Brand inverse/><p>Connecting to your path</p></div></div>}
-  </>
+  </>,document.body)
 }
 
 function Dashboard() {
@@ -400,7 +409,7 @@ function normalizeTask(t){return {...t,is_completed:Boolean(t.is_completed),subt
 
 function PathSkeleton(){return <section className="journey-map journey-map--loading">{[0,1,2,3,4].map(i=><span className="journey-skeleton skeleton" style={{left:`${[50,27,50,73,50][i]}%`,top:90+i*155}} key={i}/>)}</section>}
 
-function Modal({children,onClose,wide=false}) { useEffect(()=>{const fn=e=>e.key==='Escape'&&onClose();document.addEventListener('keydown',fn);return()=>document.removeEventListener('keydown',fn)},[onClose]); return <div className="modal-wrap" role="dialog" aria-modal="true" onMouseDown={e=>e.target===e.currentTarget&&onClose()}><div className={`modal ${wide?'modal--wide':''}`}><button className="modal-close" onClick={onClose} aria-label="Close"><X/></button>{children}</div></div> }
+function Modal({children,onClose,wide=false}) { useEffect(()=>{const fn=e=>e.key==='Escape'&&onClose();document.addEventListener('keydown',fn);return()=>document.removeEventListener('keydown',fn)},[onClose]); return createPortal(<div className="modal-wrap" role="dialog" aria-modal="true" onMouseDown={e=>e.target===e.currentTarget&&onClose()}><div className={`modal ${wide?'modal--wide':''}`}><button className="modal-close" onClick={onClose} aria-label="Close"><X/></button>{children}</div></div>,document.body) }
 
 const milestoneStats = {
   gpa:{label:'New GPA',placeholder:'Enter your GPA',min:0,max:5,step:.01},
@@ -444,12 +453,12 @@ function Assessment({data,onClose}) {
 function EssayCoach({onClose}){const [prompt,setPrompt]=useState('');const [essay,setEssay]=useState('');const [feedback,setFeedback]=useState('');const [busy,setBusy]=useState(false);const analyze=async()=>{if(essay.trim().length<50)return;setBusy(true);try{setFeedback((await api('/api/analyze_essay',{method:'POST',body:JSON.stringify({essay_text:essay,essay_prompt:prompt||'a general college application essay'})})).feedback)}catch(e){setFeedback(e.message)}finally{setBusy(false)}};return <Modal onClose={onClose} wide><div className="modal-kicker">MENTICS ESSAY COACH</div><h2>Strengthen the essay without losing your voice.</h2><div className="essay-workspace"><label>Essay prompt<input value={prompt} onChange={e=>setPrompt(e.target.value)} placeholder="Common App prompt or supplemental question"/></label><label>Essay draft<textarea value={essay} onChange={e=>setEssay(e.target.value)} rows="12" maxLength="20000" placeholder="Paste your draft here..."/></label><button className="button button--primary" onClick={analyze} disabled={busy||essay.trim().length<50}>{busy?'Analyzing…':'Get structured feedback'} <Sparkles/></button>{feedback&&<div className="essay-feedback"><Markdown>{feedback}</Markdown></div>}</div></Modal>}
 
 function ChatPanel({open,onClose,category,onNewPath}) {
-  const [messages,setMessages]=useState([]);const [input,setInput]=useState('');const [busy,setBusy]=useState(false);const [historyError,setHistoryError]=useState('');const end=useRef(null)
+  const [messages,setMessages]=useState([]);const [input,setInput]=useState('');const [busy,setBusy]=useState(false);const [historyError,setHistoryError]=useState('');const scroller=useRef(null)
   useEffect(()=>{if(open&&messages.length===0){api(`/api/chat_history?category=${encodeURIComponent(category)}`).then(h=>setMessages(Array.isArray(h)&&h.length?h:[{role:'assistant',content:`I’m here with your ${category.toLowerCase()} path. Ask about any step, concept, or roadblock.`}])).catch(()=>{setHistoryError('I couldn’t restore the earlier conversation, but you can start a new one here.');setMessages([{role:'assistant',content:`I’m ready to help with your ${category.toLowerCase()} path.`}])})}},[open,category,messages.length])
-  useEffect(()=>end.current?.scrollIntoView({behavior:'smooth'}),[messages,busy])
+  useEffect(()=>{const node=scroller.current;if(node)node.scrollTo({top:node.scrollHeight,behavior:'smooth'})},[messages,busy])
   const send=async e=>{e.preventDefault();if(!input.trim()||busy)return;const next=[...messages,{role:'user',content:input.trim()}];setMessages(next);setInput('');setBusy(true);try{const r=await api(`/api/chat?category=${encodeURIComponent(category)}`,{method:'POST',body:JSON.stringify({history:next})});if(r.new_path){onNewPath(r.new_path);setMessages([...next,{role:'assistant',content:'Your new five-step path is ready. I used our conversation to shape it.'}])}else setMessages([...next,{role:'assistant',content:r.reply}])}catch(x){setMessages([...next,{role:'assistant',content:x.message}])}finally{setBusy(false)}}
   const reset=async()=>{try{await api('/api/reset_chat',{method:'POST',body:JSON.stringify({category})});setHistoryError('');setMessages([{role:'assistant',content:`Fresh start. What would you like help with on your ${category.toLowerCase()} path?`}])}catch(error){setHistoryError(error.message)}}
-  return <aside className={`chat-panel ${open?'chat-panel--open':''}`} aria-hidden={!open}><header><span><i><Sparkles/></i><b>Mentics guide</b><small>Present with your current path</small></span><div><button onClick={reset} aria-label="Reset chat"><RotateCcw/></button><button onClick={onClose} aria-label="Close chat"><X/></button></div></header>{historyError&&<div className="chat-notice" role="status">{historyError}</div>}<div className="chat-messages">{messages.map((m,i)=><div className={`chat-message chat-message--${m.role}`} key={i}>{m.role==='assistant'?<Markdown>{m.content}</Markdown>:m.content}</div>)}{busy&&<div className="chat-thinking"><i/><i/><i/></div>}<div ref={end}/></div><form onSubmit={send}><textarea value={input} onChange={e=>setInput(e.target.value)} onKeyDown={e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();send(e)}}} placeholder="Ask about your path…" rows={1}/><button disabled={!input.trim()||busy} aria-label="Send"><Send/></button></form><p>Mentics can make mistakes. Check important information.</p></aside>
+  return <aside className={`chat-panel ${open?'chat-panel--open':''}`} aria-hidden={!open}><header><span><i><Sparkles/></i><b>Mentics guide</b><small>Present with your current path</small></span><div><button onClick={reset} aria-label="Reset chat"><RotateCcw/></button><button onClick={onClose} aria-label="Close chat"><X/></button></div></header>{historyError&&<div className="chat-notice" role="status">{historyError}</div>}<div className="chat-messages" ref={scroller}>{messages.map((m,i)=><div className={`chat-message chat-message--${m.role}`} key={i}>{m.role==='assistant'?<Markdown>{m.content}</Markdown>:m.content}</div>)}{busy&&<div className="chat-thinking"><i/><i/><i/></div>}</div><form onSubmit={send}><textarea value={input} onChange={e=>setInput(e.target.value)} onKeyDown={e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();send(e)}}} placeholder="Ask about your path…" rows={1}/><button disabled={!input.trim()||busy} aria-label="Send"><Send/></button></form><p>Mentics can make mistakes. Check important information.</p></aside>
 }
 
 function PageIntro({kicker,title,copy,actions}) {
