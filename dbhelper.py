@@ -3,6 +3,43 @@
 import datetime
 import re
 import sqlite3
+from contextlib import contextmanager
+
+
+class DatabaseTransaction:
+    """Small transaction-scoped subset of DatabaseHandler's write API."""
+
+    def __init__(self, database, connection):
+        self.database = database
+        self.connection = connection
+
+    def insert(self, table_name, data):
+        table_name = self.database._identifier(table_name)
+        columns = self.database._columns(list(data))
+        placeholders = ", ".join(["?"] * len(data))
+        query = f"INSERT INTO {table_name} ({columns}) VALUES ({placeholders})"  # nosec B608
+        if self.database.is_postgres and table_name != "gamification_stats":
+            query += " RETURNING id"
+        cursor = self.connection.cursor()
+        cursor.execute(self.database._query(query), tuple(data.values()))
+        if self.database.is_postgres:
+            row = cursor.fetchone() if query.endswith("RETURNING id") else None
+            return row["id"] if row else None
+        return cursor.lastrowid
+
+    def update(self, table_name, data, where):
+        table_name = self.database._identifier(table_name)
+        data_keys = [self.database._identifier(key) for key in data]
+        where_keys = [self.database._identifier(key) for key in where]
+        set_clause = ", ".join(f"{key}=?" for key in data_keys)
+        where_clause = " AND ".join(f"{key}=?" for key in where_keys)
+        query = f"UPDATE {table_name} SET {set_clause} WHERE {where_clause}"  # nosec B608
+        cursor = self.connection.cursor()
+        cursor.execute(
+            self.database._query(query),
+            tuple(data.values()) + tuple(where.values()),
+        )
+        return cursor.rowcount
 
 
 class DatabaseHandler:
@@ -25,6 +62,19 @@ class DatabaseHandler:
         conn.row_factory = sqlite3.Row
         conn.execute("PRAGMA foreign_keys = ON")
         return conn
+
+    @contextmanager
+    def transaction(self):
+        """Commit all writes together, rolling every write back on failure."""
+        conn = self._connect()
+        try:
+            yield DatabaseTransaction(self, conn)
+            conn.commit()
+        except Exception:
+            conn.rollback()
+            raise
+        finally:
+            conn.close()
 
     def _query(self, query):
         if not self.is_postgres:

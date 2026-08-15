@@ -469,6 +469,40 @@ def _compact_chat_history(history):
     return normalized
 
 
+def _format_chat_history_for_prompt(history):
+    """Format the useful recent conversation without sending unbounded history."""
+    lines = []
+    for message in _compact_chat_history(history):
+        role = "Assistant" if message["role"] == "model" else "User"
+        lines.append(f"{role}: {message['parts'][0]['text']}")
+    return "\n".join(lines) or "No conversation history yet."
+
+
+def _is_path_regeneration_request(message):
+    """Recognize natural requests to replace the current five-step path."""
+    normalized = re.sub(r"\s+", " ", (message or "").strip().lower())
+    if not normalized:
+        return False
+
+    if re.fullmatch(
+        r"(?:please\s+)?(?:regenerate|rebuild|refresh)(?:\s+it)?(?:\s+(?:please|pls))?[.!?]*",
+        normalized,
+    ):
+        return True
+
+    path_noun = r"(?:path|plan|roadmap|tasks?|steps?)"
+    patterns = (
+        rf"\b(?:regenerate|rebuild|redo|remake|recreate|refresh|replace|refocus|tailor)\b.{{0,50}}\b{path_noun}\b",
+        rf"\b{path_noun}\b.{{0,40}}\b(?:regenerated|rebuilt|redone|remade|recreated|refreshed|replaced)\b",
+        rf"\b(?:change|update|revise|adjust|refocus|tailor)\b.{{0,35}}\b(?:my|the|this|these|current)?\s*{path_noun}\b",
+        rf"\b(?:make|build|create|generate|give)\b.{{0,45}}\b(?:new|fresh|different|another|five[- ]step)\b.{{0,30}}\b{path_noun}\b",
+        rf"\b(?:new|fresh|different|another|updated|revised)\s+(?:five[- ]step\s+)?{path_noun}\b",
+        rf"\b(?:make|turn)\b.{{0,20}}\b(?:my|the|this|current)\s+{path_noun}\b.{{0,35}}\b(?:focus|focused|about|centered|for)\b",
+        rf"\b(?:want|need)\b.{{0,25}}\b(?:my|the|this|current)\s+{path_noun}\b.{{0,35}}\b(?:focus|focused|about|centered|changed|different)\b",
+    )
+    return any(re.search(pattern, normalized) for pattern in patterns)
+
+
 def _generate_chat_reply(history, system_instruction):
     """Generate a concise mentor reply using only the useful recent context."""
     if gemini_client is None:
@@ -536,8 +570,18 @@ def _complete_five_step_plan(tasks, category):
             {"description": "Write a first personal-statement outline built around one specific experience and what changed because of it.", "reason": "A focused narrative foundation prevents a generic personal statement.", "type": "milestone", "stat_to_update": None, "category": "College Planning", "difficulty": "hard"},
         ],
     }
-    normalized = [task for task in (tasks or []) if isinstance(task, dict) and task.get("description")][:5]
-    seen = {task["description"].strip().lower() for task in normalized}
+    normalized = []
+    seen = set()
+    for task in tasks or []:
+        if not isinstance(task, dict) or not task.get("description"):
+            continue
+        description_key = task["description"].strip().lower()
+        if not description_key or description_key in seen:
+            continue
+        normalized.append(task)
+        seen.add(description_key)
+        if len(normalized) == 5:
+            break
     for fallback in defaults[category]:
         if len(normalized) == 5:
             break
@@ -602,6 +646,7 @@ def _get_test_prep_ai_tasks(strengths, weaknesses, test_focus, current_scores=No
         [f"- {task['description']}" for task in path_history.get('incomplete', [])]) or "None."
     latest_user_message = next((msg['content'] for msg in reversed(
         chat_history) if msg['role'] == 'user'), "N/A")
+    chat_history_str = _format_chat_history_for_prompt(chat_history)
 
     # --- Test Date Formatting ---
     test_date_info = "Not set."
@@ -664,7 +709,7 @@ def _get_test_prep_ai_tasks(strengths, weaknesses, test_focus, current_scores=No
         f"You are an elite AI test prep coach for Mentics. Your mission is to generate an intelligent, 5-step study plan tailored to the student's evolving needs, demonstrating a deep understanding of their history and context SPECIFICALY FOR THE DIGITAL SAT AND THE ACT.\n\n"
 
         f"## CRITICAL SCENARIO ANALYSIS\n"
-        f"1.  **Regeneration Request:** If the user's latest message asks for a new path, your highest priority is to generate one that addresses their immediate request.\n"
+        f"1.  **Regeneration Request:** This generation was initiated from the student's path conversation. Treat the latest user request as an explicit override: every task must directly reflect its requested focus, constraints, timing, or changed goal.\n"
         f"2.  **Post-Path Continuation:** If the student just completed all tasks, the new plan MUST be a logical next step (e.g., analyzing scores, planning long-term improvements).\n"
         f"3.  **Standard Generation:** Otherwise, generate a standard path that builds on their history.\n\n"
 
@@ -679,7 +724,8 @@ def _get_test_prep_ai_tasks(strengths, weaknesses, test_focus, current_scores=No
         f"- Estimated Weekly Study Time: {hours_per_week or 'Not specified'} hours\n\n"
 
         f"## HISTORICAL & CONVERSATIONAL CONTEXT\n"
-        f"- **Most Recent User Request:** '{latest_user_message}'\n"
+        f"- **Most Recent User Request (highest priority):** '{latest_user_message}'\n"
+        f"- **Recent Conversation:**\n{chat_history_str}\n"
         f"- Recently Completed Tasks: {completed_tasks_str}\n"
         f"- Incomplete Tasks from Previous Path: {incomplete_tasks_str}\n"
         f"- Historical Performance Data (Tracker):\n{stat_history}\n\n"
@@ -690,7 +736,8 @@ def _get_test_prep_ai_tasks(strengths, weaknesses, test_focus, current_scores=No
         f"## RECENT PRACTICE SPRINT PERFORMANCE (Incorrect Answers)\n"
         f"This shows specific questions the user recently got wrong on FOCUSED sprints. This is the most important data for identifying specific skill gaps.\n{sprint_results}\n\n"
 
-        f"# YOUR TASK: GENERATE THE NEW 5-STEP PLAN(for {focus_desc.upper()})\n"
+        f"# YOUR TASK: GENERATE EXACTLY 5 NEW STEPS (for {focus_desc.upper()})\n"
+        f"- Return exactly five unique tasks. Do not repeat an old task unless the student's latest request clearly requires it.\n"
         f"- **Focus on {focus_desc.upper()}:** All content, examples, and resources MUST be relevant to the chosen test format(s).\n"
         f"- **Task Format Logic (Crucial!):** You must differentiate between passive learning and active practice. \n"
         f"  - If a task involves **actively solving problems or answering questions or mastering a math concept or advancing/consolidating knowlege **, it MUST be a `practice_sprint`.\n"
@@ -1070,9 +1117,6 @@ def _generate_and_save_new_test_path(user_id, test_path_info, chat_history=None)
     quiz_results = _get_quiz_results_for_prompt(user_id)
     sprint_results = _get_sprint_results_for_prompt(user_id)
 
-    db.update("paths", {"is_active": False}, where={
-              "user_id": user_id, "category": "Test Prep", "is_active": True})
-
     tasks = _get_test_prep_ai_tasks(
         strengths=strengths,
         weaknesses=weaknesses,
@@ -1089,40 +1133,70 @@ def _generate_and_save_new_test_path(user_id, test_path_info, chat_history=None)
     )
 
     tasks = _complete_five_step_plan(tasks, "Test Prep")
+    if len(tasks) != 5:
+        raise ValueError("Path generation must produce exactly five usable tasks.")
 
     saved_tasks = []
-    for i, task in enumerate(tasks):
-        task_format = task.get("task_format", "link")
-        task_id = db.insert("paths", {
-            "user_id": user_id, "task_order": i + 1, "description": task.get("description"),
-            "reason": task.get("reason"), "type": task.get("type"), "stat_to_update": task.get("stat_to_update"),
-            "category": "Test Prep", "is_active": True, "is_completed": False, "task_format": task_format
+    with db.transaction() as transaction:
+        transaction.update("paths", {"is_active": False}, where={
+            "user_id": user_id, "category": "Test Prep", "is_active": True
         })
+        for i, task in enumerate(tasks):
+            task_format = task.get("task_format", "link")
+            task_data = {
+                "user_id": user_id, "task_order": i + 1,
+                "description": task.get("description"), "reason": task.get("reason"),
+                "type": task.get("type"), "stat_to_update": task.get("stat_to_update"),
+                "category": "Test Prep", "is_active": True,
+                "is_completed": False, "task_format": task_format,
+            }
+            task_id = transaction.insert("paths", task_data)
 
-        if task_format == 'quiz' and task.get('quiz_content'):
-            quiz_id = db.insert("quizzes", {
-                                "task_id": task_id, "title": task['quiz_content'].get("title", "Quiz")})
-            for q in task['quiz_content'].get("questions", []):
-                db.insert("quiz_questions", {"quiz_id": quiz_id, "question_text": q.get("question_text"), "options": json.dumps(
-                    q.get("options")), "correct_option": q.get("correct_option"), "explanation": q.get("explanation")})
-            db.update("paths", {"task_content_id": quiz_id},
-                      where={"id": task_id})
+            if task_format == 'quiz' and task.get('quiz_content'):
+                quiz_id = transaction.insert("quizzes", {
+                    "task_id": task_id,
+                    "title": task['quiz_content'].get("title", "Quiz"),
+                })
+                for question in task['quiz_content'].get("questions", []):
+                    transaction.insert("quiz_questions", {
+                        "quiz_id": quiz_id,
+                        "question_text": question.get("question_text"),
+                        "options": json.dumps(question.get("options")),
+                        "correct_option": question.get("correct_option"),
+                        "explanation": question.get("explanation"),
+                    })
+                transaction.update("paths", {"task_content_id": quiz_id}, where={"id": task_id})
 
-        elif task_format == 'practice_sprint' and task.get('sprint_content') and task.get('strategy_article'):
-            sprint_id = db.insert("practice_sprints", {
-                                  "task_id": task_id, "title": task['sprint_content'].get("title", "Practice Sprint")})
-            for q in task['sprint_content'].get("questions", []):
-                db.insert("sprint_questions", {"sprint_id": sprint_id, "question_text": q.get("question_text"), "options": json.dumps(
-                    q.get("options")), "correct_option": q.get("correct_option"), "explanation": q.get("explanation")})
-            article_id = db.insert("strategy_articles", {"task_id": task_id, "title": task['strategy_article'].get(
-                "title"), "content": task['strategy_article'].get("content")})
-            db.update("paths", {"task_content_id": sprint_id,
-                      "secondary_content_id": article_id}, where={"id": task_id})
+            elif task_format == 'practice_sprint' and task.get('sprint_content') and task.get('strategy_article'):
+                sprint_id = transaction.insert("practice_sprints", {
+                    "task_id": task_id,
+                    "title": task['sprint_content'].get("title", "Practice Sprint"),
+                })
+                for question in task['sprint_content'].get("questions", []):
+                    transaction.insert("sprint_questions", {
+                        "sprint_id": sprint_id,
+                        "question_text": question.get("question_text"),
+                        "options": json.dumps(question.get("options")),
+                        "correct_option": question.get("correct_option"),
+                        "explanation": question.get("explanation"),
+                    })
+                article_id = transaction.insert("strategy_articles", {
+                    "task_id": task_id,
+                    "title": task['strategy_article'].get("title"),
+                    "content": task['strategy_article'].get("content"),
+                })
+                transaction.update("paths", {
+                    "task_content_id": sprint_id,
+                    "secondary_content_id": article_id,
+                }, where={"id": task_id})
 
-        new_task_data = db.select_one("paths", where={"id": task_id})
-        saved_tasks.append({**new_task_data, "is_completed": False})
+            saved_tasks.append({**task_data, "id": task_id})
 
-    log_activity(user_id, 'path_generated', {'category': 'Test Prep'})
+        transaction.insert("activity_log", {
+            "user_id": user_id,
+            "activity_type": "path_generated",
+            "details": json.dumps({"category": "Test Prep"}),
+        })
     return saved_tasks
 
 
@@ -1205,9 +1279,9 @@ def _get_test_prep_ai_chat_response(history, user_stats, stat_history="", quiz_r
         f"This shows specific questions the user recently got wrong. Use this granular data to mentor them in their path."
 
         "## CORE COACHING DIRECTIVES (Your Rules of Engagement)\n"
-        "0.  **Initial Greeting**: Your very first message to the user *must* be a warm and encouraging welcome. It *must* also clearly state that they can type **'regenerate'** or **'new path'** at any time to get a new path based on your conversation.\n"
+        "0.  **Initial Greeting**: Your first reply must be a warm, concise welcome. Mention once that the student can ask naturally to regenerate, replace, or refocus their path and include the focus they want.\n"
         "1.  **Primary Goal: Path & App Support**: Your main purpose is to help the user with their current, active Path. Answer their questions about specific tasks, why they were assigned, and how to approach them. You must also be able to answer general questions about using the Mentics application's features as described above.\n"
-        "2.  **Path Regeneration Protocol**: If a user expresses that their goals have changed or they want a different approach, reiterate that they can use the regeneration commands.\n"
+        "2.  **Path Regeneration Protocol**: Path replacement requests are handled by Mentics before they reach this coaching prompt. Never claim a path changed unless the app confirms it. For exploratory discussion, help the student clarify the focus they would want in a replacement path.\n"
         "3.  **Provide High-Quality Resources**: When a student is stuck or asks for help, provide specific, reputable, and free resources using markdown links (e.g., `[Khan Academy](https://...)`, official practice test PDFs, specific educational YouTube videos).\n"
         "4.  **Actionable Focus**: Every response must provide a clear next step, a useful tip, or actionable guidance. Never leave the user wondering what to do next.\n"
         "5.  **Adaptive Response Length**: \n"
@@ -1253,8 +1327,7 @@ def _get_college_planning_ai_tasks(college_context, user_stats, path_history, ch
         [f"- {task['description']}" for task in path_history.get('completed', [])]) or "None."
     incomplete_tasks_str = "\n".join(
         [f"- {task['description']}" for task in path_history.get('incomplete', [])]) or "None."
-    chat_history_str = "\n".join(
-        [f"{msg['role'].capitalize()}: {msg['content']}" for msg in chat_history]) or "No conversation history yet."
+    chat_history_str = _format_chat_history_for_prompt(chat_history)
     latest_user_message = next((msg['content'] for msg in reversed(
         chat_history) if msg['role'] == 'user'), "N/A")
 
@@ -1264,7 +1337,7 @@ def _get_college_planning_ai_tasks(college_context, user_stats, path_history, ch
 
         f"## CRITICAL SCENARIO ANALYSIS (ACTION REQUIRED)\n"
         f"First, determine the student's current situation and choose your generation strategy:\n"
-        f"1.  **Regeneration Request:** If the most recent user message (see below) contains keywords like 'regenerate', 'new path', or expresses a significant change in plans (e.g., 'I want to apply to different schools now'), your **highest priority** is to generate a path that directly addresses that immediate request.\n"
+        f"1.  **Regeneration Request:** This generation was initiated from the student's path conversation. Treat the latest user request as an explicit override: every task must directly reflect its requested focus, constraints, deadlines, or changed goal.\n"
         f"2.  **Post-Path Continuation:** If the student has just completed all tasks in their previous path, the new plan MUST be a logical next step in the college planning process (e.g., moving from 'researching colleges' to 'drafting supplemental essays'). It should feel like a natural progression.\n"
         f"3.  **Standard Generation:** If neither of the above applies, generate a standard path that is appropriate for their grade level and builds upon their historical data.\n\n"
 
@@ -1283,7 +1356,8 @@ def _get_college_planning_ai_tasks(college_context, user_stats, path_history, ch
         f"- Full Conversation History: {chat_history_str}\n"
         f"- Historical Performance Data (Tracker):\n{stat_history}\n\n"
 
-        f"# YOUR TASK: GENERATE THE NEW 5-STEP ROADMAP\n"
+        f"# YOUR TASK: GENERATE EXACTLY 5 NEW STEPS\n"
+        f"- Return exactly five unique tasks. Do not repeat an old task unless the student's latest request clearly requires it.\n"
         f"- **Synthesize, Don't Just List:** Your primary function is to connect the student's grade, goals, and history to create hyper-specific tasks. Generic tasks like 'Work on your essay' are forbidden.\n"
         f"- **Extreme Specificity & Actionable Verbs:** Descriptions must be granular and start with a strong verb (e.g., 'Draft', 'Research', 'Finalize'). Instead of 'Explore majors', generate 'Research the core curriculum for a Computer Science major at {college_context.get('target_colleges', 'one of your target schools')} to see if it aligns with your interests.'\n"
         f"- **Incorporate Multiple Formats:** The plan must include a mix of task types. Include at least one **Resource Task** (e.g., 'Watch this guide on financial aid'), one **Action Task** (e.g., 'Draft your Common App activity list'), and one **Strategic/Review Task** (e.g., 'Analyze the supplemental essay prompts for your target schools and categorize them by theme').\n"
@@ -1370,9 +1444,9 @@ def _get_college_planning_ai_chat_response(history, user_stats, stat_history="",
 
 
         "## CORE COACHING DIRECTIVES (Your Rules of Engagement)\n"
-        "0.  **Initial Greeting**: Your very first message to the user *must* be a warm and encouraging welcome. It *must* also clearly state that they can type **'regenerate'** or **'new path'** at any time to get a new path based on your conversation.\n"
+        "0.  **Initial Greeting**: Your first reply must be a warm, concise welcome. Mention once that the student can ask naturally to regenerate, replace, or refocus their path and include the focus they want.\n"
         "1.  **Primary Goal: Path & App Support**: Your main purpose is to help the user with their current, active Path. Answer their questions about specific tasks, why they were assigned, and how to approach them. You must also be able to answer general questions about using the Mentics application's features as described above.\n"
-        "2.  **Path Regeneration Protocol**: If a user expresses that their goals have changed or they want a different approach, reiterate that they can use the regeneration commands.\n"
+        "2.  **Path Regeneration Protocol**: Path replacement requests are handled by Mentics before they reach this coaching prompt. Never claim a path changed unless the app confirms it. For exploratory discussion, help the student clarify the focus they would want in a replacement path.\n"
         "3.  **Provide High-Quality Resources**: When a student is stuck or needs guidance, provide specific, reputable, and free resources using markdown links (e.g., links to the Common App, financial aid websites like FAFSA, or helpful articles on essay writing).\n"
         "4.  **Actionable Guidance**: Every response must give the student a clear next step, a valuable resource, or a concrete action to take. Never leave the user wondering what to do next.\n"
         "5.  **Adaptive Response Length**:\n"
@@ -1394,51 +1468,56 @@ def _get_college_planning_ai_chat_response(history, user_stats, stat_history="",
 def _generate_and_save_new_college_path(user_id, college_context, chat_history=None):
     """Gathers all context, generates, and saves a new college planning path."""
     chat_history = chat_history or []
-    try:
-        user_record = db.select("users", where={"id": user_id})
-        if not user_record:
-            raise ValueError(f"User with ID {user_id} not found.")
-        user_stats = json.loads(user_record[0]['stats'])
+    user_record = db.select_one("users", where={"id": user_id})
+    if not user_record:
+        raise ValueError(f"User with ID {user_id} not found.")
+    user_stats = json.loads(user_record['stats'])
 
-        all_college_tasks = db.select(
-            "paths", where={"user_id": user_id, "category": "College Planning"})
-        path_history = {
-            "completed": [task for task in all_college_tasks if task['is_completed']],
-            "incomplete": [task for task in all_college_tasks if not task['is_completed']]
-        }
+    all_college_tasks = db.select(
+        "paths", where={"user_id": user_id, "category": "College Planning"})
+    path_history = {
+        "completed": [task for task in all_college_tasks if task['is_completed']],
+        "incomplete": [task for task in all_college_tasks if not task['is_completed']],
+    }
+    stat_history = _get_stat_history_for_prompt(user_id)
+    tasks = _complete_five_step_plan(
+        _get_college_planning_ai_tasks(
+            college_context, user_stats, path_history, chat_history, stat_history
+        ),
+        "College Planning",
+    )
+    if len(tasks) != 5:
+        raise ValueError("Path generation must produce exactly five usable tasks.")
 
-        # Fetch tracker data
-        stat_history = _get_stat_history_for_prompt(user_id)
+    saved_tasks = []
+    with db.transaction() as transaction:
+        transaction.update("paths", {"is_active": False}, where={
+            "user_id": user_id,
+            "category": "College Planning",
+            "is_active": True,
+        })
+        for index, task in enumerate(tasks):
+            path_data = {
+                "user_id": user_id,
+                "task_order": index + 1,
+                "description": task.get("description"),
+                "reason": task.get("reason"),
+                "type": task.get("type"),
+                "stat_to_update": task.get("stat_to_update"),
+                "category": "College Planning",
+                "is_active": True,
+                "is_completed": False,
+                "task_format": task.get("task_format", "link"),
+            }
+            task_id = transaction.insert("paths", path_data)
+            saved_tasks.append({**task, **path_data, "id": task_id})
 
-        db.update("paths", {"is_active": False}, where={
-                  "user_id": user_id, "category": "College Planning", "is_active": True})
-
-        tasks = _get_college_planning_ai_tasks(
-            college_context, user_stats, path_history, chat_history, stat_history)
-
-        tasks = _complete_five_step_plan(tasks, "College Planning")
-
-        if not tasks or len(tasks) == 0:
-            raise ValueError(
-                "AI task generation did not return the expected tasks.")
-
-        saved_tasks = []
-        for i, task_data in enumerate(tasks):
-            task_id = db.insert("paths", {
-                "user_id": user_id, "task_order": i + 1, "description": task_data.get("description"),
-                "reason": task_data.get("reason"), "type": task_data.get("type"), "stat_to_update": task_data.get("stat_to_update"),
-                "category": "College Planning", "is_active": True, "is_completed": False
-            })
-            saved_tasks.append(
-                {**task_data, "id": task_id, "is_completed": False})
-
-        # LOGGING
-        log_activity(user_id, 'path_generated', {
-                     'category': 'College Planning'})
-        return saved_tasks
-    except Exception as e:
-        print(f"Error in _generate_and_save_new_college_path: {e}")
-        return []
+        transaction.insert("activity_log", {
+            "user_id": user_id,
+            "activity_type": "path_generated",
+            "details": json.dumps({"category": "College Planning"}),
+        })
+    return saved_tasks
 
 
 @app.route("/dashboard/tracker")
@@ -2373,14 +2452,20 @@ def api_tasks(user):
                 "user_id": user_id, "category": category})
             chat_history = json.loads(
                 chat_record_list[0]['history']) if chat_record_list else []
-            if category == 'College Planning':
-                college_context = stats.get("college_path", {})
-                tasks = _generate_and_save_new_college_path(
-                    user_id, college_context, chat_history)
-            else:
-                test_path_info = stats.get("test_path", {})
-                tasks = _generate_and_save_new_test_path(
-                    user_id, test_path_info, chat_history)
+            try:
+                if category == 'College Planning':
+                    college_context = stats.get("college_path", {})
+                    tasks = _generate_and_save_new_college_path(
+                        user_id, college_context, chat_history)
+                else:
+                    test_path_info = stats.get("test_path", {})
+                    tasks = _generate_and_save_new_test_path(
+                        user_id, test_path_info, chat_history)
+            except Exception:
+                app.logger.exception("Path generation failed for user %s", user_id)
+                return jsonify({
+                    "error": "I couldn't generate a complete five-step path. Your current path is unchanged; please try again."
+                }), 502
             return jsonify(tasks)
 
         if active_path:
@@ -2551,36 +2636,53 @@ def api_chat(user):
 
     if not history or (len(history) == 1 and history[0]['role'] == 'user' and history[0]['content'] == 'INITIAL_MESSAGE'):
         history = []
+    elif history[-1]['role'] != 'user':
+        return jsonify({"error": "The latest chat message must be from the user."}), 400
 
-    # Fetch tracker data for chat context
-    stat_history = _get_stat_history_for_prompt(user_id)
+    user_message = next((
+        message['content'] for message in reversed(history)
+        if message['role'] == 'user'
+    ), "")
+    if _is_path_regeneration_request(user_message):
+        try:
+            if category == 'College Planning':
+                college_context = stats.get("college_path", {})
+                new_tasks = _generate_and_save_new_college_path(
+                    user_id, college_context, chat_history=history)
+            else:
+                test_path_info = stats.get("test_path", {})
+                new_tasks = _generate_and_save_new_test_path(
+                    user_id, test_path_info, chat_history=history)
+            if len(new_tasks) != 5:
+                raise ValueError("Regeneration did not save exactly five tasks.")
+        except Exception:
+            app.logger.exception(
+                "Chat path regeneration failed for user %s (%s)", user_id, category
+            )
+            return jsonify({
+                "error": "I couldn't generate a complete five-step path. Your current path is unchanged; please try again."
+            }), 502
 
-    user_message = history[-1]['content'].lower() if history else ""
-    regeneration_phrases = (
-        "regenerate my path", "regenerate the path", "generate a new path",
-        "build a new path", "rebuild my path", "change my path", "new path",
-    )
-    if any(phrase in user_message for phrase in regeneration_phrases):
-        if category == 'College Planning':
-            college_context = stats.get("college_path", {})
-            new_tasks = _generate_and_save_new_college_path(
-                user_id, college_context, chat_history=history)
-        else:
-            test_path_info = stats.get("test_path", {})
-            new_tasks = _generate_and_save_new_test_path(
-                user_id, test_path_info, chat_history=history)
-
-        if history:
-            history.append(
-                {"role": "assistant", "content": "I've generated a new path for you based on our conversation."})
-
+        reply = "Your new five-step path is ready. I shaped it around your latest request and our conversation."
+        history.append({"role": "assistant", "content": reply})
+        try:
             db.upsert("chat_conversations", {
                 "user_id": user_id,
                 "category": category,
                 "history": json.dumps(history)
             }, conflict_target=["user_id", "category"])
+        except Exception:
+            # The path is already committed. A history-write failure should not
+            # turn a successful regeneration into a misleading client error.
+            app.logger.exception(
+                "Path regenerated but chat history could not be saved for user %s",
+                user_id,
+            )
+        return jsonify({"new_path": new_tasks, "reply": reply})
 
-        return jsonify({"new_path": new_tasks})
+    # Fetch tracker data only for regular coaching replies. Regeneration already
+    # gathers the richer task, assessment, and tracker context it needs.
+    stat_history = _get_stat_history_for_prompt(user_id)
 
     if category == 'College Planning':
         reply = _get_college_planning_ai_chat_response(
