@@ -138,6 +138,7 @@ def init_db():
         "reason": "TEXT"
     })
     db.add_column("paths", "task_format", "TEXT DEFAULT 'link'")
+    db.add_column("paths", "is_skipped", "BOOLEAN DEFAULT FALSE")
     db.add_column("paths", "task_content_id", "INTEGER")
 
     db.create_table("subtasks", {
@@ -620,41 +621,54 @@ def _get_sprint_results_for_prompt(user_id):
     return "\n".join(summary)
 
 
-def build_strategy_article(skill, weakness_note):
-    """Create a teaching guide that prepares a student to solve the sprint or quiz confidently."""
-    skill_name = (skill or "your target skill").strip()
-    if not skill_name:
-        skill_name = "your target skill"
+def _derive_skill_name(description, weakness_hint=""):
+    text = (description or "").strip()
+    if not text:
+        text = (weakness_hint or "target skill").strip()
+    cleaned = re.sub(r"^(Practice Sprint|Sprint|Quiz|Review|Strategy|Task)\s*[:\-]\s*", "", text, flags=re.I)
+    cleaned = re.sub(r"\b(?:for|on|about)\b.*$", "", cleaned, flags=re.I)
+    cleaned = cleaned.strip(" -:;.")
+    if not cleaned:
+        cleaned = (weakness_hint or "target skill").strip()
+    return cleaned[:120] or "target skill"
+
+
+def build_strategy_article(skill, weakness_note, task_description=""):
+    """Create a task-specific teaching guide that prepares a student to solve the sprint or quiz confidently."""
+    skill_name = (task_description or skill or "your target skill").strip() or "your target skill"
+    if skill and skill_name == "your target skill":
+        skill_name = skill
     title = f"Strategies for {skill_name}"
     weakness_text = (weakness_note or "This skill needs a systematic approach, not memorization.").strip()
+    focus_line = skill_name if skill_name and skill_name.lower() != "your target skill" else "this skill"
 
     content = f"""# {title}
 
 ## Why this matters
-This skill shows up repeatedly on the SAT and ACT, and it is usually not a random question type. The main goal is to recognize the pattern quickly, choose a reliable method, and then check whether the answer makes sense.
+This sprint is built around {focus_line}. The goal is not to memorize a random trick. It is to recognize the pattern, choose the right approach, and then verify the answer before moving on.
 
 A lot of mistakes happen when students rush the setup, skip the check step, or confuse a concept with a similar-looking idea. If you slow down just enough to identify the pattern, this topic becomes much more predictable.
 
 > Focus point: {weakness_text}
 
 ## Step 1: Identify the structure before solving
-Start by reading the question in chunks and asking: What is the problem really asking for? Are there clues that show a special rule, formula, or relationship?
+Read the prompt in chunks and ask: What is the problem really asking for? Are there clues that show a special rule, formula, relationship, or reasoning pattern?
 
-For this skill, the fastest route is to avoid solving immediately and instead classify the task:
-- Is this about a pattern, a relationship, a system, or a word/grammar rule?
-- Can the problem be solved by plugging in values, rewriting an expression, or comparing choices?
-- Is there a hidden trap such as a sign error, a unit mistake, or a missing constraint?
+For {focus_line}, the fastest route is to avoid solving immediately and instead classify the task:
+- Is this a pattern question, a relationship question, a system question, or a word/grammar rule?
+- Can the problem be solved by rewriting the information, plugging in values, comparing choices, or identifying a trap?
+- Is there a hidden constraint such as a sign change, unit issue, or a restriction like "positive" or "integer"?
 
 If you can name the structure, the next step is much easier.
 
-## Step 2: Use a method you can repeat
+## Step 2: Use a repeatable method
 Do not invent a new approach every time. Use one reliable routine:
 1. Rewrite the information in simpler form.
 2. Identify the key rule or relationship.
 3. Solve in the most direct way possible.
-4. Check if your answer fits the original prompt.
+4. Check whether the result fits the original question.
 
-This routine matters because many mistakes are not logic problems; they are process problems. Students often skip the check step or change the model mid-solution.
+This routine matters because most mistakes are process mistakes, not concept mistakes. Students often skip the check step or change the model halfway through.
 
 ## Step 3: Watch for common traps
 ### Common traps
@@ -662,7 +676,7 @@ This routine matters because many mistakes are not logic problems; they are proc
 - Ignoring a restriction such as "positive," "integer," or "greater than zero."
 - Solving a step correctly but forgetting to return to the original question.
 - Overreading the wording and picking a more complicated method than necessary.
-- Making sign, fraction, or variable mistakes in the middle of the process.
+- Making sign, fraction, variable, or wording mistakes in the middle of the process.
 
 When you see an answer that looks too easy or too complicated, pause and ask whether it matches the exact wording of the question.
 
@@ -677,9 +691,9 @@ Before you answer, ask yourself:
 If you can answer those questions, you are usually ready to move on.
 
 ## Worked example
-Use this pattern on a sample question:
+Use this pattern on a sample question built around {focus_line}:
 
-"A student is asked to solve a problem involving {skill_name}. The correct approach is to recognize the relationship, rewrite the information clearly, and solve with the shortest reliable method."
+"A student is asked to solve a problem involving {focus_line}. The correct approach is to recognize the relationship, rewrite the information clearly, and solve with the shortest reliable method."
 
 Here is the process:
 1. Read the prompt and underline the exact task.
@@ -701,7 +715,7 @@ Before you submit an answer, do this checklist:
 If you can do that, you are ready for the sprint or quiz.
 
 ## Final takeaway
-The best way to improve this topic is to repeat the same process on every question:
+The best way to improve {focus_line} is to repeat the same process on every question:
 - identify the structure
 - choose the right method
 - check the result
@@ -712,7 +726,37 @@ That habit turns a hard topic into a readable pattern. Once you practice it cons
     return {"title": title, "content": content}
 
 
-def _get_test_prep_ai_tasks(strengths, weaknesses, test_focus, current_scores=None, desired_scores=None, test_date_str=None, hours_per_week=None, chat_history=None, path_history=None, stat_history="", quiz_results="", sprint_results=""):
+def _get_path_progress_context(user_id, category):
+    """Summarize how far the user has progressed in the active path so regeneration can build from the right place."""
+    tasks = db.select(
+        "paths",
+        where={"user_id": user_id, "category": category},
+        order_by="task_order ASC"
+    )
+    if not tasks:
+        return "The student has no previous path yet, so generate a fresh five-step path."
+
+    completed = [task for task in tasks if task.get("is_completed")]
+    skipped = [task for task in tasks if task.get("is_skipped")]
+    incomplete = [task for task in tasks if not task.get("is_completed")]
+
+    if not incomplete:
+        return (
+            f"The student completed the entire prior {category} path "
+            f"({len(completed)} tasks). Build a logical continuation rather than repeating the same steps."
+        )
+
+    next_task_order = min(task["task_order"] for task in incomplete)
+    next_task = next((task for task in tasks if task["task_order"] == next_task_order), None)
+    next_desc = next_task.get("description", "the next path step") if next_task else "the next path step"
+    return (
+        f"The student has completed {len(completed)} out of {len(tasks)} tasks in this {category} path, "
+        f"with {len(skipped)} skipped steps. The next uncompleted item is task {next_task_order}: '{next_desc}'. "
+        "Build the next five-step path as a continuation from this point, not a duplicate of the previous plan."
+    )
+
+
+def _get_test_prep_ai_tasks(strengths, weaknesses, test_focus, current_scores=None, desired_scores=None, test_date_str=None, hours_per_week=None, chat_history=None, path_history=None, stat_history="", quiz_results="", sprint_results="", path_progress_context=""):
     """Generates hyper-intelligent, adaptive test prep tasks, now including interactive Practice Sprints, Strategy Articles, and better context."""
 
     current_scores = current_scores or {}
@@ -822,6 +866,7 @@ def _get_test_prep_ai_tasks(strengths, weaknesses, test_focus, current_scores=No
         f"## HISTORICAL & CONVERSATIONAL CONTEXT\n"
         f"- **Most Recent User Request (highest priority):** '{latest_user_message}'\n"
         f"- **Recent Conversation:**\n{chat_history_str}\n"
+        f"- **Path Progress Context:** {path_progress_context or 'Not provided.'}\n"
         f"- Recently Completed Tasks: {completed_tasks_str}\n"
         f"- Incomplete Tasks from Previous Path: {incomplete_tasks_str}\n"
         f"- Historical Performance Data (Tracker):\n{stat_history}\n\n"
@@ -946,8 +991,8 @@ def _get_test_prep_ai_tasks(strengths, weaknesses, test_focus, current_scores=No
                                                                                                'C', 'D'], 'correct_option': 0, 'explanation': f"Key steps for {skill}."} for qi in range(5)]
             return {'title': f"Practice Sprint: {skill}", 'questions': questions}
 
-        def make_strategy_article(skill, weakness_note):
-            return build_strategy_article(skill, weakness_note)
+        def make_strategy_article(skill, weakness_note, task_description=""):
+            return build_strategy_article(skill, weakness_note, task_description)
 
         def make_mock_quiz(topic):
             questions = [{
@@ -987,21 +1032,21 @@ def _get_test_prep_ai_tasks(strengths, weaknesses, test_focus, current_scores=No
                         topic = (weaknesses.split(',')[0].strip() if weaknesses else '') or desc.split(
                             ' on ')[-1].split('.')[0][:40].strip() or 'strategies'
                         article = t.get('strategy_article')
+                        task_skill = _derive_skill_name(desc, topic)
                         if not article or not article.get('content') or len(article.get('content', '')) < 1200:
                             t['strategy_article'] = make_strategy_article(
-                                topic, t.get('reason') or f"Focus on {topic}.")
+                                task_skill, t.get('reason') or f"Focus on {topic}.", desc)
                         t.pop('sprint_content', None)
 
                 if (not skip_practice) and (t['task_format'] == 'practice_sprint' or looks_like_practice(desc)):
                     t['task_format'] = 'practice_sprint'
-                    skill = (weaknesses.split(',')[0].strip() if weaknesses else '') or desc.split(
-                        ' on ')[-1].split('.')[0][:40].strip() or 'targeted skill'
+                    skill = _derive_skill_name(desc, weaknesses)
                     if not t.get('sprint_content'):
                         t['sprint_content'] = make_mock_sprint(skill)
                     article = t.get('strategy_article')
                     if not article or not article.get('content') or len(article.get('content', '')) < 1200:
                         t['strategy_article'] = make_strategy_article(
-                            skill, t.get('reason') or f"Target {skill}.")
+                            skill, t.get('reason') or f"Target {skill}.", desc)
 
                 desc_l = desc.lower()
                 if t.get('task_format') == 'quiz' or any(k in desc_l for k in ('quiz', 'cumulative')):
@@ -1235,19 +1280,21 @@ def _generate_and_save_new_test_path(user_id, test_path_info, chat_history=None)
     quiz_results = _get_quiz_results_for_prompt(user_id)
     sprint_results = _get_sprint_results_for_prompt(user_id)
 
+    path_progress_context = _get_path_progress_context(user_id, "Test Prep")
     tasks = _get_test_prep_ai_tasks(
         strengths=strengths,
         weaknesses=weaknesses,
-        test_focus=test_focus,  # Pass the new focus
-        current_scores=current_scores,  # Pass current scores
-        desired_scores=desired_scores,  # Pass desired scores
-        test_date_str=test_date_str,  # Pass test date
-        hours_per_week=hours_per_week,  # Pass hours
+        test_focus=test_focus,
+        current_scores=current_scores,
+        desired_scores=desired_scores,
+        test_date_str=test_date_str,
+        hours_per_week=hours_per_week,
         chat_history=chat_history,
         path_history=path_history,
         stat_history=stat_history,
         quiz_results=quiz_results,
-        sprint_results=sprint_results
+        sprint_results=sprint_results,
+        path_progress_context=path_progress_context,
     )
 
     tasks = _complete_five_step_plan(tasks, "Test Prep")
@@ -2602,6 +2649,7 @@ def api_tasks(user):
                     "description": r['description'],
                     "reason": r['reason'],
                     "is_completed": bool(r['is_completed']),
+                    "is_skipped": bool(r.get('is_skipped', False)),
                     "type": r['type'],
                     "stat_to_update": r['stat_to_update'],
                     "due_date": r['due_date'],
@@ -2650,6 +2698,50 @@ def get_quiz(user, task_id):
     })
 
 
+@app.route('/api/skip_task', methods=['POST'])
+@login_required
+def api_skip_task(user):
+    user_id = user.data['id']
+    data = request.get_json(silent=True) or {}
+    task_id = data.get("taskId")
+
+    if not task_id:
+        return jsonify({"success": False, "error": "A task ID is required."}), 400
+
+    task_info = db.select_one("paths", where={
+        "id": task_id, "user_id": user_id, "is_active": True
+    })
+    if not task_info:
+        return jsonify({"success": False, "error": "Task not found."}), 404
+    if task_info['is_completed']:
+        return jsonify({"success": True, "already_completed": True})
+
+    blocked = db.execute_for_one(
+        """SELECT id FROM paths
+           WHERE user_id=? AND category=? AND is_active=True
+             AND task_order<? AND is_completed=False LIMIT 1""",
+        (user_id, task_info['category'], task_info['task_order'])
+    )
+    if blocked:
+        return jsonify({"success": False, "error": "Complete the earlier path step first."}), 409
+
+    claimed = db.execute_write(
+        "UPDATE paths SET is_completed=?, is_skipped=? WHERE id=? AND user_id=? AND is_completed=?",
+        (True, True, task_id, user_id, False)
+    )
+    if not claimed:
+        return jsonify({"success": True, "already_completed": True})
+
+    description = task_info['description']
+    category = task_info['category']
+    log_activity(user_id, 'task_skipped', {
+        'description': description,
+        'category': category,
+        'task_format': task_info.get('task_format')
+    })
+    return jsonify({"success": True, "skipped": True})
+
+
 @app.route("/api/update_task_status", methods=['POST'])
 @login_required
 def api_update_task_status(user):
@@ -2658,7 +2750,7 @@ def api_update_task_status(user):
     status = data.get("status")
     task_id = data.get("taskId")
 
-    if status != 'complete' or not task_id:
+    if status not in {'complete', 'skip'} or not task_id:
         return jsonify({"success": False, "error": "A valid task and status are required."}), 400
     task_info = db.select_one("paths", where={
         "id": task_id, "user_id": user_id, "is_active": True
@@ -2675,9 +2767,22 @@ def api_update_task_status(user):
     )
     if blocked:
         return jsonify({"success": False, "error": "Complete the earlier path step first."}), 409
+    if status == 'skip':
+        claimed = db.execute_write(
+            "UPDATE paths SET is_completed=?, is_skipped=? WHERE id=? AND user_id=? AND is_completed=?",
+            (True, True, task_id, user_id, False)
+        )
+        if claimed:
+            description = task_info['description']
+            category = task_info['category']
+            log_activity(user_id, 'task_skipped', {
+                         'description': description, 'category': category, 'task_format': task_info.get('task_format')})
+            return jsonify({"success": True, "skipped": True})
+        return jsonify({"success": True, "already_completed": True})
+
     claimed = db.execute_write(
-        "UPDATE paths SET is_completed=? WHERE id=? AND user_id=? AND is_completed=?",
-        (True, task_id, user_id, False)
+        "UPDATE paths SET is_completed=?, is_skipped=? WHERE id=? AND user_id=? AND is_completed=?",
+        (True, False, task_id, user_id, False)
     )
     if claimed:
         description = task_info['description']
