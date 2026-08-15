@@ -677,7 +677,7 @@ def _derive_skill_name(description, weakness_hint=""):
 
 
 def build_strategy_article(skill, weakness_note, task_description=""):
-    """Create a task-specific teaching guide that prepares a student to solve the sprint or quiz confidently."""
+    """Create a concrete, teach-first strategy guide for a specific SAT/ACT math or English skill."""
     candidate_skill = _derive_skill_name(task_description or skill, skill)
     if skill and _derive_skill_name(skill, task_description) and len(_derive_skill_name(skill, task_description)) > len(candidate_skill):
         candidate_skill = _derive_skill_name(skill, task_description)
@@ -688,86 +688,135 @@ def build_strategy_article(skill, weakness_note, task_description=""):
     weakness_text = (weakness_note or "This skill needs a systematic approach, not memorization.").strip()
     focus_line = skill_name if skill_name and skill_name.lower() != "your target skill" else "this skill"
 
+    lower_skill = skill_name.lower()
+    if any(k in lower_skill for k in ["equation", "algebra", "function", "graph", "geometry", "slope", "quadratic", "ratio", "fraction", "probability", "percent", "angle", "linear", "inequality", "polynomial", "exponent", "system", "statistics"]):
+        strategy_type = "math"
+        sample_prompt = (
+            "Example: A line passes through (2, 5) and (6, 13). What is the slope?"
+            " Step 1: label the points, Step 2: use slope = (y2 - y1)/(x2 - x1), "
+            "Step 3: compute (13 - 5)/(6 - 2) = 8/4 = 2, Step 4: check that the rise and run make sense."
+        )
+        checklist = [
+            "Did I identify the actual relationship or formula being tested?",
+            "Did I define the variables and units before solving?",
+            "Did I write one clean equation instead of trying to reason in my head?",
+            "Did I check whether the answer is reasonable for the context?",
+        ]
+        core_message = "Math questions reward structure. The fastest way to improve is to stop treating every question like a fresh puzzle and instead identify the exact relationship, formula, or pattern the question is hiding."
+    elif any(k in lower_skill for k in ["grammar", "punctuation", "sentence", "verb", "pronoun", "transition", "vocabulary", "reading", "passage", "rhetoric", "inference", "evidence", "essay", "word", "clause", "modifier", "usage"]):
+        strategy_type = "english"
+        sample_prompt = (
+            "Example: 'Because the team had practiced all week, they were ready for the game.' "
+            "The best strategy is to look at the meaning, the grammar structure, and the clue words: 'because' signals a cause, and the sentence needs a clear connection between the cause and the result."
+        )
+        checklist = [
+            "Did I identify the grammar or meaning issue before choosing an answer?",
+            "Did I read the sentence around the blank instead of only the blank itself?",
+            "Did I test the answer by replacing it in context and asking, 'Does this sound precise and logical'?",
+            "Did I eliminate trap answers that are grammatically possible but meaningfully wrong?",
+        ]
+        core_message = "English questions reward precision of meaning. The best students do not guess from the blank alone; they read the surrounding sentence, check the structure, and choose the answer that fits both grammar and logic."
+    else:
+        strategy_type = "mixed"
+        sample_prompt = (
+            "Example: Translate the problem into the smallest possible version you can manage, then choose the method that matches the structure you see. "
+            "Do not rely on what feels familiar—match the task to the rule."
+        )
+        checklist = [
+            "Did I isolate the core idea instead of getting distracted by extra wording?",
+            "Did I choose the shortest method that still matches the task?",
+            "Did I check whether the answer makes sense in context?",
+            "Did I avoid a trap answer that looks reasonable but misses the actual requirement?",
+        ]
+        core_message = "The skill is not about guessing what the test wants; it is about noticing the pattern quickly and applying one reliable process every time."
+
     content = f"""# {title}
 
 ## Why this matters
-This sprint is built around {focus_line}. The goal is not to memorize a random trick. It is to recognize the pattern, choose the right approach, and then verify the answer before moving on.
+{core_message}
 
-A lot of mistakes happen when students rush the setup, skip the check step, or confuse a concept with a similar-looking idea. If you slow down just enough to identify the pattern, this topic becomes much more predictable.
+This sprint is built around {focus_line}, and the goal is to make this skill feel systematic instead of random. Students usually struggle not because they are incapable, but because they do not slow down enough to identify the exact pattern the question is testing.
 
 > Focus point: {weakness_text}
 
-## Step 1: Identify the structure before solving
-Read the prompt in chunks and ask: What is the problem really asking for? Are there clues that show a special rule, formula, relationship, or reasoning pattern?
+## Step 1: Define what the question is really asking
+Before you start solving, stop and classify the task.
 
-For {focus_line}, the fastest route is to avoid solving immediately and instead classify the task:
-- Is this a pattern question, a relationship question, a system question, or a word/grammar rule?
-- Can the problem be solved by rewriting the information, plugging in values, comparing choices, or identifying a trap?
-- Is there a hidden constraint such as a sign change, unit issue, or a restriction like "positive" or "integer"?
+- What is the core skill: identifying a relationship, simplifying an expression, choosing the strongest evidence, correcting grammar, or interpreting meaning?
+- What is the question actually asking for: a value, a comparison, a best explanation, a rule, or a sentence rewrite?
+- What is the trap: a misleading answer choice, a hidden constraint, or a detailed sentence that sounds correct but does not match the exact requirement?
 
-If you can name the structure, the next step is much easier.
+If you can name the structure first, the rest is much easier.
 
 ## Step 2: Use a repeatable method
-Do not invent a new approach every time. Use one reliable routine:
-1. Rewrite the information in simpler form.
-2. Identify the key rule or relationship.
-3. Solve in the most direct way possible.
-4. Check whether the result fits the original question.
+For {focus_line}, use the same process every time:
+1. Rewrite the information in the simplest form possible.
+2. Identify the rule, pattern, or grammar principle that matters most.
+3. Solve with the cleanest method available, not the most complicated one.
+4. Check the answer against the exact wording of the prompt.
+5. Eliminate wrong answers that are close but not actually correct.
 
-This routine matters because most mistakes are process mistakes, not concept mistakes. Students often skip the check step or change the model halfway through.
+A lot of missed questions happen because students either jump to a method too early or never check whether their final answer fits the prompt.
 
-## Step 3: Watch for common traps
-### Common traps
-- Treating a phrase or symbol as a literal match when the real structure is different.
-- Ignoring a restriction such as "positive," "integer," or "greater than zero."
-- Solving a step correctly but forgetting to return to the original question.
-- Overreading the wording and picking a more complicated method than necessary.
-- Making sign, fraction, variable, or wording mistakes in the middle of the process.
+## Step 3: What to look for in this skill
+When you are working on {focus_line}, pay attention to these clues:
+- Keywords that signal a structure: compare, estimate, interpret, prove, rewrite, best supports, simplest form, equivalent, most likely, least likely.
+- Hidden constraints: units, time, percentages, pronouns, commas, transitions, sentence boundaries, or cause-and-effect logic.
+- Answer-choice traps: answers that sound logical but are too broad, too specific, too absolute, or ignore the text around the blank.
 
-When you see an answer that looks too easy or too complicated, pause and ask whether it matches the exact wording of the question.
+This is where strong test-taking becomes different from "good guessing." Strong students are reading for signal, not just trying to finish quickly.
 
-## Step 4: Build a quick decision checklist
-Before you answer, ask yourself:
-- Did I identify the actual type of problem?
-- Did I use the correct rule or relationship?
-- Did I eliminate the obvious trap?
-- Does my answer fit the context and units?
-- Can I explain my choice in one sentence?
+## Step 4: A concrete worked example
+### Worked example
+{sample_prompt}
 
-If you can answer those questions, you are usually ready to move on.
+This is the real move: get specific. Do not just read the question and hope. The right process is to name the pattern, apply the rule, and check the result in context.
 
-## Worked example
-Use this pattern on a sample question built around {focus_line}:
+For example:
+- Identify the exact rule you need.
+- Translate the question into plain language.
+- Solve in a direct line of thinking.
+- Check whether your answer is consistent with the question's wording and logic.
 
-"A student is asked to solve a problem involving {focus_line}. The correct approach is to recognize the relationship, rewrite the information clearly, and solve with the shortest reliable method."
+The point is not speed first. The point is precision. A clean, correct method beats a flashy but careless one every time.
 
-Here is the process:
-1. Read the prompt and underline the exact task.
-2. Name the mathematical or reasoning pattern.
-3. Translate the information into a simple form.
-4. Solve using one clean method.
-5. Check the result against the original conditions.
+## Step 5: The decision checklist
+Before submitting an answer, ask yourself:
+- {checklist[0]}
+- {checklist[1]}
+- {checklist[2]}
+- {checklist[3]}
 
-The key skill is not speed; it is precision. A shorter, more controlled method is usually more reliable than a dramatic one.
+If you can answer these honestly, you are usually ready to move on.
 
-## Quick self-check before the sprint or quiz
-Before you submit an answer, do this checklist:
-- I know what type of problem this is.
-- I have identified the correct rule or relationship.
-- I have written down the necessary setup clearly.
-- I have checked whether the answer is reasonable.
-- I can explain the logic without reading the steps off a formula sheet.
+## Step 6: Common traps to avoid
+- Over-reading a prompt and making it harder than it is.
+- Reading only the blank or only the numbers and missing the context.
+- Choosing a rule that sounds familiar but does not actually fit the prompt.
+- Ignoring the final check step and hoping the answer is right.
+- Getting stuck on one answer choice too early instead of comparing the options systematically.
 
-If you can do that, you are ready for the sprint or quiz.
+Good strategy is not about being perfect at the first try. It is about having a process that catches mistakes before you lock in an answer.
+
+## Quick drill for the sprint or quiz
+Before the next question, do this in under 10 seconds:
+1. What is the question really testing?
+2. What rule or pattern applies?
+3. Which answer is the cleanest match?
+4. Why is the other option wrong?
+5. If I had to explain my answer in one sentence, could I do it clearly?
+
+That short routine will move you from guessing toward deliberate, repeatable execution.
 
 ## Final takeaway
-The best way to improve {focus_line} is to repeat the same process on every question:
+The best way to improve {focus_line} is to use the same process again and again:
 - identify the structure
-- choose the right method
-- check the result
-- eliminate common traps
+- choose the rule that matches the task
+- solve in the simplest valid way
+- check the answer against context
+- eliminate the trap answers
 
-That habit turns a hard topic into a readable pattern. Once you practice it consistently, the quiz and sprint will feel much more manageable because you are not guessing—you are applying a repeatable strategy.
+This is how students go from "I feel lost" to "I know what I'm looking for." Once you repeat this process, the sprint and quiz stop feeling like random traps and start feeling like a set of recognizable patterns you can solve with confidence.
 """
     return {"title": title, "content": content}
 

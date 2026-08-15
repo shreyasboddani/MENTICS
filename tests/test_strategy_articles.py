@@ -11,10 +11,11 @@ def test_build_strategy_article_is_comprehensive_enough_for_sprint():
 
     assert article["title"].startswith("Strategies for")
     assert "Step 1" in content
-    assert "Common traps" in content
+    assert "What to look for in this skill" in content
     assert "Worked example" in content
-    assert "Quick self-check" in content
-    assert len(content) > 1200
+    assert "Quick drill for the sprint or quiz" in content
+    assert "Final takeaway" in content
+    assert len(content) > 1800
 
 
 def test_build_strategy_article_uses_the_task_specific_skill():
@@ -43,3 +44,4 @@ def test_build_strategy_article_ignores_resource_link_text():
     assert "inference" in content
     assert "vocabulary" in content
     assert "digital sat reading and writing module strategies" not in article["title"].lower()
+    assert "what to look for in this skill" in content
