@@ -689,7 +689,39 @@ def build_strategy_article(skill, weakness_note, task_description=""):
     focus_line = skill_name if skill_name and skill_name.lower() != "your target skill" else "this skill"
 
     lower_skill = skill_name.lower()
-    if any(k in lower_skill for k in ["equation", "algebra", "function", "graph", "geometry", "slope", "quadratic", "ratio", "fraction", "probability", "percent", "angle", "linear", "inequality", "polynomial", "exponent", "system", "statistics"]):
+    
+    # Detect tool-based and technical skills first
+    if any(k in lower_skill for k in ["desmos", "calculator", "graphing", "table regression", "tilde", "~", "tool", "software", "syntax", "code"]):
+        strategy_type = "tool"
+        if "desmos" in lower_skill or "table regression" in lower_skill or "tilde" in lower_skill:
+            sample_prompt = (
+                "Example: You need to find the best-fitting function for a dataset using Desmos Table Regression. "
+                "Step 1: Open Desmos and create a table with your data points (x, y). "
+                "Step 2: In a new line, type: y1 ~ a*x1^2 + b*x1 + c (for quadratic) or adjust the formula based on the pattern you see. "
+                "Step 3: Desmos auto-calculates a, b, c and shows the R² value to measure fit quality. "
+                "Step 4: Compare multiple regression models (linear, quadratic, exponential) by testing different formulas. "
+                "Step 5: Check that your chosen model fits the actual data points and makes sense in context."
+            )
+            checklist = [
+                "Did I set up the table correctly with x and y columns?",
+                "Did I use the correct regression syntax (tilde ~) with the right formula structure?",
+                "Did I check the R² value to compare how well different models fit?",
+                "Does my chosen model make logical sense for the real-world situation in the problem?",
+            ]
+            core_message = "Tool mastery means knowing exactly what formula to test and how to read the results. Desmos Table Regression is not magic—it is a structured way to test different relationships and pick the one with the best fit. Speed comes from knowing which formula to try first, not from clicking randomly."
+        else:
+            sample_prompt = (
+                "Example: Use the calculator tool to isolate one variable, test it with sample data, and verify the result. "
+                "Do not rely on the tool to make the decision for you—use it to confirm your reasoning."
+            )
+            checklist = [
+                "Did I clearly define what I am testing?",
+                "Did I use the tool the correct way for this task?",
+                "Did I check the result using at least one test case?",
+                "Does the tool's output match what the problem is asking for?",
+            ]
+            core_message = "Tools are only as good as the questions you ask them. Master the syntax, understand the output, and always verify that the result fits the problem context."
+    elif any(k in lower_skill for k in ["equation", "algebra", "function", "graph", "geometry", "slope", "quadratic", "ratio", "fraction", "probability", "percent", "angle", "linear", "inequality", "polynomial", "exponent", "system", "statistics"]):
         strategy_type = "math"
         sample_prompt = (
             "Example: A line passes through (2, 5) and (6, 13). What is the slope?"
@@ -730,7 +762,93 @@ def build_strategy_article(skill, weakness_note, task_description=""):
         ]
         core_message = "The skill is not about guessing what the test wants; it is about noticing the pattern quickly and applying one reliable process every time."
 
-    content = f"""# {title}
+
+    if strategy_type == "tool":
+        content = f"""# {title}
+
+## Why this matters
+{core_message}
+
+This sprint is built around {focus_line}, and the goal is to take the mystery out of using this tool. Most students either avoid the tool entirely or use it without understanding the output. The real skill is knowing exactly what to test and how to read the results.
+
+> Focus point: {weakness_text}
+
+## Step 1: Master the syntax and setup
+Before you can use {focus_line} effectively, you need to know the correct syntax and how to structure your input.
+
+For table regression specifically:
+- Create a table with your data: x1 and y1 columns with your actual data points.
+- Use the correct formula structure: y1 ~ [formula involving x1]
+- Common formulas to test: y1 ~ a*x1 + b (linear), y1 ~ a*x1^2 + b*x1 + c (quadratic), y1 ~ a*exp(b*x1) (exponential)
+- Always start with the simplest model (linear) and move to more complex ones only if needed.
+
+Syntax errors waste time. Get this right once, and you can reuse the pattern for every problem.
+
+## Step 2: Understand what each output number means
+The tool will give you coefficients (a, b, c) and a fit statistic (usually R²). Here is what to look for:
+
+- **Coefficients (a, b, c)**: These are the numbers you plug into your formula. If your regression is y1 ~ a*x1^2 + b*x1 + c, your fitted equation is y = [a value]*x² + [b value]*x + [c value].
+- **R² value**: This tells you how well the model fits the data. R² ranges from 0 to 1. Closer to 1 is better. R² = 0.95 is excellent; R² = 0.85 is good; R² < 0.70 suggests the model is not a great fit.
+- **Residual plot**: If the tool shows a residual plot, look for random scatter. If residuals are clustered or curved, your model may not be the best choice.
+
+A lot of students ignore R² and just grab the first formula. That is a mistake. Always check how well the model fits before finalizing your answer.
+
+## Step 3: Test your formula with real data
+Once the tool gives you coefficients, verify that your equation actually works:
+
+1. Pick a data point from your table (e.g., x = 2, y = 10).
+2. Plug x = 2 into your fitted equation and compute the y value.
+3. Compare your computed y with the actual y in the data.
+4. If they are close, the fit is working. If they are far apart, something is wrong.
+
+This step catches errors before you lock in an answer. Do not skip it.
+
+## Step 4: A concrete worked example
+### Worked example
+{sample_prompt}
+
+The key move is not just clicking a button—it is understanding what each part means and making sure the result makes sense.
+
+## Step 5: The decision checklist
+Before you submit a regression-based answer, ask yourself:
+- {checklist[0]}
+- {checklist[1]}
+- {checklist[2]}
+- {checklist[3]}
+
+If you can answer these honestly, you are ready.
+
+## Step 6: Common traps to avoid
+- Using the wrong formula structure (e.g., forgetting the tilde ~ or using x instead of x1).
+- Trusting a high R² without checking whether the coefficients make sense in context.
+- Comparing models with different variable types (do not mix linear and exponential and then pick the one with the highest R² without thinking).
+- Forgetting to check whether the fitted equation actually matches your data points.
+- Overcomplicating the model when a simpler one fits just as well.
+
+Tool mastery includes knowing when NOT to use a more complex model. Simpler is better when the fit is similar.
+
+## Quick drill for the sprint or quiz
+Before the next question, do this in under 20 seconds:
+1. Do I need to test multiple regression models or just one?
+2. Which formula structure should I try first?
+3. What does the R² or fit statistic tell me?
+4. Does the fitted equation make sense in the real-world context?
+5. Can I verify the fit by plugging in one actual data point?
+
+That routine will move you from guessing toward deliberate tool use.
+
+## Final takeaway
+The best way to improve {focus_line} is to:
+- Master the correct syntax so you can set it up in seconds.
+- Understand what each output means (coefficients, fit statistics).
+- Always verify that the fit makes sense by testing with real data.
+- Compare models deliberately, not randomly.
+- Use the simplest model that fits well—avoid overcomplicating.
+
+Once you repeat this process, {focus_line} becomes predictable and fast. You are not hoping the tool gives you a magic answer; you are using it as a tool to confirm your reasoning and find the best model for your data.
+"""
+    else:
+        content = f"""# {title}
 
 ## Why this matters
 {core_message}
@@ -818,6 +936,7 @@ The best way to improve {focus_line} is to use the same process again and again:
 
 This is how students go from "I feel lost" to "I know what I'm looking for." Once you repeat this process, the sprint and quiz stop feeling like random traps and start feeling like a set of recognizable patterns you can solve with confidence.
 """
+
     return {"title": title, "content": content}
 
 
