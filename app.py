@@ -48,6 +48,7 @@ gemini_client = genai.Client(api_key=gemini_api_key) if gemini_api_key else None
 GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-3.5-flash-lite")
 GEMINI_CHAT_MESSAGES = 12
 GEMINI_CHAT_CHARACTERS = 12000
+PATH_REGENERATION_CONTROL = "MENTICS_REGENERATE_PATH"
 
 
 @app.after_request
@@ -208,6 +209,7 @@ def init_db():
         "explanation": "TEXT",
         "FOREIGN KEY(quiz_id)": "REFERENCES quizzes(id) ON DELETE CASCADE"
     })
+    db.add_column("quiz_questions", "source_or_prompt", "TEXT")
 
     db.create_table("quiz_results", {
         "id": "INTEGER PRIMARY KEY AUTOINCREMENT",
@@ -312,7 +314,7 @@ def _get_stat_history_for_prompt(user_id):
 def _get_quiz_results_for_prompt(user_id):
     """Fetches and formats a summary of the user's recent incorrect quiz answers for AI prompts."""
     query = """
-        SELECT qq.question_text, qq.options, qq.correct_option, qq.explanation
+        SELECT qq.source_or_prompt, qq.question_text, qq.options, qq.correct_option, qq.explanation
         FROM quiz_results qr
         JOIN quiz_questions qq ON qr.question_id = qq.id
         WHERE qr.user_id = ? AND qr.is_correct = 0
@@ -329,7 +331,8 @@ def _get_quiz_results_for_prompt(user_id):
         options = json.loads(answer['options'])
         correct_answer_text = options[answer['correct_option']]
         summary.append(
-            f"- Question: {answer['question_text']}\n"
+            f"- Source or prompt: {answer.get('source_or_prompt') or 'Standalone question'}\n"
+            f"  - Question: {answer['question_text']}\n"
             f"  - Correct Answer: \"{correct_answer_text}\"\n"
             f"  - Explanation: {answer['explanation']}"
         )
@@ -485,17 +488,18 @@ def _is_path_regeneration_request(message):
         return False
 
     if re.fullmatch(
-        r"(?:please\s+)?(?:regenerate|rebuild|refresh)(?:\s+it)?(?:\s+(?:please|pls))?[.!?]*",
+        r"(?:please\s+)?(?:regen|regenerate|rebuild|refresh)(?:\s+it)?(?:\s+(?:please|pls))?[.!?]*",
         normalized,
     ):
         return True
 
     path_noun = r"(?:path|plan|roadmap|tasks?|steps?)"
     patterns = (
-        rf"\b(?:regenerate|rebuild|redo|remake|recreate|refresh|replace|refocus|tailor)\b.{{0,50}}\b{path_noun}\b",
+        rf"\b(?:regen|regenerate|rebuild|redo|remake|recreate|refresh|replace|refocus|tailor)\b.{{0,50}}\b{path_noun}\b",
         rf"\b{path_noun}\b.{{0,40}}\b(?:regenerated|rebuilt|redone|remade|recreated|refreshed|replaced)\b",
         rf"\b(?:change|update|revise|adjust|refocus|tailor)\b.{{0,35}}\b(?:my|the|this|these|current)?\s*{path_noun}\b",
         rf"\b(?:make|build|create|generate|give)\b.{{0,45}}\b(?:new|fresh|different|another|five[- ]step)\b.{{0,30}}\b{path_noun}\b",
+        rf"\b(?:make|build|create|generate|give)\b.{{0,25}}\b(?:me\s+|my\s+|the\s+|this\s+)?{path_noun}\b.{{0,45}}\b(?:focus|focused|about|around|for|with|using|based)\b",
         rf"\b(?:new|fresh|different|another|updated|revised)\s+(?:five[- ]step\s+)?{path_noun}\b",
         rf"\b(?:make|turn)\b.{{0,20}}\b(?:my|the|this|current)\s+{path_noun}\b.{{0,35}}\b(?:focus|focused|about|centered|for)\b",
         rf"\b(?:want|need)\b.{{0,25}}\b(?:my|the|this|current)\s+{path_noun}\b.{{0,35}}\b(?:focus|focused|about|centered|changed|different)\b",
@@ -709,7 +713,7 @@ def _get_test_prep_ai_tasks(strengths, weaknesses, test_focus, current_scores=No
         f"You are an elite AI test prep coach for Mentics. Your mission is to generate an intelligent, 5-step study plan tailored to the student's evolving needs, demonstrating a deep understanding of their history and context SPECIFICALY FOR THE DIGITAL SAT AND THE ACT.\n\n"
 
         f"## CRITICAL SCENARIO ANALYSIS\n"
-        f"1.  **Regeneration Request:** This generation was initiated from the student's path conversation. Treat the latest user request as an explicit override: every task must directly reflect its requested focus, constraints, timing, or changed goal.\n"
+        f"1.  **Regeneration Request:** This generation was initiated from the student's path conversation. Treat the student's most recent substantive path request as an explicit override: every task must directly reflect its requested focus, constraints, timing, or changed goal. If the final message is only a short follow-up such as 'why?' or 'do it,' resolve it against the preceding user messages instead of using the short follow-up as the plan focus.\n"
         f"2.  **Post-Path Continuation:** If the student just completed all tasks, the new plan MUST be a logical next step (e.g., analyzing scores, planning long-term improvements).\n"
         f"3.  **Standard Generation:** Otherwise, generate a standard path that builds on their history.\n\n"
 
@@ -755,12 +759,13 @@ def _get_test_prep_ai_tasks(strengths, weaknesses, test_focus, current_scores=No
         f"2.  **Actionable Strategy Article:** The `strategy_article` must be a high-quality, concise guide (using Markdown) that teaches the student how to master the specific skill in the sprint.\n\n"
 
         f"## `quiz` GENERATION DIRECTIVES (CRITICAL)\n"
-        f"A `quiz` is different from a sprint and is a tpe `quiz`. It is a CUMULATIVE review of a broader topic and should be used to test overall knowledge, not for focused practice.\n"
+        f"A `quiz` is different from a sprint and has the task type `quiz`. It is a CUMULATIVE review of a broader topic and should be used to test overall knowledge, not for focused practice.\n"
         f"1.  **Strategic Placement:** A quiz should ideally follow a 'Resource Task' (`link`).\n"
-        f"2.  **SAT-Level Comprehensiveness:** Questions must mirror official SAT complexity, including reading passages, 'words in context', and multi-step math problems.\n"
-        f"3.  **Targeted Content:** The quiz topic MUST address one of the student's listed weaknesses.\n"
-        f"4.  **Detailed Explanations:** Every question must have an explanation.\n"
-        f"5.  Each quiz should have 5-10 questions.\n\n"
+        f"2.  **Complete Source or Prompt:** Every quiz question MUST include `source_or_prompt`. Put the full passage, excerpt, equation, data set, scenario, or chart/diagram description the question depends on in this field. Never refer to a passage, table, graph, or text that is not included. For a standalone problem, put its complete setup in `source_or_prompt`, then use `question_text` only for the question being asked. Include a source name and markdown link when adapting attributed material; otherwise identify it as an original Mentics practice prompt.\n"
+        f"3.  **SAT-Level Comprehensiveness:** Questions must mirror official SAT complexity, including complete reading passages, 'words in context', and multi-step math problems.\n"
+        f"4.  **Targeted Content:** The quiz topic MUST address one of the student's listed weaknesses.\n"
+        f"5.  **Detailed Explanations:** Every question must have an explanation.\n"
+        f"6.  Each quiz should have 5-10 questions.\n\n"
 
         f"# CRITICAL DIRECTIVES & JSON SCHEMA\n"
         f"1.  **JSON Output ONLY**: Your output MUST be a single, raw JSON object.\n"
@@ -783,7 +788,7 @@ def _get_test_prep_ai_tasks(strengths, weaknesses, test_focus, current_scores=No
         f'      "difficulty": "Either \'easy\', \'medium\', \'hard\', or \'epic\'.",\n'
         f'      "quiz_content": {{  // For \'quiz\' format ONLY. 5-10 questions. \n'
         f'          "title": "Title of the quiz",\n'
-        f'          "questions": [ {{"question_text": "...", "options": [], "correct_option": 0, "explanation": "..."}} ]\n'
+        f'          "questions": [ {{"source_or_prompt": "Complete passage, problem setup, data, or attributed source with link", "question_text": "Question asked about the source or prompt", "options": [], "correct_option": 0, "explanation": "..."}} ]\n'
         f'      }},\n'
         f'      "sprint_content": {{  // REQUIRED if task_format is \'practice_sprint\', otherwise null.\n'
         f'          "title": "Title of the sprint (e.g., \'Algebra: Functions Practice\')",\n'
@@ -855,8 +860,16 @@ def _get_test_prep_ai_tasks(strengths, weaknesses, test_focus, current_scores=No
             return {'title': title, 'content': content}
 
         def make_mock_quiz(topic):
-            questions = [{'question_text': f"Quiz question {qi+1} on {topic}.", 'options': ['A', 'B',
-                                                                                            'C', 'D'], 'correct_option': 0, 'explanation': f"Solution for {topic}."} for qi in range(7)]
+            questions = [{
+                'source_or_prompt': (
+                    f"Original Mentics practice prompt on {topic}: use the information "
+                    f"provided in this complete setup for item {qi + 1}."
+                ),
+                'question_text': f"Which option correctly answers practice item {qi + 1} on {topic}?",
+                'options': ['A', 'B', 'C', 'D'],
+                'correct_option': 0,
+                'explanation': f"Solution for {topic}.",
+            } for qi in range(7)]
             return {'title': f"Cumulative Quiz: {topic}", 'questions': questions}
 
         normalized = []
@@ -905,6 +918,19 @@ def _get_test_prep_ai_tasks(strengths, weaknesses, test_focus, current_scores=No
                         ' on ')[-1].split('.')[0][:40].strip() or 'mixed topics'
                     if not t.get('quiz_content'):
                         t['quiz_content'] = make_mock_quiz(quiz_topic)
+                    quiz_questions = t['quiz_content'].get('questions', [])
+                    for question in quiz_questions:
+                        if not isinstance(question, dict):
+                            continue
+                        source_or_prompt = next((
+                            question.get(key) for key in (
+                                'source_or_prompt', 'source', 'prompt', 'passage', 'context'
+                            ) if isinstance(question.get(key), str) and question.get(key).strip()
+                        ), None)
+                        question['source_or_prompt'] = source_or_prompt or (
+                            "Original Mentics standalone practice prompt. All required "
+                            "information is included in the question below."
+                        )
 
                 if 'boss battle' in desc.lower() or desc.startswith('Boss Battle'):
                     t['type'] = 'milestone'
@@ -1160,6 +1186,7 @@ def _generate_and_save_new_test_path(user_id, test_path_info, chat_history=None)
                 for question in task['quiz_content'].get("questions", []):
                     transaction.insert("quiz_questions", {
                         "quiz_id": quiz_id,
+                        "source_or_prompt": question.get("source_or_prompt"),
                         "question_text": question.get("question_text"),
                         "options": json.dumps(question.get("options")),
                         "correct_option": question.get("correct_option"),
@@ -1281,7 +1308,7 @@ def _get_test_prep_ai_chat_response(history, user_stats, stat_history="", quiz_r
         "## CORE COACHING DIRECTIVES (Your Rules of Engagement)\n"
         "0.  **Initial Greeting**: Your first reply must be a warm, concise welcome. Mention once that the student can ask naturally to regenerate, replace, or refocus their path and include the focus they want.\n"
         "1.  **Primary Goal: Path & App Support**: Your main purpose is to help the user with their current, active Path. Answer their questions about specific tasks, why they were assigned, and how to approach them. You must also be able to answer general questions about using the Mentics application's features as described above.\n"
-        "2.  **Path Regeneration Protocol**: Path replacement requests are handled by Mentics before they reach this coaching prompt. Never claim a path changed unless the app confirms it. For exploratory discussion, help the student clarify the focus they would want in a replacement path.\n"
+        f"2.  **Path Regeneration Protocol**: If the student asks to regen, regenerate, replace, rebuild, redo, refocus, or create a path—even in casual language or as a follow-up to an earlier request—respond with exactly `{PATH_REGENERATION_CONTROL}` and nothing else. Mentics will use that private control response to perform the update. Never say you lack access to the backend, dashboard, path, or app. If the student is only exploring an idea and has not asked to change the path, coach them normally.\n"
         "3.  **Provide High-Quality Resources**: When a student is stuck or asks for help, provide specific, reputable, and free resources using markdown links (e.g., `[Khan Academy](https://...)`, official practice test PDFs, specific educational YouTube videos).\n"
         "4.  **Actionable Focus**: Every response must provide a clear next step, a useful tip, or actionable guidance. Never leave the user wondering what to do next.\n"
         "5.  **Adaptive Response Length**: \n"
@@ -1337,7 +1364,7 @@ def _get_college_planning_ai_tasks(college_context, user_stats, path_history, ch
 
         f"## CRITICAL SCENARIO ANALYSIS (ACTION REQUIRED)\n"
         f"First, determine the student's current situation and choose your generation strategy:\n"
-        f"1.  **Regeneration Request:** This generation was initiated from the student's path conversation. Treat the latest user request as an explicit override: every task must directly reflect its requested focus, constraints, deadlines, or changed goal.\n"
+        f"1.  **Regeneration Request:** This generation was initiated from the student's path conversation. Treat the student's most recent substantive path request as an explicit override: every task must directly reflect its requested focus, constraints, deadlines, or changed goal. If the final message is only a short follow-up such as 'why?' or 'do it,' resolve it against the preceding user messages instead of using the short follow-up as the plan focus.\n"
         f"2.  **Post-Path Continuation:** If the student has just completed all tasks in their previous path, the new plan MUST be a logical next step in the college planning process (e.g., moving from 'researching colleges' to 'drafting supplemental essays'). It should feel like a natural progression.\n"
         f"3.  **Standard Generation:** If neither of the above applies, generate a standard path that is appropriate for their grade level and builds upon their historical data.\n\n"
 
@@ -1446,7 +1473,7 @@ def _get_college_planning_ai_chat_response(history, user_stats, stat_history="",
         "## CORE COACHING DIRECTIVES (Your Rules of Engagement)\n"
         "0.  **Initial Greeting**: Your first reply must be a warm, concise welcome. Mention once that the student can ask naturally to regenerate, replace, or refocus their path and include the focus they want.\n"
         "1.  **Primary Goal: Path & App Support**: Your main purpose is to help the user with their current, active Path. Answer their questions about specific tasks, why they were assigned, and how to approach them. You must also be able to answer general questions about using the Mentics application's features as described above.\n"
-        "2.  **Path Regeneration Protocol**: Path replacement requests are handled by Mentics before they reach this coaching prompt. Never claim a path changed unless the app confirms it. For exploratory discussion, help the student clarify the focus they would want in a replacement path.\n"
+        f"2.  **Path Regeneration Protocol**: If the student asks to regen, regenerate, replace, rebuild, redo, refocus, or create a path—even in casual language or as a follow-up to an earlier request—respond with exactly `{PATH_REGENERATION_CONTROL}` and nothing else. Mentics will use that private control response to perform the update. Never say you lack access to the backend, dashboard, path, or app. If the student is only exploring an idea and has not asked to change the path, coach them normally.\n"
         "3.  **Provide High-Quality Resources**: When a student is stuck or needs guidance, provide specific, reputable, and free resources using markdown links (e.g., links to the Common App, financial aid websites like FAFSA, or helpful articles on essay writing).\n"
         "4.  **Actionable Guidance**: Every response must give the student a clear next step, a valuable resource, or a concrete action to take. Never leave the user wondering what to do next.\n"
         "5.  **Adaptive Response Length**:\n"
@@ -2520,6 +2547,7 @@ def get_quiz(user, task_id):
     for q in questions_raw:
         questions.append({
             "id": q['id'],
+            "source_or_prompt": q.get('source_or_prompt'),
             "question_text": q['question_text'],
             "options": json.loads(q['options'])
         })
@@ -2612,6 +2640,50 @@ def api_update_task_status(user):
     return jsonify({"success": True})
 
 
+def _regenerate_path_from_chat(user_id, stats, category, history):
+    """Generate, persist, and return a path without leaking control messages."""
+    try:
+        if category == 'College Planning':
+            college_context = stats.get("college_path", {})
+            new_tasks = _generate_and_save_new_college_path(
+                user_id, college_context, chat_history=history)
+        else:
+            test_path_info = stats.get("test_path", {})
+            new_tasks = _generate_and_save_new_test_path(
+                user_id, test_path_info, chat_history=history)
+        if len(new_tasks) != 5:
+            raise ValueError("Regeneration did not save exactly five tasks.")
+    except Exception:
+        app.logger.exception(
+            "Chat path regeneration failed for user %s (%s)", user_id, category
+        )
+        return jsonify({
+            "error": "I couldn't generate a complete five-step path. Your current path is unchanged; please try again."
+        }), 502
+
+    reply = "Your new five-step path is ready. I shaped it around your latest request and our conversation."
+    history.append({"role": "assistant", "content": reply})
+    try:
+        db.upsert("chat_conversations", {
+            "user_id": user_id,
+            "category": category,
+            "history": json.dumps(history)
+        }, conflict_target=["user_id", "category"])
+    except Exception:
+        # The path is already committed. A history-write failure should not
+        # turn a successful regeneration into a misleading client error.
+        app.logger.exception(
+            "Path regenerated but chat history could not be saved for user %s",
+            user_id,
+        )
+    return jsonify({"new_path": new_tasks, "reply": reply})
+
+
+def _is_path_regeneration_control(reply):
+    cleaned = (reply or "").strip().strip('`').strip()
+    return cleaned == PATH_REGENERATION_CONTROL
+
+
 @app.route("/api/chat", methods=['POST'])
 @login_required
 def api_chat(user):
@@ -2644,41 +2716,7 @@ def api_chat(user):
         if message['role'] == 'user'
     ), "")
     if _is_path_regeneration_request(user_message):
-        try:
-            if category == 'College Planning':
-                college_context = stats.get("college_path", {})
-                new_tasks = _generate_and_save_new_college_path(
-                    user_id, college_context, chat_history=history)
-            else:
-                test_path_info = stats.get("test_path", {})
-                new_tasks = _generate_and_save_new_test_path(
-                    user_id, test_path_info, chat_history=history)
-            if len(new_tasks) != 5:
-                raise ValueError("Regeneration did not save exactly five tasks.")
-        except Exception:
-            app.logger.exception(
-                "Chat path regeneration failed for user %s (%s)", user_id, category
-            )
-            return jsonify({
-                "error": "I couldn't generate a complete five-step path. Your current path is unchanged; please try again."
-            }), 502
-
-        reply = "Your new five-step path is ready. I shaped it around your latest request and our conversation."
-        history.append({"role": "assistant", "content": reply})
-        try:
-            db.upsert("chat_conversations", {
-                "user_id": user_id,
-                "category": category,
-                "history": json.dumps(history)
-            }, conflict_target=["user_id", "category"])
-        except Exception:
-            # The path is already committed. A history-write failure should not
-            # turn a successful regeneration into a misleading client error.
-            app.logger.exception(
-                "Path regenerated but chat history could not be saved for user %s",
-                user_id,
-            )
-        return jsonify({"new_path": new_tasks, "reply": reply})
+        return _regenerate_path_from_chat(user_id, stats, category, history)
 
     # Fetch tracker data only for regular coaching replies. Regeneration already
     # gathers the richer task, assessment, and tracker context it needs.
@@ -2690,6 +2728,9 @@ def api_chat(user):
     else:
         reply = _get_test_prep_ai_chat_response(
             history, stats, stat_history, user_id)
+
+    if _is_path_regeneration_control(reply):
+        return _regenerate_path_from_chat(user_id, stats, category, history)
 
     history.append({"role": "assistant", "content": reply})
 
