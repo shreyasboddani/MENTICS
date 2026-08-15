@@ -1,17 +1,18 @@
 # Copyright © 2026 Mentics
 # All Rights Reserved.
-from flask import Flask, render_template, request, redirect, url_for, session, jsonify
+from flask import Flask, render_template, request, redirect, url_for, session, jsonify, g
 from werkzeug.security import generate_password_hash, check_password_hash
 from dbhelper import DatabaseHandler
 from userhelper import User
 from functools import wraps
 import json
+import hmac
 from google import genai
 from google.genai import types
 import os
 import secrets
 from dotenv import load_dotenv
-import random
+import re
 from pathlib import Path
 from datetime import datetime, timedelta, date
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
@@ -34,6 +35,7 @@ app.config.update(
     SESSION_COOKIE_HTTPONLY=True,
     SESSION_COOKIE_SAMESITE='Lax',
     SESSION_COOKIE_SECURE=is_production,
+    MAX_CONTENT_LENGTH=1024 * 1024,
 )
 app.url_map.strict_slashes = False
 app.permanent_session_lifetime = timedelta(minutes=10)
@@ -51,9 +53,45 @@ def add_security_headers(response):
     response.headers.setdefault('X-Frame-Options', 'DENY')
     response.headers.setdefault('Referrer-Policy', 'strict-origin-when-cross-origin')
     response.headers.setdefault('Permissions-Policy', 'camera=(), microphone=(), geolocation=()')
+    nonce = getattr(g, 'csp_nonce', '')
+    script_sources = "'self'"
+    if nonce:
+        script_sources += f" 'nonce-{nonce}'"
+    response.headers.setdefault(
+        'Content-Security-Policy',
+        "default-src 'self'; "
+        f"script-src {script_sources}; "
+        "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
+        "font-src 'self' https://fonts.gstatic.com data:; "
+        "img-src 'self' data:; connect-src 'self'; "
+        "object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self'"
+    )
+    if session.get('user'):
+        response.headers.setdefault('Cache-Control', 'private, no-store')
     if is_production:
         response.headers.setdefault('Strict-Transport-Security', 'max-age=31536000; includeSubDomains')
     return response
+
+
+def _csrf_token():
+    token = session.get('_csrf_token')
+    if not token:
+        token = secrets.token_urlsafe(32)
+        session['_csrf_token'] = token
+    return token
+
+
+@app.before_request
+def protect_state_changing_requests():
+    if request.method not in {'POST', 'PUT', 'PATCH', 'DELETE'}:
+        return None
+    expected = session.get('_csrf_token')
+    supplied = request.headers.get('X-CSRF-Token') or request.form.get('_csrf_token')
+    if expected and supplied and hmac.compare_digest(expected, supplied):
+        return None
+    if request.path.startswith('/api/'):
+        return jsonify({'error': 'Your session expired. Refresh the page and try again.'}), 400
+    return 'Invalid or expired request. Refresh the page and try again.', 400
 
 
 oauth = OAuth(app)
@@ -70,7 +108,7 @@ def init_db():
     db.create_table("users", {
         "id": "INTEGER PRIMARY KEY AUTOINCREMENT",
         "email": "TEXT NOT NULL UNIQUE",
-        "password": "TEXT NOT NULL",
+        "password": "TEXT NOT NULL",  # nosec B105
         "stats": "TEXT NOT NULL",
         "name": "TEXT NOT NULL DEFAULT ''",
         "onboarding_completed": "BOOLEAN DEFAULT FALSE",
@@ -867,14 +905,25 @@ def _get_test_prep_ai_tasks(strengths, weaknesses, test_focus, current_scores=No
         return get_mock_tasks_reliably()
 
 
+def _has_incomplete_earlier_task(user_id, task):
+    return bool(db.execute_for_one(
+        """SELECT id FROM paths
+           WHERE user_id=? AND category=? AND is_active=True
+             AND task_order<? AND is_completed=False LIMIT 1""",
+        (user_id, task['category'], task['task_order'])
+    ))
+
+
 @app.route('/strategy_article/<int:task_id>')
 @login_required
 def strategy_article(user, task_id):
 
     task = db.select_one(
-        "paths", where={"id": task_id, "user_id": user.data['id']})
+        "paths", where={"id": task_id, "user_id": user.data['id'], "is_active": True})
     if not task:
         return "Article not found or you do not have permission to view it.", 404
+    if _has_incomplete_earlier_task(user.data['id'], task):
+        return "Complete the earlier path step before opening this strategy guide.", 403
 
     article = db.select_one("strategy_articles", where={"task_id": task_id})
     if not article:
@@ -890,9 +939,11 @@ def strategy_article(user, task_id):
 @login_required
 def get_practice_sprint(user, task_id):
     task_info = db.select_one(
-        "paths", where={"id": task_id, "user_id": user.data['id']})
+        "paths", where={"id": task_id, "user_id": user.data['id'], "is_active": True})
     if not task_info or task_info['task_format'] != 'practice_sprint':
         return jsonify({"error": "Practice sprint not found"}), 404
+    if _has_incomplete_earlier_task(user.data['id'], task_info):
+        return jsonify({"error": "Complete the earlier path step first."}), 409
 
     sprint_details = db.select_one(
         "practice_sprints", where={"task_id": task_id})
@@ -904,9 +955,7 @@ def get_practice_sprint(user, task_id):
     questions = [{
         "id": q['id'],
         "question_text": q['question_text'],
-        "options": json.loads(q['options']),
-        "correct_option": q['correct_option'],
-        "explanation": q['explanation']
+        "options": json.loads(q['options'])
     } for q in questions_raw]
 
     return jsonify({"title": sprint_details['title'], "questions": questions})
@@ -916,20 +965,69 @@ def get_practice_sprint(user, task_id):
 @login_required
 def submit_sprint_results(user):
     data = request.get_json(silent=True) or {}
+    try:
+        score = _score_assessment_results(user.data['id'], data.get('results'), 'sprint')
+        return jsonify(score)
+    except ValueError as error:
+        return jsonify({"success": False, "error": str(error)}), 400
 
-    results = data.get('results')
-    if not results:
-        return jsonify({"success": False, "error": "Invalid results format"}), 400
 
-    user_id = user.data['id']
-    for result in results:
-        if 'question_id' in result and 'is_correct' in result:
-            db.insert('sprint_results', {
-                'user_id': user_id,
-                'question_id': result.get('question_id'),
-                'is_correct': result.get('is_correct')
-            })
-    return jsonify({"success": True})
+def _score_assessment_results(user_id, submitted, kind):
+    if not isinstance(submitted, list) or not 1 <= len(submitted) <= 50:
+        raise ValueError("Submit between 1 and 50 answers.")
+    if kind == 'quiz':
+        query = """SELECT qq.id, qq.correct_option, qq.options, qq.explanation,
+                          p.id AS task_id, p.category, p.task_order
+                   FROM quiz_questions qq
+                   JOIN quizzes q ON q.id=qq.quiz_id
+                   JOIN paths p ON p.id=q.task_id
+                   WHERE qq.id=? AND p.user_id=? AND p.is_active=True"""
+        result_table = 'quiz_results'
+    else:
+        query = """SELECT sq.id, sq.correct_option, sq.options, sq.explanation,
+                          p.id AS task_id, p.category, p.task_order
+                   FROM sprint_questions sq
+                   JOIN practice_sprints ps ON ps.id=sq.sprint_id
+                   JOIN paths p ON p.id=ps.task_id
+                   WHERE sq.id=? AND p.user_id=? AND p.is_active=True"""
+        result_table = 'sprint_results'
+    scored = []
+    seen = set()
+    checked_tasks = set()
+    for answer in submitted:
+        if not isinstance(answer, dict):
+            raise ValueError("Each answer must be an object.")
+        try:
+            question_id = int(answer.get('question_id'))
+            selected_option = int(answer.get('selected_option'))
+        except (TypeError, ValueError) as error:
+            raise ValueError("Each answer needs a valid question and option.") from error
+        if question_id in seen:
+            raise ValueError("A question can only be submitted once.")
+        seen.add(question_id)
+        question = db.execute_for_one(query, (question_id, user_id))
+        if not question:
+            raise ValueError("One or more questions do not belong to this account.")
+        if question['task_id'] not in checked_tasks:
+            if _has_incomplete_earlier_task(user_id, question):
+                raise ValueError("Complete the earlier path step first.")
+            checked_tasks.add(question['task_id'])
+        options = json.loads(question['options'])
+        if not 0 <= selected_option < len(options):
+            raise ValueError("One or more selected options are invalid.")
+        is_correct = selected_option == int(question['correct_option'])
+        db.insert(result_table, {
+            'user_id': user_id, 'question_id': question_id, 'is_correct': is_correct
+        })
+        scored.append({
+            'question_id': question_id, 'is_correct': is_correct,
+            'correct_option': int(question['correct_option']),
+            'explanation': question.get('explanation') or '',
+        })
+    return {
+        'success': True, 'correct': sum(1 for row in scored if row['is_correct']),
+        'total': len(scored), 'results': scored,
+    }
 
 
 def _generate_and_save_new_test_path(user_id, test_path_info, chat_history=None):
@@ -1143,7 +1241,7 @@ def _get_college_planning_ai_tasks(college_context, user_stats, path_history, ch
             {"description": "Create a spreadsheet to track application deadlines.", "reason": "Staying organized is key to a stress-free application season.",
                 "type": "standard", "stat_to_update": None, "category": "College Planning", "difficulty": "easy"}
         ]
-        return random.sample(all_mock_tasks, 5)
+        return all_mock_tasks
 
     if not os.getenv("GEMINI_API_KEY"):
         return get_mock_tasks_reliably()
@@ -1495,12 +1593,7 @@ def _get_tracker_ai_analysis(user):
 
         analysis_lines = []
 
-        latest_scores = []
-        try:
-            for line in stat_history_summary.splitlines()[:6]:
-                latest_scores.append(line)
-        except Exception:
-            pass
+        latest_scores = stat_history_summary.splitlines()[:6]
         analysis_lines.append("### 📈 Progress Snapshot")
         if latest_scores:
             analysis_lines.append("""
@@ -1556,12 +1649,29 @@ def tracker_analysis(user):
 
 def render_react(page, bootstrap=None, title=None, status=200):
     """Render the React application with server-verified bootstrap data."""
+    data = dict(bootstrap or {})
+    data['csrfToken'] = _csrf_token()
+    g.csp_nonce = secrets.token_urlsafe(18)
     return render_template(
         "react_app.html",
         page=page,
-        bootstrap=bootstrap or {},
+        bootstrap=data,
         title=title or "Mentics",
+        csp_nonce=g.csp_nonce,
     ), status
+
+
+def _optional_number(value, minimum, maximum, label, *, integer=True):
+    text = str(value or '').strip()
+    if not text:
+        return ''
+    try:
+        number = float(text)
+    except (TypeError, ValueError) as error:
+        raise ValueError(f'{label} must be a number.') from error
+    if not minimum <= number <= maximum:
+        raise ValueError(f'{label} must be between {minimum} and {maximum}.')
+    return str(int(number)) if integer else str(round(number, 2))
 
 
 @app.route("/privacy")
@@ -1583,12 +1693,13 @@ def home():
 @app.route("/signup", methods=["GET", "POST"])
 def signup():
     if request.method == "POST":
-        email = request.form.get("email", "").strip().lower()
-        name = request.form.get("name", "").strip()
+        email = request.form.get("email", "").strip().lower()[:254]
+        name = request.form.get("name", "").strip()[:100]
         raw_password = request.form.get("password", "")
-        if not email or not name or len(raw_password) < 8:
+        valid_email = re.fullmatch(r"[^@\s]+@[^@\s]+\.[^@\s]+", email)
+        if not valid_email or not name or not 8 <= len(raw_password) <= 128:
             return render_react("signup", {
-                "error": "Enter your name, a valid email, and a password of at least 8 characters."
+                "error": "Enter your name, a valid email, and a password between 8 and 128 characters."
             }, "Create Account | Mentics", 400)
         if db.select_one("users", where={"email": email}):
             return render_react("signup", {"error": "Email already exists!"}, "Create Account | Mentics", 409)
@@ -1605,6 +1716,7 @@ def signup():
             db.insert("gamification_stats", {
                       "user_id": user_id, "points": 0, "current_streak": 0})
 
+            session.clear()
             session["user"] = email
             session["user_id"] = user_id
             session.permanent = True
@@ -1625,7 +1737,8 @@ def login():
         password = request.form.get("password", "")
 
         user_record = db.select_one("users", where={"email": email})
-        if user_record and check_password_hash(user_record['password'], password):
+        if len(password) <= 128 and user_record and check_password_hash(user_record['password'], password):
+            session.clear()
             session["user"] = user_record['email']
             session["user_id"] = user_record['id']
             session.permanent = True
@@ -1652,10 +1765,8 @@ def authorize():
     user_record = db.select_one("users", where={"email": user_info['email']})
 
     if user_record:
-
-        session["user"] = user_record['email']
-        session["user_id"] = user_record['id']
-        session.permanent = True
+        authenticated_email = user_record['email']
+        authenticated_id = user_record['id']
     else:
 
         password_hash = generate_password_hash(os.urandom(16).hex())
@@ -1671,14 +1782,18 @@ def authorize():
         db.insert("gamification_stats", {
                   "user_id": user_id, "points": 0, "current_streak": 0})
 
-        session["user"] = user_info['email']
-        session["user_id"] = user_id
-        session.permanent = True
+        authenticated_email = user_info['email']
+        authenticated_id = user_id
+
+    session.clear()
+    session["user"] = authenticated_email
+    session["user_id"] = authenticated_id
+    session.permanent = True
 
     return redirect(url_for("onboarding"))
 
 
-@app.route("/logout")
+@app.route("/logout", methods=['POST'])
 def logout():
     session.clear()
     return redirect(url_for("home"))
@@ -1703,7 +1818,7 @@ def onboarding(user):
         onboarding_data = {
             'goal': goal,
             'learning_style': learning_style,
-            'anxieties': request.form.get('anxieties')
+            'anxieties': request.form.get('anxieties', '').strip()[:1000]
         }
         db.update('users', {
             'onboarding_data': json.dumps(onboarding_data),
@@ -1965,7 +2080,7 @@ def account(user):
 
         elif form_type == 'email':
             new_email = request.form.get('email', '').strip().lower()[:254]
-            if '@' not in new_email or new_email.startswith('@') or new_email.endswith('@'):
+            if not re.fullmatch(r"[^@\s]+@[^@\s]+\.[^@\s]+", new_email):
                 return account_error("Enter a valid email address.")
             existing_user = db.select('users', where={'email': new_email})
             if not existing_user or existing_user[0]['id'] == user.data['id']:
@@ -1982,8 +2097,8 @@ def account(user):
 
             if not check_password_hash(user.data['password'], current_password):
                 return account_error("Your current password is incorrect.")
-            if len(new_password) < 8:
-                return account_error("New password must be at least 8 characters.")
+            if not 8 <= len(new_password) <= 128:
+                return account_error("New password must be between 8 and 128 characters.")
             if new_password != confirm_password:
                 return account_error("New passwords do not match.")
             hashed_password = generate_password_hash(new_password)
@@ -2010,30 +2125,35 @@ def test_path_builder(user):
     current_test_path_info = stats.get("test_path", {})
 
     if request.method == "POST":
-
-        test_path = {
-
-            "test_focus": request.form.get("test_focus"),
-            "desired_sat": request.form.get("desired_sat", ""),
-            "desired_act": request.form.get("desired_act", ""),
-
-            "current_sat_ebrw": request.form.get("current_sat_ebrw", ""),
-
-            "current_sat_math": request.form.get("current_sat_math", ""),
-
-            "current_act_composite": request.form.get("current_act_composite", ""),
-
-            "current_act_math": request.form.get("current_act_math", ""),
-
-            "current_act_reading": request.form.get("current_act_reading", ""),
-
-            "current_act_science": request.form.get("current_act_science", ""),
-            "strengths": request.form.get("strengths", ""),
-            "weaknesses": request.form.get("weaknesses", ""),
-            "test_date": request.form.get("test_date", ""),
-
-            "hours_per_week": request.form.get("hours_per_week", "")
-        }
+        try:
+            test_focus = request.form.get("test_focus", "")
+            if test_focus not in {'sat', 'act', 'both'}:
+                raise ValueError("Choose SAT, ACT, or both.")
+            test_date = request.form.get("test_date", "").strip()
+            if test_date:
+                date.fromisoformat(test_date)
+            weaknesses = request.form.get("weaknesses", "").strip()[:2000]
+            if not weaknesses:
+                raise ValueError("Tell Mentics where you need the most help.")
+            test_path = {
+                "test_focus": test_focus,
+                "desired_sat": _optional_number(request.form.get("desired_sat"), 400, 1600, "Desired SAT"),
+                "desired_act": _optional_number(request.form.get("desired_act"), 1, 36, "Desired ACT"),
+                "current_sat_ebrw": _optional_number(request.form.get("current_sat_ebrw"), 200, 800, "Current SAT reading and writing"),
+                "current_sat_math": _optional_number(request.form.get("current_sat_math"), 200, 800, "Current SAT math"),
+                "current_act_composite": _optional_number(request.form.get("current_act_composite"), 1, 36, "Current ACT composite"),
+                "current_act_math": _optional_number(request.form.get("current_act_math"), 1, 36, "Current ACT math"),
+                "current_act_reading": _optional_number(request.form.get("current_act_reading"), 1, 36, "Current ACT reading"),
+                "current_act_science": _optional_number(request.form.get("current_act_science"), 1, 36, "Current ACT science"),
+                "strengths": request.form.get("strengths", "").strip()[:2000],
+                "weaknesses": weaknesses,
+                "test_date": test_date,
+                "hours_per_week": _optional_number(request.form.get("hours_per_week"), 1, 40, "Hours per week"),
+            }
+        except ValueError as error:
+            return render_react("test-builder", {
+                "name": user.get_name(), "error": str(error), **request.form.to_dict()
+            }, "Build Test Path | Mentics", 400)
         stats["test_path"] = test_path
         user.set_stats(stats)
         _generate_and_save_new_test_path(
@@ -2061,11 +2181,20 @@ def test_path_view(user):
 def college_path_builder(user):
     stats = user.get_stats()
     if request.method == "POST":
+        grade = request.form.get('current_grade', '')
+        planning_stage = request.form.get('planning_stage', '')
+        if grade not in {'9', '10', '11', '12'} or planning_stage not in {'exploring', 'researching', 'applying'}:
+            return render_react("college-builder", {
+                "name": user.get_name(), "error": "Choose a valid grade and planning stage.",
+                "grade": grade, "planning_stage": planning_stage,
+                "majors": request.form.get('interested_majors', '').strip()[:2000],
+                "target_colleges": request.form.get('target_colleges', '').strip()[:2000],
+            }, "Build College Path | Mentics", 400)
         college_context = {
-            'grade': request.form.get('current_grade'),
-            'planning_stage': request.form.get('planning_stage'),
-            'majors': request.form.get('interested_majors'),
-            'target_colleges': request.form.get('target_colleges', '')
+            'grade': grade,
+            'planning_stage': planning_stage,
+            'majors': request.form.get('interested_majors', '').strip()[:2000],
+            'target_colleges': request.form.get('target_colleges', '').strip()[:2000]
         }
         stats['college_path'] = college_context
         user.set_stats(stats)
@@ -2141,14 +2270,25 @@ def stats(user):
 def edit_stats(user):
     stats = user.get_stats()
     if request.method == "POST":
-        updated_stats = {
-            "gpa": request.form.get("gpa", ""),
-            "sat_ebrw": request.form.get("sat_ebrw", ""),
-            "sat_math": request.form.get("sat_math", ""),
-            "act_math": request.form.get("act_math", ""),
-            "act_reading": request.form.get("act_reading", ""),
-            "act_science": request.form.get("act_science", "")
-        }
+        try:
+            updated_stats = {
+                "gpa": _optional_number(request.form.get("gpa"), 0, 5, "GPA", integer=False),
+                "sat_ebrw": _optional_number(request.form.get("sat_ebrw"), 200, 800, "SAT reading and writing"),
+                "sat_math": _optional_number(request.form.get("sat_math"), 200, 800, "SAT math"),
+                "act_math": _optional_number(request.form.get("act_math"), 1, 36, "ACT math"),
+                "act_reading": _optional_number(request.form.get("act_reading"), 1, 36, "ACT reading"),
+                "act_science": _optional_number(request.form.get("act_science"), 1, 36, "ACT science"),
+            }
+        except ValueError as error:
+            return render_react("edit-stats", {
+                "name": user.get_name(), "error": str(error),
+                "satEbrw": request.form.get("sat_ebrw", ""),
+                "satMath": request.form.get("sat_math", ""),
+                "actMath": request.form.get("act_math", ""),
+                "actReading": request.form.get("act_reading", ""),
+                "actScience": request.form.get("act_science", ""),
+                "gpa": request.form.get("gpa", ""),
+            }, "Update Progress | Mentics", 400)
 
         for key, value in updated_stats.items():
 
@@ -2177,21 +2317,10 @@ def edit_stats(user):
 @login_required
 def submit_quiz_results(user):
     data = request.get_json(silent=True) or {}
-    # Expecting a list of {'question_id': id, 'is_correct': bool}
-    results = data.get('results')
-    if not results or not isinstance(results, list):
-        return jsonify({"success": False, "error": "Invalid results format"}), 400
-
-    user_id = user.data['id']
-    for result in results:
-        if 'question_id' in result and 'is_correct' in result:
-            db.insert('quiz_results', {
-                'user_id': user_id,
-                'question_id': result.get('question_id'),
-                'is_correct': result.get('is_correct')
-            })
-
-    return jsonify({"success": True})
+    try:
+        return jsonify(_score_assessment_results(user.data['id'], data.get('results'), 'quiz'))
+    except ValueError as error:
+        return jsonify({"success": False, "error": str(error)}), 400
 
 
 @app.route('/api/test-path-status')
@@ -2287,9 +2416,11 @@ def api_tasks(user):
 def get_quiz(user, task_id):
 
     task_info = db.select(
-        "paths", where={"id": task_id, "user_id": user.data['id']})
+        "paths", where={"id": task_id, "user_id": user.data['id'], "is_active": True})
     if not task_info or task_info[0]['task_format'] != 'quiz':
         return jsonify({"error": "Quiz not found or task is not a quiz"}), 404
+    if _has_incomplete_earlier_task(user.data['id'], task_info[0]):
+        return jsonify({"error": "Complete the earlier path step first."}), 409
 
     quiz_id = task_info[0]['task_content_id']
     quiz_details = db.select("quizzes", where={"id": quiz_id})
@@ -2302,9 +2433,7 @@ def get_quiz(user, task_id):
         questions.append({
             "id": q['id'],
             "question_text": q['question_text'],
-            "options": json.loads(q['options']),
-            "correct_option": q['correct_option'],
-            "explanation": q['explanation']
+            "options": json.loads(q['options'])
         })
 
     return jsonify({
@@ -2321,57 +2450,76 @@ def api_update_task_status(user):
     status = data.get("status")
     task_id = data.get("taskId")
 
-    if status == 'complete' and task_id:
-        task_info_list = db.select(
-            "paths", where={"id": task_id, "user_id": user_id})
-        #
-        if task_info_list and not task_info_list[0]['is_completed']:
-            task_info = task_info_list[0]
-            description = task_info['description']
-            category = task_info['category']
-            task_type = task_info['type']
+    if status != 'complete' or not task_id:
+        return jsonify({"success": False, "error": "A valid task and status are required."}), 400
+    task_info = db.select_one("paths", where={
+        "id": task_id, "user_id": user_id, "is_active": True
+    })
+    if not task_info:
+        return jsonify({"success": False, "error": "Task not found."}), 404
+    if task_info['is_completed']:
+        return jsonify({"success": True, "already_completed": True})
+    blocked = db.execute_for_one(
+        """SELECT id FROM paths
+           WHERE user_id=? AND category=? AND is_active=True
+             AND task_order<? AND is_completed=False LIMIT 1""",
+        (user_id, task_info['category'], task_info['task_order'])
+    )
+    if blocked:
+        return jsonify({"success": False, "error": "Complete the earlier path step first."}), 409
+    claimed = db.execute_write(
+        "UPDATE paths SET is_completed=? WHERE id=? AND user_id=? AND is_completed=?",
+        (True, task_id, user_id, False)
+    )
+    if claimed:
+        description = task_info['description']
+        category = task_info['category']
+        task_type = task_info['type']
+        log_activity(user_id, 'task_completed', {
+                     'description': description, 'category': category})
 
-            db.update("paths", {"is_completed": True}, where={
-                      "id": task_id, "user_id": user_id})
-            log_activity(user_id, 'task_completed', {
-                         'description': description, 'category': category})
+        # --- GAMIFICATION LOGIC ---
+        points_to_add = 25 if task_type == 'milestone' else 10
+        if "boss battle" in description.lower():
+            points_to_add = 100
 
-            # --- GAMIFICATION LOGIC ---
-            points_to_add = 25 if task_type == 'milestone' else 10
-            if "boss battle" in description.lower():
-                points_to_add = 100
+        game_stats_rows = db.select(
+            "gamification_stats", where={"user_id": user_id})
+        if not game_stats_rows:
+            db.insert("gamification_stats", {
+                "user_id": user_id, "points": 0, "current_streak": 0
+            })
+            game_stats_rows = db.select(
+                "gamification_stats", where={"user_id": user_id})
+        game_stats_row = game_stats_rows[0]
+        game_stats = {
+            "points": game_stats_row['points'],
+            "streak": game_stats_row['current_streak'],
+            "last_date": game_stats_row['last_completed_date']
+        }
 
-            game_stats_row = db.select(
-                "gamification_stats", where={"user_id": user_id})[0]
-            game_stats = {
-                "points": game_stats_row['points'],
-                "streak": game_stats_row['current_streak'],
-                "last_date": game_stats_row['last_completed_date']
-            }
+        today = date.today()
+        yesterday = today - timedelta(days=1)
+        last_completed_date = None
+        if game_stats['last_date']:
+            last_completed_date = date.fromisoformat(
+                game_stats['last_date'])
 
-            today = date.today()
-            yesterday = today - timedelta(days=1)
-            last_completed_date = None
-            if game_stats['last_date']:
-                last_completed_date = date.fromisoformat(
-                    game_stats['last_date'])
-
+        new_streak = game_stats['streak']
+        if last_completed_date == today:
             new_streak = game_stats['streak']
-            if last_completed_date == today:
+        elif last_completed_date == yesterday:
+            new_streak += 1
+        else:
+            new_streak = 1
 
-                new_streak = game_stats['streak']
-            elif last_completed_date == yesterday:
-
-                new_streak += 1
-            else:
-
-                new_streak = 1
-
-            db.update("gamification_stats", {
-                "points": game_stats['points'] + points_to_add,
-                "current_streak": new_streak,
-                "last_completed_date": today.isoformat()
-            }, where={"user_id": user_id})
+        db.update("gamification_stats", {
+            "points": game_stats['points'] + points_to_add,
+            "current_streak": new_streak,
+            "last_completed_date": today.isoformat()
+        }, where={"user_id": user_id})
+    else:
+        return jsonify({"success": True, "already_completed": True})
 
     return jsonify({"success": True})
 
@@ -2559,6 +2707,17 @@ def add_task(user):
         except ValueError:
             return jsonify({"success": False, "error": "Due date must be a valid date"}), 400
 
+    personal_task_count = db.execute_for_one(
+        """SELECT COUNT(*) AS task_count FROM paths
+           WHERE user_id=? AND category=? AND is_active=True AND is_user_added=True""",
+        (user_id, category)
+    )
+    if personal_task_count and personal_task_count['task_count'] >= 20:
+        return jsonify({
+            "success": False,
+            "error": "This path already has 20 personal steps. Complete or regenerate it before adding more."
+        }), 429
+
     latest_task_query = "SELECT MAX(task_order) as max_order FROM paths WHERE user_id=? AND category=? AND is_active=True"
     max_order_result = db.execute(latest_task_query, (user_id, category))
     new_order = (max_order_result[0]['max_order'] or 0) + 1
@@ -2602,6 +2761,12 @@ def add_subtask(user):
     description = str(description).strip()[:500]
     if not description:
         return jsonify({"success": False, "error": "Description is required"}), 400
+    subtask_count = db.execute_for_one(
+        "SELECT COUNT(*) AS subtask_count FROM subtasks WHERE parent_task_id=?",
+        (parent_task_id,)
+    )
+    if subtask_count and subtask_count['subtask_count'] >= 30:
+        return jsonify({"success": False, "error": "A task can have up to 30 notes and sub-steps."}), 429
 
     subtask_id = db.insert("subtasks", {
         "parent_task_id": parent_task_id,
@@ -2639,6 +2804,9 @@ def update_subtask(user):
     data = request.get_json(silent=True) or {}
     subtask_id = data.get('subtaskId')
     is_completed = data.get('is_completed')
+
+    if not isinstance(is_completed, bool):
+        return jsonify({"success": False, "error": "Completion state must be true or false"}), 400
 
     owned_subtask = db.execute_for_one(
         """SELECT subtasks.id FROM subtasks

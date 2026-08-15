@@ -16,6 +16,23 @@ import './brand-system.css'
 import './liquid-glass.css'
 
 const boot = window.__MENTICS__ || { page: 'landing', data: {} }
+const csrfToken = boot.data.csrfToken || ''
+
+function CsrfField() { return <input type="hidden" name="_csrf_token" value={csrfToken}/> }
+
+function CsrfBootstrap() {
+  useEffect(()=>{
+    const attach=event=>{
+      const form=event.target
+      if(!(form instanceof HTMLFormElement)||String(form.method).toLowerCase()!=='post'||form.querySelector('input[name="_csrf_token"]'))return
+      const field=document.createElement('input')
+      field.type='hidden';field.name='_csrf_token';field.value=csrfToken;form.appendChild(field)
+    }
+    document.addEventListener('submit',attach,true)
+    return()=>document.removeEventListener('submit',attach,true)
+  },[])
+  return null
+}
 
 function Brand({ inverse = false }) {
   return <a className={`brand ${inverse ? 'brand--inverse' : ''}`} href="/" aria-label="Mentics home">MENTICS</a>
@@ -215,11 +232,11 @@ function AppShell({ children, name }) {
     <header className="product-nav">
       <Brand/>
       <nav className={menu?'open':''} aria-label="Product navigation">{navItems.map(([href,Icon,label])=><a key={href} className={active(href)?'active':''} href={href} onClick={event=>travel(event,href,label)}><Icon size={17}/><span>{label}</span></a>)}</nav>
-      <div className="product-account"><a href="/account" onClick={event=>travel(event,'/account','Settings')}><i>{(name||'M').slice(0,1).toUpperCase()}</i><span>{name||'Mentics student'}</span></a><a href="/logout" aria-label="Log out"><LogOut size={17}/></a></div>
+      <div className="product-account"><a href="/account" onClick={event=>travel(event,'/account','Settings')}><i>{(name||'M').slice(0,1).toUpperCase()}</i><span>{name||'Mentics student'}</span></a><form className="product-logout" method="POST" action="/logout"><CsrfField/><button type="submit" aria-label="Log out"><LogOut size={17}/></button></form></div>
       <button className="product-menu" onClick={()=>setMenu(!menu)} aria-label="Toggle navigation">{menu?<X/>:<Menu/>}</button>
     </header>
     {menu&&<button className="menu-scrim" onClick={()=>setMenu(false)} aria-label="Close navigation"/>}
-    <div className="app-stage">{children}</div>
+    <div className="app-stage">{['test-builder','college-builder','edit-stats'].includes(boot.page)&&boot.data.error&&<div className="shell-error" role="alert">{boot.data.error}</div>}{children}</div>
     {navWarp&&<div className="warp-overlay warp-overlay--nav" aria-live="polite"><Starfield warp tone="violet"/><div><Brand inverse/><p>Opening {navWarp.label}</p></div></div>}
   </div>
 }
@@ -288,7 +305,9 @@ function activityTitle(a) {
 function activityDetail(a) { return a.details?.description || a.details?.stat_name || 'A step forward on your Mentics path' }
 
 async function api(url, options = {}) {
-  const response = await fetch(url, {headers:{'Content-Type':'application/json', ...(options.headers || {})}, ...options})
+  const method=String(options.method||'GET').toUpperCase()
+  const csrfHeader=!['GET','HEAD','OPTIONS'].includes(method)&&csrfToken?{'X-CSRF-Token':csrfToken}:{}
+  const response = await fetch(url, {headers:{'Content-Type':'application/json',...csrfHeader,...(options.headers || {})}, ...options})
   const data = await response.json().catch(()=>({}))
   if (!response.ok) throw new Error(data.error || 'Something went wrong. Please try again.')
   return data
@@ -306,7 +325,7 @@ function PathPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [selected, setSelected] = useState(null)
-  const [chatOpen, setChatOpen] = useState(()=>window.matchMedia('(min-width: 1100px)').matches)
+  const [chatOpen, setChatOpen] = useState(()=>window.matchMedia('(min-width: 1280px)').matches)
   const [adding, setAdding] = useState(false)
   const [essayOpen, setEssayOpen] = useState(false)
   const builder = isTest ? '/dashboard/test-path-builder' : '/dashboard/college-path-builder'
@@ -406,7 +425,11 @@ function TaskModal({task,category,onClose,onUpdate,onCompleted}) {
 
 function AddTask({category,onClose,onAdded}) { const [description,setDescription]=useState('');const [date,setDate]=useState('');const [error,setError]=useState('');const submit=async e=>{e.preventDefault();setError('');try{const r=await api('/api/add_task',{method:'POST',body:JSON.stringify({description,category,due_date:date||null})});onAdded(r.task)}catch(x){setError(x.message)}};return <Modal onClose={onClose}><div className="modal-kicker">ADD A PERSONAL STEP</div><h2>Make the path yours.</h2><form className="modal-form" onSubmit={submit}><label>What do you want to do?<textarea autoFocus value={description} onChange={e=>setDescription(e.target.value)} placeholder="Write a clear, finishable action" maxLength={500}/></label><label>Due date <span>optional</span><input type="date" value={date} onChange={e=>setDate(e.target.value)}/></label>{error&&<p className="form-error">{error}</p>}<button className="button button--primary" disabled={!description.trim()}>Add to path <ArrowRight/></button></form></Modal> }
 
-function Assessment({data,onClose}) { const [answers,setAnswers]=useState({});const [result,setResult]=useState(null);const questions=data.questions||[];const submit=async()=>{const rows=questions.map(q=>({question_id:q.id,is_correct:Number(answers[q.id])===q.correct_option}));await api(data.kind==='quiz'?'/api/submit_quiz_results':'/api/submit_sprint_results',{method:'POST',body:JSON.stringify({results:rows})});setResult(rows.filter(x=>x.is_correct).length)};return <Modal onClose={onClose} wide><div className="modal-kicker">FOCUSED CHECK</div><h2>{data.title}</h2>{result==null?<><div className="questions">{questions.map((q,i)=><fieldset key={q.id}><legend>{i+1}. {q.question_text}</legend>{q.options.map((o,oi)=><label key={oi}><input type="radio" name={`q-${q.id}`} checked={Number(answers[q.id])===oi} onChange={()=>setAnswers({...answers,[q.id]:oi})}/><span>{o}</span></label>)}</fieldset>)}</div><button className="button button--primary" disabled={Object.keys(answers).length!==questions.length} onClick={submit}>Check answers</button></>:<div className="assessment-result"><Trophy/><h3>{result} of {questions.length} correct</h3><p>Review the explanations, then mark this path step complete when you are ready.</p>{questions.map((q,i)=><details key={q.id}><summary>Question {i+1}</summary><p>{q.explanation}</p></details>)}<button className="button button--dark" onClick={onClose}>Back to task</button></div>}</Modal> }
+function Assessment({data,onClose}) {
+  const [answers,setAnswers]=useState({});const [result,setResult]=useState(null);const [busy,setBusy]=useState(false);const [error,setError]=useState('');const questions=data.questions||[]
+  const submit=async()=>{setBusy(true);setError('');const rows=questions.map(q=>({question_id:q.id,selected_option:Number(answers[q.id])}));try{setResult(await api(data.kind==='quiz'?'/api/submit_quiz_results':'/api/submit_sprint_results',{method:'POST',body:JSON.stringify({results:rows})}))}catch(e){setError(e.message)}finally{setBusy(false)}}
+  return <Modal onClose={onClose} wide><div className="modal-kicker">FOCUSED CHECK</div><h2>{data.title}</h2>{result==null?<><div className="questions">{questions.map((q,i)=><fieldset key={q.id}><legend>{i+1}. {q.question_text}</legend>{q.options.map((o,oi)=><label key={oi}><input type="radio" name={`q-${q.id}`} checked={Number(answers[q.id])===oi} onChange={()=>setAnswers({...answers,[q.id]:oi})}/><span>{o}</span></label>)}</fieldset>)}</div>{error&&<p className="form-error">{error}</p>}<button className="button button--primary" disabled={busy||Object.keys(answers).length!==questions.length} onClick={submit}>{busy?'Checking…':'Check answers'}</button></>:<div className="assessment-result"><Trophy/><h3>{result.correct} of {result.total} correct</h3><p>Review the explanations, then mark this path step complete when you are ready.</p>{questions.map((q,i)=>{const detail=result.results?.find(row=>row.question_id===q.id);return <details key={q.id}><summary>Question {i+1} · {detail?.is_correct?'Correct':'Review'}</summary><p>{detail?.explanation||'Review this concept and try a similar question.'}</p></details>})}<button className="button button--dark" onClick={onClose}>Back to task</button></div>}</Modal>
+}
 
 function EssayCoach({onClose}){const [prompt,setPrompt]=useState('');const [essay,setEssay]=useState('');const [feedback,setFeedback]=useState('');const [busy,setBusy]=useState(false);const analyze=async()=>{if(essay.trim().length<50)return;setBusy(true);try{setFeedback((await api('/api/analyze_essay',{method:'POST',body:JSON.stringify({essay_text:essay,essay_prompt:prompt||'a general college application essay'})})).feedback)}catch(e){setFeedback(e.message)}finally{setBusy(false)}};return <Modal onClose={onClose} wide><div className="modal-kicker">MENTICS ESSAY COACH</div><h2>Strengthen the essay without losing your voice.</h2><div className="essay-workspace"><label>Essay prompt<input value={prompt} onChange={e=>setPrompt(e.target.value)} placeholder="Common App prompt or supplemental question"/></label><label>Essay draft<textarea value={essay} onChange={e=>setEssay(e.target.value)} rows="12" maxLength="20000" placeholder="Paste your draft here..."/></label><button className="button button--primary" onClick={analyze} disabled={busy||essay.trim().length<50}>{busy?'Analyzing…':'Get structured feedback'} <Sparkles/></button>{feedback&&<div className="essay-feedback"><Markdown>{feedback}</Markdown></div>}</div></Modal>}
 
@@ -425,7 +448,7 @@ function PageIntro({kicker,title,copy,actions}) {
 
 function AuthPage({mode}) {
   const signup = mode === 'signup'
-  return <div className="auth-page"><div className="auth-brand"><Brand/></div><div className="auth-art"><span className="shape shape--peach"/><span className="shape shape--mint"/><div><small>YOUR NEXT CHAPTER</small><h1>Ambition feels better with a plan.</h1><p>Build momentum across test prep, college planning, and every goal between.</p></div></div><main className="auth-panel"><div className="auth-copy"><small>{signup?'START YOUR PATH':'WELCOME BACK'}</small><h2>{signup?'Join Mentics.':'Continue building.'}</h2><p>{signup?'Your focused workspace is a minute away.':'Your goals and progress are waiting.'}</p></div>{boot.data.error&&<div className="form-error" role="alert">{boot.data.error}</div>}<form method="POST" className="react-form">{signup&&<label>Full name<input name="name" autoComplete="name" required maxLength="100" placeholder="Your name"/></label>}<label>Email address<input type="email" name="email" autoComplete="email" required placeholder="you@example.com"/></label><label>Password<input type="password" name="password" autoComplete={signup?'new-password':'current-password'} minLength={signup?8:undefined} required placeholder={signup?'At least 8 characters':'Your password'}/></label><button className="button button--primary" type="submit">{signup?'Create my account':'Sign in'} <ArrowRight/></button></form><div className="form-divider"><span>or</span></div><a className="google-button" href="/google-login"><span>G</span> Continue with Google</a><p className="auth-switch">{signup?'Already have an account?':'New to Mentics?'} <a href={signup?'/login':'/signup'}>{signup?'Sign in':'Create an account'}</a></p></main></div>
+  return <div className="auth-page"><div className="auth-brand"><Brand/></div><div className="auth-art"><span className="shape shape--peach"/><span className="shape shape--mint"/><div><small>YOUR NEXT CHAPTER</small><h1>Ambition feels better with a plan.</h1><p>Build momentum across test prep, college planning, and every goal between.</p></div></div><main className="auth-panel"><div className="auth-copy"><small>{signup?'START YOUR PATH':'WELCOME BACK'}</small><h2>{signup?'Join Mentics.':'Continue building.'}</h2><p>{signup?'Your focused workspace is a minute away.':'Your goals and progress are waiting.'}</p></div>{boot.data.error&&<div className="form-error" role="alert">{boot.data.error}</div>}<form method="POST" className="react-form"><CsrfField/>{signup&&<label>Full name<input name="name" autoComplete="name" required maxLength="100" placeholder="Your name"/></label>}<label>Email address<input type="email" name="email" autoComplete="email" required placeholder="you@example.com"/></label><label>Password<input type="password" name="password" autoComplete={signup?'new-password':'current-password'} minLength={signup?8:undefined} maxLength="128" required placeholder={signup?'At least 8 characters':'Your password'}/></label><button className="button button--primary" type="submit">{signup?'Create my account':'Sign in'} <ArrowRight/></button></form><div className="form-divider"><span>or</span></div><a className="google-button" href="/google-login"><span>G</span> Continue with Google</a><p className="auth-switch">{signup?'Already have an account?':'New to Mentics?'} <a href={signup?'/login':'/signup'}>{signup?'Sign in':'Create an account'}</a></p></main></div>
 }
 
 const learningOptions = [['visual','Visual',Sparkles,'I learn by seeing'],['auditory','Auditory',Headphones,'I learn by hearing'],['reading_writing','Reading / writing',PenLine,'I learn through words'],['kinesthetic','Hands-on',Hand,'I learn by doing']]
@@ -463,7 +486,7 @@ function ForumPage(){const d=boot.data;const [creating,setCreating]=useState(fal
 
 function LeaderboardPage(){const d=boot.data;return <AppShell name={d.name}><main className="app-main"><PageIntro kicker="COMMUNITY MOMENTUM" title="Consistency deserves the spotlight." copy="Points celebrate completed work—not comparison for its own sake."/><section className="leaderboard-list">{d.leaderboard?.map((row,index)=><article className={index<3?'top':''} key={`${row.name}-${index}`}><span>{index+1}</span><div>{String(row.name||'M').slice(0,1).toUpperCase()}</div><b>{row.name}</b><strong>{row.points} pts</strong>{index===0&&<Trophy/>}</article>)}</section></main></AppShell>}
 
-function AccountPage(){const d=boot.data;return <AppShell name={d.name}><main className="app-main form-page"><PageIntro kicker="YOUR ACCOUNT" title="Make Mentics yours." copy="Keep your identity and sign-in details current."/>{d.updated&&<div className="success-banner"><Check/> Your account was updated.</div>}{d.error&&<div className="form-error">{d.error}</div>}<section className="account-sections"><form method="POST"><input type="hidden" name="form_type" value="name"/><div><UserRound/><span><h2>Your name</h2><p>How Mentics addresses you.</p></span></div><Field name="name" label="Full name" value={d.name} required/><button className="button button--primary">Save name</button></form><form method="POST"><input type="hidden" name="form_type" value="email"/><div><Mail/><span><h2>Email address</h2><p>Where you sign in.</p></span></div><Field name="email" label="Email" type="email" value={d.email} required/><button className="button button--primary">Save email</button></form><form method="POST"><input type="hidden" name="form_type" value="password"/><div><ShieldCheck/><span><h2>Password</h2><p>Use at least eight characters.</p></span></div><Field name="current_password" label="Current password" type="password" required/><Field name="new_password" label="New password" type="password" minLength="8" required/><Field name="confirm_password" label="Confirm new password" type="password" minLength="8" required/><button className="button button--primary">Change password</button></form></section><a className="logout-link" href="/logout">Sign out of Mentics <ArrowRight/></a></main></AppShell>}
+function AccountPage(){const d=boot.data;return <AppShell name={d.name}><main className="app-main form-page"><PageIntro kicker="YOUR ACCOUNT" title="Make Mentics yours." copy="Keep your identity and sign-in details current."/>{d.updated&&<div className="success-banner"><Check/> Your account was updated.</div>}{d.error&&<div className="form-error">{d.error}</div>}<section className="account-sections"><form method="POST"><input type="hidden" name="form_type" value="name"/><div><UserRound/><span><h2>Your name</h2><p>How Mentics addresses you.</p></span></div><Field name="name" label="Full name" value={d.name} required maxLength="100"/><button className="button button--primary">Save name</button></form><form method="POST"><input type="hidden" name="form_type" value="email"/><div><Mail/><span><h2>Email address</h2><p>Where you sign in.</p></span></div><Field name="email" label="Email" type="email" value={d.email} required maxLength="254"/><button className="button button--primary">Save email</button></form><form method="POST"><input type="hidden" name="form_type" value="password"/><div><ShieldCheck/><span><h2>Password</h2><p>Use at least eight characters.</p></span></div><Field name="current_password" label="Current password" type="password" required maxLength="128"/><Field name="new_password" label="New password" type="password" minLength="8" maxLength="128" required/><Field name="confirm_password" label="Confirm new password" type="password" minLength="8" maxLength="128" required/><button className="button button--primary">Change password</button></form></section><form className="logout-link" method="POST" action="/logout"><CsrfField/><button type="submit">Sign out of Mentics <ArrowRight/></button></form></main></AppShell>}
 
 const legalCopy = {
   privacy: {
@@ -504,4 +527,4 @@ function ArticlePage(){const d=boot.data;return <AppShell name={d.name}><main cl
 
 function App(){switch(boot.page){case'dashboard':return <Dashboard/>;case'path':return <PathPage/>;case'login':return <AuthPage mode="login"/>;case'signup':return <AuthPage mode="signup"/>;case'onboarding':return <Onboarding/>;case'stats':return <StatsPage/>;case'edit-stats':return <EditStats/>;case'test-builder':return <BuilderPage kind="test"/>;case'college-builder':return <BuilderPage kind="college"/>;case'tracker':return <TrackerPage/>;case'forum':return <ForumPage/>;case'leaderboard':return <LeaderboardPage/>;case'account':return <AccountPage/>;case'privacy':return <LegalPage type="privacy"/>;case'terms':return <LegalPage type="terms"/>;case'article':return <ArticlePage/>;default:return <Landing/>}}
 
-createRoot(document.getElementById('root')).render(<React.StrictMode><App/></React.StrictMode>)
+createRoot(document.getElementById('root')).render(<React.StrictMode><CsrfBootstrap/><App/></React.StrictMode>)

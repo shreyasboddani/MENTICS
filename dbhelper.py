@@ -6,6 +6,12 @@ import sqlite3
 
 
 class DatabaseHandler:
+    _identifier_pattern = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
+    _order_by_pattern = re.compile(
+        r"^[A-Za-z_][A-Za-z0-9_]*(?:\s+(?:ASC|DESC))?(?:\s+LIMIT\s+[1-9][0-9]*)?$",
+        flags=re.I,
+    )
+
     def __init__(self, database):
         self.database = database
         self.is_postgres = database.startswith(("postgres://", "postgresql://"))
@@ -26,6 +32,26 @@ class DatabaseHandler:
         query = query.replace("?", "%s")
         query = re.sub(r"\bis_correct\s*=\s*0\b", "is_correct = FALSE", query, flags=re.I)
         return re.sub(r"\bis_correct\s*=\s*1\b", "is_correct = TRUE", query, flags=re.I)
+
+    @classmethod
+    def _identifier(cls, value):
+        value = str(value)
+        if not cls._identifier_pattern.fullmatch(value):
+            raise ValueError(f"Unsafe database identifier: {value!r}")
+        return value
+
+    @classmethod
+    def _columns(cls, columns):
+        if columns == "*":
+            return "*"
+        values = columns if isinstance(columns, (list, tuple)) else [columns]
+        return ", ".join(cls._identifier(value) for value in values)
+
+    @classmethod
+    def _order_by(cls, value):
+        if value and not cls._order_by_pattern.fullmatch(str(value)):
+            raise ValueError(f"Unsafe ORDER BY expression: {value!r}")
+        return value
 
     @staticmethod
     def _row(row):
@@ -51,7 +77,20 @@ class DatabaseHandler:
         finally:
             conn.close()
 
+    def execute_write(self, query, params=None):
+        """Execute a parameterized mutation and return the affected row count."""
+        conn = self._connect()
+        try:
+            cursor = conn.cursor()
+            cursor.execute(self._query(query), params or ())
+            affected = cursor.rowcount
+            conn.commit()
+            return affected
+        finally:
+            conn.close()
+
     def create_table(self, table_name, columns):
+        table_name = self._identifier(table_name)
         definitions = []
         for name, column_type in columns.items():
             if self.is_postgres:
@@ -60,6 +99,8 @@ class DatabaseHandler:
         self.execute(f"CREATE TABLE IF NOT EXISTS {table_name} ({', '.join(definitions)})")
 
     def add_column(self, table_name, column_name, column_type):
+        table_name = self._identifier(table_name)
+        column_name = self._identifier(column_name)
         if self.is_postgres:
             self.execute(f"ALTER TABLE {table_name} ADD COLUMN IF NOT EXISTS {column_name} {column_type}")
             return
@@ -70,9 +111,10 @@ class DatabaseHandler:
                 raise
 
     def insert(self, table_name, data):
-        columns = ", ".join(data)
+        table_name = self._identifier(table_name)
+        columns = self._columns(list(data))
         placeholders = ", ".join(["?"] * len(data))
-        query = f"INSERT INTO {table_name} ({columns}) VALUES ({placeholders})"
+        query = f"INSERT INTO {table_name} ({columns}) VALUES ({placeholders})"  # nosec B608
         conn = self._connect()
         try:
             cursor = conn.cursor()
@@ -90,32 +132,45 @@ class DatabaseHandler:
             conn.close()
 
     def update(self, table_name, data, where):
-        set_clause = ", ".join(f"{key}=?" for key in data)
-        where_clause = " AND ".join(f"{key}=?" for key in where)
-        self.execute(f"UPDATE {table_name} SET {set_clause} WHERE {where_clause}", tuple(data.values()) + tuple(where.values()))
+        table_name = self._identifier(table_name)
+        data_keys = [self._identifier(key) for key in data]
+        where_keys = [self._identifier(key) for key in where]
+        set_clause = ", ".join(f"{key}=?" for key in data_keys)
+        where_clause = " AND ".join(f"{key}=?" for key in where_keys)
+        query = f"UPDATE {table_name} SET {set_clause} WHERE {where_clause}"  # nosec B608
+        self.execute(query, tuple(data.values()) + tuple(where.values()))
 
     def delete(self, table_name, where):
-        where_clause = " AND ".join(f"{key}=?" for key in where)
-        self.execute(f"DELETE FROM {table_name} WHERE {where_clause}", tuple(where.values()))
+        table_name = self._identifier(table_name)
+        where_keys = [self._identifier(key) for key in where]
+        where_clause = " AND ".join(f"{key}=?" for key in where_keys)
+        query = f"DELETE FROM {table_name} WHERE {where_clause}"  # nosec B608
+        self.execute(query, tuple(where.values()))
 
     def select(self, table_name, columns="*", where=None, order_by=None):
-        columns = ", ".join(columns) if isinstance(columns, list) else columns
-        query = f"SELECT {columns} FROM {table_name}"
+        table_name = self._identifier(table_name)
+        columns = self._columns(columns)
+        order_by = self._order_by(order_by)
+        query = f"SELECT {columns} FROM {table_name}"  # nosec B608
         params = ()
         if where:
-            query += " WHERE " + " AND ".join(f"{key}=?" for key in where)
+            where_keys = [self._identifier(key) for key in where]
+            query += " WHERE " + " AND ".join(f"{key}=?" for key in where_keys)
             params = tuple(where.values())
         if order_by:
             query += f" ORDER BY {order_by}"
         return self.execute(query, params)
 
     def upsert(self, table_name, data, conflict_target):
-        columns = ", ".join(data)
+        table_name = self._identifier(table_name)
+        data_keys = [self._identifier(key) for key in data]
+        conflict_target = [self._identifier(key) for key in conflict_target]
+        columns = ", ".join(data_keys)
         placeholders = ", ".join(["?"] * len(data))
-        update_columns = [key for key in data if key not in conflict_target]
+        update_columns = [key for key in data_keys if key not in conflict_target]
         set_clause = ", ".join(f"{key}=excluded.{key}" for key in update_columns)
         query = (f"INSERT INTO {table_name} ({columns}) VALUES ({placeholders}) "
-                 f"ON CONFLICT({', '.join(conflict_target)}) DO UPDATE SET {set_clause}")
+                 f"ON CONFLICT({', '.join(conflict_target)}) DO UPDATE SET {set_clause}")  # nosec B608
         self.execute(query, tuple(data.values()))
 
     def execute_for_one(self, query, params=None):
@@ -128,11 +183,14 @@ class DatabaseHandler:
             conn.close()
 
     def select_one(self, table_name, columns="*", where=None, order_by=None):
-        columns = ", ".join(columns) if isinstance(columns, list) else columns
-        query = f"SELECT {columns} FROM {table_name}"
+        table_name = self._identifier(table_name)
+        columns = self._columns(columns)
+        order_by = self._order_by(order_by)
+        query = f"SELECT {columns} FROM {table_name}"  # nosec B608
         params = ()
         if where:
-            query += " WHERE " + " AND ".join(f"{key}=?" for key in where)
+            where_keys = [self._identifier(key) for key in where]
+            query += " WHERE " + " AND ".join(f"{key}=?" for key in where_keys)
             params = tuple(where.values())
         if order_by:
             query += f" ORDER BY {order_by}"

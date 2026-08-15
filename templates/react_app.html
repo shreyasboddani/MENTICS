@@ -10,13 +10,13 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Lalezar&display=swap" rel="stylesheet">
   <link rel="icon" href="{{ url_for('static', filename='favicon.svg') }}" type="image/svg+xml">
-  <link rel="stylesheet" href="{{ url_for('static', filename='react/app.css', v='20260814-liquid') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='react/app.css', v='20260814-rail') }}">
 </head>
 <body>
   <div id="root"></div>
-  <script>
+  <script nonce="{{ csp_nonce }}">
     window.__MENTICS__ = {{ {"page": page, "data": bootstrap}|tojson }};
   </script>
-  <script type="module" src="{{ url_for('static', filename='react/app.js', v='20260814-liquid') }}"></script>
+  <script type="module" src="{{ url_for('static', filename='react/app.js', v='20260814-rail') }}"></script>
 </body>
 </html>
