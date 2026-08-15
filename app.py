@@ -766,175 +766,247 @@ def build_strategy_article(skill, weakness_note, task_description=""):
     if strategy_type == "tool":
         content = f"""# {title}
 
-## Why this matters
+## What you need to know for the quiz
+
 {core_message}
 
-This sprint is built around {focus_line}, and the goal is to take the mystery out of using this tool. Most students either avoid the tool entirely or use it without understanding the output. The real skill is knowing exactly what to test and how to read the results.
+> **Your focus:** {weakness_text}
 
-> Focus point: {weakness_text}
+### Essential concepts and skills for this topic
 
-## Step 1: Master the syntax and setup
-Before you can use {focus_line} effectively, you need to know the correct syntax and how to structure your input.
+For {focus_line}, you need to master these exact ideas:
 
-For table regression specifically:
-- Create a table with your data: x1 and y1 columns with your actual data points.
-- Use the correct formula structure: y1 ~ [formula involving x1]
-- Common formulas to test: y1 ~ a*x1 + b (linear), y1 ~ a*x1^2 + b*x1 + c (quadratic), y1 ~ a*exp(b*x1) (exponential)
-- Always start with the simplest model (linear) and move to more complex ones only if needed.
+**The core idea:** Regression finds the best-fitting mathematical relationship between data points. Instead of guessing, you test multiple formulas and let the tool calculate which one fits the data most accurately.
 
-Syntax errors waste time. Get this right once, and you can reuse the pattern for every problem.
+**How it works:**
+1. Collect your data in a table with independent variable (x) and dependent variable (y).
+2. Test different models: linear (y ~ ax + b), quadratic (y ~ ax² + bx + c), exponential (y ~ ae^(bx)), etc.
+3. The tool calculates coefficients (a, b, c) and gives you a fit quality score (R²).
+4. Compare fit scores and choose the model with the best match to your actual data.
 
-## Step 2: Understand what each output number means
-The tool will give you coefficients (a, b, c) and a fit statistic (usually R²). Here is what to look for:
+### Key definitions and formulas
 
-- **Coefficients (a, b, c)**: These are the numbers you plug into your formula. If your regression is y1 ~ a*x1^2 + b*x1 + c, your fitted equation is y = [a value]*x² + [b value]*x + [c value].
-- **R² value**: This tells you how well the model fits the data. R² ranges from 0 to 1. Closer to 1 is better. R² = 0.95 is excellent; R² = 0.85 is good; R² < 0.70 suggests the model is not a great fit.
-- **Residual plot**: If the tool shows a residual plot, look for random scatter. If residuals are clustered or curved, your model may not be the best choice.
+- **Linear regression:** y = ax + b (straight line relationship)
+- **Quadratic regression:** y = ax² + bx + c (parabola/curved relationship)
+- **Exponential regression:** y = ae^(bx) (rapid growth or decay)
+- **R² (coefficient of determination):** Ranges from 0 to 1. R² = 0.95 means the model explains 95% of the variation in the data. Higher R² = better fit.
+- **Residuals:** The differences between actual y-values and predicted y-values. Look for random scatter, not patterns.
+- **Tilde syntax (~):** In Desmos, y1 ~ formula means "fit this formula to the data."
 
-A lot of students ignore R² and just grab the first formula. That is a mistake. Always check how well the model fits before finalizing your answer.
+### Worked examples with real numbers
 
-## Step 3: Test your formula with real data
-Once the tool gives you coefficients, verify that your equation actually works:
+**Example 1: Linear regression**
+Data: (1, 3), (2, 5), (3, 7), (4, 9)
+- Formula to test: y1 ~ a*x1 + b
+- Result: y = 2x + 1 (a = 2, b = 1)
+- R² = 1.0 (perfect fit because the data is perfectly linear)
+- Check: When x = 2, y = 2(2) + 1 = 5 ✓ (matches the data)
 
-1. Pick a data point from your table (e.g., x = 2, y = 10).
-2. Plug x = 2 into your fitted equation and compute the y value.
-3. Compare your computed y with the actual y in the data.
-4. If they are close, the fit is working. If they are far apart, something is wrong.
+**Example 2: Quadratic regression**
+Data: (0, 0), (1, 1), (2, 4), (3, 9)
+- Formula to test: y1 ~ a*x1^2 + b*x1 + c
+- Result: y = x² (a = 1, b = 0, c = 0)
+- R² = 1.0 (perfect fit for quadratic data)
+- This is a better fit than linear because the data follows a curved pattern.
 
-This step catches errors before you lock in an answer. Do not skip it.
+**Example 3: Choosing between models**
+Data with growth pattern: (0, 1), (1, 2), (2, 4), (3, 8), (4, 16)
+- Linear model: R² = 0.88 (not great)
+- Exponential model: y = e^(0.693*x), R² = 0.99 (excellent)
+- **Decision:** Use exponential because it fits much better.
 
-## Step 4: A concrete worked example
-### Worked example
-{sample_prompt}
+### Common mistakes to watch for
 
-The key move is not just clicking a button—it is understanding what each part means and making sure the result makes sense.
+- **Wrong syntax:** Using y instead of y1, or x instead of x1, or missing the tilde (~).
+- **Trusting R² blindly:** A high R² might mean the formula is overcomplicated. Always check if simpler models fit just as well.
+- **Not testing multiple models:** Always try at least linear and quadratic before settling on your answer.
+- **Forgetting to verify:** Do not just read the coefficients. Plug one data point into your fitted equation and check it matches.
+- **Misinterpreting coefficients:** Remember, in y = ax² + bx + c, 'a' is not the same as 'a' in y = ax + b.
 
-## Step 5: The decision checklist
-Before you submit a regression-based answer, ask yourself:
+### Real situations where you'll use this
+
+- Predicting population growth from historical data.
+- Finding the best relationship between test prep hours and SAT scores.
+- Analyzing scientific experiments where you collect data and need to find a model.
+- Financial projections based on historical trends.
+
+---
+
+## Quiz and sprint strategies
+
+Now that you know the content, here is how to apply it on the quiz:
+
+### Before you start solving
+
+1. **Read the data.** Count the number of points. Look for obvious patterns (straight line, curve, exponential growth).
+2. **Name the pattern.** Is it linear, quadratic, or exponential? Do not guess—look at the shape.
+3. **Decide which models to test.** If data looks curved, test quadratic. If it explodes, test exponential.
+
+### While you are working
+
+4. **Set up the table correctly.** Use x1 and y1 columns with exact data.
+5. **Test formulas in order:** Linear first → Quadratic second → Exponential third (if needed).
+6. **Record all R² values.** Do not move on until you have tried at least two models.
+7. **Compare and pick.** The model with the highest R² wins, but check that it makes sense in context.
+
+### Before you submit
+
+8. **Verify with one data point.** Pick an (x, y) pair from the data, plug x into your fitted equation, and check y.
+9. **Check reasonableness.** Does the model make sense for the real-world situation? (Negative population? Faster-than-light growth? Red flag.)
+10. **Make sure you answered the actual question.** The problem might ask for the equation, the R² value, or a prediction. Answer exactly what is asked.
+
+### Decision checklist
+
 - {checklist[0]}
 - {checklist[1]}
 - {checklist[2]}
 - {checklist[3]}
 
-If you can answer these honestly, you are ready.
+### 30-second pre-answer review
 
-## Step 6: Common traps to avoid
-- Using the wrong formula structure (e.g., forgetting the tilde ~ or using x instead of x1).
-- Trusting a high R² without checking whether the coefficients make sense in context.
-- Comparing models with different variable types (do not mix linear and exponential and then pick the one with the highest R² without thinking).
-- Forgetting to check whether the fitted equation actually matches your data points.
-- Overcomplicating the model when a simpler one fits just as well.
+Before you lock in your answer:
+1. What is the highest R² value I got? (This should be your chosen model.)
+2. Did I verify this fit with at least one actual data point?
+3. Does this equation make sense in the real-world context?
+4. Did I answer the exact question being asked?
 
-Tool mastery includes knowing when NOT to use a more complex model. Simpler is better when the fit is similar.
+If you can say yes to all four, you are ready to move on.
 
-## Quick drill for the sprint or quiz
-Before the next question, do this in under 20 seconds:
-1. Do I need to test multiple regression models or just one?
-2. Which formula structure should I try first?
-3. What does the R² or fit statistic tell me?
-4. Does the fitted equation make sense in the real-world context?
-5. Can I verify the fit by plugging in one actual data point?
+---
 
-That routine will move you from guessing toward deliberate tool use.
+## Study tips for practice
 
-## Final takeaway
-The best way to improve {focus_line} is to:
-- Master the correct syntax so you can set it up in seconds.
-- Understand what each output means (coefficients, fit statistics).
-- Always verify that the fit makes sense by testing with real data.
-- Compare models deliberately, not randomly.
-- Use the simplest model that fits well—avoid overcomplicating.
-
-Once you repeat this process, {focus_line} becomes predictable and fast. You are not hoping the tool gives you a magic answer; you are using it as a tool to confirm your reasoning and find the best model for your data.
+- **Drill the syntax:** Open Desmos and type y1 ~ a*x1 + b with your own test data. Do this 5 times until it is muscle memory.
+- **Compare models yourself:** Take a dataset and run linear, quadratic, and exponential. See which R² wins and why.
+- **Spot patterns by eye:** Before using the tool, guess which model will fit best. Then check if you were right.
+- **Understand residuals:** Plot your residuals and see if they are random or clustered. Clustered residuals mean your model is missing something.
 """
     else:
         content = f"""# {title}
 
-## Why this matters
+## What you need to know for the quiz
+
 {core_message}
 
-This sprint is built around {focus_line}, and the goal is to make this skill feel systematic instead of random. Students usually struggle not because they are incapable, but because they do not slow down enough to identify the exact pattern the question is testing.
+> **Your focus:** {weakness_text}
 
-> Focus point: {weakness_text}
+### Essential concepts and skills for this topic
 
-## Step 1: Define what the question is really asking
-Before you start solving, stop and classify the task.
+For {focus_line}, you need to understand these core ideas before the quiz:
 
-- What is the core skill: identifying a relationship, simplifying an expression, choosing the strongest evidence, correcting grammar, or interpreting meaning?
-- What is the question actually asking for: a value, a comparison, a best explanation, a rule, or a sentence rewrite?
-- What is the trap: a misleading answer choice, a hidden constraint, or a detailed sentence that sounds correct but does not match the exact requirement?
+**The main concept:** {skill_name} is not a trick—it follows predictable patterns. Once you recognize the pattern, the solution becomes straightforward.
 
-If you can name the structure first, the rest is much easier.
+**Why it matters:** Students often struggle with {focus_line} because they try to solve it without first understanding what the question is really asking. A few seconds of classification saves minutes of wasted work.
 
-## Step 2: Use a repeatable method
-For {focus_line}, use the same process every time:
-1. Rewrite the information in the simplest form possible.
-2. Identify the rule, pattern, or grammar principle that matters most.
-3. Solve with the cleanest method available, not the most complicated one.
-4. Check the answer against the exact wording of the prompt.
-5. Eliminate wrong answers that are close but not actually correct.
+### Key definitions and important principles
 
-A lot of missed questions happen because students either jump to a method too early or never check whether their final answer fits the prompt.
-
-## Step 3: What to look for in this skill
-When you are working on {focus_line}, pay attention to these clues:
-- Keywords that signal a structure: compare, estimate, interpret, prove, rewrite, best supports, simplest form, equivalent, most likely, least likely.
-- Hidden constraints: units, time, percentages, pronouns, commas, transitions, sentence boundaries, or cause-and-effect logic.
-- Answer-choice traps: answers that sound logical but are too broad, too specific, too absolute, or ignore the text around the blank.
-
-This is where strong test-taking becomes different from "good guessing." Strong students are reading for signal, not just trying to finish quickly.
-
-## Step 4: A concrete worked example
-### Worked example
 {sample_prompt}
 
-This is the real move: get specific. Do not just read the question and hope. The right process is to name the pattern, apply the rule, and check the result in context.
+These are the exact ideas you will see in different forms on the quiz. Learn to recognize them:
 
-For example:
-- Identify the exact rule you need.
-- Translate the question into plain language.
-- Solve in a direct line of thinking.
-- Check whether your answer is consistent with the question's wording and logic.
+- **Pattern 1:** {skill_name} questions that test [core relationship/grammar concept]
+- **Pattern 2:** Variations where the [setup/wording] changes but the underlying principle stays the same
+- **Pattern 3:** Trap questions designed to catch students who skip the classification step
 
-The point is not speed first. The point is precision. A clean, correct method beats a flashy but careless one every time.
+### Worked examples with full explanations
 
-## Step 5: The decision checklist
-Before submitting an answer, ask yourself:
+**Example 1: Straightforward case**
+This is the most common form you will see. Here is how to solve it:
+- Identify the pattern → Name the rule → Apply the rule → Check the result
+
+**Example 2: Variation with a twist**
+When the problem looks different, do not panic. The core principle is the same; only the context changes. Go through the same steps.
+
+**Example 3: Trap answer included**
+Watch for wrong answer choices that:
+- Look correct at first glance
+- Miss a small but critical constraint
+- Solve a different problem entirely
+- Are mathematically close but not actually right
+
+### Common misconceptions to avoid
+
+- Assuming the problem is asking for X when it is actually asking for Y
+- Using a method that works for similar problems but not this specific type
+- Skipping the verification step and hoping your answer is right
+- Choosing the first answer that "looks reasonable"
+- Missing hidden constraints or special conditions in the wording
+
+### Real-world applications
+
+{skill_name} appears in:
+- Standardized test questions (SAT, ACT, AP exams)
+- College math and science courses
+- Professional certifications
+- Data analysis and problem-solving in careers
+
+---
+
+## Quiz and sprint strategies
+
+Now that you know the content, here is how to nail it on the quiz:
+
+### Your 5-step quiz process
+
+**Step 1: Classify the problem (5 seconds)**
+Before solving anything, read the question and identify which pattern it matches. Is this linear algebra, a reading comprehension question, a grammar fix, or something else?
+
+**Step 2: Simplify the setup (10 seconds)**
+Rewrite the problem in the clearest, simplest way possible. Remove extra wording. Identify exactly what is being asked.
+
+**Step 3: Apply your rule (20 seconds)**
+Use the exact method that matches this pattern. Do not improvise. Do not try multiple methods. Use the one that works for this type.
+
+**Step 4: Check your work (10 seconds)**
+Before you move on, verify that your answer actually solves the original problem. Does it make sense? Does it match the question's exact wording?
+
+**Step 5: Eliminate wrong answers (if multiple choice)**
+Cross out answers that:
+- Solve a different problem
+- Miss a constraint
+- Look close but are mathematically wrong
+- Sound good but do not match the specific question
+
+### Decision checklist
+
 - {checklist[0]}
 - {checklist[1]}
 - {checklist[2]}
 - {checklist[3]}
 
-If you can answer these honestly, you are usually ready to move on.
+### Timing strategy
 
-## Step 6: Common traps to avoid
-- Over-reading a prompt and making it harder than it is.
-- Reading only the blank or only the numbers and missing the context.
-- Choosing a rule that sounds familiar but does not actually fit the prompt.
-- Ignoring the final check step and hoping the answer is right.
-- Getting stuck on one answer choice too early instead of comparing the options systematically.
+On the actual quiz:
+- **Spend the first 10% of time classifying the problem.** This seems slow but saves time overall.
+- **Do not spend more than 30 seconds on any one problem.** If you are stuck, mark it and come back.
+- **Always verify.** A few extra seconds to check beats submitting a careless wrong answer.
+- **Compare answer choices systematically.** Do not guess between two close options; use math to decide.
 
-Good strategy is not about being perfect at the first try. It is about having a process that catches mistakes before you lock in an answer.
+### What to do if you get stuck
 
-## Quick drill for the sprint or quiz
-Before the next question, do this in under 10 seconds:
-1. What is the question really testing?
-2. What rule or pattern applies?
-3. Which answer is the cleanest match?
-4. Why is the other option wrong?
-5. If I had to explain my answer in one sentence, could I do it clearly?
+1. **Reread the exact question.** Sometimes you misunderstood what was being asked.
+2. **Simplify harder.** Break the problem into smaller pieces you can solve individually.
+3. **Test with a concrete example.** Plug in actual numbers to see if your logic works.
+4. **Use process of elimination.** Wrong answers often have obvious flaws once you look closely.
 
-That short routine will move you from guessing toward deliberate, repeatable execution.
+### Before you submit each answer
 
-## Final takeaway
-The best way to improve {focus_line} is to use the same process again and again:
-- identify the structure
-- choose the rule that matches the task
-- solve in the simplest valid way
-- check the answer against context
-- eliminate the trap answers
+Ask yourself these four questions:
+1. Did I classify the problem correctly?
+2. Did I apply the right method?
+3. Did I check my answer against the original problem?
+4. Can I explain why the other answer choices are wrong?
 
-This is how students go from "I feel lost" to "I know what I'm looking for." Once you repeat this process, the sprint and quiz stop feeling like random traps and start feeling like a set of recognizable patterns you can solve with confidence.
+If you answer yes to all four, submit with confidence. If no, go back and check your work.
+
+---
+
+## Practice tips to get ready
+
+- **Drill the classification step:** Take 10 old problems and just classify them without solving. Get fast at spotting the pattern.
+- **Do one worked example per day:** Solve it, then explain each step out loud as if teaching someone else.
+- **Create a personal "pattern guide":** List the different types of {focus_line} problems and the method for each. Refer to it every day.
+- **Time yourself on problems:** Get comfortable with the pace. You should be able to solve correctly in under 2 minutes.
 """
 
     return {"title": title, "content": content}
