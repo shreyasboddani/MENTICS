@@ -7,6 +7,7 @@ from userhelper import User
 from functools import wraps
 import json
 import hmac
+import mimetypes
 from google import genai
 from google.genai import types
 import os
@@ -18,6 +19,8 @@ from datetime import datetime, timedelta, date
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 from authlib.integrations.flask_client import OAuth
 from werkzeug.middleware.proxy_fix import ProxyFix
+
+mimetypes.add_type('font/woff2', '.woff2')
 
 
 env_path = Path('.') / '.env'
