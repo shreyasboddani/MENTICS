@@ -621,23 +621,69 @@ def _get_sprint_results_for_prompt(user_id):
     return "\n".join(summary)
 
 
-def _derive_skill_name(description, weakness_hint=""):
-    text = (description or "").strip()
+def _sanitize_skill_text(value):
+    text = str(value or "").strip()
     if not text:
-        text = (weakness_hint or "target skill").strip()
-    cleaned = re.sub(r"^(Practice Sprint|Sprint|Quiz|Review|Strategy|Task)\s*[:\-]\s*", "", text, flags=re.I)
-    cleaned = re.sub(r"\b(?:for|on|about)\b.*$", "", cleaned, flags=re.I)
-    cleaned = cleaned.strip(" -:;.")
-    if not cleaned:
-        cleaned = (weakness_hint or "target skill").strip()
-    return cleaned[:120] or "target skill"
+        return ""
+    text = re.sub(r"\[[^\]]+\]\([^\)]+\)", " ", text)
+    text = re.sub(r"https?://\S+", " ", text)
+    text = text.replace("**", " ").replace("`", " ")
+    text = re.sub(r"\s+", " ", text).strip()
+    return text
+
+
+def _derive_skill_name(description, weakness_hint=""):
+    raw_text = _sanitize_skill_text(description)
+    fallback = _sanitize_skill_text(weakness_hint) or "target skill"
+    if not raw_text:
+        return fallback[:120] or "target skill"
+
+    text = raw_text
+
+    if re.search(r"(?i)\b(?:practice\s+sprint|sprint|quiz|review|strategy|task)\s*[:\-]", text):
+        text = re.split(r"(?i)\b(?:practice\s+sprint|sprint|quiz|review|strategy|task)\s*[:\-]", text, maxsplit=1)[1]
+
+    lower_text = text.lower()
+    for marker in [
+        "to refine pacing for",
+        "to improve",
+        "to practice",
+        "to strengthen",
+        "to work on",
+        "to build",
+    ]:
+        marker_index = lower_text.find(marker)
+        if marker_index != -1:
+            text = text[marker_index + len(marker):].strip()
+            break
+
+    text = re.sub(r"^(?:read|watch|review|study|explore|complete|practice|do)\s+(?:the\s+)?(?:official\s+)?(?:guide|article|lesson|resource|video|module|link)\s+(?:on|about)\s*", "", text, flags=re.I)
+    text = re.sub(r"^(?:read|watch|review|study|explore|complete|practice|do)\s+", "", text, flags=re.I)
+    text = re.sub(r"^(?:official\s+)?(?:sat|act)\s+(?:reading|writing|math|science)\s*(?:module\s+)?(?:strategies?)?\s*", "", text, flags=re.I)
+    text = re.sub(r"^\s*\b(?:digital\s+)?sat\b.*?\b(?:strategies?|module)\b\s*", "", text, flags=re.I)
+    text = re.sub(r"^(?:in\s+)?(?:the\s+)?(?:context\s+of\s+)?", "", text, flags=re.I)
+
+    text = re.sub(r"\b(?:questions?|skills?|strategies?|concepts?|topics?)\b.*$", "", text, flags=re.I)
+    text = re.sub(r"\b(?:for|on|about|with)\s+.*$", "", text, flags=re.I)
+    text = re.sub(r"\s+[\-:;.,/]+$", "", text).strip()
+    text = re.sub(r"^[\-:;.,/\s]+", "", text)
+    text = re.sub(r"\s+", " ", text).strip()
+
+    if not text:
+        text = fallback
+    if len(text) > 120:
+        text = text[:120].rstrip(" -:;.,")
+    return text or "target skill"
 
 
 def build_strategy_article(skill, weakness_note, task_description=""):
     """Create a task-specific teaching guide that prepares a student to solve the sprint or quiz confidently."""
-    skill_name = (task_description or skill or "your target skill").strip() or "your target skill"
-    if skill and skill_name == "your target skill":
-        skill_name = skill
+    candidate_skill = _derive_skill_name(task_description or skill, skill)
+    if skill and _derive_skill_name(skill, task_description) and len(_derive_skill_name(skill, task_description)) > len(candidate_skill):
+        candidate_skill = _derive_skill_name(skill, task_description)
+    if not candidate_skill or candidate_skill.lower() in {"target skill", "your target skill"}:
+        candidate_skill = _sanitize_skill_text(skill) or _sanitize_skill_text(task_description) or "your target skill"
+    skill_name = candidate_skill.strip() or "your target skill"
     title = f"Strategies for {skill_name}"
     weakness_text = (weakness_note or "This skill needs a systematic approach, not memorization.").strip()
     focus_line = skill_name if skill_name and skill_name.lower() != "your target skill" else "this skill"
@@ -981,9 +1027,13 @@ def _get_test_prep_ai_tasks(strengths, weaknesses, test_focus, current_scores=No
         def looks_like_practice(desc):
             if not desc:
                 return False
+            desc_l = desc.lower()
+            if re.search(r"\[[^\]]+\]\([^\)]+\)", desc) and "sprint" not in desc_l and "practice" not in desc_l:
+                return False
+            if re.search(r"\b(?:read|watch|review|study|explore)\b.*\b(?:guide|article|lesson|resource|video|module)\b", desc_l):
+                return False
             kws = ['practice', 'solve', 'questions', 'problem', 'drill',
                    'master', 'consolidate', 'attempt', 'answer', 'worksheet', 'sprint']
-            desc_l = desc.lower()
             return any(k in desc_l for k in kws)
 
         def make_mock_sprint(skill):

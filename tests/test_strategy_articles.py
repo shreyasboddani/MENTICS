@@ -29,3 +29,17 @@ def test_build_strategy_article_uses_the_task_specific_skill():
     assert "vertex form" in content
     assert "horizontal" in content
     assert "vertical" in content
+
+
+def test_build_strategy_article_ignores_resource_link_text():
+    article = build_strategy_article(
+        "reading and writing",
+        "You need stronger inference and vocabulary strategy work.",
+        "Read the official guide on [Digital SAT Reading and Writing Module Strategies](https://example.com) to refine pacing for inference and vocabulary questions.",
+    )
+    content = article["content"].lower()
+
+    assert "official guide" not in content
+    assert "inference" in content
+    assert "vocabulary" in content
+    assert "digital sat reading and writing module strategies" not in article["title"].lower()
