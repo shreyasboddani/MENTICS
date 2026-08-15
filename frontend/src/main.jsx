@@ -242,6 +242,8 @@ function AppShell({ children, name }) {
   const active=href=>current===href||(href==='/dashboard/test-path-view'&&current.startsWith('/dashboard/test-path'))||(href==='/dashboard/college-path-view'&&current.startsWith('/dashboard/college-path'))||(href!=='/dashboard'&&current.startsWith(`${href}/`))
   const travel=(event,href,label)=>{
     if(event.defaultPrevented||event.button!==0||event.metaKey||event.ctrlKey||event.shiftKey||event.altKey||current===href)return
+    const opensPath=href==='/dashboard/test-path-view'||href==='/dashboard/college-path-view'
+    if(!opensPath)return
     event.preventDefault();setMenu(false);setNavWarp({href,label})
     const reduced=window.matchMedia('(prefers-reduced-motion: reduce)').matches
     window.setTimeout(()=>{window.location.href=href},reduced?60:420)
@@ -290,6 +292,7 @@ function PortalSelector({open,onClose}) {
 
 function Dashboard() {
   const d=boot.data
+  const trophies=d.earnedAchievements||[]
   const [suggestion,setSuggestion]=useState('Reviewing your latest progress…')
   const [portalOpen,setPortalOpen]=useState(false)
   useEffect(()=>{fetch('/api/get-suggestion').then(r=>r.json()).then(x=>setSuggestion(x.suggestion||'Your next clear step is waiting.')).catch(()=>setSuggestion('Keep the next step small, specific, and finishable.'))},[])
@@ -306,7 +309,7 @@ function Dashboard() {
       <article className="dash-module vital-module"><header><small>VITAL STATS</small><a href="/dashboard/stats/edit">Update</a></header><dl><div><dt>GPA</dt><dd>{d.gpa}</dd></div><div><dt>SAT</dt><dd>{d.satTotal}</dd></div><div><dt>ACT</dt><dd>{d.actAverage}</dd></div></dl></article>
       <article className="dash-module insight-module"><div className="countdown">{d.testDateInfo?.days_left!=null?<><strong>{d.testDateInfo.days_left}</strong><span>DAYS TO {d.testDateInfo.test_type}</span><small>{d.testDateInfo.date_str}</small></>:<><CalendarDays/><span>NO TEST DATE SET</span><a href="/dashboard/test-path-builder">Set your date</a></>}</div><div className="insight"><Brain/><small>MENTICS INSIGHT</small><p>{suggestion}</p></div></article>
       <article className="dash-module updates-module"><header><div><small>LATEST SIGNALS</small><h2>Recent updates</h2></div><Clock3/></header><div>{d.recentActivities?.length?d.recentActivities.slice(0,4).map((a,i)=><span key={i}><i><Check/></i><p><b>{activityTitle(a)}</b><small>{activityDetail(a)}</small></p></span>):<div className="empty-state"><Target/><p>Your completed work will show up here.</p></div>}</div></article>
-      <article className="dash-module trophies-module"><header><div><small>MILESTONES</small><h2>Trophies</h2></div><Award/></header><div>{d.earnedAchievements?.length?d.earnedAchievements.slice(0,6).map(item=><span key={item.id} title={`${item.title}: ${item.description}`}><Trophy/></span>):<p>Complete tasks to unlock trophies.</p>}</div><a href="/leaderboard">View leaderboard <ArrowRight/></a></article>
+      <article className={`dash-module trophies-module ${trophies.length?'':'trophies-module--empty'}`}><header><div><small>MILESTONES</small><h2>Trophies</h2></div>{trophies.length?<span className="trophy-total">{trophies.length} earned</span>:<Award/>}</header><div className="trophy-list">{trophies.length?trophies.slice(0,6).map(item=><div className="trophy-item" key={item.id}><i><Trophy/></i><div><b>{item.title}</b><small>{item.description}</small></div></div>):<div className="trophy-empty"><i><Trophy/></i><div><b>No trophies yet</b><small>Complete your first path task to earn one.</small></div></div>}</div><a href="/leaderboard">View leaderboard <ArrowRight/></a></article>
     </section>
     <PortalSelector open={portalOpen} onClose={()=>setPortalOpen(false)}/>
   </main></AppShell>
@@ -315,7 +318,7 @@ function Dashboard() {
 function ProgressTile({type,value}) {
   const test=type==='test'
   const Icon=test?BookOpen:GraduationCap
-  return <a className={`dash-module progress-tile progress-tile--${type}`} href={test?'/dashboard/test-path-view':'/dashboard/college-path-view'}><header><Icon/><small>{test?'TEST PREP':'COLLEGE PLAN'}</small></header><div><strong>{value}<i>/5</i></strong><span>{value===5?'PATH COMPLETE':'TASKS DONE'}</span></div><em><i style={{width:`${value/5*100}%`}}/></em></a>
+  return <a className={`dash-module progress-tile progress-tile--${type}`} href={test?'/dashboard/test-path-view':'/dashboard/college-path-view'}><header><Icon/><small>{test?'TEST PREP':'COLLEGE PLAN'}</small></header><div><strong><b>{value}</b><i>/5</i></strong><span>{value===5?'PATH COMPLETE':'TASKS DONE'}</span></div><em><i style={{width:`${value/5*100}%`}}/></em></a>
 }
 
 function activityTitle(a) {
@@ -385,7 +388,7 @@ function PathPage() {
   }
   return <AppShell name={boot.data.name}><main className={`app-main path-page ${chatOpen?'chat-docked':''}`}>
     <div className="path-header"><div><div className="eyebrow"><span/> {category.toUpperCase()}</div><h1>Your five-step path.</h1><p>Finish what is in front of you. The path adapts from there.</p></div><div className="path-header-actions">{!isTest&&<button className="button button--quiet" onClick={()=>setEssayOpen(true)}><PenLine size={17}/> Essay feedback</button>}{!chatOpen&&<button className="button button--quiet" onClick={()=>setChatOpen(true)}><MessageCircle size={17}/> Ask Mentics</button>}<a className="button button--dark" href={builder}>Edit goals <ArrowRight size={16}/></a></div></div>
-    <div className="path-progress"><span style={{width:`${tasks.length ? completed/tasks.length*100 : 0}%`}}/><p><b>{completed} of {tasks.length || 5}</b> steps complete</p></div>
+    <div className="path-progress"><span style={{width:`${tasks.length ? completed/tasks.length*100 : 0}%`}}/><p><b><span>{completed}</span><i>/</i><span>{tasks.length || 5}</span></b><span>steps complete</span></p></div>
     {error && <div className="error-banner">{error}<button onClick={()=>loadTasks()}>Try again</button></div>}
     {loading ? <PathSkeleton/> : <section className="journey-map" style={{height:journeyHeight}} aria-label={`${category} learning journey`}>
       <svg className="journey-route" viewBox={`0 0 640 ${journeyHeight}`} preserveAspectRatio="none" aria-hidden="true"><defs><linearGradient id="journey-gradient" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#8b5cf6"/><stop offset="1" stopColor="#4f46e5"/></linearGradient></defs><path className="journey-route-shadow" d={journeyCurve}/><path className="journey-route-progress" d={journeyCurve} pathLength="100" style={{strokeDasharray:`${tasks.length?Math.min(100,completed/tasks.length*100):0} 100`}}/></svg>
@@ -458,7 +461,7 @@ function ChatPanel({open,onClose,category,onNewPath}) {
   useEffect(()=>{const node=scroller.current;if(node)node.scrollTo({top:node.scrollHeight,behavior:'smooth'})},[messages,busy])
   const send=async e=>{e.preventDefault();if(!input.trim()||busy)return;const next=[...messages,{role:'user',content:input.trim()}];setMessages(next);setInput('');setBusy(true);try{const r=await api(`/api/chat?category=${encodeURIComponent(category)}`,{method:'POST',body:JSON.stringify({history:next})});if(r.new_path){onNewPath(r.new_path);setMessages([...next,{role:'assistant',content:'Your new five-step path is ready. I used our conversation to shape it.'}])}else setMessages([...next,{role:'assistant',content:r.reply}])}catch(x){setMessages([...next,{role:'assistant',content:x.message}])}finally{setBusy(false)}}
   const reset=async()=>{try{await api('/api/reset_chat',{method:'POST',body:JSON.stringify({category})});setHistoryError('');setMessages([{role:'assistant',content:`Fresh start. What would you like help with on your ${category.toLowerCase()} path?`}])}catch(error){setHistoryError(error.message)}}
-  return <aside className={`chat-panel ${open?'chat-panel--open':''}`} aria-hidden={!open}><header><span><i><Sparkles/></i><b>Mentics guide</b><small>Present with your current path</small></span><div><button onClick={reset} aria-label="Reset chat"><RotateCcw/></button><button onClick={onClose} aria-label="Close chat"><X/></button></div></header>{historyError&&<div className="chat-notice" role="status">{historyError}</div>}<div className="chat-messages" ref={scroller}>{messages.map((m,i)=><div className={`chat-message chat-message--${m.role}`} key={i}>{m.role==='assistant'?<Markdown>{m.content}</Markdown>:m.content}</div>)}{busy&&<div className="chat-thinking"><i/><i/><i/></div>}</div><form onSubmit={send}><textarea value={input} onChange={e=>setInput(e.target.value)} onKeyDown={e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();send(e)}}} placeholder="Ask about your path…" rows={1}/><button disabled={!input.trim()||busy} aria-label="Send"><Send/></button></form><p>Mentics can make mistakes. Check important information.</p></aside>
+  return <aside className={`chat-panel ${open?'chat-panel--open':''}`} aria-hidden={!open}><header><span><i><Sparkles/></i><b>Mentics guide</b><small>Present with your current path</small></span><div><button onClick={reset} aria-label="Reset chat"><RotateCcw/></button><button onClick={onClose} aria-label="Close chat"><X/></button></div></header>{historyError&&<div className="chat-notice" role="status">{historyError}</div>}<div className="chat-messages" ref={scroller}>{messages.map((m,i)=><div className={`chat-message chat-message--${m.role}`} key={i}>{m.role==='assistant'?<Markdown>{m.content}</Markdown>:m.content}</div>)}{busy&&<div className="chat-thinking"><i/><i/><i/></div>}</div><form onSubmit={send}><textarea name="message" aria-label="Ask Mentics about your path" value={input} onChange={e=>setInput(e.target.value)} onKeyDown={e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();send(e)}}} placeholder="Ask about your path…" rows={1}/><button disabled={!input.trim()||busy} aria-label="Send"><Send/></button></form><p>Mentics can make mistakes. Check important information.</p></aside>
 }
 
 function PageIntro({kicker,title,copy,actions}) {
