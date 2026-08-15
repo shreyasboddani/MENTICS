@@ -620,6 +620,98 @@ def _get_sprint_results_for_prompt(user_id):
     return "\n".join(summary)
 
 
+def build_strategy_article(skill, weakness_note):
+    """Create a teaching guide that prepares a student to solve the sprint or quiz confidently."""
+    skill_name = (skill or "your target skill").strip()
+    if not skill_name:
+        skill_name = "your target skill"
+    title = f"Strategies for {skill_name}"
+    weakness_text = (weakness_note or "This skill needs a systematic approach, not memorization.").strip()
+
+    content = f"""# {title}
+
+## Why this matters
+This skill shows up repeatedly on the SAT and ACT, and it is usually not a random question type. The main goal is to recognize the pattern quickly, choose a reliable method, and then check whether the answer makes sense.
+
+A lot of mistakes happen when students rush the setup, skip the check step, or confuse a concept with a similar-looking idea. If you slow down just enough to identify the pattern, this topic becomes much more predictable.
+
+> Focus point: {weakness_text}
+
+## Step 1: Identify the structure before solving
+Start by reading the question in chunks and asking: What is the problem really asking for? Are there clues that show a special rule, formula, or relationship?
+
+For this skill, the fastest route is to avoid solving immediately and instead classify the task:
+- Is this about a pattern, a relationship, a system, or a word/grammar rule?
+- Can the problem be solved by plugging in values, rewriting an expression, or comparing choices?
+- Is there a hidden trap such as a sign error, a unit mistake, or a missing constraint?
+
+If you can name the structure, the next step is much easier.
+
+## Step 2: Use a method you can repeat
+Do not invent a new approach every time. Use one reliable routine:
+1. Rewrite the information in simpler form.
+2. Identify the key rule or relationship.
+3. Solve in the most direct way possible.
+4. Check if your answer fits the original prompt.
+
+This routine matters because many mistakes are not logic problems; they are process problems. Students often skip the check step or change the model mid-solution.
+
+## Step 3: Watch for common traps
+### Common traps
+- Treating a phrase or symbol as a literal match when the real structure is different.
+- Ignoring a restriction such as "positive," "integer," or "greater than zero."
+- Solving a step correctly but forgetting to return to the original question.
+- Overreading the wording and picking a more complicated method than necessary.
+- Making sign, fraction, or variable mistakes in the middle of the process.
+
+When you see an answer that looks too easy or too complicated, pause and ask whether it matches the exact wording of the question.
+
+## Step 4: Build a quick decision checklist
+Before you answer, ask yourself:
+- Did I identify the actual type of problem?
+- Did I use the correct rule or relationship?
+- Did I eliminate the obvious trap?
+- Does my answer fit the context and units?
+- Can I explain my choice in one sentence?
+
+If you can answer those questions, you are usually ready to move on.
+
+## Worked example
+Use this pattern on a sample question:
+
+"A student is asked to solve a problem involving {skill_name}. The correct approach is to recognize the relationship, rewrite the information clearly, and solve with the shortest reliable method."
+
+Here is the process:
+1. Read the prompt and underline the exact task.
+2. Name the mathematical or reasoning pattern.
+3. Translate the information into a simple form.
+4. Solve using one clean method.
+5. Check the result against the original conditions.
+
+The key skill is not speed; it is precision. A shorter, more controlled method is usually more reliable than a dramatic one.
+
+## Quick self-check before the sprint or quiz
+Before you submit an answer, do this checklist:
+- I know what type of problem this is.
+- I have identified the correct rule or relationship.
+- I have written down the necessary setup clearly.
+- I have checked whether the answer is reasonable.
+- I can explain the logic without reading the steps off a formula sheet.
+
+If you can do that, you are ready for the sprint or quiz.
+
+## Final takeaway
+The best way to improve this topic is to repeat the same process on every question:
+- identify the structure
+- choose the right method
+- check the result
+- eliminate common traps
+
+That habit turns a hard topic into a readable pattern. Once you practice it consistently, the quiz and sprint will feel much more manageable because you are not guessing—you are applying a repeatable strategy.
+"""
+    return {"title": title, "content": content}
+
+
 def _get_test_prep_ai_tasks(strengths, weaknesses, test_focus, current_scores=None, desired_scores=None, test_date_str=None, hours_per_week=None, chat_history=None, path_history=None, stat_history="", quiz_results="", sprint_results=""):
     """Generates hyper-intelligent, adaptive test prep tasks, now including interactive Practice Sprints, Strategy Articles, and better context."""
 
@@ -855,9 +947,7 @@ def _get_test_prep_ai_tasks(strengths, weaknesses, test_focus, current_scores=No
             return {'title': f"Practice Sprint: {skill}", 'questions': questions}
 
         def make_strategy_article(skill, weakness_note):
-            title = f"Strategies for {skill}"
-            content = f"# {title}\n\nHow to master {skill}.\n\n1. Key concept.\n2. Common trap.\n3. Strategy.\n\nWhy: {weakness_note or 'Improvement needed.'}"
-            return {'title': title, 'content': content}
+            return build_strategy_article(skill, weakness_note)
 
         def make_mock_quiz(topic):
             questions = [{
@@ -896,7 +986,8 @@ def _get_test_prep_ai_tasks(strengths, weaknesses, test_focus, current_scores=No
                         skip_practice = True
                         topic = (weaknesses.split(',')[0].strip() if weaknesses else '') or desc.split(
                             ' on ')[-1].split('.')[0][:40].strip() or 'strategies'
-                        if not t.get('strategy_article'):
+                        article = t.get('strategy_article')
+                        if not article or not article.get('content') or len(article.get('content', '')) < 1200:
                             t['strategy_article'] = make_strategy_article(
                                 topic, t.get('reason') or f"Focus on {topic}.")
                         t.pop('sprint_content', None)
@@ -907,7 +998,8 @@ def _get_test_prep_ai_tasks(strengths, weaknesses, test_focus, current_scores=No
                         ' on ')[-1].split('.')[0][:40].strip() or 'targeted skill'
                     if not t.get('sprint_content'):
                         t['sprint_content'] = make_mock_sprint(skill)
-                    if not t.get('strategy_article'):
+                    article = t.get('strategy_article')
+                    if not article or not article.get('content') or len(article.get('content', '')) < 1200:
                         t['strategy_article'] = make_strategy_article(
                             skill, t.get('reason') or f"Target {skill}.")
 
