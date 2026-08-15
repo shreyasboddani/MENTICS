@@ -251,6 +251,23 @@ def init_db():
 
     db.add_column("sprint_questions", "source_or_prompt", "TEXT")
 
+    db.create_table("official_questions", {
+        "id": "INTEGER PRIMARY KEY AUTOINCREMENT",
+        "test_type": "TEXT NOT NULL",
+        "subject": "TEXT NOT NULL",
+        "topic": "TEXT NOT NULL",
+        "difficulty": "TEXT",
+        "question_text": "TEXT NOT NULL",
+        "options": "TEXT NOT NULL",
+        "correct_option": "INTEGER NOT NULL",
+        "explanation": "TEXT",
+        "source_url": "TEXT",
+        "source_or_prompt": "TEXT",
+        "created_at": "TIMESTAMP DEFAULT CURRENT_TIMESTAMP"
+    })
+    db.execute("CREATE INDEX IF NOT EXISTS idx_official_questions_subject_topic ON official_questions (test_type, subject, topic)")
+    db.execute("CREATE INDEX IF NOT EXISTS idx_official_questions_difficulty ON official_questions (difficulty)")
+
     db.create_table("strategy_articles", {
         "id": "INTEGER PRIMARY KEY AUTOINCREMENT",
         "task_id": "INTEGER NOT NULL UNIQUE",
@@ -1044,6 +1061,106 @@ def _get_path_progress_context(user_id, category):
     )
 
 
+def _get_official_questions_for_topic(test_type, subject, topic, limit=10):
+    """Fetch official questions from the official_questions table for a specific topic."""
+    query = """
+        SELECT id, question_text, options, correct_option, explanation, source_or_prompt, source_url
+        FROM official_questions
+        WHERE test_type = ? AND subject = ? AND topic LIKE ?
+        ORDER BY RANDOM()
+        LIMIT ?
+    """
+    questions = db.execute(query, (test_type, subject, f"%{topic}%", limit))
+    if not questions:
+        return []
+    return [
+        {
+            "id": q['id'],
+            "question_text": q['question_text'],
+            "options": json.loads(q['options']) if isinstance(q['options'], str) else q['options'],
+            "correct_option": q['correct_option'],
+            "explanation": q['explanation'],
+            "source_or_prompt": q['source_or_prompt'],
+            "source_url": q['source_url'],
+            "is_official": True
+        }
+        for q in questions
+    ]
+
+
+def _extract_official_examples_for_ai(test_type, subject, topic, count=3):
+    """Fetch a few official questions to use as examples for AI generation."""
+    questions = _get_official_questions_for_topic(test_type, subject, topic, limit=count)
+    if not questions:
+        return "No official examples available for this topic yet."
+    
+    examples = []
+    for q in questions:
+        examples.append(
+            f"**Example Question:** {q['question_text']}\n"
+            f"Options: {', '.join(q['options'])}\n"
+            f"Correct: {q['options'][q['correct_option']]}\n"
+            f"Explanation: {q['explanation']}\n"
+        )
+    return "\n---\n".join(examples)
+
+
+def _populate_quiz_with_official_questions(topic, test_type, subject, needed_count=7):
+    """Try to fetch official questions first, fill remaining with mock."""
+    official_qs = _get_official_questions_for_topic(test_type, subject, topic, limit=needed_count)
+    
+    questions = []
+    for q in official_qs:
+        questions.append({
+            "source_or_prompt": q['source_or_prompt'] or "Original SAT/ACT official practice prompt",
+            "question_text": q['question_text'],
+            "options": q['options'],
+            "correct_option": q['correct_option'],
+            "explanation": q['explanation'],
+            "is_official": True
+        })
+    
+    # Fill remaining with AI-generated questions if needed
+    while len(questions) < needed_count:
+        questions.append({
+            "source_or_prompt": f"Mentics practice prompt on {topic}",
+            "question_text": f"Practice question {len(questions) + 1} on {topic}",
+            "options": ["A", "B", "C", "D"],
+            "correct_option": 0,
+            "explanation": f"Detailed explanation for {topic}",
+            "is_official": False
+        })
+    
+    return questions[:needed_count]
+
+
+def _populate_sprint_with_official_questions(topic, test_type, subject, needed_count=5):
+    """Try to fetch official questions for sprint, fill remaining with mock."""
+    official_qs = _get_official_questions_for_topic(test_type, subject, topic, limit=needed_count)
+    
+    questions = []
+    for q in official_qs:
+        questions.append({
+            "question_text": q['question_text'],
+            "options": q['options'],
+            "correct_option": q['correct_option'],
+            "explanation": q['explanation'],
+            "is_official": True
+        })
+    
+    # Fill remaining with AI-generated if needed
+    while len(questions) < needed_count:
+        questions.append({
+            "question_text": f"Practice problem {len(questions) + 1} on {topic}",
+            "options": ["A", "B", "C", "D"],
+            "correct_option": 0,
+            "explanation": f"Solution strategy for {topic}",
+            "is_official": False
+        })
+    
+    return questions[:needed_count]
+
+
 def _get_test_prep_ai_tasks(strengths, weaknesses, test_focus, current_scores=None, desired_scores=None, test_date_str=None, hours_per_week=None, chat_history=None, path_history=None, stat_history="", quiz_results="", sprint_results="", path_progress_context=""):
     """Generates hyper-intelligent, adaptive test prep tasks, now including interactive Practice Sprints, Strategy Articles, and better context."""
 
@@ -1279,24 +1396,20 @@ def _get_test_prep_ai_tasks(strengths, weaknesses, test_focus, current_scores=No
             return any(k in desc_l for k in kws)
 
         def make_mock_sprint(skill):
-            questions = [{'question_text': f"SAT/ACT practice {qi+1} on {skill}.", 'options': ['A', 'B',
-                                                                                               'C', 'D'], 'correct_option': 0, 'explanation': f"Key steps for {skill}."} for qi in range(5)]
+            # Try to fetch official questions first, then fall back to AI
+            test_type = 'SAT' if test_focus != 'act' else 'ACT'
+            subject = 'Math' if any(k in skill.lower() for k in ['algebra', 'geometry', 'quadratic', 'function', 'equation']) else 'Reading/Writing'
+            questions = _populate_sprint_with_official_questions(skill, test_type, subject, 5)
             return {'title': f"Practice Sprint: {skill}", 'questions': questions}
 
         def make_strategy_article(skill, weakness_note, task_description=""):
             return build_strategy_article(skill, weakness_note, task_description)
 
         def make_mock_quiz(topic):
-            questions = [{
-                'source_or_prompt': (
-                    f"Original Mentics practice prompt on {topic}: use the information "
-                    f"provided in this complete setup for item {qi + 1}."
-                ),
-                'question_text': f"Which option correctly answers practice item {qi + 1} on {topic}?",
-                'options': ['A', 'B', 'C', 'D'],
-                'correct_option': 0,
-                'explanation': f"Solution for {topic}.",
-            } for qi in range(7)]
+            # Try to fetch official questions first, then fall back to AI
+            test_type = 'SAT' if test_focus != 'act' else 'ACT'
+            subject = 'Math' if any(k in topic.lower() for k in ['algebra', 'geometry', 'quadratic', 'function', 'equation']) else 'Reading/Writing'
+            questions = _populate_quiz_with_official_questions(topic, test_type, subject, 7)
             return {'title': f"Cumulative Quiz: {topic}", 'questions': questions}
 
         normalized = []
@@ -3176,6 +3289,56 @@ def _regenerate_path_from_chat(user_id, stats, category, history):
 def _is_path_regeneration_control(reply):
     cleaned = (reply or "").strip().strip('`').strip()
     return cleaned == PATH_REGENERATION_CONTROL
+
+
+@app.route("/api/import_official_questions", methods=['POST'])
+def import_official_questions():
+    """Bulk import official SAT/ACT questions. Format: JSON array of question objects."""
+    try:
+        data = request.get_json(silent=True) or {}
+        questions = data.get("questions", [])
+        
+        if not isinstance(questions, list):
+            return jsonify({"error": "Questions must be an array"}), 400
+        
+        imported_count = 0
+        errors = []
+        
+        for idx, q in enumerate(questions):
+            try:
+                # Validate required fields
+                if not all(k in q for k in ['test_type', 'subject', 'topic', 'question_text', 'options', 'correct_option']):
+                    errors.append(f"Question {idx}: Missing required field")
+                    continue
+                
+                # Ensure options is a list
+                options = q['options'] if isinstance(q['options'], list) else json.loads(q['options'])
+                
+                db.insert("official_questions", {
+                    "test_type": q.get('test_type', 'SAT'),  # SAT or ACT
+                    "subject": q.get('subject', 'Math'),  # Math, Reading/Writing
+                    "topic": q.get('topic', 'General'),
+                    "difficulty": q.get('difficulty', 'medium'),
+                    "question_text": q['question_text'],
+                    "options": json.dumps(options),
+                    "correct_option": int(q['correct_option']),
+                    "explanation": q.get('explanation', ''),
+                    "source_url": q.get('source_url', ''),
+                    "source_or_prompt": q.get('source_or_prompt', ''),
+                })
+                imported_count += 1
+            except Exception as e:
+                errors.append(f"Question {idx}: {str(e)}")
+        
+        return jsonify({
+            "success": imported_count > 0,
+            "imported": imported_count,
+            "total": len(questions),
+            "errors": errors if errors else None
+        }), 200 if imported_count > 0 else 400
+    
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 
 @app.route("/api/chat", methods=['POST'])

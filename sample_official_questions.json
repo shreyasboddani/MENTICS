@@ -1,0 +1,164 @@
+{
+  "questions": [
+    {
+      "test_type": "SAT",
+      "subject": "Math",
+      "topic": "Quadratic Functions",
+      "difficulty": "medium",
+      "question_text": "A quadratic function f(x) = ax² + bx + c has a vertex at (2, -3) and passes through the point (4, 5). What is the value of the coefficient a?",
+      "options": [
+        "a = 2",
+        "a = 1",
+        "a = 0.5",
+        "a = -1"
+      ],
+      "correct_option": 0,
+      "explanation": "Since the vertex is at (2, -3), we can write f(x) = a(x - 2)² - 3. Using the point (4, 5): 5 = a(4 - 2)² - 3, so 5 = 4a - 3, giving a = 2.",
+      "source_or_prompt": "Digital SAT Math Module - Quadratic Functions"
+    },
+    {
+      "test_type": "SAT",
+      "subject": "Math",
+      "topic": "Linear Equations",
+      "difficulty": "easy",
+      "question_text": "If 3x + 7 = 22, what is the value of x?",
+      "options": [
+        "x = 5",
+        "x = 10",
+        "x = 15",
+        "x = 20"
+      ],
+      "correct_option": 0,
+      "explanation": "Subtract 7 from both sides: 3x = 15. Divide by 3: x = 5.",
+      "source_or_prompt": "Digital SAT Math Module - Linear Equations"
+    },
+    {
+      "test_type": "SAT",
+      "subject": "Math",
+      "topic": "Systems of Equations",
+      "difficulty": "medium",
+      "question_text": "Solve the system: 2x + 3y = 12 and x - y = 1. What is x + y?",
+      "options": [
+        "x + y = 6",
+        "x + y = 4",
+        "x + y = 8",
+        "x + y = 2"
+      ],
+      "correct_option": 0,
+      "explanation": "From x - y = 1, we get x = y + 1. Substitute: 2(y + 1) + 3y = 12, so 5y + 2 = 12, y = 2. Therefore x = 3, and x + y = 5.",
+      "source_or_prompt": "Digital SAT Math Module - Systems of Equations"
+    },
+    {
+      "test_type": "SAT",
+      "subject": "Math",
+      "topic": "Function Notation",
+      "difficulty": "medium",
+      "question_text": "If f(x) = 2x² + 3x - 5, what is f(-2)?",
+      "options": [
+        "f(-2) = -3",
+        "f(-2) = 1",
+        "f(-2) = 5",
+        "f(-2) = -7"
+      ],
+      "correct_option": 0,
+      "explanation": "f(-2) = 2(-2)² + 3(-2) - 5 = 2(4) - 6 - 5 = 8 - 6 - 5 = -3.",
+      "source_or_prompt": "Digital SAT Math Module - Function Notation"
+    },
+    {
+      "test_type": "SAT",
+      "subject": "Math",
+      "topic": "Exponential Growth",
+      "difficulty": "hard",
+      "question_text": "A bacteria population doubles every 3 hours. If the initial population is 500, which equation represents the population after t hours?",
+      "options": [
+        "P(t) = 500 · 2^(t/3)",
+        "P(t) = 500 · 2^t",
+        "P(t) = 500 + 2^t",
+        "P(t) = 500 · 3^t"
+      ],
+      "correct_option": 0,
+      "explanation": "Since the population doubles every 3 hours, the exponent should be t/3. The general form is P(t) = P₀ · 2^(t/3) where P₀ = 500.",
+      "source_or_prompt": "Digital SAT Math Module - Exponential Growth"
+    },
+    {
+      "test_type": "SAT",
+      "subject": "Reading/Writing",
+      "topic": "Subject-Verb Agreement",
+      "difficulty": "easy",
+      "question_text": "Which of the following sentences is grammatically correct? A) The team are playing well. B) The team is playing well. C) The teams are plays well. D) The team are playing good.",
+      "options": [
+        "A",
+        "B",
+        "C",
+        "D"
+      ],
+      "correct_option": 1,
+      "explanation": "'Team' is a collective noun that takes a singular verb in American English. 'is playing' is correct.",
+      "source_or_prompt": "Digital SAT Reading and Writing Module - Grammar"
+    },
+    {
+      "test_type": "SAT",
+      "subject": "Reading/Writing",
+      "topic": "Verb Tense Consistency",
+      "difficulty": "medium",
+      "question_text": "The report detailed the company's strategy, and it _____ the potential risks clearly. A) outlines B) outlined C) outline D) will outline",
+      "options": [
+        "A",
+        "B",
+        "C",
+        "D"
+      ],
+      "correct_option": 1,
+      "explanation": "The first clause uses past tense ('detailed'), so the second clause should also use past tense ('outlined') for consistency.",
+      "source_or_prompt": "Digital SAT Reading and Writing Module - Verb Tense"
+    },
+    {
+      "test_type": "SAT",
+      "subject": "Reading/Writing",
+      "topic": "Word Choice",
+      "difficulty": "medium",
+      "question_text": "Despite the _____ circumstances, the team managed to complete the project on time. A) adverse B) averse C) inverse D) diverse",
+      "options": [
+        "A",
+        "B",
+        "C",
+        "D"
+      ],
+      "correct_option": 0,
+      "explanation": "'Adverse' means unfavorable or harmful, which fits the context. 'Averse' means having a strong dislike, 'inverse' means opposite, and 'diverse' means varied.",
+      "source_or_prompt": "Digital SAT Reading and Writing Module - Vocabulary"
+    },
+    {
+      "test_type": "ACT",
+      "subject": "Math",
+      "topic": "Algebra",
+      "difficulty": "medium",
+      "question_text": "What is the solution to the inequality 5x - 8 > 12?",
+      "options": [
+        "x > 4",
+        "x < 4",
+        "x > 20",
+        "x < -4"
+      ],
+      "correct_option": 0,
+      "explanation": "Add 8 to both sides: 5x > 20. Divide by 5: x > 4.",
+      "source_or_prompt": "ACT Math Test - Algebra"
+    },
+    {
+      "test_type": "ACT",
+      "subject": "Reading",
+      "topic": "Main Idea",
+      "difficulty": "medium",
+      "question_text": "In a passage about climate change, the author primarily argues that: A) Climate change is entirely caused by human activity. B) Scientific research has proven global warming will end soon. C) Governments must take immediate action to reduce carbon emissions. D) Renewable energy cannot replace fossil fuels.",
+      "options": [
+        "A",
+        "B",
+        "C",
+        "D"
+      ],
+      "correct_option": 2,
+      "explanation": "The main idea focuses on the need for government action regarding carbon emissions, which is a common theme in climate change advocacy.",
+      "source_or_prompt": "ACT Reading Comprehension Test - Science Topic"
+    }
+  ]
+}
