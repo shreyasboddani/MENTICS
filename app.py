@@ -249,6 +249,8 @@ def init_db():
         "FOREIGN KEY(question_id)": "REFERENCES sprint_questions(id) ON DELETE CASCADE"
     })
 
+    db.add_column("sprint_questions", "source_or_prompt", "TEXT")
+
     db.create_table("strategy_articles", {
         "id": "INTEGER PRIMARY KEY AUTOINCREMENT",
         "task_id": "INTEGER NOT NULL UNIQUE",
@@ -1457,8 +1459,11 @@ def get_practice_sprint(user, task_id):
                               "sprint_id": sprint_details['id']})
     questions = [{
         "id": q['id'],
+        "source_or_prompt": q.get('source_or_prompt'),
         "question_text": q['question_text'],
-        "options": json.loads(q['options'])
+        "options": json.loads(q['options']),
+        "correct_option": q.get('correct_option', 0),
+        "explanation": q.get('explanation', '')
     } for q in questions_raw]
 
     return jsonify({"title": sprint_details['title'], "questions": questions})
@@ -2979,7 +2984,9 @@ def get_quiz(user, task_id):
             "id": q['id'],
             "source_or_prompt": q.get('source_or_prompt'),
             "question_text": q['question_text'],
-            "options": json.loads(q['options'])
+            "options": json.loads(q['options']),
+            "correct_option": q.get('correct_option', 0),
+            "explanation": q.get('explanation', '')
         })
 
     return jsonify({
