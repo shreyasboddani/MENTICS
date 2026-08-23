@@ -70,6 +70,7 @@ def add_security_headers(response):
     )
     if is_production and request.path.startswith('/static/'):
         response.headers['Cache-Control'] = 'public, max-age=31536000, immutable'
+        response.headers['Vercel-CDN-Cache-Control'] = 'public, max-age=31536000'
         response.headers.pop('Vary', None)
     elif session.get('user'):
         response.headers.setdefault('Cache-Control', 'private, no-store')
