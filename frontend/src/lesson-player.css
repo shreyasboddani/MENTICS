@@ -647,6 +647,26 @@
 .task-details { padding-top: 8px }
 .journey-skill { display: block; font-size: 12px; color: #8b83a8; font-style: normal; margin-top: 2px }
 
+/* A skipped step is resolved, but it is not the same achievement as a
+   completed one. Keep the state legible without introducing another loud
+   brand colour. */
+.journey-step.skipped .journey-node {
+  color: #fff;
+  background: linear-gradient(145deg, #9288a6, #736983);
+  box-shadow: 0 8px 0 #5f566d, 0 17px 28px -18px rgba(51, 43, 66, .58);
+}
+.journey-step.skipped .journey-label small { color: #746b84 }
+
+/* Keep directional prompts useful, then let the path settle. */
+.journey-next { animation-iteration-count: 3 }
+
+@media (max-width: 620px) {
+  .modal-wrap > .modal { transform-origin: bottom center }
+  .task-kind { align-items: flex-start; flex-wrap: wrap }
+  .task-kind > div { min-width: calc(100% - 60px) }
+  .task-kind-xp { margin-left: 56px }
+}
+
 /* --- Dark theme --------------------------------------------------------- */
 
 @media (prefers-color-scheme: dark) {

@@ -128,7 +128,6 @@
 .product-logout button,
 .path-launcher,
 .progress-tile,
-.journey-step,
 .floating-chat,
 .chat-panel button,
 .modal button,
@@ -156,7 +155,6 @@
 .product-logout button:active,
 .path-launcher:active,
 .progress-tile:active,
-.journey-step:active,
 .floating-chat:active,
 .chat-panel button:active,
 .modal button:active,
@@ -167,6 +165,16 @@
 .thread button:active,
 .faq summary:active {
   transform: scale(.97);
+}
+
+/* Journey buttons are centered with translate(-50%, -50%). Applying the
+   generic press scale to the button replaces that positioning transform,
+   moves the hit target out from under the pointer, and cancels the click.
+   Keep the positioned wrapper fixed and press the tactile node inside it. */
+.journey-step:active { transform: translate(-50%, -50%); }
+.journey-step:not(.locked):active .journey-node {
+  transform: translateY(2px) scale(.98);
+  transition-duration: var(--ds-press);
 }
 
 .button:disabled:active { transform: none; }

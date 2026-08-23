@@ -1,52 +1,51 @@
-from app import build_strategy_article
+from learning import _fallback_teaching
 
 
-def test_build_strategy_article_is_comprehensive_enough_for_sprint():
-    article = build_strategy_article(
-        "linear equation word problems",
-        "You often set up the wrong equation before solving.",
-    )
-
-    content = article["content"]
-
-    assert article["title"].startswith("Strategies for")
-    # Check for educational content section
-    assert "What you need to know for the quiz" in content
-    assert "Essential concepts and skills for this topic" in content
-    assert "Worked examples with" in content
-    assert "Common" in content and ("misconception" in content.lower() or "trap" in content.lower())
-    # Check for quiz strategies section
-    assert "Quiz and sprint strategies" in content or "strategy" in content.lower()
-    assert "Decision checklist" in content
-    assert len(content) > 2000
+def _node(subject="Math", syllabus=None):
+    return {
+        "skill": {
+            "subject": subject,
+            "skill_label": "Quadratic graph transformations",
+        },
+        "objective": "Distinguish horizontal and vertical shifts in vertex form.",
+        "syllabus": syllabus if syllabus is not None else [
+            "Read vertex form",
+            "Identify horizontal shifts",
+            "Identify vertical shifts",
+            "Check the transformed graph",
+        ],
+    }
 
 
-def test_build_strategy_article_uses_the_task_specific_skill():
-    article = build_strategy_article(
-        "quadratic graph transformations",
-        "You mix up horizontal and vertical shifts.",
-        "Practice Sprint: Graphing quadratic shifts in vertex form",
-    )
-    content = article["content"].lower()
+def test_fallback_teaching_is_complete_enough_to_use():
+    lesson = _fallback_teaching(_node())
 
-    assert "graphing quadratic shifts" in article["title"].lower()
+    assert lesson["intro"]
+    assert lesson["recap"]
+    assert len(lesson["cards"]) == 4
+    for card in lesson["cards"]:
+        assert card["title"]
+        assert card["body"]
+        assert card["worked_example"]
+        assert card["takeaway"]
+        assert card["trap"]
+
+
+def test_fallback_teaching_preserves_task_specific_content():
+    lesson = _fallback_teaching(_node())
+    content = " ".join(
+        [lesson["intro"], lesson["recap"]]
+        + [value for card in lesson["cards"] for value in card.values()]
+    ).lower()
+
+    assert "quadratic graph transformations" in content
     assert "vertex form" in content
-    assert "horizontal" in content
-    assert "vertical" in content
+    assert "horizontal shifts" in content
+    assert "vertical shifts" in content
 
 
-def test_build_strategy_article_ignores_resource_link_text():
-    article = build_strategy_article(
-        "reading and writing",
-        "You need stronger inference and vocabulary strategy work.",
-        "Read the official guide on [Digital SAT Reading and Writing Module Strategies](https://example.com) to refine pacing for inference and vocabulary questions.",
-    )
-    content = article["content"].lower()
+def test_fallback_teaching_handles_an_empty_syllabus():
+    lesson = _fallback_teaching(_node(syllabus=[]))
 
-    assert "official guide" not in content
-    assert "inference" in content
-    assert "vocabulary" in content
-    assert "digital sat reading and writing module strategies" not in article["title"].lower()
-    # Check for comprehensive study guide structure
-    assert "what you need to know for the quiz" in content
-    assert "worked examples" in content
+    assert len(lesson["cards"]) == 1
+    assert lesson["cards"][0]["title"] == "Quadratic graph transformations"

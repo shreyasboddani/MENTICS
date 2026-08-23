@@ -640,7 +640,9 @@ def _record_skill_result(user_id, skill_key, skill_label, subject, is_correct):
         "attempts": attempts,
         "correct": correct,
         "level": level,
-        "updated_at": datetime.utcnow().isoformat(sep=" ", timespec="seconds"),
+        "updated_at": datetime.now(ZoneInfo("UTC")).replace(tzinfo=None).isoformat(
+            sep=" ", timespec="seconds"
+        ),
     }
     if row:
         db.update("skill_mastery", payload, where={"id": row["id"]})
@@ -708,6 +710,56 @@ def _award_xp(user_id, amount):
     total = (row["points"] or 0) + amount
     db.update("gamification_stats", {"points": total}, where={"user_id": user_id})
     return total
+
+
+def _advance_completion_streak(user_id):
+    """Advance a student's streak once for a newly completed path step."""
+    row = db.select_one("gamification_stats", where={"user_id": user_id})
+    if not row:
+        db.insert("gamification_stats", {
+            "user_id": user_id, "points": 0, "current_streak": 0,
+        })
+        row = db.select_one("gamification_stats", where={"user_id": user_id})
+
+    today = date.today()
+    yesterday = today - timedelta(days=1)
+    last_completed = None
+    if row.get("last_completed_date"):
+        try:
+            last_completed = date.fromisoformat(row["last_completed_date"])
+        except (TypeError, ValueError):
+            app.logger.warning(
+                "Resetting invalid completion date for user %s", user_id,
+            )
+
+    streak = row.get("current_streak") or 0
+    if last_completed == today:
+        next_streak = streak
+    elif last_completed == yesterday:
+        next_streak = streak + 1
+    else:
+        next_streak = 1
+
+    db.update("gamification_stats", {
+        "current_streak": next_streak,
+        "last_completed_date": today.isoformat(),
+    }, where={"user_id": user_id})
+
+
+def _record_task_completion(user_id, task):
+    """Claim a completion once, then record its activity and streak effects."""
+    claimed = db.execute_write(
+        "UPDATE paths SET is_completed=?, is_skipped=? "
+        "WHERE id=? AND user_id=? AND is_completed=?",
+        (True, False, task["id"], user_id, False),
+    )
+    if not claimed:
+        return False
+    log_activity(user_id, "task_completed", {
+        "description": task["description"], "category": task["category"],
+    })
+    _advance_completion_streak(user_id)
+    return True
 
 
 def _compact_chat_history(history):
@@ -1217,6 +1269,10 @@ def assessment_finish(user):
     task = db.select_one("paths", where={"id": task_id, "user_id": user_id, "is_active": True})
     if not task:
         return jsonify({"error": "That step is not part of your active path."}), 404
+    if task.get('task_format') not in {'quiz', 'practice_sprint'}:
+        return jsonify({"error": "That step is not a scored practice activity."}), 400
+    if _has_incomplete_earlier_task(user_id, task):
+        return jsonify({"error": "Complete the earlier path step first."}), 409
 
     # Scored on first attempts only: missed questions are re-served during the
     # run, so counting every attempt would let a replay inflate the result.
@@ -1232,6 +1288,11 @@ def assessment_finish(user):
                    GROUP BY r2.question_id)""",
             (task_id, user_id),
         )
+        expected = db.execute_for_one(
+            """SELECT COUNT(*) AS total FROM quiz_questions qq
+               JOIN quizzes q ON q.id=qq.quiz_id WHERE q.task_id=?""",
+            (task_id,),
+        )
     else:
         summary = db.execute_for_one(
             """SELECT COUNT(*) AS total, SUM(CASE WHEN r.is_correct THEN 1 ELSE 0 END) AS correct
@@ -1244,8 +1305,16 @@ def assessment_finish(user):
                    GROUP BY r2.question_id)""",
             (task_id, user_id),
         )
+        expected = db.execute_for_one(
+            """SELECT COUNT(*) AS total FROM sprint_questions sq
+               JOIN practice_sprints ps ON ps.id=sq.sprint_id WHERE ps.task_id=?""",
+            (task_id,),
+        )
 
     total = (summary or {}).get('total') or 0
+    expected_total = (expected or {}).get('total') or 0
+    if expected_total <= 0 or total < expected_total:
+        return jsonify({"error": "Finish every question before completing this step."}), 409
     correct = (summary or {}).get('correct') or 0
     accuracy = correct / total if total else 0.0
     base = task.get('xp_reward') or 20
@@ -1260,10 +1329,12 @@ def assessment_finish(user):
             "UPDATE paths SET xp_awarded=? WHERE id=? AND user_id=?",
             (earned, task_id, user_id),
         )
+    completed_now = _record_task_completion(user_id, task)
     return jsonify({
         "xp_earned": xp_delta,
         "total_points": _award_xp(user_id, xp_delta) if xp_delta else None,
         "accuracy": round(accuracy, 3),
+        "completed": completed_now or bool(task.get('is_completed')),
     })
 
 
@@ -1449,6 +1520,12 @@ def lesson_finish(user, task_id):
     ) or {}
     total = summary.get('total') or 0
     correct = summary.get('correct') or 0
+    expected = db.execute_for_one(
+        "SELECT COUNT(*) AS total FROM lesson_steps WHERE lesson_id=? AND step_type='check'",
+        (lesson['id'],),
+    ) or {}
+    if total < (expected.get('total') or 0):
+        return jsonify({"error": "Finish every check before completing this lesson."}), 409
     accuracy = correct / total if total else 1.0
 
     progress = db.select_one("lesson_progress", where={"user_id": user_id, "lesson_id": lesson['id']})
@@ -1460,7 +1537,9 @@ def lesson_finish(user, task_id):
     payload = {
         "is_completed": True,
         "xp_earned": max(earned, already_awarded),
-        "completed_at": datetime.utcnow().isoformat(sep=" ", timespec="seconds"),
+        "completed_at": datetime.now(ZoneInfo("UTC")).replace(tzinfo=None).isoformat(
+            sep=" ", timespec="seconds"
+        ),
     }
     if progress:
         db.update("lesson_progress", payload, where={"id": progress['id']})
@@ -1470,6 +1549,14 @@ def lesson_finish(user, task_id):
             "correct_count": correct, "attempt_count": total, **payload,
         })
 
+    current_path_xp = task.get('xp_awarded') or 0
+    if earned > current_path_xp:
+        db.execute_write(
+            "UPDATE paths SET xp_awarded=? WHERE id=? AND user_id=?",
+            (earned, task_id, user_id),
+        )
+    completed_now = _record_task_completion(user_id, task)
+
     return jsonify({
         "success": True,
         "correct": correct,
@@ -1477,6 +1564,7 @@ def lesson_finish(user, task_id):
         "xp_earned": xp_delta,
         "total_points": _award_xp(user_id, xp_delta) if xp_delta else None,
         "recap": lesson.get('recap') or "",
+        "completed": completed_now or bool(task.get('is_completed')),
     })
 
 
@@ -3383,6 +3471,11 @@ def api_update_task_status(user):
     )
     if blocked:
         return jsonify({"success": False, "error": "Complete the earlier path step first."}), 409
+    if status == 'complete' and task_info.get('task_format') in {'lesson', 'quiz', 'practice_sprint'}:
+        return jsonify({
+            "success": False,
+            "error": "Finish the activity before completing this path step."
+        }), 409
     if status == 'skip':
         claimed = db.execute_write(
             "UPDATE paths SET is_completed=?, is_skipped=? WHERE id=? AND user_id=? AND is_completed=?",
@@ -3396,59 +3489,25 @@ def api_update_task_status(user):
             return jsonify({"success": True, "skipped": True})
         return jsonify({"success": True, "already_completed": True})
 
-    claimed = db.execute_write(
-        "UPDATE paths SET is_completed=?, is_skipped=? WHERE id=? AND user_id=? AND is_completed=?",
-        (True, False, task_id, user_id, False)
-    )
+    claimed = _record_task_completion(user_id, task_info)
     if claimed:
         description = task_info['description']
-        category = task_info['category']
         task_type = task_info['type']
-        log_activity(user_id, 'task_completed', {
-                     'description': description, 'category': category})
 
         # --- GAMIFICATION LOGIC ---
         # Lesson and drill nodes carry their own XP value; older rows and
         # personal steps fall back to the original flat award.
-        points_to_add = task_info.get('xp_reward') or (25 if task_type == 'milestone' else 10)
+        points_target = task_info.get('xp_reward') or (25 if task_type == 'milestone' else 10)
         if "boss battle" in description.lower():
-            points_to_add = max(points_to_add, 100)
-
-        game_stats_rows = db.select(
-            "gamification_stats", where={"user_id": user_id})
-        if not game_stats_rows:
-            db.insert("gamification_stats", {
-                "user_id": user_id, "points": 0, "current_streak": 0
-            })
-            game_stats_rows = db.select(
-                "gamification_stats", where={"user_id": user_id})
-        game_stats_row = game_stats_rows[0]
-        game_stats = {
-            "points": game_stats_row['points'],
-            "streak": game_stats_row['current_streak'],
-            "last_date": game_stats_row['last_completed_date']
-        }
-
-        today = date.today()
-        yesterday = today - timedelta(days=1)
-        last_completed_date = None
-        if game_stats['last_date']:
-            last_completed_date = date.fromisoformat(
-                game_stats['last_date'])
-
-        new_streak = game_stats['streak']
-        if last_completed_date == today:
-            new_streak = game_stats['streak']
-        elif last_completed_date == yesterday:
-            new_streak += 1
-        else:
-            new_streak = 1
-
-        db.update("gamification_stats", {
-            "points": game_stats['points'] + points_to_add,
-            "current_streak": new_streak,
-            "last_completed_date": today.isoformat()
-        }, where={"user_id": user_id})
+            points_target = max(points_target, 100)
+        already_awarded = task_info.get('xp_awarded') or 0
+        points_to_add = max(0, points_target - already_awarded)
+        if points_target > already_awarded:
+            db.execute_write(
+                "UPDATE paths SET xp_awarded=? WHERE id=? AND user_id=?",
+                (points_target, task_id, user_id),
+            )
+        _award_xp(user_id, points_to_add)
     else:
         return jsonify({"success": True, "already_completed": True})
 

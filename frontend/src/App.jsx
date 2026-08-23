@@ -7,7 +7,7 @@ import {
   ArrowLeft, ArrowRight, Award, BarChart3, BookOpen, Brain, CalendarDays,
   Check, Clock3, Flame,
   GraduationCap, Hand, Headphones, House, LayoutDashboard, LineChart,
-  LockKeyhole, LogOut, Mail, Menu, MessageCircle, PenLine, Plus, RotateCcw,
+  LockKeyhole, LogOut, Mail, Menu, MessageCircle, PenLine, Plus, RotateCcw, SkipForward,
   Search, Send, Settings, ShieldCheck, Sparkles, Target, Trophy, UserRound,
   UsersRound, X, Zap
 } from 'lucide-react'
@@ -447,17 +447,27 @@ function PathPage() {
       .finally(() => { if (!cancelled) setLoading(false) })
     return () => { cancelled = true }
   }, [category])
-  const completed = tasks.filter(t => t.is_completed).length
+  useEffect(() => {
+    const desktop = window.matchMedia('(min-width: 1050px)')
+    const keepPathVisible = event => { if (!event.matches) setChatOpen(false) }
+    desktop.addEventListener('change', keepPathVisible)
+    return () => desktop.removeEventListener('change', keepPathVisible)
+  }, [])
+  const coreTasks = tasks.filter(t => !t.is_user_added)
+  const completed = coreTasks.filter(t => t.is_completed).length
+  const progressTotal = coreTasks.length || 5
   const activeIndex = tasks.findIndex(t => !t.is_completed)
   const journeyHeight = Math.max(790, 180 + (tasks.length - 1) * 155)
   const journeyXs = [320, 170, 320, 470, 320]
   const journeyPoints = tasks.map((_, index) => ({ x: journeyXs[index % journeyXs.length], y: 90 + index * 155 }))
   const journeyCurve = journeyPoints.reduce((path, point, index) => { if (index === 0) return `M ${point.x} ${point.y}`; const previous = journeyPoints[index - 1]; const mid = (previous.y + point.y) / 2; return `${path} C ${previous.x} ${mid}, ${point.x} ${mid}, ${point.x} ${point.y}` }, '')
   const finishTask = (next) => {
+    const coreWasComplete = coreTasks.length === 5 && coreTasks.every(t => t.is_completed)
     const updated = tasks.map(t => t.id === next.id ? next : t)
     setTasks(updated)
     setSelected(null)
-    if (updated.length === 5 && updated.every(t => t.is_completed)) {
+    const updatedCore = updated.filter(t => !t.is_user_added)
+    if (!coreWasComplete && updatedCore.length === 5 && updatedCore.every(t => t.is_completed)) {
       window.setTimeout(async () => {
         if (window.confirm('You finished all five steps. Build the next five-step path now?')) await loadTasks(true)
       }, 250)
@@ -465,15 +475,16 @@ function PathPage() {
   }
   return <AppShell name={boot.data.name}><main className={`app-main path-page ${chatOpen ? 'chat-docked' : ''}`}>
     <div className="path-header"><div><div className="eyebrow"><span /> {category.toUpperCase()}</div><h1>Your five-step path.</h1><p>Finish what is in front of you. The path adapts from there.</p></div><div className="path-header-actions">{!isTest && <button className="button button--quiet" onClick={() => setEssayOpen(true)}><PenLine size={17} /> Essay feedback</button>}{!chatOpen && <button className="button button--quiet" onClick={() => setChatOpen(true)}><MessageCircle size={17} /> Ask Mentics</button>}<a className="button button--dark" href={builder}>Edit goals <ArrowRight size={16} /></a></div></div>
-    <div className="path-progress"><span style={{ width: `${tasks.length ? completed / tasks.length * 100 : 0}%` }} /><p><b><span>{completed}</span><i>/</i><span>{tasks.length || 5}</span></b><span>steps complete</span></p></div>
+    <div className="path-progress"><span style={{ width: `${completed / progressTotal * 100}%` }} /><p><b><span>{completed}</span><i>/</i><span>{progressTotal}</span></b><span>core steps complete</span></p></div>
     {error && <div className="error-banner">{error}<button onClick={() => loadTasks()}>Try again</button></div>}
     {loading ? <PathSkeleton /> : <section className="journey-map" style={{ height: journeyHeight }} aria-label={`${category} learning journey`}>
       <svg className="journey-route" viewBox={`0 0 640 ${journeyHeight}`} preserveAspectRatio="none" aria-hidden="true"><defs><linearGradient id="journey-gradient" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#8b5cf6" /><stop offset="1" stopColor="#4f46e5" /></linearGradient></defs><path className="journey-route-shadow" d={journeyCurve} /><path className="journey-route-progress" d={journeyCurve} pathLength="100" style={{ strokeDasharray: `${tasks.length ? Math.min(100, completed / tasks.length * 100) : 0} 100` }} /></svg>
       {tasks.map((task, index) => {
-        const locked = index > activeIndex && activeIndex !== -1; const kind = taskKind(task); const meta = kind ? nodeKinds[kind] : null; const milestone = kind === 'boss_battle'; const NodeIcon = meta?.icon; const point = journeyPoints[index]; return <button key={task.id || index} disabled={locked} style={{ left: `${point.x / 640 * 100}%`, top: point.y }} className={`journey-step ${task.is_completed ? 'done' : index === activeIndex ? 'current' : 'locked'} ${milestone ? 'milestone' : ''} ${kind ? `journey-step--${kind}` : ''}`} onClick={() => setSelected(task)} aria-label={`Step ${index + 1}${meta ? `, ${meta.label}` : ''}: ${task.description}`}>
+        const locked = index > activeIndex && activeIndex !== -1; const kind = taskKind(task); const meta = kind ? nodeKinds[kind] : null; const milestone = kind === 'boss_battle'; const NodeIcon = meta?.icon; const point = journeyPoints[index]; const status = task.is_skipped ? 'skipped' : task.is_completed ? 'completed' : index === activeIndex ? 'current' : 'locked'; return <button key={task.id || index} disabled={locked} style={{ left: `${point.x / 640 * 100}%`, top: point.y }} className={`journey-step ${task.is_completed ? 'done' : index === activeIndex ? 'current' : 'locked'} ${task.is_skipped ? 'skipped' : ''} ${milestone ? 'milestone' : ''} ${kind ? `journey-step--${kind}` : ''}`} onClick={() => setSelected(task)} aria-haspopup="dialog" aria-current={index === activeIndex ? 'step' : undefined}>
+          <span className="sr-only">Step {index + 1}, {status}{locked ? `: ${task.description}` : '.'} </span>
           {index === activeIndex && !task.is_completed && <span className="journey-next">START</span>}
-          <span className="journey-node"><i>{task.is_completed ? <Check /> : locked ? <LockKeyhole /> : NodeIcon ? <NodeIcon /> : index + 1}</i></span>
-          <span className={`journey-label ${point.x < 320 ? 'label-right' : point.x > 320 ? 'label-left' : index % 2 ? 'label-left' : 'label-right'}`}><small>{task.is_completed ? 'COMPLETED' : meta ? meta.label.toUpperCase() : `STEP ${index + 1}`}</small><b><PlainText value={task.description} /></b>{task.skill_label && kind !== 'boss_battle' && <em className="journey-skill">{task.skill_label}</em>}{task.due_date && <em><CalendarDays /> {task.due_date}</em>}</span>
+          <span className="journey-node"><i>{task.is_skipped ? <SkipForward /> : task.is_completed ? <Check /> : locked ? <LockKeyhole /> : NodeIcon ? <NodeIcon /> : index + 1}</i></span>
+          <span className={`journey-label ${point.x < 320 ? 'label-right' : point.x > 320 ? 'label-left' : index % 2 ? 'label-left' : 'label-right'}`}><small>{task.is_skipped ? 'SKIPPED' : task.is_completed ? 'COMPLETED' : task.is_user_added ? 'PERSONAL STEP' : meta ? meta.label.toUpperCase() : `STEP ${index + 1}`}</small><b><PlainText value={task.description} /></b>{task.skill_label && kind !== 'boss_battle' && <em className="journey-skill">{task.skill_label}</em>}{task.due_date && <em><CalendarDays /> {task.due_date}</em>}</span>
         </button>
       })}
     </section>}
@@ -482,7 +493,7 @@ function PathPage() {
     {adding && <AddTask category={category} onClose={() => setAdding(false)} onAdded={t => { setTasks(items => [...items, normalizeTask(t)]); setAdding(false) }} />}
     {essayOpen && <EssayCoach onClose={() => setEssayOpen(false)} />}
     <ChatPanel open={chatOpen} onClose={() => setChatOpen(false)} category={category} onNewPath={items => setTasks(items.map(normalizeTask))} />
-    {!chatOpen && <button className="floating-chat" onClick={() => setChatOpen(true)}><MessageCircle /><span>Ask Mentics</span></button>}
+    {!chatOpen && <button className="floating-chat" onClick={() => setChatOpen(true)} aria-label="Ask Mentics"><MessageCircle /><span>Ask Mentics</span></button>}
   </main></AppShell>
 }
 
@@ -491,7 +502,36 @@ function normalizeTask(t) { return { ...t, is_completed: Boolean(t.is_completed)
 
 function PathSkeleton() { return <section className="journey-map journey-map--loading">{[0, 1, 2, 3, 4].map(i => <span className="journey-skeleton skeleton" style={{ left: `${[50, 27, 50, 73, 50][i]}%`, top: 90 + i * 155 }} key={i} />)}</section> }
 
-function Modal({ children, onClose, wide = false }) { useEffect(() => { const fn = e => e.key === 'Escape' && onClose(); document.addEventListener('keydown', fn); return () => document.removeEventListener('keydown', fn) }, [onClose]); return createPortal(<div className="modal-wrap" role="dialog" aria-modal="true" onMouseDown={e => e.target === e.currentTarget && onClose()}><div className={`modal ${wide ? 'modal--wide' : ''}`}><button className="modal-close" onClick={onClose} aria-label="Close"><X /></button>{children}</div></div>, document.body) }
+function Modal({ children, onClose, wide = false, label = 'Dialog' }) {
+  const modalRef = useRef(null)
+  useEffect(() => {
+    const previouslyFocused = document.activeElement
+    const previousOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    const frame = requestAnimationFrame(() => {
+      const preferred = modalRef.current?.querySelector('[autofocus], [data-modal-autofocus], button:not(:disabled), a[href], input:not(:disabled), textarea:not(:disabled), select:not(:disabled)')
+      ;(preferred || modalRef.current)?.focus()
+    })
+    const handleKeyDown = event => {
+      if (event.key === 'Escape') { event.preventDefault(); onClose(); return }
+      if (event.key !== 'Tab' || !modalRef.current) return
+      const focusable = [...modalRef.current.querySelectorAll('button:not(:disabled), a[href], input:not(:disabled), textarea:not(:disabled), select:not(:disabled), [tabindex]:not([tabindex="-1"])')]
+        .filter(node => node.getClientRects().length)
+      if (!focusable.length) { event.preventDefault(); modalRef.current.focus(); return }
+      const first = focusable[0]; const last = focusable[focusable.length - 1]
+      if (event.shiftKey && (document.activeElement === first || !modalRef.current.contains(document.activeElement))) { event.preventDefault(); last.focus() }
+      else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus() }
+    }
+    document.addEventListener('keydown', handleKeyDown)
+    return () => {
+      cancelAnimationFrame(frame)
+      document.removeEventListener('keydown', handleKeyDown)
+      document.body.style.overflow = previousOverflow
+      if (previouslyFocused instanceof HTMLElement && previouslyFocused.isConnected) previouslyFocused.focus()
+    }
+  }, [onClose])
+  return createPortal(<div className="modal-wrap" role="dialog" aria-modal="true" aria-label={label} onPointerDown={event => event.target === event.currentTarget && onClose()}><div ref={modalRef} tabIndex={-1} className={`modal ${wide ? 'modal--wide' : ''}`}><button className="modal-close" onClick={onClose} aria-label="Close"><X /></button>{children}</div></div>, document.body)
+}
 
 const milestoneStats = {
   gpa: { label: 'New GPA', placeholder: 'Enter your GPA', min: 0, max: 5, step: .01 },
@@ -514,8 +554,8 @@ function TaskModal({ task, category, onClose, onUpdate, onCompleted }) {
   const meta = kind ? nodeKinds[kind] : null
   const complete = async () => { setBusy(true); setError(''); try { await api('/api/update_task_status', { method: 'POST', body: JSON.stringify({ taskId: task.id, status: 'complete' }) }); const next = { ...task, is_completed: true }; onUpdate(next); if (stat) setStatPrompt(true); else onCompleted(next) } catch (e) { setError(e.message) } finally { setBusy(false) } }
   const finishMilestone = async (save) => { setBusy(true); setError(''); try { if (save) await api('/api/update_stats', { method: 'POST', body: JSON.stringify({ stat_name: task.stat_to_update, stat_value: statValue }) }); onCompleted({ ...task, is_completed: true }) } catch (e) { setError(e.message) } finally { setBusy(false) } }
-  const addNote = async () => { if (!note.trim()) return; const r = await api('/api/add_subtask', { method: 'POST', body: JSON.stringify({ parent_task_id: task.id, description: note }) }); onUpdate({ ...task, subtasks: [...task.subtasks, r.subtask] }); setNote('') }
-  const toggleNote = async (s) => { await api('/api/update_subtask', { method: 'POST', body: JSON.stringify({ subtaskId: s.id, is_completed: !s.is_completed }) }); onUpdate({ ...task, subtasks: task.subtasks.map(x => x.id === s.id ? { ...x, is_completed: !x.is_completed } : x) }) }
+  const addNote = async () => { if (!note.trim() || busy) return; setBusy(true); setError(''); try { const r = await api('/api/add_subtask', { method: 'POST', body: JSON.stringify({ parent_task_id: task.id, description: note }) }); onUpdate({ ...task, subtasks: [...task.subtasks, r.subtask] }); setNote('') } catch (e) { setError(e.message) } finally { setBusy(false) } }
+  const toggleNote = async (s) => { if (busy) return; setBusy(true); setError(''); try { await api('/api/update_subtask', { method: 'POST', body: JSON.stringify({ subtaskId: s.id, is_completed: !s.is_completed }) }); onUpdate({ ...task, subtasks: task.subtasks.map(x => x.id === s.id ? { ...x, is_completed: !x.is_completed } : x) }) } catch (e) { setError(e.message) } finally { setBusy(false) } }
   const saveDeadline = async () => { try { await api('/api/update_task_deadline', { method: 'POST', body: JSON.stringify({ taskId: task.id, dueDate: dueDate || null }) }); onUpdate({ ...task, due_date: dueDate || null }); toast.success('Target date saved') } catch (e) { toast.error('Could not save the target date', { description: e.message }) } }
   const skipTask = async () => { setBusy(true); setError(''); try { await api('/api/skip_task', { method: 'POST', body: JSON.stringify({ taskId: task.id }) }); const next = { ...task, is_completed: true, is_skipped: true }; onUpdate(next); onCompleted(next) } catch (e) { setError(e.message) } finally { setBusy(false) } }
 
@@ -524,11 +564,8 @@ function TaskModal({ task, category, onClose, onUpdate, onCompleted }) {
   const finishPlay = async () => {
     setPlaying(false)
     if (task.is_completed) { onClose(); return }
-    try {
-      await api('/api/update_task_status', { method: 'POST', body: JSON.stringify({ taskId: task.id, status: 'complete' }) })
-      const next = { ...task, is_completed: true }; onUpdate(next)
-      if (stat) setStatPrompt(true); else onCompleted(next)
-    } catch (e) { setError(e.message) }
+    const next = { ...task, is_completed: true }; onUpdate(next)
+    if (stat) setStatPrompt(true); else onCompleted(next)
   }
 
   if (playing && kind === 'lesson') return <LessonPlayer task={task} onClose={() => setPlaying(false)} onCompleted={finishPlay} />
@@ -540,7 +577,7 @@ function TaskModal({ task, category, onClose, onUpdate, onCompleted }) {
   const bossLink = kind === 'boss_battle' ? (firstLink(task.description) || 'https://satsuite.collegeboard.org/sat/practice-preparation/practice-tests') : null
   const playable = ['lesson', 'practice_sprint', 'quiz'].includes(kind)
 
-  return <Modal onClose={onClose}>
+  return <Modal onClose={onClose} label={`${meta?.label || 'Task'} details`}>
     <div className="modal-kicker">{category} · {meta ? meta.label : task.type === 'milestone' ? 'Milestone' : 'Action step'}{task.skill_label ? ` · ${task.skill_label}` : ''}</div>
     <h2><PlainText value={task.description} /></h2>
     {task.objective && <p className="task-objective"><Target /> {task.objective}</p>}
@@ -575,7 +612,7 @@ function TaskModal({ task, category, onClose, onUpdate, onCompleted }) {
     </button>
     {detailsOpen && <div className="task-details">
       <div className="task-deadline"><label>Target date<input type="date" value={dueDate} onChange={e => setDueDate(e.target.value)} /></label><button onClick={saveDeadline}>Save date</button></div>
-      <div className="task-notes"><label>Notes and sub-steps</label>{task.subtasks.map(s => <button key={s.id} className={s.is_completed ? 'checked' : ''} onClick={() => toggleNote(s)}><span>{s.is_completed && <Check />}</span>{s.description}</button>)}<div><input value={note} onChange={e => setNote(e.target.value)} onKeyDown={e => e.key === 'Enter' && addNote()} placeholder="Add a note or smaller step" /><button onClick={addNote} disabled={!note.trim()}><Plus /></button></div></div>
+      <div className="task-notes"><label>Notes and sub-steps</label>{task.subtasks.map(s => <button key={s.id} className={s.is_completed ? 'checked' : ''} onClick={() => toggleNote(s)} disabled={busy}><span>{s.is_completed && <Check />}</span>{s.description}</button>)}<div><input value={note} onChange={e => setNote(e.target.value)} onKeyDown={e => e.key === 'Enter' && addNote()} placeholder="Add a note or smaller step" disabled={busy} /><button onClick={addNote} disabled={busy || !note.trim()} aria-label="Add note or sub-step"><Plus /></button></div></div>
       <div className="modal-actions">
         {(kind === 'boss_battle' || !playable) && !task.is_completed && <button className="button button--quiet" onClick={complete} disabled={busy}>Mark complete <Check /></button>}
         {playable && !task.is_skipped && !task.is_completed && <button className="button button--quiet" onClick={skipTask} disabled={busy}>Skip this step</button>}
@@ -584,7 +621,7 @@ function TaskModal({ task, category, onClose, onUpdate, onCompleted }) {
   </Modal>
 }
 
-function AddTask({ category, onClose, onAdded }) { const [description, setDescription] = useState(''); const [date, setDate] = useState(''); const [error, setError] = useState(''); const submit = async e => { e.preventDefault(); setError(''); try { const r = await api('/api/add_task', { method: 'POST', body: JSON.stringify({ description, category, due_date: date || null }) }); onAdded(r.task) } catch (x) { setError(x.message) } }; return <Modal onClose={onClose}><div className="modal-kicker">ADD A PERSONAL STEP</div><h2>Make the path yours.</h2><form className="modal-form" onSubmit={submit}><label>What do you want to do?<textarea autoFocus value={description} onChange={e => setDescription(e.target.value)} placeholder="Write a clear, finishable action" maxLength={500} /></label><label>Due date <span>optional</span><input type="date" value={date} onChange={e => setDate(e.target.value)} /></label>{error && <p className="form-error">{error}</p>}<button className="button button--primary" disabled={!description.trim()}>Add to path <ArrowRight /></button></form></Modal> }
+function AddTask({ category, onClose, onAdded }) { const [description, setDescription] = useState(''); const [date, setDate] = useState(''); const [error, setError] = useState(''); const [busy, setBusy] = useState(false); const submit = async e => { e.preventDefault(); if (busy) return; setBusy(true); setError(''); try { const r = await api('/api/add_task', { method: 'POST', body: JSON.stringify({ description, category, due_date: date || null }) }); onAdded(r.task) } catch (x) { setError(x.message) } finally { setBusy(false) } }; return <Modal onClose={onClose} label="Add a personal step"><div className="modal-kicker">ADD A PERSONAL STEP</div><h2>Make the path yours.</h2><form className="modal-form" onSubmit={submit}><label>What do you want to do?<textarea autoFocus value={description} onChange={e => setDescription(e.target.value)} placeholder="Write a clear, finishable action" maxLength={500} disabled={busy} /></label><label>Due date <span>optional</span><input type="date" value={date} onChange={e => setDate(e.target.value)} disabled={busy} /></label>{error && <p className="form-error" role="alert">{error}</p>}<button className="button button--primary" disabled={busy || !description.trim()}>{busy ? 'Adding…' : 'Add to path'} <ArrowRight /></button></form></Modal> }
 
 // --- Duolingo-style player -------------------------------------------------
 // One step on screen at a time, an answer graded the moment it is given, and a
@@ -925,7 +962,7 @@ function ChatPanel({ open, onClose, category, onNewPath }) {
   useEffect(() => { const node = scroller.current; if (node) node.scrollTo({ top: node.scrollHeight, behavior: 'smooth' }) }, [messages, busy])
   const send = async e => { e.preventDefault(); if (!input.trim() || busy) return; const next = [...messages, { role: 'user', content: input.trim() }]; setMessages(next); setInput(''); setBusy(true); try { const r = await api(`/api/chat?category=${encodeURIComponent(category)}`, { method: 'POST', body: JSON.stringify({ history: next }) }); if (Object.prototype.hasOwnProperty.call(r, 'new_path')) { if (!Array.isArray(r.new_path) || r.new_path.length !== 5) throw new Error('Mentics could not build a complete five-step path. Your current path is unchanged.'); onNewPath(r.new_path); setMessages([...next, { role: 'assistant', content: r.reply || 'Your new five-step path is ready. I used our conversation to shape it.' }]) } else setMessages([...next, { role: 'assistant', content: r.reply }]) } catch (x) { setMessages([...next, { role: 'assistant', content: x.message }]) } finally { setBusy(false) } }
   const reset = async () => { try { await api('/api/reset_chat', { method: 'POST', body: JSON.stringify({ category }) }); setHistoryError(''); setMessages([{ role: 'assistant', content: `Fresh start. What would you like help with on your ${category.toLowerCase()} path?` }]) } catch (error) { setHistoryError(error.message) } }
-  return <aside className={`chat-panel ${open ? 'chat-panel--open' : ''}`} aria-hidden={!open}><header><span><i><Sparkles /></i><b>Mentics guide</b><small>Present with your current path</small></span><div><button onClick={reset} aria-label="Reset chat"><RotateCcw /></button><button onClick={onClose} aria-label="Close chat"><X /></button></div></header>{historyError && <div className="chat-notice" role="status">{historyError}</div>}<div className="chat-messages" ref={scroller}>{messages.map((m, i) => <div className={`chat-message chat-message--${m.role}`} key={i}>{m.role === 'assistant' ? <Markdown>{m.content}</Markdown> : m.content}</div>)}{busy && <div className="chat-thinking"><i /><i /><i /></div>}</div><form onSubmit={send}><textarea name="message" aria-label="Ask Mentics about your path" value={input} onChange={e => setInput(e.target.value)} onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(e) } }} placeholder="Ask about your path…" rows={1} /><button disabled={!input.trim() || busy} aria-label="Send"><Send /></button></form><p>Mentics can make mistakes. Check important information.</p></aside>
+  return <aside className={`chat-panel ${open ? 'chat-panel--open' : ''}`} aria-hidden={!open} inert={!open || undefined}><header><span><i><Sparkles /></i><b>Mentics guide</b><small>Present with your current path</small></span><div><button onClick={reset} aria-label="Reset chat"><RotateCcw /></button><button onClick={onClose} aria-label="Close chat"><X /></button></div></header>{historyError && <div className="chat-notice" role="status">{historyError}</div>}<div className="chat-messages" ref={scroller}>{messages.map((m, i) => <div className={`chat-message chat-message--${m.role}`} key={i}>{m.role === 'assistant' ? <Markdown>{m.content}</Markdown> : m.content}</div>)}{busy && <div className="chat-thinking"><i /><i /><i /></div>}</div><form onSubmit={send}><textarea name="message" aria-label="Ask Mentics about your path" value={input} onChange={e => setInput(e.target.value)} onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(e) } }} placeholder="Ask about your path…" rows={1} /><button disabled={!input.trim() || busy} aria-label="Send"><Send /></button></form><p>Mentics can make mistakes. Check important information.</p></aside>
 }
 
 function PageIntro({ kicker, title, copy, actions }) {
