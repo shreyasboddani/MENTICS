@@ -1397,6 +1397,23 @@
    backdrop.  Safari is especially prone to losing fixed descendants of a
    blurred header, so the menu uses an opaque glass material instead. */
 @media (max-width: 759px) {
+  /* The landing action was inheriting a transparent glass control on iPhone,
+     leaving white text on a white header. Keep this one decisive and readable. */
+  .public-nav > .button--dark {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+    min-height: 40px;
+    color: #fff !important;
+    border: 1px solid rgba(255, 255, 255, .2) !important;
+    background: linear-gradient(135deg, #7444dc, #4d46cc) !important;
+    box-shadow: 0 12px 24px -15px rgba(57, 38, 147, .78) !important;
+    -webkit-text-fill-color: #fff;
+  }
+
+  .public-nav > .button--dark svg { color: currentColor; }
+
   .app-shell.app-shell--tabs > .product-nav {
     z-index: 1000;
     isolation: isolate;
