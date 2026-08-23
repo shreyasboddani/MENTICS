@@ -1,4 +1,4 @@
-"""The plan contract: five usable nodes no matter what the model returns.
+"""The plan contract: server-owned usable nodes no matter what the model returns.
 
 _complete_five_step_plan enforced this when a single call produced the whole
 path. The server now owns the unit shape, so the same guarantee lives in the
@@ -82,7 +82,7 @@ def test_an_invented_skill_key_still_resolves_to_a_real_skill():
     assert plan["nodes"][0]["skill"]["skill_key"] in learning.SKILL_TAXONOMY
 
 
-def test_college_plan_holds_its_shape_and_ends_in_a_deliverable():
+def test_college_plan_is_a_lesson_then_a_real_world_deliverable():
     plan = learning._normalize_college_plan({}, learning.COLLEGE_SHAPE, dict(COLLEGE_PROFILE))
 
     assert [node["node_type"] for node in plan["nodes"]] == learning.COLLEGE_SHAPE
@@ -90,3 +90,19 @@ def test_college_plan_holds_its_shape_and_ends_in_a_deliverable():
     assert milestone["node_type"] == "milestone"
     assert milestone["stat_to_update"] == "applications_submitted"
     assert all(node["skill"]["skill_key"] in learning.COLLEGE_TAXONOMY for node in plan["nodes"])
+    assert plan["nodes"][0]["node_type"] == "lesson"
+    assert "report back" in milestone["reason"].lower()
+
+
+def test_college_unit_never_generates_multiple_choice_checks(monkeypatch):
+    monkeypatch.setattr(learning, "plan_college_unit", lambda *_: {})
+    monkeypatch.setattr(learning, "generate_college_teaching", lambda node, profile: {
+        "intro": "A direct lesson.",
+        "cards": [{"title": "One useful idea", "body": "Concrete guidance for a real application decision.",
+                   "worked_example": "A real example.", "takeaway": "Use it today.", "trap": "Being vague."}],
+        "recap": "Use the idea in the assignment.",
+    })
+    unit = learning.build_college_unit(dict(COLLEGE_PROFILE))
+
+    assert [node["node_type"] for node in unit["nodes"]] == ["lesson", "milestone"]
+    assert all(step["step_type"] != "check" for step in unit["nodes"][0]["steps"])

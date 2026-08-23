@@ -53,7 +53,7 @@
   display: flex !important;
   flex-direction: column;
   overflow: hidden;
-  background: var(--mx-paper, #fff);
+  background: linear-gradient(145deg, rgba(255, 255, 255, .96), rgba(246, 245, 252, .92));
   border: 1px solid var(--mx-line, #dedfeb);
   border-radius: 20px;
   box-shadow: var(--mx-shadow-lg);
@@ -76,23 +76,35 @@
 .chat-identity {
   display: flex;
   align-items: center;
-  gap: 11px;
+  gap: 12px;
   min-width: 0;
 }
 
-.chat-mark {
+/* Override the legacy header grid without relying on a generic header span.
+   The MENTICS wordmark needs its natural width, not the old 37px icon slot. */
+.chat-panel .chat-identity {
+  display: flex;
+  grid-template-columns: none;
+  column-gap: 12px;
+  height: auto;
+}
+.chat-panel .chat-identity > span:last-child { min-width: 0; }
+
+.chat-wordmark {
   flex: none;
   display: grid;
   place-items: center;
-  width: 38px;
-  height: 38px;
-  border-radius: 12px;
-  background: var(--mx-violet-lift);
+  height: 30px;
+  padding: 0 9px;
+  border-radius: 9px;
+  background: linear-gradient(135deg, var(--mx-violet, #7c3aed), var(--mx-indigo, #4f46e5));
   color: #fff;
-  box-shadow: 0 4px 12px -4px rgba(99, 102, 241, .55);
+  font-family: Lalezar, Inter, sans-serif;
+  font-size: 15px;
+  letter-spacing: .05em;
+  line-height: 1;
+  box-shadow: 0 5px 14px -7px rgba(79, 70, 229, .72);
 }
-
-.chat-mark svg { width: 19px; height: 19px }
 
 .chat-identity > span { min-width: 0 }
 
@@ -176,15 +188,16 @@
   flex: none;
   display: grid;
   place-items: center;
-  width: 26px;
-  height: 26px;
+  width: 25px;
+  height: 25px;
   margin-top: 2px;
   border-radius: 8px;
   background: var(--mx-violet-lift);
   color: #fff;
+  font-family: Lalezar, Inter, sans-serif;
+  font-size: 14px;
+  line-height: 1;
 }
-
-.chat-avatar svg { width: 13px; height: 13px }
 
 .chat-bubble {
   min-width: 0;
@@ -291,7 +304,7 @@
   transform: translateX(2px);
 }
 
-.chat-starters svg { flex: none; width: 15px; height: 15px; color: var(--mx-violet, #7c3aed) }
+.chat-starters button > span { flex: none; color: var(--mx-violet, #7c3aed); font-size: 16px; line-height: 1 }
 
 .chat-notice {
   flex: none;
@@ -391,6 +404,7 @@
   padding: 30px 30px 26px;
   border: 1px solid var(--mx-line, #dedfeb);
   border-radius: 24px;
+  background: linear-gradient(145deg, rgba(255, 255, 255, .98), rgba(247, 246, 252, .96));
   box-shadow: var(--mx-shadow-lg);
   animation: modal-in .24s var(--mx-ease, cubic-bezier(.2, .8, .2, 1));
 }
@@ -635,7 +649,10 @@
    4. Dark theme
    ========================================================================== */
 
-@media (prefers-color-scheme: dark) {
+/* This product currently has one light material system. Do not apply a partial
+   system-dark override to only some cards: it leaves light pages with white
+   text and transparent dark surfaces. A real dark theme can opt in later. */
+@media not all {
   .chat-panel,
   .modal {
     background: #1b1730;
@@ -680,6 +697,47 @@
   .modal { padding: 24px 20px 20px; border-radius: 20px }
   .chat-starters { padding-left: 0 }
 }
+
+/* Small, purposeful response keeps the glass system alive without bringing
+   back expensive perpetual effects on the map or data visualizations. */
+@media (prefers-reduced-motion: no-preference) {
+  .stat-tile,
+  .goal-meter,
+  .tracker-panel,
+  .task-kind-banner,
+  .chat-starters button {
+    transition: transform 180ms cubic-bezier(.2, .8, .2, 1), box-shadow 180ms cubic-bezier(.2, .8, .2, 1), border-color 180ms ease;
+  }
+
+  .stat-tile:hover,
+  .goal-meter:hover,
+  .tracker-panel:hover,
+  .task-kind-banner:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--mx-shadow-md);
+  }
+
+.chat-starters button:hover { transform: translateX(3px); }
+}
+
+/* Account consent is a calm, legible acknowledgement—not buried fine print. */
+.legal-consent { display: flex !important; align-items: flex-start; gap: 10px; font-size: 12.5px !important; line-height: 1.45; color: var(--mx-muted, #6e7182); }
+.legal-consent input { flex: none; width: 16px; height: 16px; margin: 2px 0 0; accent-color: var(--mx-violet, #7c3aed); }
+.legal-consent a, .oauth-legal-notice a { color: var(--mx-violet-deep, #5b21b6); font-weight: 700; text-decoration: underline; text-underline-offset: 2px; }
+.oauth-legal-notice { margin: 10px 4px 0; font-size: 11.5px; line-height: 1.5; color: var(--mx-muted, #6e7182); text-align: center; }
+
+/* Legal pages use the same polished material system while keeping long-form
+   policy text exceptionally calm and easy to scan. */
+.legal-page { background: radial-gradient(circle at 86% 3%, rgba(139,92,246,.17), transparent 22rem), linear-gradient(135deg, #f8f7fc, #f2effb); }
+.legal-page > header { border-bottom-color: rgba(91,33,182,.14); background: rgba(255,255,255,.76); backdrop-filter: blur(18px); }
+.legal-page main { max-width: 900px; }
+.legal-title { padding: 42px 44px 30px; border: 1px solid rgba(124,58,237,.19); border-radius: 26px 26px 0 0; background: linear-gradient(145deg, rgba(255,255,255,.98), rgba(241,237,255,.86)); box-shadow: var(--mx-shadow-sm); }
+.legal-title h1 { color: var(--mx-ink, #171427); }
+.legal-intro { margin: 0; padding: 26px 44px 32px; border: 1px solid rgba(124,58,237,.19); border-top: 0; background: rgba(255,255,255,.82); font-size: 17px; }
+.legal-page section { margin: 12px 0 0; padding: 24px 30px; border: 1px solid rgba(23,20,39,.1); border-radius: 16px; background: rgba(255,255,255,.82); box-shadow: 0 12px 28px -28px rgba(34,25,74,.65); }
+.legal-page section h2 { margin: 0 0 9px; color: var(--mx-ink, #171427); }
+.legal-page section p { margin: 0; }
+@media (max-width: 700px) { .legal-title { padding: 30px 24px 22px; border-radius: 20px 20px 0 0; } .legal-intro { padding: 22px 24px 26px; } .legal-page section { padding: 21px; } }
 
 /* ==========================================================================
    6. Boss battle
@@ -821,7 +879,7 @@
 
 .boss-sections b { font-size: 22px; font-weight: 650; letter-spacing: -.02em; color: var(--mx-ink, #171427) }
 
-@media (prefers-color-scheme: dark) {
+@media not all {
   .boss-steps b, .boss-score-grid input, .boss-sections b { color: #f2f0f8 }
   .boss-score-grid input, .boss-sections > div { background: rgba(255, 255, 255, .05); border-color: rgba(255, 255, 255, .11) }
   .boss-delta { background: rgba(255, 255, 255, .08) }
@@ -880,7 +938,7 @@
 
 .milestone-log em { font-style: normal; font-size: 12.5px; color: var(--mx-muted, #6e7182) }
 
-@media (prefers-color-scheme: dark) {
+@media not all {
   .milestone-log { background: rgba(255, 255, 255, .04); border-color: rgba(255, 255, 255, .1) }
   .milestone-log label { color: #f2f0f8 }
   .milestone-log input, .milestone-log select { background: rgba(255, 255, 255, .05); border-color: rgba(255, 255, 255, .11); color: #e6e2f2 }
@@ -900,7 +958,7 @@
   --viz-ink: #6e7182;
 }
 
-@media (prefers-color-scheme: dark) {
+@media not all {
   :root {
     --viz-series-1: #8b5cf6;
     --viz-series-2: #0d9488;
@@ -997,6 +1055,51 @@
 .chart-table th { font-size: 11px; letter-spacing: .07em; text-transform: uppercase; color: var(--viz-ink) }
 
 /* --- Stat tiles --- */
+
+.score-overview {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+  margin: 0 0 14px;
+}
+
+.score-card {
+  position: relative;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  min-height: 154px;
+  padding: 22px;
+  overflow: hidden;
+  border: 1px solid var(--mx-line, #dedfeb);
+  border-radius: 20px;
+  background: linear-gradient(145deg, rgba(255,255,255,.98), rgba(246,245,252,.88));
+  box-shadow: var(--mx-shadow-sm);
+}
+
+.score-card::after {
+  content: '';
+  position: absolute;
+  width: 148px;
+  aspect-ratio: 1;
+  right: -58px;
+  top: -80px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(139,92,246,.2), rgba(139,92,246,0) 68%);
+  pointer-events: none;
+}
+
+.score-card > div, .score-card > span { position: relative; z-index: 1 }
+.score-card small { display: block; font-size: 10.5px; font-weight: 750; letter-spacing: .1em; color: var(--viz-ink); }
+.score-card strong { display: block; margin-top: 9px; font-size: clamp(42px, 4vw, 58px); line-height: .9; letter-spacing: -.06em; color: var(--mx-ink, #171427); }
+.score-card p { margin: 12px 0 0; font-size: 12.5px; color: var(--viz-ink); }
+.score-card > span { padding: 7px 9px; border-radius: 999px; background: rgba(23,20,39,.055); font-size: 10px; font-weight: 750; letter-spacing: .08em; color: var(--viz-ink); }
+.score-card--sat { border-color: rgba(124,58,237,.28); background: linear-gradient(140deg, rgba(250,248,255,.98), rgba(237,232,255,.86)); }
+.score-card--sat strong { color: var(--mx-violet-deep, #5b21b6); }
+.score-card--act { border-color: rgba(79,70,229,.23); background: linear-gradient(140deg, rgba(249,250,255,.98), rgba(230,235,255,.82)); }
+.score-card--act strong { color: #3730a3; }
+.score-card--gpa { border-color: rgba(13,148,136,.22); background: linear-gradient(140deg, rgba(249,255,253,.98), rgba(226,247,240,.84)); }
+.score-card--gpa strong { color: #0f766e; }
 
 .stat-tiles {
   display: grid;
@@ -1269,9 +1372,10 @@
 
 @media (max-width: 980px) {
   .stat-columns { grid-template-columns: 1fr }
+  .score-overview { grid-template-columns: 1fr }
 }
 
-@media (prefers-color-scheme: dark) {
+@media not all {
   .stat-tile, .goal-meter, .mastery-row, .path-card, .tracker-panel,
   .section-scores span, .subject-split > div, .app-progress span {
     background: rgba(255, 255, 255, .04);

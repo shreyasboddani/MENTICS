@@ -429,29 +429,36 @@ function PathPage() {
   const [chatOpen, setChatOpen] = useState(() => window.matchMedia('(min-width: 1050px)').matches)
   const [adding, setAdding] = useState(false)
   const [essayOpen, setEssayOpen] = useState(false)
+  const pathRequest = useRef(0)
   const builder = isTest ? '/dashboard/test-path-builder' : '/dashboard/college-path-builder'
   const loadTasks = async (regenerate = false) => {
+    const requestId = ++pathRequest.current
     setLoading(true); setError('')
     try {
       const data = await api(`/api/tasks?category=${encodeURIComponent(category)}`, regenerate ? { method: 'POST' } : {})
       if (!Array.isArray(data)) throw new Error('Your path could not be loaded.')
-      setTasks(data.map(normalizeTask))
-    } catch (e) { setError(e.message) } finally { setLoading(false) }
+      if (requestId === pathRequest.current) setTasks(data.map(normalizeTask))
+    } catch (e) { if (requestId === pathRequest.current) setError(e.message) } finally { if (requestId === pathRequest.current) setLoading(false) }
   }
   useEffect(() => {
-    let cancelled = false
+    const requestId = ++pathRequest.current
+    let mounted = true
     api(`/api/tasks?category=${encodeURIComponent(category)}`)
       .then(data => {
         if (!Array.isArray(data)) throw new Error('Your path could not be loaded.')
-        if (!cancelled) setTasks(data.map(normalizeTask))
+        if (mounted && requestId === pathRequest.current) setTasks(data.map(normalizeTask))
       })
-      .catch(e => { if (!cancelled) setError(e.message) })
-      .finally(() => { if (!cancelled) setLoading(false) })
-    return () => { cancelled = true }
+      .catch(e => { if (mounted && requestId === pathRequest.current) setError(e.message) })
+      .finally(() => { if (mounted && requestId === pathRequest.current) setLoading(false) })
+    return () => { mounted = false }
   }, [category])
   useEffect(() => {
     const desktop = window.matchMedia('(min-width: 1050px)')
     const keepPathVisible = event => { if (!event.matches) setChatOpen(false) }
+    // A page can hydrate at desktop width and then be restored on a smaller
+    // viewport. Check immediately as well as on later changes so the guide
+    // never obscures the path on phones.
+    keepPathVisible(desktop)
     desktop.addEventListener('change', keepPathVisible)
     return () => desktop.removeEventListener('change', keepPathVisible)
   }, [])
@@ -463,7 +470,12 @@ function PathPage() {
   const journeyXs = [320, 170, 320, 470, 320]
   const journeyPoints = tasks.map((_, index) => ({ x: journeyXs[index % journeyXs.length], y: 90 + index * 155 }))
   const journeyCurve = journeyPoints.reduce((path, point, index) => { if (index === 0) return `M ${point.x} ${point.y}`; const previous = journeyPoints[index - 1]; const mid = (previous.y + point.y) / 2; return `${path} C ${previous.x} ${mid}, ${point.x} ${mid}, ${point.x} ${point.y}` }, '')
-  const finishTask = (next) => {
+  const finishTask = (next, replacementTasks = null) => {
+    if (replacementTasks) {
+      setTasks(replacementTasks.map(normalizeTask))
+      setSelected(null)
+      return
+    }
     const coreWasComplete = coreTasks.length === 5 && coreTasks.every(t => t.is_completed)
     const updated = tasks.map(t => t.id === next.id ? next : t)
     setTasks(updated)
@@ -490,8 +502,8 @@ function PathPage() {
         </button>
       })}
     </section>}
-    <div className="path-footer-actions"><button className="button button--quiet" onClick={() => setAdding(true)}><Plus /> Add your own step</button><button className="text-button" onClick={() => loadTasks(true)}><RotateCcw /> Regenerate five steps</button></div>
-    {selected && <TaskModal task={selected} category={category} onClose={() => setSelected(null)} onUpdate={(next) => { setTasks(items => items.map(t => t.id === next.id ? next : t)); setSelected(next) }} onCompleted={finishTask} />}
+    <div className="path-footer-actions"><button className="button button--quiet" onClick={() => setAdding(true)}><Plus /> Add your own step</button><button className="text-button" onClick={() => loadTasks(true)}><RotateCcw /> {isTest ? 'Regenerate five steps' : 'Start next coaching loop'}</button></div>
+    {selected && <TaskModal task={selected} category={category} onClose={() => setSelected(null)} onUpdate={(next) => { setTasks(items => items.map(t => t.id === next.id ? next : t)); setSelected(next) }} onCompleted={finishTask} onReported={tasks => finishTask(null, tasks)} />}
     {adding && <AddTask category={category} onClose={() => setAdding(false)} onAdded={t => { setTasks(items => [...items, normalizeTask(t)]); setAdding(false) }} />}
     {essayOpen && <EssayCoach onClose={() => setEssayOpen(false)} />}
     <ChatPanel open={chatOpen} onClose={() => setChatOpen(false)} category={category} onNewPath={items => setTasks(items.map(normalizeTask))} />
@@ -714,7 +726,35 @@ function MilestoneStep({ task, onClose, onCompleted }) {
   </Modal>
 }
 
-function TaskModal({ task, category, onClose, onUpdate, onCompleted }) {
+function CollegeReportStep({ task, onClose, onReported }) {
+  const [report, setReport] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState('')
+  const submit = async e => {
+    e.preventDefault(); if (busy || report.trim().length < 20) return
+    setBusy(true); setError('')
+    try {
+      const result = await api('/api/college_task_report', { method: 'POST', body: JSON.stringify({ taskId: task.id, report }) })
+      toast.success('Mentics updated your next step')
+      onReported(result.tasks || [])
+    } catch (cause) { setError(cause.message) } finally { setBusy(false) }
+  }
+  return <Modal onClose={onClose} label="Report back to Mentics">
+    <div className="modal-kicker">COLLEGE COACHING LOOP</div>
+    <h2>{task.description}</h2>
+    <p className="milestone-copy">Do the real work, then tell Mentics what happened. Your report—not a quiz—shapes the next lesson and assignment.</p>
+    {task.objective && <div className="task-why"><small>YOUR ASSIGNMENT</small><Markdown>{task.objective}</Markdown></div>}
+    <form className="modal-form college-report-form" onSubmit={submit}>
+      <label>What did you do, what did you produce, and what felt difficult?
+        <textarea autoFocus value={report} onChange={e => setReport(e.target.value)} minLength={20} maxLength={4000} placeholder="Example: I compared three colleges on cost and engineering opportunities. Two feel like a fit, but I need help deciding whether the third belongs on my list." disabled={busy} />
+      </label>
+      {error && <p className="form-error" role="alert">{error}</p>}
+      <button className="button button--primary task-start" disabled={busy || report.trim().length < 20}>{busy ? 'Updating your path…' : 'Report back and continue'} <ArrowRight /></button>
+    </form>
+  </Modal>
+}
+
+function TaskModal({ task, category, onClose, onUpdate, onCompleted, onReported }) {
   const [note, setNote] = useState(''); const [busy, setBusy] = useState(false); const [playing, setPlaying] = useState(false); const [dueDate, setDueDate] = useState(task.due_date || ''); const [statPrompt, setStatPrompt] = useState(false); const [statValue, setStatValue] = useState(''); const [error, setError] = useState(''); const [detailsOpen, setDetailsOpen] = useState(false)
   const stat = milestoneStats[task.stat_to_update]
   const kind = taskKind(task)
@@ -738,6 +778,7 @@ function TaskModal({ task, category, onClose, onUpdate, onCompleted }) {
   // A boss battle has its own flow: sit the official test, then log real
   // section scores. It is the only step that cannot be "marked complete".
   if (kind === 'boss_battle' && !task.is_completed) return <BossBattle task={task} onClose={onClose} onCompleted={onCompleted} />
+  if (kind === 'milestone' && category === 'College Planning' && !task.is_completed) return <CollegeReportStep task={task} onClose={onClose} onReported={onReported} />
   if (kind === 'milestone' && !task.is_completed) return <MilestoneStep task={task} onClose={onClose} onCompleted={onCompleted} />
   if (playing && kind === 'lesson') return <LessonPlayer task={task} onClose={() => setPlaying(false)} onCompleted={finishPlay} />
   if (playing) return <AssessmentPlayer task={task} onClose={() => setPlaying(false)} onCompleted={finishPlay} />
@@ -1180,10 +1221,10 @@ function ChatPanel({ open, onClose, category, onNewPath }) {
   return <aside className={`chat-panel ${open ? 'chat-panel--open' : ''}`} aria-hidden={!open} inert={!open || undefined}>
     <header className="chat-head">
       <span className="chat-identity">
-        <i className="chat-mark"><Sparkles /></i>
+        <span className="chat-wordmark">MENTICS</span>
         <span>
-          <b>Mentics guide</b>
-          <small><em className="chat-live" /> Reading your {category.toLowerCase()} path</small>
+          <b>Path guide</b>
+          <small><em className="chat-live" /> Here with your {category.toLowerCase()} path</small>
         </span>
       </span>
       <div className="chat-head-actions">
@@ -1196,13 +1237,13 @@ function ChatPanel({ open, onClose, category, onNewPath }) {
 
     <div className="chat-messages" ref={scroller}>
       {messages.map((m, i) => <div className={`chat-message chat-message--${m.role}`} key={i}>
-        {m.role === 'assistant' && <i className="chat-avatar"><Sparkles /></i>}
+        {m.role === 'assistant' && <i className="chat-avatar" aria-hidden="true">M</i>}
         <div className="chat-bubble">{m.role === 'assistant' ? <Markdown>{m.content}</Markdown> : m.content}</div>
       </div>)}
-      {busy && <div className="chat-message chat-message--assistant"><i className="chat-avatar"><Sparkles /></i><div className="chat-bubble chat-bubble--thinking"><span /><span /><span /></div></div>}
+      {busy && <div className="chat-message chat-message--assistant"><i className="chat-avatar" aria-hidden="true">M</i><div className="chat-bubble chat-bubble--thinking"><span /><span /><span /></div></div>}
       {!conversationStarted && !busy && <div className="chat-starters">
         <small>TRY ASKING</small>
-        {starters.map(({ icon: Icon, label }) => <button key={label} onClick={() => ask(label)}><Icon /> {label}</button>)}
+        {starters.map(({ label }) => <button key={label} onClick={() => ask(label)}><span aria-hidden="true">→</span>{label}</button>)}
       </div>}
     </div>
 
@@ -1222,7 +1263,7 @@ function PageIntro({ kicker, title, copy, actions }) {
 
 function AuthPage({ mode }) {
   const signup = mode === 'signup'
-  return <div className="auth-page"><div className="auth-brand"><Brand /></div><div className="auth-art"><span className="shape shape--peach" /><span className="shape shape--mint" /><div><small>YOUR NEXT CHAPTER</small><h1>Ambition feels better with a plan.</h1><p>Build momentum across test prep, college planning, and every goal between.</p></div></div><main className="auth-panel"><div className="auth-copy"><small>{signup ? 'START YOUR PATH' : 'WELCOME BACK'}</small><h2>{signup ? 'Join Mentics.' : 'Continue building.'}</h2><p>{signup ? 'Your focused workspace is a minute away.' : 'Your goals and progress are waiting.'}</p></div>{boot.data.error && <div className="form-error" role="alert">{boot.data.error}</div>}<form method="POST" className="react-form"><CsrfField />{signup && <label>Full name<input name="name" autoComplete="name" required maxLength="100" placeholder="Your name" /></label>}<label>Email address<input type="email" name="email" autoComplete="email" required placeholder="you@example.com" /></label><label>Password<input type="password" name="password" autoComplete={signup ? 'new-password' : 'current-password'} minLength={signup ? 8 : undefined} maxLength="128" required placeholder={signup ? 'At least 8 characters' : 'Your password'} /></label><button className="button button--primary" type="submit">{signup ? 'Create my account' : 'Sign in'} <ArrowRight /></button></form><div className="form-divider"><span>or</span></div><a className="google-button" href="/google-login"><span>G</span> Continue with Google</a><p className="auth-switch">{signup ? 'Already have an account?' : 'New to Mentics?'} <a href={signup ? '/login' : '/signup'}>{signup ? 'Sign in' : 'Create an account'}</a></p></main></div>
+  return <div className="auth-page"><div className="auth-brand"><Brand /></div><div className="auth-art"><span className="shape shape--peach" /><span className="shape shape--mint" /><div><small>YOUR NEXT CHAPTER</small><h1>Ambition feels better with a plan.</h1><p>Build momentum across test prep, college planning, and every goal between.</p></div></div><main className="auth-panel"><div className="auth-copy"><small>{signup ? 'START YOUR PATH' : 'WELCOME BACK'}</small><h2>{signup ? 'Join Mentics.' : 'Continue building.'}</h2><p>{signup ? 'Your focused workspace is a minute away.' : 'Your goals and progress are waiting.'}</p></div>{boot.data.error && <div className="form-error" role="alert">{boot.data.error}</div>}<form method="POST" className="react-form"><CsrfField />{signup && <label>Full name<input name="name" autoComplete="name" required maxLength="100" placeholder="Your name" /></label>}<label>Email address<input type="email" name="email" autoComplete="email" required placeholder="you@example.com" /></label><label>Password<input type="password" name="password" autoComplete={signup ? 'new-password' : 'current-password'} minLength={signup ? 8 : undefined} maxLength="128" required placeholder={signup ? 'At least 8 characters' : 'Your password'} /></label>{signup && <label className="legal-consent"><input type="checkbox" name="legal_acceptance" value="accepted" required /> <span>I agree to the <a href="/terms" target="_blank" rel="noreferrer">Terms of Service</a> and <a href="/privacy" target="_blank" rel="noreferrer">Privacy Policy</a>.</span></label>}<button className="button button--primary" type="submit">{signup ? 'Create my account' : 'Sign in'} <ArrowRight /></button></form><div className="form-divider"><span>or</span></div><a className="google-button" href="/google-login"><span>G</span> Continue with Google</a><p className="oauth-legal-notice">By continuing with Google, you agree to the <a href="/terms" target="_blank" rel="noreferrer">Terms of Service</a> and acknowledge the <a href="/privacy" target="_blank" rel="noreferrer">Privacy Policy</a>.</p><p className="auth-switch">{signup ? 'Already have an account?' : 'New to Mentics?'} <a href={signup ? '/login' : '/signup'}>{signup ? 'Sign in' : 'Create an account'}</a></p></main></div>
 }
 
 const learningOptions = [['visual', 'Visual', Sparkles, 'I learn by seeing'], ['auditory', 'Auditory', Headphones, 'I learn by hearing'], ['reading_writing', 'Reading / writing', PenLine, 'I learn through words'], ['kinesthetic', 'Hands-on', Hand, 'I learn by doing']]
@@ -1374,18 +1415,24 @@ function StatsPage() {
   const d = boot.data
   const p = d.practice || {}
   const hasMastery = (d.weakest?.length || 0) > 0
+  const score = value => value ?? '—'
 
   return <AppShell name={d.name}><main className="app-main">
-    <PageIntro kicker="YOUR PROGRESS" title="Everything you have actually done."
-      copy="Scores you log, questions you answer, and where both paths stand right now."
+    <PageIntro kicker="ACADEMIC PROFILE" title="Your progress, at a glance."
+      copy="Your latest test scores, skill evidence, and next steps—kept in one clear view."
       actions={<a className="button button--primary" href="/dashboard/stats/edit">Update scores <ArrowRight /></a>} />
 
-    {/* Headline numbers: the ones earned by work come first. */}
+    <section className="score-overview" aria-label="Latest academic scores">
+      <article className="score-card score-card--sat"><div><small>LATEST SAT</small><strong>{score(d.satTotal)}</strong><p>{d.satEbrw || d.satMath ? `R&W ${score(d.satEbrw)} · Math ${score(d.satMath)}` : 'Add your section scores'}</p></div><span>/ 1600</span></article>
+      <article className="score-card score-card--act"><div><small>ACT COMPOSITE</small><strong>{score(d.actComposite || d.actAverage)}</strong><p>{d.actMath || d.actReading || d.actScience ? `Math ${score(d.actMath)} · Reading ${score(d.actReading)} · Science ${score(d.actScience)}` : 'Add your section scores'}</p></div><span>/ 36</span></article>
+      <article className="score-card score-card--gpa"><div><small>CURRENT GPA</small><strong>{score(d.gpa)}</strong><p>Your academic foundation</p></div><span>PROFILE</span></article>
+    </section>
+
     <section className="stat-tiles">
       <article className="stat-tile stat-tile--accent"><small>TOTAL XP</small><strong>{d.points.toLocaleString()}</strong><p>Earned from completed steps</p></article>
       <article className="stat-tile"><small>DAY STREAK</small><strong>{d.streak}<i><Flame /></i></strong><p>{d.streak > 0 ? 'Keep it alive today' : 'Finish a step to start one'}</p></article>
       <article className="stat-tile"><small>QUESTIONS ANSWERED</small><strong>{p.answered || 0}</strong><p>{p.accuracy != null ? `${p.accuracy}% correct overall` : 'Across lessons and practice'}</p></article>
-      <article className="stat-tile"><small>CURRENT GPA</small><strong>{d.gpa || '—'}</strong><p>Your academic foundation</p></article>
+      <article className="stat-tile"><small>TEST DATE</small><strong>{d.testDate ? new Date(`${d.testDate}T00:00:00`).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) : '—'}</strong><p>{d.testDate ? 'Your next scheduled test' : 'Set one in your test path'}</p></article>
     </section>
 
     <section className="stat-columns">
@@ -1395,13 +1442,13 @@ function StatsPage() {
           <GoalMeter label="SAT total" current={d.satTotal} goal={d.goalSat} min={400} />
           <GoalMeter label="ACT composite" current={d.actAverage} goal={d.goalAct} min={1} />
         </div>
-        {(d.satEbrw || d.satMath) && <div className="section-scores">
-          {d.satEbrw ? <span><small>SAT Reading &amp; Writing</small><b>{d.satEbrw}</b></span> : null}
-          {d.satMath ? <span><small>SAT Math</small><b>{d.satMath}</b></span> : null}
-          {d.actMath ? <span><small>ACT Math</small><b>{d.actMath}</b></span> : null}
-          {d.actReading ? <span><small>ACT Reading</small><b>{d.actReading}</b></span> : null}
-          {d.actScience ? <span><small>ACT Science</small><b>{d.actScience}</b></span> : null}
-        </div>}
+        <div className="section-scores">
+          <span><small>SAT Reading &amp; Writing</small><b>{score(d.satEbrw)}</b></span>
+          <span><small>SAT Math</small><b>{score(d.satMath)}</b></span>
+          <span><small>ACT Math</small><b>{score(d.actMath)}</b></span>
+          <span><small>ACT Reading</small><b>{score(d.actReading)}</b></span>
+          <span><small>ACT Science</small><b>{score(d.actScience)}</b></span>
+        </div>
 
         <h2 className="section-title">Skill mastery</h2>
         {hasMastery ? <>
@@ -1532,7 +1579,7 @@ function AccountPage() { const d = boot.data; return <AppShell name={d.name}><ma
 
 const legalCopy = {
   privacy: {
-    title: 'Privacy Policy', date: 'October 9, 2025',
+    title: 'Privacy Policy', date: 'August 23, 2026',
     intro: 'Welcome to Mentics. This policy explains how Mentics collects, uses, discloses, and safeguards information when you use our website and services.',
     sections: [
       ['1. Information we collect', 'We collect account information such as your name, email, and securely hashed password or Google profile details. Educational data can include goals, learning style, anxieties, GPA, SAT/ACT scores, strengths, weaknesses, test dates, grade level, majors, and target colleges. We also collect content you choose to submit, including forum posts and replies, AI-assistant conversations, essays and prompts, plus activity data such as completed tasks, generated paths, and stat updates. Our servers may also receive technical information such as IP address, browser, operating system, access times, and viewed pages.'],
@@ -1541,11 +1588,19 @@ const legalCopy = {
       ["4. Children's privacy", 'Mentics is intended for high school students generally over age 13. We do not knowingly collect personally identifiable information from children under 13. If we learn that a user is under 13, we will require verifiable parental consent; parents or guardians may contact us to request appropriate action.'],
       ['5. Your rights and choices', 'You may review or change account information from account settings and may contact us to opt out of communications or ask about your information.'],
       ['6. Security', 'We use administrative, technical, and physical safeguards designed to protect personal information. No security measure or method of transmission can be guaranteed against every interception or misuse.'],
-      ['7. Contact us', 'Questions or comments about this policy can be sent to thementicsapp@gmail.com.']
+      ['7. Cookies and authentication', 'Mentics uses essential cookies and similar technologies to maintain sessions, remember security state, prevent abuse, and operate the service. Google sign-in uses the openid, email, and profile scopes; we do not request access to Gmail, Google Drive, Calendar, or other Google content.'],
+      ['8. AI processing', 'When you request AI chat, path generation, assignment feedback, or essay feedback, the relevant input and necessary path context may be sent to an AI service provider to produce that feature. AI outputs may be inaccurate or incomplete and are not professional, admissions, legal, medical, financial, or mental-health advice. Do not submit content you do not want processed for the feature you requested.'],
+      ['9. Public community content', 'Forum posts, replies, display name, and other content you choose to make public may be visible to other users and may be copied by them. Do not publish private contact details, account credentials, educational records, or another person’s information without permission.'],
+      ['10. Retention', 'We retain information for as long as reasonably necessary to operate Mentics, maintain security, resolve disputes, enforce agreements, and meet legal obligations. Retention varies by purpose. We may retain aggregated or de-identified information that does not reasonably identify you.'],
+      ['11. Your privacy choices and rights', 'You may update certain account and academic information in Mentics. Subject to applicable law, you may request access, correction, deletion, or a copy of personal information by emailing us. We may verify requests and may retain limited information where needed for security, fraud prevention, legal compliance, or legitimate operations.'],
+      ['12. California and other regional rights', 'Mentics does not sell personal information or share it for cross-context behavioral advertising. California residents and residents of other jurisdictions may have additional rights under applicable law, including rights to know, correct, delete, or limit certain uses. Contact us to make a request.'],
+      ['13. International transfers', 'Mentics is operated from the United States. If you access it from elsewhere, your information may be processed in the United States or other places where our service providers operate, which may have different privacy laws.'],
+      ['14. Changes to this policy', 'We may update this policy as the service or law changes. We will post the revised version and update the Last updated date; where required, we will provide additional notice or obtain consent.'],
+      ['15. Contact us', 'Questions, privacy requests, or complaints can be sent to thementicsapp@gmail.com.']
     ]
   },
   terms: {
-    title: 'Terms of Service', date: 'October 9, 2025',
+    title: 'Terms of Service', date: 'August 23, 2026',
     intro: 'Please read these terms carefully before using the Mentics website and services. Creating an account, accessing, or using Mentics means you agree to these Terms and our Privacy Policy.',
     sections: [
       ['1. Agreement to terms', 'If you disagree with any part of these terms, you may not access the service.'],
@@ -1556,11 +1611,14 @@ const legalCopy = {
       ['6. Prohibited activities', 'Do not use Mentics illegally, harass or defraud users, post obscene, defamatory, hateful, infringing, or harmful content, compromise system security, decipher server transmissions, or submit false or misleading information.'],
       ['7. Copyright policy and DMCA', 'We respect intellectual-property rights. Send a detailed claim that meets DMCA requirements to thementicsapp@gmail.com with the subject “Copyright Infringement.”'],
       ['8. Disclaimers and trademark notice', 'Mentics is independent and is not affiliated with, endorsed by, or sponsored by the College Board®, owner of the SAT®, or ACT®, Inc., owner of the ACT®. AI content and the service are provided “as is” and “as available,” without express or implied warranties.'],
-      ['9. Termination', 'Mentics may terminate or suspend an account immediately and without prior notice or liability, including for a breach of these terms.'],
-      ['10. Governing law and disputes', 'These terms are governed by the laws of Georgia, United States. Disputes will be resolved through binding arbitration in Cumming, Georgia, except qualifying small-claims matters.'],
-      ['11. Limitation of liability', 'Mentics, its directors, employees, and agents are not liable for indirect, incidental, special, consequential, or punitive damages, including loss of profits, data, or goodwill, arising from use of the service or its content.'],
-      ['12. Changes', 'Mentics may modify these terms. If a revision is material, we will provide at least 30 days’ notice before the new terms take effect.'],
-      ['13. Contact us', 'Questions about these terms can be sent to thementicsapp@gmail.com.']
+      ['9. Independence from tests and institutions', 'MENTICS IS INDEPENDENT. Mentics is not affiliated with, endorsed by, sponsored by, approved by, or acting on behalf of the College Board, SAT, ACT, ACT, Inc., any school, university, college, admissions office, scholarship provider, or government agency. References to tests, schools, trademarks, or third-party resources are for identification and educational purposes only.'],
+      ['10. Educational and AI disclaimer', 'Mentics, including AI-generated paths, lessons, coaching, and essay feedback, provides general educational information only. It does not guarantee scores, admission, scholarships, financial aid, or any outcome. AI may be inaccurate, incomplete, biased, or out of date. Verify deadlines, requirements, score policies, and admissions information directly with the relevant official source before acting.'],
+      ['11. Third-party services', 'Mentics may link to or use third-party services, including Google sign-in, AI providers, official test resources, and college websites. Their content, availability, privacy practices, and terms are outside our control and your use is governed by their policies.'],
+      ['12. Termination', 'Mentics may terminate or suspend an account immediately and without prior notice or liability, including for a breach of these terms.'],
+      ['13. Governing law and disputes', 'These terms are governed by the laws of Georgia, United States. Before filing a claim, contact us and attempt to resolve the issue informally for 30 days. Nothing in these Terms limits non-waivable consumer rights or a claim properly brought in small-claims court.'],
+      ['14. Limitation of liability', 'TO THE MAXIMUM EXTENT PERMITTED BY LAW, Mentics and its directors, employees, agents, and providers are not liable for indirect, incidental, special, consequential, exemplary, or punitive damages, including loss of data, goodwill, profits, scores, admissions opportunities, or other intangible losses arising from the service or its content.'],
+      ['15. Changes', 'Mentics may modify these Terms by posting an updated version and changing the Last updated date. Continued use after the effective date means you accept the updated Terms, except where applicable law requires a different form of notice or consent.'],
+      ['16. Contact us', 'Questions about these terms can be sent to thementicsapp@gmail.com.']
     ]
   }
 }

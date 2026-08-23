@@ -1190,12 +1190,11 @@ def format_mastery_summary(rows):
 # ==========================================================================
 # College planning
 # ==========================================================================
-# College prep is taught the same way as test prep, because the failure mode is
-# the same: a student told to "research colleges" does not know what good looks
-# like. So the unit teaches the judgement first -- what separates a strong
-# activities entry from a weak one, what a balanced list actually means -- and
-# checks it with comparison questions, which is the form this material grades
-# well in. The unit then ends in a real deliverable rather than a practice test.
+# College prep is a coaching loop, not a test-prep clone. Mentics teaches one
+# useful idea, sends the student out to do the real work, then uses their report
+# to decide what they need next. Application work rarely has one objectively
+# correct multiple-choice answer, and pretending it does makes the product feel
+# like school rather than a counselor who is paying attention.
 
 COLLEGE_TAXONOMY = {
     # Foundation and self-knowledge
@@ -1291,9 +1290,9 @@ COLLEGE_STAGE_FOCUS = {
                  "recommendations", "why_major_essay", "financial_aid_forms"],
 }
 
-COLLEGE_SHAPE = ["lesson", "practice_sprint", "lesson", "quiz", "milestone"]
+COLLEGE_SHAPE = ["lesson", "milestone"]
 
-COLLEGE_XP = {"lesson": 30, "practice_sprint": 20, "quiz": 40, "milestone": 90}
+COLLEGE_XP = {"lesson": 30, "milestone": 90}
 
 
 def college_skill_options(stage):
@@ -1394,12 +1393,8 @@ essays, this unit is an essay unit.
 {shape_lines}
 
 How the nodes relate:
-- A `lesson` teaches ONE application skill from scratch, with real examples.
-- The `practice_sprint` drills judgement on the skill from the lesson before it: give it that
-  same skill_key. Its questions compare weak and strong versions so the student learns to tell
-  them apart.
-- The `quiz` reviews the skills taught in this unit. Use the most important one's key.
-- Node 5 is a real deliverable and is handled by the server. Ignore it.
+- The one `lesson` teaches ONE application skill from scratch, with real examples.
+- Node 2 is a real deliverable and is handled by the server. Ignore it.
 
 # SKILL CATALOG (use these exact keys)
 {catalog}
@@ -1427,13 +1422,14 @@ Raw JSON only:
       "skill_key": "exact key from the catalog",
       "title": "student-facing title, max 8 words",
       "objective": "one sentence: what they will be able to do",
+      "assignment": "one specific 20-45 minute real-world action that applies this lesson",
       "syllabus": ["claim 1", "claim 2", "claim 3", "claim 4"],
       "reason": "why this now, citing their grade, stage, majors, or progress",
       "difficulty": "easy | medium | hard"
     }}
   ]
 }}
-Return exactly {len(shape) - 1} nodes, for positions 1 through {len(shape) - 1}."""
+Return exactly {len(shape) - 1} node, for position 1."""
 
     return _call(prompt, tokens=2600, system=SYSTEM_COUNSELOR, expect_key="nodes", retries=1)
 
@@ -1605,17 +1601,20 @@ Return exactly {count} questions."""
     return items[:count]
 
 
-def _college_milestone_node(profile):
+def _college_milestone_node(profile, lesson=None):
     milestone = profile["milestone"]
+    assignment = (lesson or {}).get("assignment") or milestone["action"]
     return {
         "node_type": "milestone",
-        "skill": resolve_college_skill("narrative_core"),
-        "title": milestone["title"],
-        "objective": milestone["action"],
+        "skill": dict(lesson["skill"]) if lesson else resolve_college_skill("narrative_core"),
+        "title": (lesson or {}).get("assignment_title") or (
+            f"Put {lesson['skill']['skill_label']} into practice" if lesson else milestone["title"]
+        ),
+        "objective": assignment,
         "syllabus": [],
         "reason": (
-            "This unit taught the judgement. This step is where you actually produce something, "
-            "which is the only part an admissions officer ever sees."
+            "Put the lesson into real use, then report back what you did, what felt hard, and what "
+            "you produced. Mentics will use that evidence to choose your next lesson and task."
         ),
         "difficulty": "hard",
         "stat_to_update": milestone["stat"],
@@ -1633,7 +1632,7 @@ def _normalize_college_plan(data, shape, profile):
     nodes, used_keys, used_order = [], set(), []
     for index, node_type in enumerate(shape):
         if node_type == "milestone":
-            nodes.append(_college_milestone_node(profile))
+            nodes.append(_college_milestone_node(profile, nodes[-1] if nodes else None))
             continue
 
         raw = raw_nodes[index] if index < len(raw_nodes) and isinstance(raw_nodes[index], dict) else {}
@@ -1671,6 +1670,8 @@ def _normalize_college_plan(data, shape, profile):
             "title": _clean(raw.get("title"), 90) or skill["skill_label"],
             "objective": _clean(raw.get("objective"), 300) or
                          f"Handle {skill['skill_label']} with judgement instead of guesswork.",
+            "assignment": _clean(raw.get("assignment"), 600) or
+                          f"Use this lesson to create one concrete {skill['skill_label']} artifact you can report back on.",
             "syllabus": syllabus,
             "reason": _clean(raw.get("reason"), 700) or
                       f"This is the piece of {skill['skill_label']} that is blocking your next move.",
@@ -1765,7 +1766,7 @@ def build_college_unit(profile, *, max_workers=6):
 
     taught_keys, taught_labels = [], []
     for node in plan["nodes"]:
-        if node["node_type"] in ("lesson", "practice_sprint") and node["skill"]["skill_key"] not in taught_keys:
+        if node["node_type"] == "lesson" and node["skill"]["skill_key"] not in taught_keys:
             taught_keys.append(node["skill"]["skill_key"])
             taught_labels.append(node["skill"]["skill_label"])
 
@@ -1775,21 +1776,12 @@ def build_college_unit(profile, *, max_workers=6):
             continue
         if node["node_type"] == "lesson":
             jobs.append((index, "teaching", node, None))
-            jobs.append((index, "checks", node, LESSON_CHECK_COUNT))
-        else:
-            jobs.append((index, "exercises", node, EXERCISE_COUNT[node["node_type"]]))
 
     def run(job):
         index, kind, node, count = job
         try:
             if kind == "teaching":
                 return index, kind, generate_college_teaching(node, profile)
-            if kind == "checks":
-                return index, kind, generate_college_exercises(node, profile, count)
-            cumulative = taught_keys if node["node_type"] == "quiz" else None
-            return index, kind, generate_college_exercises(
-                node, profile, count, cumulative_skills=cumulative
-            )
         except Exception as error:  # noqa: BLE001
             _log("learning: college %s failed for node %s (%s): %s",
                  kind, index + 1, node["skill"]["skill_key"], error)
@@ -1805,13 +1797,21 @@ def build_college_unit(profile, *, max_workers=6):
         node["xp_reward"] = COLLEGE_XP[node["node_type"]]
         if node["node_type"] == "lesson":
             teaching = results.get((index, "teaching")) or _fallback_college_teaching(node)
-            checks = results.get((index, "checks")) or []
             node["teaching"] = teaching
-            node["checks"] = checks
-            node["steps"] = _interleave_lesson(teaching, checks)
-        elif node["node_type"] in ("practice_sprint", "quiz"):
-            node["questions"] = results.get((index, "exercises")) or []
+            node["steps"] = _college_teaching_steps(teaching)
 
     plan["taught_labels"] = taught_labels
     plan["taught_keys"] = taught_keys
     return plan
+
+
+def _college_teaching_steps(teaching):
+    """Turn teaching cards into a lesson with reflection, never a graded quiz."""
+    steps = [{
+        "step_type": "teach", "title": card["title"], "body": card["body"],
+        "worked_example": card.get("worked_example", ""),
+        "takeaway": card.get("takeaway", ""), "trap": card.get("trap", ""),
+    } for card in teaching.get("cards", [])]
+    if teaching.get("recap"):
+        steps.append({"step_type": "recap", "title": "Use this in your task", "body": teaching["recap"]})
+    return steps

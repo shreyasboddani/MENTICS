@@ -2268,6 +2268,10 @@ def _build_college_profile(user_id, college_context, chat_history):
             "personal statement finalized" if str(stats["essay_progress"]) == "2"
             else "personal statement drafted"
         )
+    for report in (college_context.get("reports") or [])[-6:]:
+        text = str(report.get("report") or "").strip()
+        if text:
+            progress.append(f"Student report: {text[:700]}")
     done = db.execute(
         """SELECT skill_label FROM paths
            WHERE user_id=? AND category='College Planning' AND is_completed=True
@@ -2297,27 +2301,13 @@ def _build_college_profile(user_id, college_context, chat_history):
 
 
 def _generate_and_save_new_college_path(user_id, college_context, chat_history=None):
-    """Build the next college unit: teach the judgement, then a real deliverable."""
+    """Build the next college coaching loop: teach, act, then report back."""
     profile = _build_college_profile(user_id, college_context or {}, chat_history or [])
     unit = learning.build_college_unit(profile)
 
-    # A drill with no questions would be an empty step, so it becomes a lesson
-    # on the same skill instead.
-    for node in unit["nodes"]:
-        if node["node_type"] in ("practice_sprint", "quiz") and not node.get("questions"):
-            app.logger.warning(
-                "No college questions for %s node on %s; converting to a lesson.",
-                node["node_type"], node["skill"]["skill_key"],
-            )
-            node["node_type"] = "lesson"
-            node["xp_reward"] = learning.COLLEGE_XP["lesson"]
-            teaching = learning._fallback_college_teaching(node)
-            node["teaching"] = teaching
-            node["steps"] = learning._interleave_lesson(teaching, [])
-
     saved = _persist_unit(user_id, unit, "College Planning")
-    if len(saved) != 5:
-        raise ValueError("College path generation must produce exactly five usable steps.")
+    if len(saved) != len(learning.COLLEGE_SHAPE):
+        raise ValueError("College path generation must produce a lesson and a real-world assignment.")
     return saved
 
 def _get_college_planning_ai_chat_response(history, user_stats, stat_history="", user_id=None):
@@ -2688,6 +2678,10 @@ def signup():
         name = request.form.get("name", "").strip()[:100]
         raw_password = request.form.get("password", "")
         valid_email = re.fullmatch(r"[^@\s]+@[^@\s]+\.[^@\s]+", email)
+        if request.form.get("legal_acceptance") != "accepted":
+            return render_react("signup", {
+                "error": "You must agree to the Terms of Service and Privacy Policy to create an account."
+            }, "Create Account | Mentics", 400)
         if not valid_email or not name or not 8 <= len(raw_password) <= 128:
             return render_react("signup", {
                 "error": "Enter your name, a valid email, and a password between 8 and 128 characters."
@@ -2700,7 +2694,9 @@ def signup():
                 "email": email, "password": password, "name": name,
                 "stats": json.dumps({
                     "sat_ebrw": "", "sat_math": "", "act_math": "",
-                    "act_reading": "", "act_science": "", "gpa": "", "milestones": 0
+                    "act_reading": "", "act_science": "", "gpa": "", "milestones": 0,
+                    "legal_acceptance": {"terms_version": "2026-08-23", "privacy_version": "2026-08-23",
+                                         "accepted_at": datetime.now().isoformat(timespec="seconds"), "method": "signup"}
                 })
             })
 
@@ -2778,6 +2774,9 @@ def google_login():
         app_url = os.getenv("PUBLIC_APP_URL", "https://mentics.vercel.app").rstrip('/')
         return redirect(f"{app_url}/google-login")
 
+    # The app shows the notice immediately next to the Google control; retain
+    # that acknowledgement through the third-party OAuth redirect.
+    session['oauth_legal_notice'] = True
     redirect_uri = url_for('authorize', _external=True)
     return _get_oauth().google.authorize_redirect(redirect_uri)
 
@@ -2787,6 +2786,10 @@ def google_login():
 @app.route('/authorize')
 @rate_limit('20/hour', name='oauth_callback')
 def authorize():
+    if not session.pop('oauth_legal_notice', False):
+        return render_react(
+            "login", {"error": "Start Google sign-in from Mentics so you can review the Terms and Privacy Policy."},
+            "Sign In | Mentics", 400)
     google_oauth = _get_oauth().google
     try:
         # authorize_access_token() validates state, exchanges the code, and
@@ -2823,7 +2826,9 @@ def authorize():
             "password": password_hash,
             "stats": json.dumps({
                 "sat_ebrw": "", "sat_math": "", "act_math": "",
-                "act_reading": "", "act_science": "", "gpa": "", "milestones": 0
+                "act_reading": "", "act_science": "", "gpa": "", "milestones": 0,
+                "legal_acceptance": {"terms_version": "2026-08-23", "privacy_version": "2026-08-23",
+                                     "accepted_at": datetime.now().isoformat(timespec="seconds"), "method": "google_oauth"}
             })
         })
         db.insert("gamification_stats", {
@@ -3337,13 +3342,19 @@ def stats(user):
         except (TypeError, ValueError):
             return None
 
-    sat_ebrw, sat_math = as_int(stats.get("sat_ebrw")), as_int(stats.get("sat_math"))
-    sat_total = sat_ebrw + sat_math if sat_ebrw and sat_math else None
-    act_sections = [as_int(stats.get(k)) for k in ("act_math", "act_reading", "act_science")]
-    act_average = round(sum(v for v in act_sections if v) / len([v for v in act_sections if v])) \
-        if any(act_sections) else None
-
     test_path = stats.get("test_path") or {}
+    # Scores may be entered on the profile or while building a test path.
+    # The profile should show one coherent snapshot, not make students re-enter them.
+    sat_ebrw = as_int(stats.get("sat_ebrw") or test_path.get("current_sat_ebrw"))
+    sat_math = as_int(stats.get("sat_math") or test_path.get("current_sat_math"))
+    sat_total = sat_ebrw + sat_math if sat_ebrw and sat_math else as_int(stats.get("sat_total"))
+    act_math = as_int(stats.get("act_math") or test_path.get("current_act_math"))
+    act_reading = as_int(stats.get("act_reading") or test_path.get("current_act_reading"))
+    act_science = as_int(stats.get("act_science") or test_path.get("current_act_science"))
+    act_sections = [act_math, act_reading, act_science]
+    act_composite = as_int(stats.get("act_composite") or test_path.get("current_act_composite"))
+    act_average = act_composite or (round(sum(v for v in act_sections if v) / len([v for v in act_sections if v]))
+                                    if any(act_sections) else None)
     goal_sat = as_int(test_path.get("desired_sat"))
     goal_act = as_int(test_path.get("desired_act"))
 
@@ -3373,8 +3384,8 @@ def stats(user):
         "name": user.get_name(),
         "gpa": stats.get("gpa", ""),
         "satEbrw": sat_ebrw, "satMath": sat_math, "satTotal": sat_total,
-        "actMath": stats.get("act_math", ""), "actReading": stats.get("act_reading", ""),
-        "actScience": stats.get("act_science", ""), "actAverage": act_average,
+        "actMath": act_math, "actReading": act_reading,
+        "actScience": act_science, "actAverage": act_average, "actComposite": act_composite,
         "goalSat": goal_sat, "goalAct": goal_act,
         "testDate": test_path.get("test_date"),
         "points": game.get("points") or 0,
@@ -3519,7 +3530,7 @@ def api_tasks(user):
             except Exception:
                 app.logger.exception("Path generation failed for user %s", user_id)
                 return jsonify({
-                    "error": "I couldn't generate a complete five-step path. Your current path is unchanged; please try again."
+                    "error": "I couldn't generate your next coaching step. Your current path is unchanged; please try again."
                 }), 502
             return jsonify(tasks)
 
@@ -3711,6 +3722,64 @@ def api_update_task_status(user):
     return jsonify({"success": True})
 
 
+@app.route('/api/college_task_report', methods=['POST'])
+@login_required
+@rate_limit('12/hour', name='college_task_report')
+def college_task_report(user):
+    """Close one real-world assignment and immediately build the next coaching loop."""
+    user_id = user.data['id']
+    data = request.get_json(silent=True) or {}
+    task_id = data.get('taskId')
+    report = str(data.get('report') or '').strip()
+    if not task_id or not 20 <= len(report) <= 4000:
+        return jsonify({"error": "Please share a short, specific report before continuing."}), 400
+
+    task = db.select_one('paths', where={
+        'id': task_id, 'user_id': user_id, 'category': 'College Planning',
+        'is_active': True, 'task_format': 'milestone',
+    })
+    if not task:
+        return jsonify({"error": "That college assignment is no longer active."}), 404
+    blocked = db.execute_for_one(
+        """SELECT id FROM paths WHERE user_id=? AND category='College Planning'
+           AND is_active=True AND task_order<? AND is_completed=False LIMIT 1""",
+        (user_id, task['task_order']),
+    )
+    if blocked:
+        return jsonify({"error": "Finish the lesson before reporting back."}), 409
+
+    if not task.get('is_completed') and _record_task_completion(user_id, task):
+        points_target = task.get('xp_reward') or 90
+        already_awarded = task.get('xp_awarded') or 0
+        points_to_add = max(0, points_target - already_awarded)
+        if points_to_add:
+            db.execute_write('UPDATE paths SET xp_awarded=? WHERE id=? AND user_id=?',
+                             (points_target, task_id, user_id))
+            _award_xp(user_id, points_to_add)
+
+    stats = user.get_stats()
+    college_path = dict(stats.get('college_path') or {})
+    reports = list(college_path.get('reports') or [])[-11:]
+    reports.append({
+        'task': task['description'], 'report': report,
+        'reported_at': datetime.now().isoformat(timespec='seconds'),
+    })
+    college_path['reports'] = reports
+    stats['college_path'] = college_path
+    user.set_stats(stats)
+    log_activity(user_id, 'college_task_reported', {'description': task['description']})
+
+    history_row = db.select_one('chat_conversations', where={
+        'user_id': user_id, 'category': 'College Planning'})
+    history = json.loads(history_row['history']) if history_row and history_row.get('history') else []
+    try:
+        tasks = _generate_and_save_new_college_path(user_id, college_path, history)
+    except Exception:
+        app.logger.exception('College next-step generation failed for user %s', user_id)
+        return jsonify({"error": "Your report was saved, but the next step could not be built yet. Please try again."}), 502
+    return jsonify({"success": True, "tasks": tasks})
+
+
 def _remember_path_focus(user, category, history):
     """Persist the focus a student asked for so it outlives one regeneration.
 
@@ -3759,17 +3828,20 @@ def _regenerate_path_from_chat(user_id, stats, category, history):
             test_path_info = stats.get("test_path", {})
             new_tasks = _generate_and_save_new_test_path(
                 user_id, test_path_info, chat_history=history)
-        if len(new_tasks) != 5:
-            raise ValueError("Regeneration did not save exactly five tasks.")
+        expected = len(learning.COLLEGE_SHAPE) if category == 'College Planning' else 5
+        if len(new_tasks) != expected:
+            raise ValueError("Regeneration did not save the expected path steps.")
     except Exception:
         app.logger.exception(
             "Chat path regeneration failed for user %s (%s)", user_id, category
         )
         return jsonify({
-            "error": "I couldn't generate a complete five-step path. Your current path is unchanged; please try again."
+            "error": "I couldn't generate your next coaching step. Your current path is unchanged; please try again."
         }), 502
 
-    reply = "Your new five-step path is ready. I shaped it around your latest request and our conversation."
+    reply = ("Your next college coaching loop is ready. I shaped it around your latest request and our conversation."
+             if category == 'College Planning' else
+             "Your new five-step path is ready. I shaped it around your latest request and our conversation.")
     history.append({"role": "assistant", "content": reply})
     try:
         db.upsert("chat_conversations", {
