@@ -478,8 +478,29 @@ function AuthPage({ mode }) {
 
 const learningOptions = [['visual', 'Visual', Sparkles, 'I learn by seeing'], ['auditory', 'Auditory', Headphones, 'I learn by hearing'], ['reading_writing', 'Reading / writing', PenLine, 'I learn through words'], ['kinesthetic', 'Hands-on', Hand, 'I learn by doing']]
 function Onboarding() {
-  const [step, setStep] = useState(0); const [goal, setGoal] = useState(''); const [style, setStyle] = useState(''); const canNext = step === 0 ? goal : style
-  return <div className="onboarding-page"><header><Brand /><span>Step {step + 1} of 3</span></header><main><div className="onboarding-progress"><i style={{ width: `${(step + 1) / 3 * 100}%` }} /></div>{boot.data.error && <div className="form-error">{boot.data.error}</div>}<form method="POST"><section className={step === 0 ? 'active' : ''}><div className="eyebrow"><span /> START WITH DIRECTION</div><h1>What are we building toward?</h1><p>This sets the first version of your Mentics workspace.</p><div className="choice-grid choice-grid--two">{[['test_prep', 'Test preparation', BookOpen, 'Build confidence for the SAT or ACT'], ['college_planning', 'College planning', GraduationCap, 'Turn applications into a clear process']].map(([value, label, Icon, copy]) => <label className={goal === value ? 'selected' : ''} key={value}><input type="radio" name="goal" value={value} required checked={goal === value} onChange={() => setGoal(value)} /><Icon /><b>{label}</b><small>{copy}</small></label>)}</div></section><section className={step === 1 ? 'active' : ''}><div className="eyebrow"><span /> MAKE IT YOURS</div><h1>How do you learn best?</h1><p>Your tasks and explanations will use this preference.</p><div className="choice-grid">{learningOptions.map(([value, label, Icon, copy]) => <label className={style === value ? 'selected' : ''} key={value}><input type="radio" name="learning_style" value={value} required checked={style === value} onChange={() => setStyle(value)} /><Icon /><b>{label}</b><small>{copy}</small></label>)}</div></section><section className={step === 2 ? 'active' : ''}><div className="eyebrow"><span /> ONE LAST THING</div><h1>What feels hardest right now?</h1><p>Be honest. This helps Mentics meet you where you are.</p><textarea name="anxieties" rows="6" placeholder="Time management, test anxiety, essays, choosing schools..." /></section><div className="onboarding-actions">{step > 0 ? <button type="button" className="button button--quiet" onClick={() => setStep(step - 1)}><ArrowLeft /> Back</button> : <span />}{step < 2 ? <button type="button" className="button button--primary" disabled={!canNext} onClick={() => setStep(step + 1)}>Continue <ArrowRight /></button> : <button type="submit" className="button button--primary">Build my workspace <ArrowRight /></button>}</div></form></main></div>
+  const [step, setStep] = useState(0)
+  const [goal, setGoal] = useState('')
+  const [style, setStyle] = useState('')
+  const [anxieties, setAnxieties] = useState('')
+  const allowSubmit = useRef(false)
+  const canNext = step === 0 ? goal : style
+
+  const submitOnlyFromButton = event => {
+    if (!allowSubmit.current) {
+      event.preventDefault()
+      return
+    }
+    allowSubmit.current = false
+  }
+
+  const finishOnboarding = event => {
+    const form = event.currentTarget.form
+    if (!form?.reportValidity()) return
+    allowSubmit.current = true
+    form.requestSubmit()
+  }
+
+  return <div className="onboarding-page"><header><Brand /><span>Step {step + 1} of 3</span></header><main><div className="onboarding-progress"><i style={{ width: `${(step + 1) / 3 * 100}%` }} /></div>{boot.data.error && <div className="form-error">{boot.data.error}</div>}<form method="POST" onSubmit={submitOnlyFromButton}><section className={step === 0 ? 'active' : ''}><div className="eyebrow"><span /> START WITH DIRECTION</div><h1>What are we building toward?</h1><p>This sets the first version of your Mentics workspace.</p><div className="choice-grid choice-grid--two">{[['test_prep', 'Test preparation', BookOpen, 'Build confidence for the SAT or ACT'], ['college_planning', 'College planning', GraduationCap, 'Turn applications into a clear process']].map(([value, label, Icon, copy]) => <label className={goal === value ? 'selected' : ''} key={value}><input type="radio" name="goal" value={value} required checked={goal === value} onChange={() => setGoal(value)} /><Icon /><b>{label}</b><small>{copy}</small></label>)}</div></section><section className={step === 1 ? 'active' : ''}><div className="eyebrow"><span /> MAKE IT YOURS</div><h1>How do you learn best?</h1><p>Your tasks and explanations will use this preference.</p><div className="choice-grid">{learningOptions.map(([value, label, Icon, copy]) => <label className={style === value ? 'selected' : ''} key={value}><input type="radio" name="learning_style" value={value} required checked={style === value} onChange={() => setStyle(value)} /><Icon /><b>{label}</b><small>{copy}</small></label>)}</div></section><section className={step === 2 ? 'active' : ''}><div className="eyebrow"><span /> ONE LAST THING</div><h1>What feels hardest right now?</h1><p>Be honest. This helps Mentics meet you where you are.</p><textarea name="anxieties" rows="6" value={anxieties} onChange={event => setAnxieties(event.target.value)} onKeyDown={event => event.stopPropagation()} placeholder="Time management, test anxiety, essays, choosing schools..." /></section><div className="onboarding-actions">{step > 0 ? <button type="button" className="button button--quiet" onClick={() => setStep(step - 1)}><ArrowLeft /> Back</button> : <span />}{step < 2 ? <button type="button" className="button button--primary" disabled={!canNext} onClick={() => setStep(step + 1)}>Continue <ArrowRight /></button> : <button type="button" className="button button--primary" onClick={finishOnboarding}>Build my workspace <ArrowRight /></button>}</div></form></main></div>
 }
 
 function StatsPage() {
