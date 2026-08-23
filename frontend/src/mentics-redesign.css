@@ -286,11 +286,13 @@ button,a { -webkit-tap-highlight-color: transparent; }
 .suite-grid article:hover { background: #fff; }
 .suite-grid article > svg { color: var(--mx-violet); }
 .week-flow article:hover { background: #fff; }
-.faq { max-width: 900px; }
+.faq { width: 100%; max-width: 900px; padding-inline: 28px; }
+.faq > .section-heading,.faq > details { width: 100%; min-width: 0; }
 .faq details { margin: 0; padding: 0; border: 0; border-bottom: 1px solid var(--mx-line); border-radius: 0; background: transparent; box-shadow: none; }
 .faq details:first-of-type { border-top: 1px solid var(--mx-line); }
-.faq summary { min-height: 82px; padding: 0 4px; }
-.faq details p { padding: 0 4px; }
+.faq summary { width: 100%; min-width: 0; min-height: 82px; gap: 18px; padding: 0 4px; }
+.faq summary svg { flex: 0 0 auto; }
+.faq details p { width: 100%; max-width: none; padding: 0 4px; overflow-wrap: break-word; }
 .closing { max-width: 1320px; }
 .closing > div { border-radius: 30px; background: radial-gradient(circle at 80% 15%,rgba(139,92,246,.55),transparent 28rem),linear-gradient(135deg,#17132f,#292052 55%,#39358d); }
 .landing footer { border-color: var(--mx-line); }
@@ -553,6 +555,11 @@ button,a { -webkit-tap-highlight-color: transparent; }
   .week-heading { grid-template-columns: 1fr; }
   .week-heading .eyebrow { grid-column: auto; }
   .week-heading > p { justify-self: start; }
+  .faq { max-width: none; padding-inline: clamp(20px,5vw,38px); }
+  .faq .section-heading { width: 100%; max-width: none; margin-inline: 0; text-align: center; }
+  .faq > details { display: block; }
+  .faq summary { font-size: .95rem; line-height: 1.35; }
+  .faq details p { font-size: .92rem; line-height: 1.65; }
   .forum-layout { grid-template-columns: 1fr; }
   .community-aside { position: static; }
   .auth-page { display: block; }
