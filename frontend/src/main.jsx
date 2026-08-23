@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom'
 import { createRoot } from 'react-dom/client'
 import DOMPurify from 'dompurify'
 import { marked } from 'marked'
+import { Toaster, toast } from 'sonner'
 import {
   ArrowLeft, ArrowRight, Award, BarChart3, BookOpen, Brain, CalendarDays,
   Check, Clock3, Flame,
@@ -16,6 +17,7 @@ import './experience.css'
 import './brand-system.css'
 import './liquid-glass.css'
 import './mentics-redesign.css'
+import './story-system.css'
 
 const boot = window.__MENTICS__ || { page: 'landing', data: {} }
 const csrfToken = boot.data.csrfToken || ''
@@ -43,7 +45,7 @@ function Brand({ inverse = false }) {
 function Landing() {
   const loggedIn = boot.data.isLoggedIn
   useEffect(() => {
-    const nodes = [...document.querySelectorAll('.landing-facts > div,.section-heading,.process-grid article,.journey-showcase-copy,.journey-demo,.platform-copy,.feature-stack > div,.suite-heading,.suite-grid article,.week-heading,.week-flow article,.faq details,.closing')]
+    const nodes = [...document.querySelectorAll('.landing-facts > div,.story-chapter,.section-heading,.process-grid article,.signal-story-visual,.signal-story-beats article,.journey-showcase-copy,.journey-demo,.platform-copy,.feature-stack > div,.suite-heading,.suite-grid article,.week-heading,.week-flow article,.faq details,.closing')]
     nodes.forEach(node => node.classList.add('mx-reveal'))
     if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) { nodes.forEach(node => node.classList.add('is-visible')); return }
     const observer = new IntersectionObserver(entries => entries.forEach(entry => { if (entry.isIntersecting) { entry.target.classList.add('is-visible'); observer.unobserve(entry.target) } }), { threshold: .12, rootMargin: '0px 0px -7% 0px' })
@@ -51,6 +53,7 @@ function Landing() {
     return () => observer.disconnect()
   }, [])
   return <div className="landing">
+    <div className="story-progress" aria-hidden="true" />
     <Starfield />
     <header className="public-nav">
       <Brand />
@@ -69,6 +72,10 @@ function Landing() {
       <section className="hero">
         <div className="hero-glow hero-glow--one" />
         <div className="hero-glow hero-glow--two" />
+        <svg className="hero-route" viewBox="0 0 620 420" aria-hidden="true">
+          <path d="M22 355 C115 355 103 205 214 205 S318 72 420 72 S497 204 598 204" />
+          <circle cx="22" cy="355" r="6" /><circle cx="214" cy="205" r="6" /><circle cx="420" cy="72" r="6" /><circle cx="598" cy="204" r="6" />
+        </svg>
         <div className="hero-copy">
           <div className="eyebrow"><span /> Built for high school ambition</div>
           <h1>MENTICS</h1>
@@ -89,6 +96,8 @@ function Landing() {
         </div>
 
         <div className="product-frame" aria-label="Mentics product preview">
+          <div className="frame-float frame-float--signal" aria-hidden="true"><Sparkles /> Path recalibrated</div>
+          <div className="frame-float frame-float--focus" aria-hidden="true"><Target /> One clear move</div>
           <div className="frame-top"><span /><span /><span /><div>app.mentics</div></div>
           <div className="preview-shell">
             <aside className="preview-rail"><Brand /><div className="preview-nav active"><House size={16} /> Home</div><div className="preview-nav"><Target size={16} /> My path</div><div className="preview-nav"><BarChart3 size={16} /> Progress</div></aside>
@@ -104,6 +113,7 @@ function Landing() {
             </div>
           </div>
         </div>
+        <div className="hero-scroll-cue" aria-hidden="true"><span>Follow the path</span><i /></div>
       </section>
 
       <section className="trust-strip"><span>A path that adapts</span><span>Focused daily action</span><span>Progress you can see</span><span>Guidance when you need it</span></section>
@@ -114,7 +124,7 @@ function Landing() {
         <div><strong>1</strong><span><b>place to keep moving</b><small>Your plan, practice, feedback, progress, and people.</small></span></div>
       </section>
 
-      <section className="section process" id="how-it-works">
+      <section className="section process story-chapter" data-chapter="01" id="how-it-works">
         <div className="section-heading"><div className="eyebrow"><span /> THE MENTICS METHOD</div><h2>Clarity changes everything.</h2><p>Mentics turns a distant goal into the next right move—then learns from what happens.</p></div>
         <div className="process-grid">
           <article><b>01</b><Target /><h3>Tell us where you are</h3><p>Share your goals, timing, strengths, and the areas that need attention.</p></article>
@@ -123,7 +133,39 @@ function Landing() {
         </div>
       </section>
 
-      <section className="journey-showcase" aria-labelledby="journey-title">
+      <section className="signal-story story-chapter" data-chapter="02" aria-labelledby="signal-story-title">
+        <div className="signal-story-intro">
+          <div className="eyebrow"><span /> FROM AMBITION TO ACTION</div>
+          <h2 id="signal-story-title">Mentics turns uncertainty into momentum.</h2>
+          <p>Not with a giant checklist. With a living path that gets clearer every time you move.</p>
+        </div>
+        <div className="signal-story-layout">
+          <div className="signal-story-visual" aria-hidden="true">
+            <div className="signal-glass">
+              <span className="signal-glass-shine" />
+              <div className="signal-orbit signal-orbit--one" />
+              <div className="signal-orbit signal-orbit--two" />
+              <div className="signal-core"><Target /></div>
+              <svg viewBox="0 0 440 540">
+                <path d="M220 84 C220 150 104 150 104 242 S336 330 336 418 S220 455 220 490" />
+                <circle cx="220" cy="84" r="8" /><circle cx="104" cy="242" r="8" /><circle cx="336" cy="418" r="8" /><circle cx="220" cy="490" r="8" />
+              </svg>
+              <span className="signal-tag signal-tag--goal"><small>01</small><b>Your goal</b></span>
+              <span className="signal-tag signal-tag--path"><small>02</small><b>Five clear steps</b></span>
+              <span className="signal-tag signal-tag--proof"><small>03</small><b>Real evidence</b></span>
+              <span className="signal-tag signal-tag--adapt"><small>04</small><b>A smarter next path</b></span>
+            </div>
+          </div>
+          <div className="signal-story-beats">
+            <article><span>01</span><div><small>FIND THE SIGNAL</small><h3>Start with what is true now.</h3><p>Your scores, goals, timing, strengths, and friction become useful context—not another form that disappears into a database.</p></div></article>
+            <article><span>02</span><div><small>MAKE IT FINISHABLE</small><h3>See only the next five moves.</h3><p>Mentics cuts through the noise and builds a Duolingo-style route where the next useful action is always obvious.</p></div></article>
+            <article><span>03</span><div><small>LEARN FROM THE WORK</small><h3>Every result changes the picture.</h3><p>Practice, quiz sources, completed tasks, and updated scores become evidence the system can actually use.</p></div></article>
+            <article><span>04</span><div><small>ADAPT WITHOUT STARTING OVER</small><h3>Your path grows with you.</h3><p>Regenerate when life changes or progress lands. Mentics keeps the context and gives you a sharper next chapter.</p></div></article>
+          </div>
+        </div>
+      </section>
+
+      <section className="journey-showcase story-chapter" data-chapter="03" aria-labelledby="journey-title">
         <div className="journey-showcase-copy">
           <div className="eyebrow eyebrow--light"><span /> A PATH YOU CAN FEEL</div>
           <h2 id="journey-title">Progress should feel alive.</h2>
@@ -148,7 +190,7 @@ function Landing() {
         </div>
       </section>
 
-      <section className="section platform" id="platform">
+      <section className="section platform story-chapter" data-chapter="04" id="platform">
         <div className="platform-copy"><div className="eyebrow eyebrow--light"><span /> ONE FOCUSED WORKSPACE</div><h2>Less noise.<br />More momentum.</h2><p>Test prep, college planning, progress, and contextual guidance belong in one calm place.</p><a href={loggedIn ? '/dashboard' : '/signup'}>Explore the platform <ArrowRight size={17} /></a></div>
         <div className="feature-stack">
           <div><Target /><span><b>Adaptive paths</b><small>Five clear steps that respond to your goals and performance.</small></span></div>
@@ -158,7 +200,7 @@ function Landing() {
         </div>
       </section>
 
-      <section className="suite-section" id="suite">
+      <section className="suite-section story-chapter" data-chapter="05" id="suite">
         <div className="suite-heading"><div className="eyebrow"><span /> THE COMPLETE MENTICS SUITE</div><h2>Everything your ambition needs.<br />Nothing it doesn’t.</h2><p>The tools already inside Mentics, brought into one expressive workspace.</p></div>
         <div className="suite-grid">
           <article className="suite-path"><Target /><small>ADAPTIVE PATHS</small><h3>Five steps. One clear direction.</h3><p>Personalized SAT, ACT, and college-planning roadmaps that respond to your progress.</p><div className="mini-road"><i>1</i><span /><i>2</i><span /><i>3</i><span /><i>4</i><span /><i>5</i></div></article>
@@ -169,7 +211,7 @@ function Landing() {
         </div>
       </section>
 
-      <section className="week-section">
+      <section className="week-section story-chapter" data-chapter="06">
         <div className="week-heading"><div className="eyebrow"><span /> MOMENTUM, NOT BUSYWORK</div><h2>A week inside Mentics.</h2><p>The plan bends around real student life. Each session has a purpose, a finish line, and a visible place in the bigger picture.</p></div>
         <div className="week-flow">
           {[
@@ -182,7 +224,7 @@ function Landing() {
         </div>
       </section>
 
-      <section className="section faq" id="faq"><div className="section-heading"><h2>Good questions.</h2></div>
+      <section className="section faq story-chapter" data-chapter="07" id="faq"><div className="section-heading"><h2>Good questions.</h2></div>
         {[['Is Mentics free to use?', 'Yes. The current early-access product is free and does not require a credit card.'], ['Does it support both SAT and ACT?', 'Yes. Your test-prep path can focus on the SAT, ACT, or both.'], ['Can my plan change as I improve?', 'Yes. Regenerate a path after new scores, completed work, or a change in goals. Mentics uses that context to plan the next five steps.']].map(([q, a]) => <details key={q}><summary>{q}<Plus size={18} /></summary><p>{a}</p></details>)}
       </section>
 
@@ -437,8 +479,8 @@ function TaskModal({ task, category, onClose, onUpdate, onCompleted }) {
   const finishMilestone = async (save) => { setBusy(true); setError(''); try { if (save) await api('/api/update_stats', { method: 'POST', body: JSON.stringify({ stat_name: task.stat_to_update, stat_value: statValue }) }); onCompleted({ ...task, is_completed: true }) } catch (e) { setError(e.message) } finally { setBusy(false) } }
   const addNote = async () => { if (!note.trim()) return; const r = await api('/api/add_subtask', { method: 'POST', body: JSON.stringify({ parent_task_id: task.id, description: note }) }); onUpdate({ ...task, subtasks: [...task.subtasks, r.subtask] }); setNote('') }
   const toggleNote = async (s) => { await api('/api/update_subtask', { method: 'POST', body: JSON.stringify({ subtaskId: s.id, is_completed: !s.is_completed }) }); onUpdate({ ...task, subtasks: task.subtasks.map(x => x.id === s.id ? { ...x, is_completed: !x.is_completed } : x) }) }
-  const saveDeadline = async () => { await api('/api/update_task_deadline', { method: 'POST', body: JSON.stringify({ taskId: task.id, dueDate: dueDate || null }) }); onUpdate({ ...task, due_date: dueDate || null }) }
-  const launch = async () => { setBusy(true); try { const path = task.task_format === 'quiz' ? `/api/quiz/${task.id}` : `/api/practice_sprint/${task.id}`; setAssessment({ ...(await api(path)), kind: task.task_format }) } catch (e) { window.alert(e.message) } finally { setBusy(false) } }
+  const saveDeadline = async () => { try { await api('/api/update_task_deadline', { method: 'POST', body: JSON.stringify({ taskId: task.id, dueDate: dueDate || null }) }); onUpdate({ ...task, due_date: dueDate || null }); toast.success('Target date saved') } catch (e) { toast.error('Could not save the target date', { description: e.message }) } }
+  const launch = async () => { setBusy(true); try { const path = task.task_format === 'quiz' ? `/api/quiz/${task.id}` : `/api/practice_sprint/${task.id}`; setAssessment({ ...(await api(path)), kind: task.task_format }) } catch (e) { toast.error('Could not open this activity', { description: e.message }) } finally { setBusy(false) } }
   const skipTask = async () => { setBusy(true); setError(''); try { await api('/api/skip_task', { method: 'POST', body: JSON.stringify({ taskId: task.id }) }); const next = { ...task, is_completed: true, is_skipped: true }; onUpdate(next); onCompleted(next) } catch (e) { setError(e.message) } finally { setBusy(false) } }
   if (assessment) return <Assessment data={assessment} onClose={() => setAssessment(null)} />
   if (statPrompt) return <Modal onClose={() => finishMilestone(false)}><div className="milestone-mark"><Trophy /></div><div className="modal-kicker">MILESTONE COMPLETE</div><h2>Record the progress behind the win.</h2><p className="milestone-copy">This keeps your stats, tracker, and next path grounded in what actually changed.</p><label className="milestone-input">{stat.label}<input autoFocus type="number" value={statValue} onChange={e => setStatValue(e.target.value)} placeholder={stat.placeholder} min={stat.min} max={stat.max} step={stat.step || 1} /></label>{error && <p className="form-error">{error}</p>}<div className="modal-actions"><button className="button button--quiet" onClick={() => finishMilestone(false)} disabled={busy}>Skip for now</button><button className="button button--primary" onClick={() => finishMilestone(true)} disabled={busy || statValue === ''}>Save progress <ArrowRight /></button></div></Modal>
@@ -571,6 +613,42 @@ const legalCopy = {
 function LegalPage({ type }) { const d = legalCopy[type]; return <div className="legal-page"><header><Brand /><a href="/"><ArrowLeft /> Back to Mentics</a></header><main><div className="legal-title"><small>MENTICS LEGAL</small><h1>{d.title}</h1><p>Last updated {d.date}</p></div><p className="legal-intro">{d.intro}</p>{d.sections.map(([title, copy]) => <section key={title}><h2>{title}</h2><p>{copy}</p></section>)}</main></div> }
 function ArticlePage() { const d = boot.data; return <AppShell name={d.name}><main className="app-main article-page"><a href="/dashboard/test-path-view" className="text-button"><ArrowLeft /> Back to path</a><article><div className="eyebrow"><span /> STRATEGY GUIDE</div><h1>{d.article?.title}</h1><Markdown>{d.article?.content || 'This article is not available yet.'}</Markdown></article></main></AppShell> }
 
-function App() { switch (boot.page) { case 'dashboard': return <Dashboard />; case 'path': return <PathPage />; case 'login': return <AuthPage mode="login" />; case 'signup': return <AuthPage mode="signup" />; case 'onboarding': return <Onboarding />; case 'stats': return <StatsPage />; case 'edit-stats': return <EditStats />; case 'test-builder': return <BuilderPage kind="test" />; case 'college-builder': return <BuilderPage kind="college" />; case 'tracker': return <TrackerPage />; case 'forum': return <ForumPage />; case 'leaderboard': return <LeaderboardPage />; case 'account': return <AccountPage />; case 'privacy': return <LegalPage type="privacy" />; case 'terms': return <LegalPage type="terms" />; case 'article': return <ArticlePage />; default: return <Landing /> } }
+function App() {
+  useEffect(() => {
+    document.documentElement.dataset.menticsPage = boot.page
+    const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    const nodes = [...document.querySelectorAll('.app-main > :not(.chat-panel),.onboarding-page main > form > section.active,.auth-panel > *')]
+    if (!reduced) {
+      nodes.slice(0, 8).forEach((node, index) => {
+        node.classList.add('mx-app-enter')
+        node.style.setProperty('--mx-enter-delay', `${Math.min(index, 5) * 35}ms`)
+      })
+      requestAnimationFrame(() => requestAnimationFrame(() => nodes.forEach(node => node.classList.add('is-present'))))
+    }
+    return () => { delete document.documentElement.dataset.menticsPage }
+  }, [])
+
+  let page
+  switch (boot.page) {
+    case 'dashboard': page = <Dashboard />; break
+    case 'path': page = <PathPage />; break
+    case 'login': page = <AuthPage mode="login" />; break
+    case 'signup': page = <AuthPage mode="signup" />; break
+    case 'onboarding': page = <Onboarding />; break
+    case 'stats': page = <StatsPage />; break
+    case 'edit-stats': page = <EditStats />; break
+    case 'test-builder': page = <BuilderPage kind="test" />; break
+    case 'college-builder': page = <BuilderPage kind="college" />; break
+    case 'tracker': page = <TrackerPage />; break
+    case 'forum': page = <ForumPage />; break
+    case 'leaderboard': page = <LeaderboardPage />; break
+    case 'account': page = <AccountPage />; break
+    case 'privacy': page = <LegalPage type="privacy" />; break
+    case 'terms': page = <LegalPage type="terms" />; break
+    case 'article': page = <ArticlePage />; break
+    default: page = <Landing />
+  }
+  return <><Toaster position="bottom-right" mobileOffset={16} offset={24} closeButton theme="light" toastOptions={{ duration: 4200 }} />{page}</>
+}
 
 createRoot(document.getElementById('root')).render(<React.StrictMode><CsrfBootstrap /><App /></React.StrictMode>)
