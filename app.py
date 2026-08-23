@@ -1,9 +1,13 @@
 # Copyright © 2026 Mentics
 # All Rights Reserved.
-from flask import Flask, render_template, request, redirect, url_for, session, jsonify, g
+from flask import Flask, Response, render_template, request, redirect, url_for, session, jsonify, g
 from werkzeug.security import generate_password_hash, check_password_hash
 from dbhelper import DatabaseHandler
 from userhelper import User
+import learning
+import ratelimit
+import seo
+from ratelimit import rate_limit
 from functools import wraps
 import json
 import hmac
@@ -87,9 +91,23 @@ def _csrf_token():
     return token
 
 
+# Ceiling on write traffic from any single caller. Individual endpoints below
+# set tighter, purpose-specific limits; this only stops broad hammering.
+GLOBAL_WRITE_LIMIT = os.getenv('RATE_LIMIT_WRITES', '120/minute')
+CSRF_EXEMPT_PATHS = {'/api/import_official_questions'}
+
+
 @app.before_request
 def protect_state_changing_requests():
     if request.method not in {'POST', 'PUT', 'PATCH', 'DELETE'}:
+        return None
+    allowed, retry_after = ratelimit.check(GLOBAL_WRITE_LIMIT, name='global_write')
+    if not allowed:
+        return ratelimit.too_many(retry_after)
+    # CSRF defends against a browser attaching the session cookie to a forged
+    # request. Endpoints that authenticate with an explicit header instead of a
+    # cookie carry no such ambient authority, so the token check does not apply.
+    if request.path in CSRF_EXEMPT_PATHS:
         return None
     expected = session.get('_csrf_token')
     supplied = request.headers.get('X-CSRF-Token') or request.form.get('_csrf_token')
@@ -120,6 +138,7 @@ def _get_oauth():
 
 
 def init_db():
+    ratelimit.ensure_table(db)
     db.create_table("users", {
         "id": "INTEGER PRIMARY KEY AUTOINCREMENT",
         "email": "TEXT NOT NULL UNIQUE",
@@ -289,6 +308,113 @@ def init_db():
 
     db.add_column("paths", "secondary_content_id", "INTEGER")
 
+    # --- Adaptive lesson engine ---
+    # A path step now carries the skill it targets so mastery survives across
+    # regenerated paths, and node_type distinguishes teaching from drilling.
+    for column, column_type in {
+        "skill_key": "TEXT",
+        "skill_label": "TEXT",
+        "subject": "TEXT",
+        "node_type": "TEXT",
+        "objective": "TEXT",
+        "xp_reward": "INTEGER DEFAULT 10",
+        "unit_title": "TEXT",
+        # High-water mark of XP already granted for this step, so replaying a
+        # drill cannot mint points over and over.
+        "xp_awarded": "INTEGER DEFAULT 0",
+    }.items():
+        db.add_column("paths", column, column_type)
+
+    db.create_table("lessons", {
+        "id": "INTEGER PRIMARY KEY AUTOINCREMENT",
+        "task_id": "INTEGER NOT NULL UNIQUE",
+        "title": "TEXT NOT NULL",
+        "skill_key": "TEXT",
+        "skill_label": "TEXT",
+        "subject": "TEXT",
+        "objective": "TEXT",
+        "intro": "TEXT",
+        "recap": "TEXT",
+        "xp_reward": "INTEGER DEFAULT 30",
+        "FOREIGN KEY(task_id)": "REFERENCES paths(id) ON DELETE CASCADE"
+    })
+
+    db.create_table("lesson_steps", {
+        "id": "INTEGER PRIMARY KEY AUTOINCREMENT",
+        "lesson_id": "INTEGER NOT NULL",
+        "step_order": "INTEGER NOT NULL",
+        "step_type": "TEXT NOT NULL",
+        "title": "TEXT",
+        "body": "TEXT",
+        "worked_example": "TEXT",
+        "takeaway": "TEXT",
+        "trap": "TEXT",
+        "source_or_prompt": "TEXT",
+        "question_text": "TEXT",
+        "options": "TEXT",
+        "correct_option": "INTEGER",
+        "explanation": "TEXT",
+        "FOREIGN KEY(lesson_id)": "REFERENCES lessons(id) ON DELETE CASCADE"
+    })
+
+    db.create_table("lesson_progress", {
+        "id": "INTEGER PRIMARY KEY AUTOINCREMENT",
+        "user_id": "INTEGER NOT NULL",
+        "lesson_id": "INTEGER NOT NULL",
+        "current_step": "INTEGER DEFAULT 0",
+        "is_completed": "BOOLEAN DEFAULT FALSE",
+        "xp_earned": "INTEGER DEFAULT 0",
+        "correct_count": "INTEGER DEFAULT 0",
+        "attempt_count": "INTEGER DEFAULT 0",
+        "completed_at": "TIMESTAMP",
+        "UNIQUE": "(user_id, lesson_id)",
+        "FOREIGN KEY(user_id)": "REFERENCES users(id) ON DELETE CASCADE"
+    })
+
+    db.create_table("lesson_answers", {
+        "id": "INTEGER PRIMARY KEY AUTOINCREMENT",
+        "user_id": "INTEGER NOT NULL",
+        "step_id": "INTEGER NOT NULL",
+        "is_correct": "BOOLEAN NOT NULL",
+        "submitted_at": "TIMESTAMP DEFAULT CURRENT_TIMESTAMP",
+        "FOREIGN KEY(user_id)": "REFERENCES users(id) ON DELETE CASCADE",
+        "FOREIGN KEY(step_id)": "REFERENCES lesson_steps(id) ON DELETE CASCADE"
+    })
+
+    # Mastery is the memory that makes the next unit adaptive rather than random.
+    db.create_table("skill_mastery", {
+        "id": "INTEGER PRIMARY KEY AUTOINCREMENT",
+        "user_id": "INTEGER NOT NULL",
+        "skill_key": "TEXT NOT NULL",
+        "skill_label": "TEXT",
+        "subject": "TEXT",
+        "attempts": "INTEGER DEFAULT 0",
+        "correct": "INTEGER DEFAULT 0",
+        "level": "INTEGER DEFAULT 0",
+        "updated_at": "TIMESTAMP DEFAULT CURRENT_TIMESTAMP",
+        "UNIQUE": "(user_id, skill_key)",
+        "FOREIGN KEY(user_id)": "REFERENCES users(id) ON DELETE CASCADE"
+    })
+
+    # Wrong answers are re-served as targeted review in the next unit.
+    db.create_table("mistake_bank", {
+        "id": "INTEGER PRIMARY KEY AUTOINCREMENT",
+        "user_id": "INTEGER NOT NULL",
+        "skill_key": "TEXT",
+        "skill_label": "TEXT",
+        "question_text": "TEXT NOT NULL",
+        "chosen_text": "TEXT",
+        "correct_text": "TEXT",
+        "explanation": "TEXT",
+        "resolved": "BOOLEAN DEFAULT FALSE",
+        "created_at": "TIMESTAMP DEFAULT CURRENT_TIMESTAMP",
+        "FOREIGN KEY(user_id)": "REFERENCES users(id) ON DELETE CASCADE"
+    })
+
+    for table in ("sprint_questions", "quiz_questions"):
+        db.add_column(table, "skill_key", "TEXT")
+        db.add_column(table, "difficulty", "TEXT")
+
     try:
         db.execute("DROP INDEX IF EXISTS idx_paths_user_category_active;")
     except Exception as e:
@@ -307,6 +433,9 @@ def init_db():
         'idx_quiz_results_user': 'quiz_results (user_id)',
         'idx_sprint_results_user': 'sprint_results (user_id)',
         'idx_forum_replies_post': 'forum_replies (post_id, created_at)',
+        'idx_lesson_steps_lesson': 'lesson_steps (lesson_id, step_order)',
+        'idx_skill_mastery_user': 'skill_mastery (user_id)',
+        'idx_mistake_bank_user': 'mistake_bank (user_id, resolved, created_at DESC)',
     }
     for index_name, index_target in indexes.items():
         db.execute(f"CREATE INDEX IF NOT EXISTS {index_name} ON {index_target}")
@@ -486,6 +615,99 @@ def _generate_text(prompt, *, max_output_tokens=800, json_output=False,
     if not text:
         raise ValueError("Gemini returned an empty response.")
     return text
+
+
+learning.configure(_generate_text, logger=app.logger)
+
+
+# --- Skill mastery ---------------------------------------------------------
+# Every graded answer anywhere in the product feeds one table, so the planner
+# for the next unit sees a single honest picture of what the student can do.
+
+def _record_skill_result(user_id, skill_key, skill_label, subject, is_correct):
+    """Fold one graded answer into the student's mastery for that skill."""
+    if not skill_key:
+        return
+    row = db.select_one("skill_mastery", where={"user_id": user_id, "skill_key": skill_key})
+    attempts = (row["attempts"] if row else 0) + 1
+    correct = (row["correct"] if row else 0) + (1 if is_correct else 0)
+    level = learning.mastery_level(correct / attempts, attempts)
+    payload = {
+        "user_id": user_id,
+        "skill_key": skill_key,
+        "skill_label": skill_label or skill_key,
+        "subject": subject or "",
+        "attempts": attempts,
+        "correct": correct,
+        "level": level,
+        "updated_at": datetime.utcnow().isoformat(sep=" ", timespec="seconds"),
+    }
+    if row:
+        db.update("skill_mastery", payload, where={"id": row["id"]})
+    else:
+        db.insert("skill_mastery", payload)
+
+
+def _record_mistake(user_id, skill_key, skill_label, question, chosen_text, correct_text, explanation):
+    """Keep a wrong answer so the next unit can teach against it specifically."""
+    db.insert("mistake_bank", {
+        "user_id": user_id,
+        "skill_key": skill_key or "",
+        "skill_label": skill_label or "",
+        "question_text": str(question or "")[:900],
+        "chosen_text": str(chosen_text or "")[:400],
+        "correct_text": str(correct_text or "")[:400],
+        "explanation": str(explanation or "")[:900],
+    })
+
+
+def _get_mastery_rows(user_id):
+    rows = db.select("skill_mastery", where={"user_id": user_id}) or []
+    summary = []
+    for row in rows:
+        attempts = row["attempts"] or 0
+        summary.append({
+            "skill_key": row["skill_key"],
+            "skill_label": row["skill_label"],
+            "subject": row["subject"],
+            "attempts": attempts,
+            "correct": row["correct"] or 0,
+            "accuracy": (row["correct"] or 0) / attempts if attempts else 0.0,
+            "level": row["level"] or 0,
+        })
+    return summary
+
+
+def _get_recent_mistakes_for_prompt(user_id, limit=8):
+    rows = db.execute(
+        """SELECT skill_label, question_text, chosen_text, correct_text, explanation
+           FROM mistake_bank
+           WHERE user_id=? AND resolved=False
+           ORDER BY created_at DESC LIMIT ?""",
+        (user_id, limit),
+    ) or []
+    if not rows:
+        return "No graded mistakes recorded yet."
+    lines = []
+    for row in rows:
+        lines.append(
+            f"- [{row.get('skill_label') or 'general'}] {str(row.get('question_text') or '')[:220]}\n"
+            f"  chose: {str(row.get('chosen_text') or '')[:120]} | correct: {str(row.get('correct_text') or '')[:120]}"
+        )
+    return "\n".join(lines)
+
+
+def _award_xp(user_id, amount):
+    """Add XP to the existing gamification counter and return the new total."""
+    if amount <= 0:
+        return None
+    row = db.select_one("gamification_stats", where={"user_id": user_id})
+    if not row:
+        db.insert("gamification_stats", {"user_id": user_id, "points": amount, "current_streak": 0})
+        return amount
+    total = (row["points"] or 0) + amount
+    db.update("gamification_stats", {"points": total}, where={"user_id": user_id})
+    return total
 
 
 def _compact_chat_history(history):
@@ -733,427 +955,6 @@ def _get_sprint_results_for_prompt(user_id):
     return "\n".join(summary)
 
 
-def _sanitize_skill_text(value):
-    text = str(value or "").strip()
-    if not text:
-        return ""
-    text = re.sub(r"\[[^\]]+\]\([^\)]+\)", " ", text)
-    text = re.sub(r"https?://\S+", " ", text)
-    text = text.replace("**", " ").replace("`", " ")
-    text = re.sub(r"\s+", " ", text).strip()
-    return text
-
-
-def _derive_skill_name(description, weakness_hint=""):
-    raw_text = _sanitize_skill_text(description)
-    fallback = _sanitize_skill_text(weakness_hint) or "target skill"
-    if not raw_text:
-        return fallback[:120] or "target skill"
-
-    text = raw_text
-
-    if re.search(r"(?i)\b(?:practice\s+sprint|sprint|quiz|review|strategy|task)\s*[:\-]", text):
-        text = re.split(r"(?i)\b(?:practice\s+sprint|sprint|quiz|review|strategy|task)\s*[:\-]", text, maxsplit=1)[1]
-
-    lower_text = text.lower()
-    for marker in [
-        "to refine pacing for",
-        "to improve",
-        "to practice",
-        "to strengthen",
-        "to work on",
-        "to build",
-    ]:
-        marker_index = lower_text.find(marker)
-        if marker_index != -1:
-            text = text[marker_index + len(marker):].strip()
-            break
-
-    text = re.sub(r"^(?:read|watch|review|study|explore|complete|practice|do)\s+(?:the\s+)?(?:official\s+)?(?:guide|article|lesson|resource|video|module|link)\s+(?:on|about)\s*", "", text, flags=re.I)
-    text = re.sub(r"^(?:read|watch|review|study|explore|complete|practice|do)\s+", "", text, flags=re.I)
-    text = re.sub(r"^(?:official\s+)?(?:sat|act)\s+(?:reading|writing|math|science)\s*(?:module\s+)?(?:strategies?)?\s*", "", text, flags=re.I)
-    text = re.sub(r"^\s*\b(?:digital\s+)?sat\b.*?\b(?:strategies?|module)\b\s*", "", text, flags=re.I)
-    text = re.sub(r"^(?:in\s+)?(?:the\s+)?(?:context\s+of\s+)?", "", text, flags=re.I)
-
-    text = re.sub(r"\b(?:questions?|skills?|strategies?|concepts?|topics?)\b.*$", "", text, flags=re.I)
-    text = re.sub(r"\b(?:for|on|about|with)\s+.*$", "", text, flags=re.I)
-    text = re.sub(r"\s+[\-:;.,/]+$", "", text).strip()
-    text = re.sub(r"^[\-:;.,/\s]+", "", text)
-    text = re.sub(r"\s+", " ", text).strip()
-
-    if not text:
-        text = fallback
-    if len(text) > 120:
-        text = text[:120].rstrip(" -:;.,")
-    return text or "target skill"
-
-
-def build_strategy_article(skill, weakness_note, task_description=""):
-    """Create a concrete, teach-first strategy guide for a specific SAT/ACT math or English skill."""
-    candidate_skill = _derive_skill_name(task_description or skill, skill)
-    if skill and _derive_skill_name(skill, task_description) and len(_derive_skill_name(skill, task_description)) > len(candidate_skill):
-        candidate_skill = _derive_skill_name(skill, task_description)
-    if not candidate_skill or candidate_skill.lower() in {"target skill", "your target skill"}:
-        candidate_skill = _sanitize_skill_text(skill) or _sanitize_skill_text(task_description) or "your target skill"
-    skill_name = candidate_skill.strip() or "your target skill"
-    title = f"Strategies for {skill_name}"
-    weakness_text = (weakness_note or "This skill needs a systematic approach, not memorization.").strip()
-    focus_line = skill_name if skill_name and skill_name.lower() != "your target skill" else "this skill"
-
-    lower_skill = skill_name.lower()
-    
-    # Detect tool-based and technical skills first
-    if any(k in lower_skill for k in ["desmos", "calculator", "graphing", "table regression", "tilde", "~", "tool", "software", "syntax", "code"]):
-        strategy_type = "tool"
-        if "desmos" in lower_skill or "table regression" in lower_skill or "tilde" in lower_skill:
-            sample_prompt = (
-                "Example: You need to find the best-fitting function for a dataset using Desmos Table Regression. "
-                "Step 1: Open Desmos and create a table with your data points (x, y). "
-                "Step 2: In a new line, type: y1 ~ a*x1^2 + b*x1 + c (for quadratic) or adjust the formula based on the pattern you see. "
-                "Step 3: Desmos auto-calculates a, b, c and shows the R² value to measure fit quality. "
-                "Step 4: Compare multiple regression models (linear, quadratic, exponential) by testing different formulas. "
-                "Step 5: Check that your chosen model fits the actual data points and makes sense in context."
-            )
-            checklist = [
-                "Did I set up the table correctly with x and y columns?",
-                "Did I use the correct regression syntax (tilde ~) with the right formula structure?",
-                "Did I check the R² value to compare how well different models fit?",
-                "Does my chosen model make logical sense for the real-world situation in the problem?",
-            ]
-            core_message = "Tool mastery means knowing exactly what formula to test and how to read the results. Desmos Table Regression is not magic—it is a structured way to test different relationships and pick the one with the best fit. Speed comes from knowing which formula to try first, not from clicking randomly."
-        else:
-            sample_prompt = (
-                "Example: Use the calculator tool to isolate one variable, test it with sample data, and verify the result. "
-                "Do not rely on the tool to make the decision for you—use it to confirm your reasoning."
-            )
-            checklist = [
-                "Did I clearly define what I am testing?",
-                "Did I use the tool the correct way for this task?",
-                "Did I check the result using at least one test case?",
-                "Does the tool's output match what the problem is asking for?",
-            ]
-            core_message = "Tools are only as good as the questions you ask them. Master the syntax, understand the output, and always verify that the result fits the problem context."
-    elif any(k in lower_skill for k in ["equation", "algebra", "function", "graph", "geometry", "slope", "quadratic", "ratio", "fraction", "probability", "percent", "angle", "linear", "inequality", "polynomial", "exponent", "system", "statistics"]):
-        strategy_type = "math"
-        sample_prompt = (
-            "Example: A line passes through (2, 5) and (6, 13). What is the slope?"
-            " Step 1: label the points, Step 2: use slope = (y2 - y1)/(x2 - x1), "
-            "Step 3: compute (13 - 5)/(6 - 2) = 8/4 = 2, Step 4: check that the rise and run make sense."
-        )
-        checklist = [
-            "Did I identify the actual relationship or formula being tested?",
-            "Did I define the variables and units before solving?",
-            "Did I write one clean equation instead of trying to reason in my head?",
-            "Did I check whether the answer is reasonable for the context?",
-        ]
-        core_message = "Math questions reward structure. The fastest way to improve is to stop treating every question like a fresh puzzle and instead identify the exact relationship, formula, or pattern the question is hiding."
-    elif any(k in lower_skill for k in ["grammar", "punctuation", "sentence", "verb", "pronoun", "transition", "vocabulary", "reading", "passage", "rhetoric", "inference", "evidence", "essay", "word", "clause", "modifier", "usage"]):
-        strategy_type = "english"
-        sample_prompt = (
-            "Example: 'Because the team had practiced all week, they were ready for the game.' "
-            "The best strategy is to look at the meaning, the grammar structure, and the clue words: 'because' signals a cause, and the sentence needs a clear connection between the cause and the result."
-        )
-        checklist = [
-            "Did I identify the grammar or meaning issue before choosing an answer?",
-            "Did I read the sentence around the blank instead of only the blank itself?",
-            "Did I test the answer by replacing it in context and asking, 'Does this sound precise and logical'?",
-            "Did I eliminate trap answers that are grammatically possible but meaningfully wrong?",
-        ]
-        core_message = "English questions reward precision of meaning. The best students do not guess from the blank alone; they read the surrounding sentence, check the structure, and choose the answer that fits both grammar and logic."
-    else:
-        strategy_type = "mixed"
-        sample_prompt = (
-            "Example: Translate the problem into the smallest possible version you can manage, then choose the method that matches the structure you see. "
-            "Do not rely on what feels familiar—match the task to the rule."
-        )
-        checklist = [
-            "Did I isolate the core idea instead of getting distracted by extra wording?",
-            "Did I choose the shortest method that still matches the task?",
-            "Did I check whether the answer makes sense in context?",
-            "Did I avoid a trap answer that looks reasonable but misses the actual requirement?",
-        ]
-        core_message = "The skill is not about guessing what the test wants; it is about noticing the pattern quickly and applying one reliable process every time."
-
-
-    if strategy_type == "tool":
-        content = f"""# {title}
-
-## What you need to know for the quiz
-
-{core_message}
-
-> **Your focus:** {weakness_text}
-
-### Essential concepts and skills for this topic
-
-For {focus_line}, you need to master these exact ideas:
-
-**The core idea:** Regression finds the best-fitting mathematical relationship between data points. Instead of guessing, you test multiple formulas and let the tool calculate which one fits the data most accurately.
-
-**How it works:**
-1. Collect your data in a table with independent variable (x) and dependent variable (y).
-2. Test different models: linear (y ~ ax + b), quadratic (y ~ ax² + bx + c), exponential (y ~ ae^(bx)), etc.
-3. The tool calculates coefficients (a, b, c) and gives you a fit quality score (R²).
-4. Compare fit scores and choose the model with the best match to your actual data.
-
-### Key definitions and formulas
-
-- **Linear regression:** y = ax + b (straight line relationship)
-- **Quadratic regression:** y = ax² + bx + c (parabola/curved relationship)
-- **Exponential regression:** y = ae^(bx) (rapid growth or decay)
-- **R² (coefficient of determination):** Ranges from 0 to 1. R² = 0.95 means the model explains 95% of the variation in the data. Higher R² = better fit.
-- **Residuals:** The differences between actual y-values and predicted y-values. Look for random scatter, not patterns.
-- **Tilde syntax (~):** In Desmos, y1 ~ formula means "fit this formula to the data."
-
-### Worked examples with real numbers
-
-**Example 1: Linear regression**
-Data: (1, 3), (2, 5), (3, 7), (4, 9)
-- Formula to test: y1 ~ a*x1 + b
-- Result: y = 2x + 1 (a = 2, b = 1)
-- R² = 1.0 (perfect fit because the data is perfectly linear)
-- Check: When x = 2, y = 2(2) + 1 = 5 ✓ (matches the data)
-
-**Example 2: Quadratic regression**
-Data: (0, 0), (1, 1), (2, 4), (3, 9)
-- Formula to test: y1 ~ a*x1^2 + b*x1 + c
-- Result: y = x² (a = 1, b = 0, c = 0)
-- R² = 1.0 (perfect fit for quadratic data)
-- This is a better fit than linear because the data follows a curved pattern.
-
-**Example 3: Choosing between models**
-Data with growth pattern: (0, 1), (1, 2), (2, 4), (3, 8), (4, 16)
-- Linear model: R² = 0.88 (not great)
-- Exponential model: y = e^(0.693*x), R² = 0.99 (excellent)
-- **Decision:** Use exponential because it fits much better.
-
-### Common mistakes to watch for
-
-- **Wrong syntax:** Using y instead of y1, or x instead of x1, or missing the tilde (~).
-- **Trusting R² blindly:** A high R² might mean the formula is overcomplicated. Always check if simpler models fit just as well.
-- **Not testing multiple models:** Always try at least linear and quadratic before settling on your answer.
-- **Forgetting to verify:** Do not just read the coefficients. Plug one data point into your fitted equation and check it matches.
-- **Misinterpreting coefficients:** Remember, in y = ax² + bx + c, 'a' is not the same as 'a' in y = ax + b.
-
-### Real situations where you'll use this
-
-- Predicting population growth from historical data.
-- Finding the best relationship between test prep hours and SAT scores.
-- Analyzing scientific experiments where you collect data and need to find a model.
-- Financial projections based on historical trends.
-
----
-
-## Quiz and sprint strategies
-
-Now that you know the content, here is how to apply it on the quiz:
-
-### Before you start solving
-
-1. **Read the data.** Count the number of points. Look for obvious patterns (straight line, curve, exponential growth).
-2. **Name the pattern.** Is it linear, quadratic, or exponential? Do not guess—look at the shape.
-3. **Decide which models to test.** If data looks curved, test quadratic. If it explodes, test exponential.
-
-### While you are working
-
-4. **Set up the table correctly.** Use x1 and y1 columns with exact data.
-5. **Test formulas in order:** Linear first → Quadratic second → Exponential third (if needed).
-6. **Record all R² values.** Do not move on until you have tried at least two models.
-7. **Compare and pick.** The model with the highest R² wins, but check that it makes sense in context.
-
-### Before you submit
-
-8. **Verify with one data point.** Pick an (x, y) pair from the data, plug x into your fitted equation, and check y.
-9. **Check reasonableness.** Does the model make sense for the real-world situation? (Negative population? Faster-than-light growth? Red flag.)
-10. **Make sure you answered the actual question.** The problem might ask for the equation, the R² value, or a prediction. Answer exactly what is asked.
-
-### Decision checklist
-
-- {checklist[0]}
-- {checklist[1]}
-- {checklist[2]}
-- {checklist[3]}
-
-### 30-second pre-answer review
-
-Before you lock in your answer:
-1. What is the highest R² value I got? (This should be your chosen model.)
-2. Did I verify this fit with at least one actual data point?
-3. Does this equation make sense in the real-world context?
-4. Did I answer the exact question being asked?
-
-If you can say yes to all four, you are ready to move on.
-
----
-
-## Study tips for practice
-
-- **Drill the syntax:** Open Desmos and type y1 ~ a*x1 + b with your own test data. Do this 5 times until it is muscle memory.
-- **Compare models yourself:** Take a dataset and run linear, quadratic, and exponential. See which R² wins and why.
-- **Spot patterns by eye:** Before using the tool, guess which model will fit best. Then check if you were right.
-- **Understand residuals:** Plot your residuals and see if they are random or clustered. Clustered residuals mean your model is missing something.
-"""
-    else:
-        content = f"""# {title}
-
-## What you need to know for the quiz
-
-{core_message}
-
-> **Your focus:** {weakness_text}
-
-### Essential concepts and skills for this topic
-
-For {focus_line}, you need to understand these core ideas before the quiz:
-
-**The main concept:** {skill_name} is not a trick—it follows predictable patterns. Once you recognize the pattern, the solution becomes straightforward.
-
-**Why it matters:** Students often struggle with {focus_line} because they try to solve it without first understanding what the question is really asking. A few seconds of classification saves minutes of wasted work.
-
-### Key definitions and important principles
-
-{sample_prompt}
-
-These are the exact ideas you will see in different forms on the quiz. Learn to recognize them:
-
-- **Pattern 1:** {skill_name} questions that test [core relationship/grammar concept]
-- **Pattern 2:** Variations where the [setup/wording] changes but the underlying principle stays the same
-- **Pattern 3:** Trap questions designed to catch students who skip the classification step
-
-### Worked examples with full explanations
-
-**Example 1: Straightforward case**
-This is the most common form you will see. Here is how to solve it:
-- Identify the pattern → Name the rule → Apply the rule → Check the result
-
-**Example 2: Variation with a twist**
-When the problem looks different, do not panic. The core principle is the same; only the context changes. Go through the same steps.
-
-**Example 3: Trap answer included**
-Watch for wrong answer choices that:
-- Look correct at first glance
-- Miss a small but critical constraint
-- Solve a different problem entirely
-- Are mathematically close but not actually right
-
-### Common misconceptions to avoid
-
-- Assuming the problem is asking for X when it is actually asking for Y
-- Using a method that works for similar problems but not this specific type
-- Skipping the verification step and hoping your answer is right
-- Choosing the first answer that "looks reasonable"
-- Missing hidden constraints or special conditions in the wording
-
-### Real-world applications
-
-{skill_name} appears in:
-- Standardized test questions (SAT, ACT, AP exams)
-- College math and science courses
-- Professional certifications
-- Data analysis and problem-solving in careers
-
----
-
-## Quiz and sprint strategies
-
-Now that you know the content, here is how to nail it on the quiz:
-
-### Your 5-step quiz process
-
-**Step 1: Classify the problem (5 seconds)**
-Before solving anything, read the question and identify which pattern it matches. Is this linear algebra, a reading comprehension question, a grammar fix, or something else?
-
-**Step 2: Simplify the setup (10 seconds)**
-Rewrite the problem in the clearest, simplest way possible. Remove extra wording. Identify exactly what is being asked.
-
-**Step 3: Apply your rule (20 seconds)**
-Use the exact method that matches this pattern. Do not improvise. Do not try multiple methods. Use the one that works for this type.
-
-**Step 4: Check your work (10 seconds)**
-Before you move on, verify that your answer actually solves the original problem. Does it make sense? Does it match the question's exact wording?
-
-**Step 5: Eliminate wrong answers (if multiple choice)**
-Cross out answers that:
-- Solve a different problem
-- Miss a constraint
-- Look close but are mathematically wrong
-- Sound good but do not match the specific question
-
-### Decision checklist
-
-- {checklist[0]}
-- {checklist[1]}
-- {checklist[2]}
-- {checklist[3]}
-
-### Timing strategy
-
-On the actual quiz:
-- **Spend the first 10% of time classifying the problem.** This seems slow but saves time overall.
-- **Do not spend more than 30 seconds on any one problem.** If you are stuck, mark it and come back.
-- **Always verify.** A few extra seconds to check beats submitting a careless wrong answer.
-- **Compare answer choices systematically.** Do not guess between two close options; use math to decide.
-
-### What to do if you get stuck
-
-1. **Reread the exact question.** Sometimes you misunderstood what was being asked.
-2. **Simplify harder.** Break the problem into smaller pieces you can solve individually.
-3. **Test with a concrete example.** Plug in actual numbers to see if your logic works.
-4. **Use process of elimination.** Wrong answers often have obvious flaws once you look closely.
-
-### Before you submit each answer
-
-Ask yourself these four questions:
-1. Did I classify the problem correctly?
-2. Did I apply the right method?
-3. Did I check my answer against the original problem?
-4. Can I explain why the other answer choices are wrong?
-
-If you answer yes to all four, submit with confidence. If no, go back and check your work.
-
----
-
-## Practice tips to get ready
-
-- **Drill the classification step:** Take 10 old problems and just classify them without solving. Get fast at spotting the pattern.
-- **Do one worked example per day:** Solve it, then explain each step out loud as if teaching someone else.
-- **Create a personal "pattern guide":** List the different types of {focus_line} problems and the method for each. Refer to it every day.
-- **Time yourself on problems:** Get comfortable with the pace. You should be able to solve correctly in under 2 minutes.
-"""
-
-    return {"title": title, "content": content}
-
-
-def _get_path_progress_context(user_id, category):
-    """Summarize how far the user has progressed in the active path so regeneration can build from the right place."""
-    tasks = db.select(
-        "paths",
-        where={"user_id": user_id, "category": category},
-        order_by="task_order ASC"
-    )
-    if not tasks:
-        return "The student has no previous path yet, so generate a fresh five-step path."
-
-    completed = [task for task in tasks if task.get("is_completed")]
-    skipped = [task for task in tasks if task.get("is_skipped")]
-    incomplete = [task for task in tasks if not task.get("is_completed")]
-
-    if not incomplete:
-        return (
-            f"The student completed the entire prior {category} path "
-            f"({len(completed)} tasks). Build a logical continuation rather than repeating the same steps."
-        )
-
-    next_task_order = min(task["task_order"] for task in incomplete)
-    next_task = next((task for task in tasks if task["task_order"] == next_task_order), None)
-    next_desc = next_task.get("description", "the next path step") if next_task else "the next path step"
-    return (
-        f"The student has completed {len(completed)} out of {len(tasks)} tasks in this {category} path, "
-        f"with {len(skipped)} skipped steps. The next uncompleted item is task {next_task_order}: '{next_desc}'. "
-        "Build the next five-step path as a continuation from this point, not a duplicate of the previous plan."
-    )
-
-
 def _get_official_questions_for_topic(test_type, subject, topic, limit=10):
     """Fetch official questions from the official_questions table for a specific topic."""
     query = """
@@ -1198,404 +999,6 @@ def _extract_official_examples_for_ai(test_type, subject, topic, count=3):
     return "\n---\n".join(examples)
 
 
-def _populate_quiz_with_official_questions(topic, test_type, subject, needed_count=7):
-    """Try to fetch official questions first, fill remaining with mock."""
-    official_qs = _get_official_questions_for_topic(test_type, subject, topic, limit=needed_count)
-    
-    questions = []
-    for q in official_qs:
-        questions.append({
-            "source_or_prompt": q['source_or_prompt'] or "Original SAT/ACT official practice prompt",
-            "question_text": q['question_text'],
-            "options": q['options'],
-            "correct_option": q['correct_option'],
-            "explanation": q['explanation'],
-            "is_official": True
-        })
-    
-    # Fill remaining with AI-generated questions if needed
-    while len(questions) < needed_count:
-        questions.append({
-            "source_or_prompt": f"Mentics practice prompt on {topic}",
-            "question_text": f"Practice question {len(questions) + 1} on {topic}",
-            "options": ["A", "B", "C", "D"],
-            "correct_option": 0,
-            "explanation": f"Detailed explanation for {topic}",
-            "is_official": False
-        })
-    
-    return questions[:needed_count]
-
-
-def _populate_sprint_with_official_questions(topic, test_type, subject, needed_count=5):
-    """Try to fetch official questions for sprint, fill remaining with mock."""
-    official_qs = _get_official_questions_for_topic(test_type, subject, topic, limit=needed_count)
-    
-    questions = []
-    for q in official_qs:
-        questions.append({
-            "question_text": q['question_text'],
-            "options": q['options'],
-            "correct_option": q['correct_option'],
-            "explanation": q['explanation'],
-            "is_official": True
-        })
-    
-    # Fill remaining with AI-generated if needed
-    while len(questions) < needed_count:
-        questions.append({
-            "question_text": f"Practice problem {len(questions) + 1} on {topic}",
-            "options": ["A", "B", "C", "D"],
-            "correct_option": 0,
-            "explanation": f"Solution strategy for {topic}",
-            "is_official": False
-        })
-    
-    return questions[:needed_count]
-
-
-def _get_test_prep_ai_tasks(strengths, weaknesses, test_focus, current_scores=None, desired_scores=None, test_date_str=None, hours_per_week=None, chat_history=None, path_history=None, stat_history="", quiz_results="", sprint_results="", path_progress_context=""):
-    """Generates hyper-intelligent, adaptive test prep tasks, now including interactive Practice Sprints, Strategy Articles, and better context."""
-
-    current_scores = current_scores or {}
-    desired_scores = desired_scores or {}
-    chat_history = chat_history or []
-    path_history = path_history or {}
-
-    def get_mock_tasks_reliably():
-        """A fallback function to provide tasks if the AI service is unavailable."""
-        print("--- DEBUG: Running fallback mock task generator for Test Prep. ---")
-
-        return [
-            {"task_format": "link", "description": "Take a full-length, timed SAT practice test from the [official College Board site](https://satsuite.collegeboard.org/sat/practice-preparation/practice-tests).",
-             "reason": "This is a 'boss battle' to test your skills under pressure.", "type": "milestone", "stat_to_update": "sat_total", "category": "Test Prep", "difficulty": "hard"},
-            {"task_format": "link", "description": "Review algebra concepts using [Khan Academy](https://www.khanacademy.org/math/algebra).",
-             "reason": "A strong algebra foundation is crucial.", "type": "standard", "stat_to_update": None, "category": "Test Prep", "difficulty": "medium"},
-            {"task_format": "link", "description": "Practice time management for the reading section.", "reason": "Pacing is key to finishing on time.",
-                "type": "standard", "stat_to_update": None, "category": "Test Prep", "difficulty": "medium"}
-        ]
-
-    if not os.getenv("GEMINI_API_KEY"):
-        return get_mock_tasks_reliably()
-
-    completed_tasks_str = "\n".join(
-        [f"- {task['description']}" for task in path_history.get('completed', [])]) or "None."
-    incomplete_tasks_str = "\n".join(
-        [f"- {task['description']}" for task in path_history.get('incomplete', [])]) or "None."
-    latest_user_message = next((msg['content'] for msg in reversed(
-        chat_history) if msg['role'] == 'user'), "N/A")
-    chat_history_str = _format_chat_history_for_prompt(chat_history)
-
-    # --- Test Date Formatting ---
-    test_date_info = "Not set."
-    if test_date_str:
-        try:
-            user_tz = ZoneInfo(session.get('timezone', 'UTC'))
-            test_date = datetime.strptime(test_date_str, '%Y-%m-%d').date()
-            delta = test_date - datetime.now(user_tz).date()
-            formatted_date = test_date.strftime('%B %d, %Y')
-            if delta.days >= 0:
-                test_date_info = f"on {formatted_date} ({delta.days} days remaining)"
-            else:
-                test_date_info = f"on {formatted_date} (this date has passed)"
-        except (ValueError, ZoneInfoNotFoundError):
-            test_date_info = "Invalid date format."
-
-    # --- Format Current Scores for Prompt ---
-    current_scores_formatted = []
-    if current_scores.get("current_sat_ebrw"):
-        current_scores_formatted.append(
-            f"SAT EBRW: {current_scores['current_sat_ebrw']}")
-    if current_scores.get("current_sat_math"):
-        current_scores_formatted.append(
-            f"SAT Math: {current_scores['current_sat_math']}")
-    if current_scores.get("current_act_composite"):
-        current_scores_formatted.append(
-            f"ACT Composite: {current_scores['current_act_composite']}")
-    if current_scores.get("current_act_math"):
-        current_scores_formatted.append(
-            f"ACT Math: {current_scores['current_act_math']}")
-    if current_scores.get("current_act_reading"):
-        current_scores_formatted.append(
-            f"ACT Reading: {current_scores['current_act_reading']}")
-    if current_scores.get("current_act_science"):
-        current_scores_formatted.append(
-            f"ACT Science: {current_scores['current_act_science']}")
-    current_scores_str = ", ".join(
-        current_scores_formatted) if current_scores_formatted else "Not provided"
-
-    # --- Format Desired Scores for Prompt ---
-    desired_scores_formatted = []
-    if desired_scores.get("desired_sat"):
-        desired_scores_formatted.append(
-            f"SAT: {desired_scores['desired_sat']}")
-    if desired_scores.get("desired_act"):
-        desired_scores_formatted.append(
-            f"ACT: {desired_scores['desired_act']}")
-    desired_scores_str = ", ".join(
-        desired_scores_formatted) if desired_scores_formatted else "Not specified"
-
-    # --- Determine Test Focus Description ---
-    focus_desc = "SAT"
-    if test_focus == 'act':
-        focus_desc = "ACT"
-    elif test_focus == 'both':
-        focus_desc = "both SAT and ACT"
-
-    prompt = (
-        f"# MISSION\n"
-        f"You are an elite AI test prep coach for Mentics. Your mission is to generate an intelligent, 5-step study plan tailored to the student's evolving needs, demonstrating a deep understanding of their history and context SPECIFICALY FOR THE DIGITAL SAT AND THE ACT.\n\n"
-
-        f"## CRITICAL SCENARIO ANALYSIS\n"
-        f"1.  **Regeneration Request:** This generation was initiated from the student's path conversation. Treat the student's most recent substantive path request as an explicit override: every task must directly reflect its requested focus, constraints, timing, or changed goal. If the final message is only a short follow-up such as 'why?' or 'do it,' resolve it against the preceding user messages instead of using the short follow-up as the plan focus.\n"
-        f"2.  **Post-Path Continuation:** If the student just completed all tasks, the new plan MUST be a logical next step (e.g., analyzing scores, planning long-term improvements).\n"
-        f"3.  **Standard Generation:** Otherwise, generate a standard path that builds on their history.\n\n"
-
-        f"# STUDENT ANALYSIS DATA\n"
-        f"- **Primary Test Focus:** {focus_desc}\n"
-        f"- Strengths: {strengths}\n"
-        f"- Weaknesses: {weaknesses} <== **Base your tasks primarily on these specific weaknesses.**\n"
-        f"- **Current Scores (Baseline):** {current_scores_str}\n"
-        f"- Desired Scores: {desired_scores_str}\n"
-        f"- Official Test Date: {test_date_info}\n"
-
-        f"- Estimated Weekly Study Time: {hours_per_week or 'Not specified'} hours\n\n"
-
-        f"## HISTORICAL & CONVERSATIONAL CONTEXT\n"
-        f"- **Most Recent User Request (highest priority):** '{latest_user_message}'\n"
-        f"- **Recent Conversation:**\n{chat_history_str}\n"
-        f"- **Path Progress Context:** {path_progress_context or 'Not provided.'}\n"
-        f"- Recently Completed Tasks: {completed_tasks_str}\n"
-        f"- Incomplete Tasks from Previous Path: {incomplete_tasks_str}\n"
-        f"- Historical Performance Data (Tracker):\n{stat_history}\n\n"
-
-        f"## RECENT QUIZ PERFORMANCE (Incorrect Answers)\n"
-        f"This shows specific questions the user recently got wrong on CUMULATIVE quizzes. Use this granular data to create targeted follow-up tasks.\n{quiz_results}\n\n"
-
-        f"## RECENT PRACTICE SPRINT PERFORMANCE (Incorrect Answers)\n"
-        f"This shows specific questions the user recently got wrong on FOCUSED sprints. This is the most important data for identifying specific skill gaps.\n{sprint_results}\n\n"
-
-        f"# YOUR TASK: GENERATE EXACTLY 5 NEW STEPS (for {focus_desc.upper()})\n"
-        f"- Return exactly five unique tasks. Do not repeat an old task unless the student's latest request clearly requires it.\n"
-        f"- **Focus on {focus_desc.upper()}:** All content, examples, and resources MUST be relevant to the chosen test format(s).\n"
-        f"- **Task Format Logic (Crucial!):** You must differentiate between passive learning and active practice. \n"
-        f"  - If a task involves **actively solving problems or answering questions or mastering a math concept or advancing/consolidating knowlege **, it MUST be a `practice_sprint`.\n"
-        f"  - If a task involves **reading articles, or watching content on yt or using external resources**, it MUST be a `link`, `strategy`, or `review` task.\n"
-        f"- **Synthesize, Don't Just List:** Your primary function is to connect multiple data points to create hyper-specific tasks. Generic tasks like 'Practice Algebra' are forbidden.\n"
-        f"- **Extreme Specificity & Actionable Verbs:** Descriptions must be granular and start with a strong verb (e.g., 'Master', 'Analyze', 'Implement').\n"
-        f"- **Incorporate Multiple Formats:** The plan must include a mix of task types, including at least one `practice_sprint`.\n"
-        f"- ** DIGITAL SAT & ACT FOCUS:** All tasks must be relevant to the unique formats and content of the Digital SAT and ACT, do not include thigns that were on the Paper SAT like ELA IS NOW JS EBRW AND MATH ACT IS similar to paper.\n"
-        f"- **Data-Driven Justification:** The `reason` for each task is critical. It MUST explicitly reference the student's personal data (e.g., 'This is important because you listed Geometry as a weakness...').\n\n"
-        f"- **Math:** is the user is struggling in math the biggest thing to ensure is they know how to use desmos regression for the tricky constant questions. table regressiopn, tilde regression, and system of eqs regression and also normalizing the x values. This is like a starting point for math but get specific with other topics if they need specific practice.\n\n"
-
-        f"## ASSESSMENT CONTENT (SERVER-OWNED)\n"
-        f"For `practice_sprint` or `quiz`, output ONLY the task metadata and the narrow skill/topic in the description. Do NOT output questions, passages, sources, articles, or nested content. Mentics attaches curated questions and a complete guide server-side. This keeps the plan reliable and inexpensive.\n\n"
-
-        f"# CRITICAL DIRECTIVES & JSON SCHEMA\n"
-        f"1.  **JSON Output ONLY**: Your output MUST be a single, raw JSON object.\n"
-        f"2.  **Task Formats**: You must use a mix of `link`, `quiz`, `practice_sprint`, `strategy`, and `review` based on the logic in 'YOUR TASK'.\n"
-        f"3.  **Data-Driven Justification**: The `reason` field is mandatory and must explain *why* the task is assigned, referencing the student's data.\n"
-        f"4.  **Milestones & 'Boss Battles'**: Use 'milestone' for major assessments. 'Boss Battle' descriptions must start with 'Boss Battle:' they DO NOT have any practice sprints with them and they DO NOT habve a guide they SHOULD direct the user to take a test on one prep or bluebook.\n"
-        f"5.  **Correct Stat Naming**: `stat_to_update` must be one of: ['sat_math', 'sat_ebrw', 'sat_total', 'act_math', 'act_reading', 'act_science', 'act_composite'].\n\n"
-        f"6.  ** The tasks without any practice sprints should tell user to read or watch something and then summarize key strategies. The tasks with practice sprints should have a strategy article that teaches the skill being practiced. The quiz tasks should be cumulative and test a broader topic, not just one skill.\n\n"
-
-        f"# JSON OUTPUT STRUCTURE\n"
-        f"{{\n"
-        f'  "tasks": [\n'
-        f'    {{\n'
-        f'      "task_format": "Can be \'link\', \'quiz\', \'strategy\', \'review\', or \'practice_sprint\'.",\n'
-        f'      "description": "Hyper-specific instruction. For a sprint, describe the skill (e.g., \'Practice Sprint: Subject-Verb Agreement\'). MUST include markdown link if format is \'link\'.",\n'
-        f'      "reason": "Mandatory, data-driven justification referencing the student\'s specific stats, weaknesses, or history.",\n'
-        f'      "type": "Either \'standard\' or \'milestone\'.",\n'
-        f'      "stat_to_update": "Valid stat name ONLY if type is milestone, otherwise null.",\n'
-        f'      "category": "This MUST be the string \'Test Prep\'.",\n'
-        f'      "difficulty": "Either \'easy\', \'medium\', \'hard\', or \'epic\'."\n'
-        f'    }}\n'
-        f'  ]\n'
-        f'}}'
-    )
-    try:
-        raw_text = _generate_text(
-            prompt,
-            # The server creates sprint, quiz, and guide content from its
-            # curated sources. Asking Gemini to emit all of that nested data
-            # wastes tokens and increases malformed/duplicate plan responses.
-            max_output_tokens=1800,
-            json_output=True,
-            thinking_level="low",
-        )
-
-        response_data = None
-
-        import re
-        cleaned_text = re.sub(
-            r'[\x00-\x08\x0b\x0c\x0e-\x1f\x7f-\x9f]', '', raw_text)
-
-        try:
-
-            response_data = json.loads(cleaned_text)
-        except json.JSONDecodeError as direct_e:
-
-            print(
-                f"--- Direct JSON parsing failed: {direct_e}. Attempting extraction... ---")
-            match = re.search(
-                r'^\s*(\{.*\}|\[.*\])\s*$', cleaned_text, re.DOTALL)
-            if match:
-                json_candidate = match.group(1)
-                try:
-                    response_data = json.loads(json_candidate)
-                    print("--- Successfully parsed extracted JSON. ---")
-                except json.JSONDecodeError as extract_e:
-
-                    raise ValueError(
-                        f"Failed to parse cleaned AI JSON response even after extraction: {extract_e}\nCleaned text (first 2000 chars): {cleaned_text[:2000]}") from extract_e
-            else:
-
-                raise ValueError(
-                    f"No valid JSON structure found in the cleaned AI response.\nCleaned text (first 2000 chars): {cleaned_text[:2000]}") from direct_e
-
-        tasks = response_data.get("tasks", [])
-
-        def looks_like_practice(desc):
-            if not desc:
-                return False
-            desc_l = desc.lower()
-            if re.search(r"\[[^\]]+\]\([^\)]+\)", desc) and "sprint" not in desc_l and "practice" not in desc_l:
-                return False
-            if re.search(r"\b(?:read|watch|review|study|explore)\b.*\b(?:guide|article|lesson|resource|video|module)\b", desc_l):
-                return False
-            kws = ['practice', 'solve', 'questions', 'problem', 'drill',
-                   'master', 'consolidate', 'attempt', 'answer', 'worksheet', 'sprint']
-            return any(k in desc_l for k in kws)
-
-        def make_mock_sprint(skill):
-            # Try to fetch official questions first, then fall back to AI
-            test_type = 'SAT' if test_focus != 'act' else 'ACT'
-            subject = 'Math' if any(k in skill.lower() for k in ['algebra', 'geometry', 'quadratic', 'function', 'equation']) else 'Reading/Writing'
-            questions = _populate_sprint_with_official_questions(skill, test_type, subject, 5)
-            return {'title': f"Practice Sprint: {skill}", 'questions': questions}
-
-        def make_strategy_article(skill, weakness_note, task_description=""):
-            return build_strategy_article(skill, weakness_note, task_description)
-
-        def make_mock_quiz(topic):
-            # Try to fetch official questions first, then fall back to AI
-            test_type = 'SAT' if test_focus != 'act' else 'ACT'
-            subject = 'Math' if any(k in topic.lower() for k in ['algebra', 'geometry', 'quadratic', 'function', 'equation']) else 'Reading/Writing'
-            questions = _populate_quiz_with_official_questions(topic, test_type, subject, 7)
-            return {'title': f"Cumulative Quiz: {topic}", 'questions': questions}
-
-        normalized = []
-
-        for t in tasks if isinstance(tasks, list) else []:
-            try:
-
-                if not isinstance(t, dict):
-                    continue
-                desc = t.get('description', '') or ''
-                t['category'] = 'Test Prep'
-                inferred_format = t.get('task_format') or (
-                    'practice_sprint' if looks_like_practice(desc) else 'link')
-                t['task_format'] = inferred_format
-
-                skip_practice = False
-                if t['task_format'] in ('link', 'strategy', 'review'):
-                    if len(desc) < 40 and t['task_format'] == 'link':
-                        main_weak = (weaknesses.split(',')[0].strip(
-                        ) if weaknesses else '') or 'your weakest subskill'
-                        t['description'] = desc.strip(
-                        ) + f" Read/watch content on {main_weak} & summarize 3 key strategies."
-                    if t['task_format'] in ('strategy', 'review'):
-                        skip_practice = True
-                        topic = (weaknesses.split(',')[0].strip() if weaknesses else '') or desc.split(
-                            ' on ')[-1].split('.')[0][:40].strip() or 'strategies'
-                        article = t.get('strategy_article')
-                        task_skill = _derive_skill_name(desc, topic)
-                        if not article or not article.get('content') or len(article.get('content', '')) < 1200:
-                            t['strategy_article'] = make_strategy_article(
-                                task_skill, t.get('reason') or f"Focus on {topic}.", desc)
-                        t.pop('sprint_content', None)
-
-                if (not skip_practice) and (t['task_format'] == 'practice_sprint' or looks_like_practice(desc)):
-                    t['task_format'] = 'practice_sprint'
-                    skill = _derive_skill_name(desc, weaknesses)
-                    if not t.get('sprint_content'):
-                        t['sprint_content'] = make_mock_sprint(skill)
-                    article = t.get('strategy_article')
-                    if not article or not article.get('content') or len(article.get('content', '')) < 1200:
-                        t['strategy_article'] = make_strategy_article(
-                            skill, t.get('reason') or f"Target {skill}.", desc)
-
-                desc_l = desc.lower()
-                if t.get('task_format') == 'quiz' or any(k in desc_l for k in ('quiz', 'cumulative')):
-                    t['task_format'] = 'quiz'
-                    quiz_topic = (weaknesses.split(',')[0].strip() if weaknesses else '') or desc.split(
-                        ' on ')[-1].split('.')[0][:40].strip() or 'mixed topics'
-                    if not t.get('quiz_content'):
-                        t['quiz_content'] = make_mock_quiz(quiz_topic)
-                    quiz_questions = t['quiz_content'].get('questions', [])
-                    for question in quiz_questions:
-                        if not isinstance(question, dict):
-                            continue
-                        source_or_prompt = next((
-                            question.get(key) for key in (
-                                'source_or_prompt', 'source', 'prompt', 'passage', 'context'
-                            ) if isinstance(question.get(key), str) and question.get(key).strip()
-                        ), None)
-                        question['source_or_prompt'] = source_or_prompt or (
-                            "Original Mentics standalone practice prompt. All required "
-                            "information is included in the question below."
-                        )
-
-                if 'boss battle' in desc.lower() or desc.startswith('Boss Battle'):
-                    t['type'] = 'milestone'
-                    preferred_test = 'SAT' if test_focus != 'act' else 'ACT'
-                    stat_map = {'SAT': 'sat_total', 'ACT': 'act_composite'}
-                    t['stat_to_update'] = stat_map.get(preferred_test)
-                    resource_hint = f'Take a full-length, timed official {preferred_test} practice test (e.g., College Board Bluebook for SAT, official ACT platform).'
-                    cb_link = 'https://satsuite.collegeboard.org/sat/practice-preparation/practice-tests' if preferred_test == 'SAT' else ''
-                    act_link = 'https://www.act.org/content/act/en/products-and-services/the-act/test-preparation/free-act-test-prep.html' if preferred_test == 'ACT' else ''  # Example ACT link
-                    link_md = f" [Official Practice]({cb_link or act_link})" if (
-                        cb_link or act_link) else ""
-                    norm_desc = f"Boss Battle: {resource_hint}{link_md}"
-                    if not desc.startswith('Boss Battle:'):
-                        t['description'] = norm_desc
-                    elif resource_hint.lower() not in desc.lower():
-                        t['description'] = desc.strip() + ' ' + \
-                            resource_hint + link_md
-
-                if t.get('type') == 'milestone':
-                    valid_stats = ['sat_math', 'sat_ebrw', 'sat_total',
-                                   'act_math', 'act_reading', 'act_science', 'act_composite']
-                    if t.get('stat_to_update') not in valid_stats:
-                        t['stat_to_update'] = None
-                normalized.append(t)
-            except Exception as norm_e:
-                print(
-                    f"--- Error normalizing task: {norm_e} --- Task data: {t}")
-                continue
-
-        if isinstance(normalized, list) and len(normalized) > 0:
-            return normalized
-        elif isinstance(normalized, list) and len(normalized) == 0 and tasks:
-            print("--- WARNING: Normalization removed all tasks. Falling back. ---")
-            return get_mock_tasks_reliably()
-        else:
-            raise ValueError(
-                "AI response did not contain a valid 'tasks' list or normalization produced no tasks")
-
-    except Exception as e:
-
-        print(
-            f"\n--- GEMINI API OR PROCESSING ERROR IN _get_test_prep_ai_tasks: {e} ---\n")
-
-        if 'raw_text' not in locals():
-            raw_text = "Raw text extraction failed."
-        print(
-            f"--- Raw Response (if available, first 500 chars): {str(raw_text)[:500]} ---")
-        return get_mock_tasks_reliably()
-
-
 def _has_incomplete_earlier_task(user_id, task):
     return bool(db.execute_for_one(
         """SELECT id FROM paths
@@ -1628,6 +1031,7 @@ def strategy_article(user, task_id):
 
 @app.route('/api/practice_sprint/<int:task_id>')
 @login_required
+@rate_limit('40/hour', name='practice_sprint')
 def get_practice_sprint(user, task_id):
     task_info = db.select_one(
         "paths", where={"id": task_id, "user_id": user.data['id'], "is_active": True})
@@ -1657,6 +1061,7 @@ def get_practice_sprint(user, task_id):
 
 @app.route('/api/submit_sprint_results', methods=['POST'])
 @login_required
+@rate_limit('60/hour', name='sprint_results')
 def submit_sprint_results(user):
     data = request.get_json(silent=True) or {}
     try:
@@ -1666,25 +1071,84 @@ def submit_sprint_results(user):
         return jsonify({"success": False, "error": str(error)}), 400
 
 
+_ASSESSMENT_SOURCES = {
+    'quiz': (
+        """SELECT qq.id, qq.correct_option, qq.options, qq.explanation, qq.question_text,
+                  qq.skill_key, p.id AS task_id, p.category, p.task_order,
+                  p.skill_label, p.subject, p.xp_reward
+           FROM quiz_questions qq
+           JOIN quizzes q ON q.id=qq.quiz_id
+           JOIN paths p ON p.id=q.task_id
+           WHERE qq.id=? AND p.user_id=? AND p.is_active=True""",
+        'quiz_results',
+    ),
+    'sprint': (
+        """SELECT sq.id, sq.correct_option, sq.options, sq.explanation, sq.question_text,
+                  sq.skill_key, p.id AS task_id, p.category, p.task_order,
+                  p.skill_label, p.subject, p.xp_reward
+           FROM sprint_questions sq
+           JOIN practice_sprints ps ON ps.id=sq.sprint_id
+           JOIN paths p ON p.id=ps.task_id
+           WHERE sq.id=? AND p.user_id=? AND p.is_active=True""",
+        'sprint_results',
+    ),
+}
+
+
+def _grade_one_answer(user_id, question, selected_option, result_table):
+    """Grade a single answer, persist it, and fold the first attempt into mastery."""
+    options = json.loads(question['options'])
+    if not 0 <= selected_option < len(options):
+        raise ValueError("The selected option is not valid for this question.")
+    correct_option = int(question['correct_option'])
+    is_correct = selected_option == correct_option
+
+    # Missed questions are deliberately re-served later in the run, and a step can
+    # be replayed. Only the first attempt at a question counts toward mastery,
+    # otherwise grinding one item to a correct answer would read as competence.
+    prior_attempt_query = {
+        'quiz_results': "SELECT id FROM quiz_results WHERE user_id=? AND question_id=? LIMIT 1",
+        'sprint_results': "SELECT id FROM sprint_results WHERE user_id=? AND question_id=? LIMIT 1",
+    }[result_table]
+    first_attempt = not db.execute_for_one(prior_attempt_query, (user_id, question['id']))
+
+    db.insert(result_table, {
+        'user_id': user_id, 'question_id': question['id'], 'is_correct': is_correct
+    })
+    if not first_attempt:
+        return {
+            'question_id': question['id'], 'is_correct': is_correct,
+            'correct_option': correct_option,
+            'explanation': question.get('explanation') or '',
+        }
+    # A cumulative review mixes skills, so credit the question's own skill rather
+    # than the step's headline skill.
+    skill_key = question.get('skill_key') or ''
+    if skill_key:
+        resolved = learning.resolve_skill(skill_key)
+        skill_label, subject = resolved['skill_label'], resolved['subject']
+    else:
+        skill_key = question.get('skill_key')
+        skill_label, subject = question.get('skill_label'), question.get('subject')
+
+    _record_skill_result(user_id, skill_key, skill_label, subject, is_correct)
+    if not is_correct:
+        _record_mistake(
+            user_id, skill_key, skill_label,
+            question.get('question_text'), options[selected_option],
+            options[correct_option], question.get('explanation'),
+        )
+    return {
+        'question_id': question['id'], 'is_correct': is_correct,
+        'correct_option': correct_option,
+        'explanation': question.get('explanation') or '',
+    }
+
+
 def _score_assessment_results(user_id, submitted, kind):
     if not isinstance(submitted, list) or not 1 <= len(submitted) <= 50:
         raise ValueError("Submit between 1 and 50 answers.")
-    if kind == 'quiz':
-        query = """SELECT qq.id, qq.correct_option, qq.options, qq.explanation,
-                          p.id AS task_id, p.category, p.task_order
-                   FROM quiz_questions qq
-                   JOIN quizzes q ON q.id=qq.quiz_id
-                   JOIN paths p ON p.id=q.task_id
-                   WHERE qq.id=? AND p.user_id=? AND p.is_active=True"""
-        result_table = 'quiz_results'
-    else:
-        query = """SELECT sq.id, sq.correct_option, sq.options, sq.explanation,
-                          p.id AS task_id, p.category, p.task_order
-                   FROM sprint_questions sq
-                   JOIN practice_sprints ps ON ps.id=sq.sprint_id
-                   JOIN paths p ON p.id=ps.task_id
-                   WHERE sq.id=? AND p.user_id=? AND p.is_active=True"""
-        result_table = 'sprint_results'
+    query, result_table = _ASSESSMENT_SOURCES['quiz' if kind == 'quiz' else 'sprint']
     scored = []
     seen = set()
     checked_tasks = set()
@@ -1706,151 +1170,697 @@ def _score_assessment_results(user_id, submitted, kind):
             if _has_incomplete_earlier_task(user_id, question):
                 raise ValueError("Complete the earlier path step first.")
             checked_tasks.add(question['task_id'])
-        options = json.loads(question['options'])
-        if not 0 <= selected_option < len(options):
-            raise ValueError("One or more selected options are invalid.")
-        is_correct = selected_option == int(question['correct_option'])
-        db.insert(result_table, {
-            'user_id': user_id, 'question_id': question_id, 'is_correct': is_correct
-        })
-        scored.append({
-            'question_id': question_id, 'is_correct': is_correct,
-            'correct_option': int(question['correct_option']),
-            'explanation': question.get('explanation') or '',
-        })
+        scored.append(_grade_one_answer(user_id, question, selected_option, result_table))
     return {
         'success': True, 'correct': sum(1 for row in scored if row['is_correct']),
         'total': len(scored), 'results': scored,
     }
 
 
-def _generate_and_save_new_test_path(user_id, test_path_info, chat_history=None):
-    chat_history = chat_history or []
-    user_record = db.select_one("users", where={"id": user_id})
-    user_stats = json.loads(user_record['stats']) if user_record else {
+@app.route('/api/assessment/answer', methods=['POST'])
+@login_required
+@rate_limit('400/hour', name='assessment_answer')
+def assessment_answer(user):
+    """Grade one answer so the player can give Duolingo-style instant feedback."""
+    data = request.get_json(silent=True) or {}
+    kind = 'quiz' if data.get('kind') == 'quiz' else 'sprint'
+    try:
+        question_id = int(data.get('question_id'))
+        selected_option = int(data.get('selected_option'))
+    except (TypeError, ValueError):
+        return jsonify({"error": "A question and an option are required."}), 400
+
+    query, result_table = _ASSESSMENT_SOURCES[kind]
+    question = db.execute_for_one(query, (question_id, user.data['id']))
+    if not question:
+        return jsonify({"error": "That question is not part of your active path."}), 404
+    if _has_incomplete_earlier_task(user.data['id'], question):
+        return jsonify({"error": "Complete the earlier path step first."}), 409
+    try:
+        return jsonify(_grade_one_answer(user.data['id'], question, selected_option, result_table))
+    except ValueError as error:
+        return jsonify({"error": str(error)}), 400
+
+
+@app.route('/api/assessment/finish', methods=['POST'])
+@login_required
+@rate_limit('60/hour', name='assessment_finish')
+def assessment_finish(user):
+    """Award XP from the answers actually recorded on the server for this step."""
+    user_id = user.data['id']
+    data = request.get_json(silent=True) or {}
+    try:
+        task_id = int(data.get('task_id'))
+    except (TypeError, ValueError):
+        return jsonify({"error": "A task is required."}), 400
+
+    task = db.select_one("paths", where={"id": task_id, "user_id": user_id, "is_active": True})
+    if not task:
+        return jsonify({"error": "That step is not part of your active path."}), 404
+
+    # Scored on first attempts only: missed questions are re-served during the
+    # run, so counting every attempt would let a replay inflate the result.
+    if task.get('task_format') == 'quiz':
+        summary = db.execute_for_one(
+            """SELECT COUNT(*) AS total, SUM(CASE WHEN r.is_correct THEN 1 ELSE 0 END) AS correct
+               FROM quiz_results r
+               WHERE r.id IN (
+                   SELECT MIN(r2.id) FROM quiz_results r2
+                   JOIN quiz_questions qq ON qq.id=r2.question_id
+                   JOIN quizzes q ON q.id=qq.quiz_id
+                   WHERE q.task_id=? AND r2.user_id=?
+                   GROUP BY r2.question_id)""",
+            (task_id, user_id),
+        )
+    else:
+        summary = db.execute_for_one(
+            """SELECT COUNT(*) AS total, SUM(CASE WHEN r.is_correct THEN 1 ELSE 0 END) AS correct
+               FROM sprint_results r
+               WHERE r.id IN (
+                   SELECT MIN(r2.id) FROM sprint_results r2
+                   JOIN sprint_questions sq ON sq.id=r2.question_id
+                   JOIN practice_sprints ps ON ps.id=sq.sprint_id
+                   WHERE ps.task_id=? AND r2.user_id=?
+                   GROUP BY r2.question_id)""",
+            (task_id, user_id),
+        )
+
+    total = (summary or {}).get('total') or 0
+    correct = (summary or {}).get('correct') or 0
+    accuracy = correct / total if total else 0.0
+    base = task.get('xp_reward') or 20
+    earned = int(round(base * (0.5 + 0.5 * accuracy))) if total else 0
+
+    # Only the improvement over what this step already paid out is granted, so
+    # re-running a drill (or replaying this call) cannot farm points.
+    already = task.get('xp_awarded') or 0
+    xp_delta = max(0, earned - already)
+    if xp_delta:
+        db.execute_write(
+            "UPDATE paths SET xp_awarded=? WHERE id=? AND user_id=?",
+            (earned, task_id, user_id),
+        )
+    return jsonify({
+        "xp_earned": xp_delta,
+        "total_points": _award_xp(user_id, xp_delta) if xp_delta else None,
+        "accuracy": round(accuracy, 3),
+    })
+
+
+# --- Lesson player ---------------------------------------------------------
+
+def _load_lesson_for_task(user_id, task_id):
+    """Return (task, lesson) for a lesson step the user is allowed to open."""
+    task = db.select_one("paths", where={"id": task_id, "user_id": user_id, "is_active": True})
+    if not task:
+        return None, None, ("That step is not part of your active path.", 404)
+    if task.get('task_format') != 'lesson':
+        return None, None, ("That step is not a lesson.", 404)
+    if _has_incomplete_earlier_task(user_id, task):
+        return None, None, ("Complete the earlier path step first.", 409)
+    lesson = db.select_one("lessons", where={"task_id": task_id})
+    if not lesson:
+        return None, None, ("This lesson has no content yet.", 404)
+    return task, lesson, None
+
+
+@app.route('/api/lesson/<int:task_id>')
+@login_required
+@rate_limit('120/hour', name='lesson_fetch')
+def get_lesson(user, task_id):
+    user_id = user.data['id']
+    task, lesson, error = _load_lesson_for_task(user_id, task_id)
+    if error:
+        return jsonify({"error": error[0]}), error[1]
+
+    steps_raw = db.select("lesson_steps", where={"lesson_id": lesson['id']}, order_by="step_order ASC")
+    steps = []
+    for step in sorted(steps_raw, key=lambda s: s['step_order']):
+        payload = {
+            "id": step['id'],
+            "step_type": step['step_type'],
+            "title": step.get('title') or "",
+        }
+        if step['step_type'] == 'check':
+            payload.update({
+                "source_or_prompt": step.get('source_or_prompt') or "",
+                "question_text": step.get('question_text') or "",
+                "options": json.loads(step['options']) if step.get('options') else [],
+            })
+        else:
+            payload.update({
+                "body": step.get('body') or "",
+                "worked_example": step.get('worked_example') or "",
+                "takeaway": step.get('takeaway') or "",
+                "trap": step.get('trap') or "",
+            })
+        steps.append(payload)
+
+    progress = db.select_one("lesson_progress", where={"user_id": user_id, "lesson_id": lesson['id']})
+    return jsonify({
+        "task_id": task_id,
+        "lesson_id": lesson['id'],
+        "title": lesson['title'],
+        "skill_label": lesson.get('skill_label') or "",
+        "subject": lesson.get('subject') or "",
+        "objective": lesson.get('objective') or "",
+        "intro": lesson.get('intro') or "",
+        "recap": lesson.get('recap') or "",
+        "xp_reward": lesson.get('xp_reward') or 30,
+        "steps": steps,
+        "progress": {
+            "current_step": (progress or {}).get('current_step') or 0,
+            "is_completed": bool((progress or {}).get('is_completed')),
+        },
+    })
+
+
+@app.route('/api/lesson/<int:task_id>/answer', methods=['POST'])
+@login_required
+@rate_limit('400/hour', name='lesson_answer')
+def lesson_answer(user, task_id):
+    """Grade one in-lesson check and return the teaching explanation with it."""
+    user_id = user.data['id']
+    task, lesson, error = _load_lesson_for_task(user_id, task_id)
+    if error:
+        return jsonify({"error": error[0]}), error[1]
+    data = request.get_json(silent=True) or {}
+    try:
+        step_id = int(data.get('step_id'))
+        selected_option = int(data.get('selected_option'))
+    except (TypeError, ValueError):
+        return jsonify({"error": "A step and an option are required."}), 400
+
+    step = db.select_one("lesson_steps", where={"id": step_id, "lesson_id": lesson['id']})
+    if not step or step['step_type'] != 'check':
+        return jsonify({"error": "That question is not part of this lesson."}), 404
+
+    options = json.loads(step['options']) if step.get('options') else []
+    if not 0 <= selected_option < len(options):
+        return jsonify({"error": "That option is not valid for this question."}), 400
+
+    correct_option = int(step['correct_option'] or 0)
+    is_correct = selected_option == correct_option
+
+    # As with drills, a repeated attempt at the same check is for learning, not
+    # for measurement, so only the first one moves mastery.
+    first_attempt = not db.execute_for_one(
+        "SELECT id FROM lesson_answers WHERE user_id=? AND step_id=? LIMIT 1",
+        (user_id, step_id),
+    )
+    db.insert("lesson_answers", {
+        "user_id": user_id, "step_id": step_id, "is_correct": is_correct,
+    })
+    if first_attempt:
+        _record_skill_result(
+            user_id, lesson.get('skill_key'), lesson.get('skill_label'),
+            lesson.get('subject'), is_correct,
+        )
+        if not is_correct:
+            _record_mistake(
+                user_id, lesson.get('skill_key'), lesson.get('skill_label'),
+                step.get('question_text'), options[selected_option],
+                options[correct_option], step.get('explanation'),
+            )
+
+    progress = db.select_one("lesson_progress", where={"user_id": user_id, "lesson_id": lesson['id']})
+    if progress:
+        db.update("lesson_progress", {
+            "attempt_count": (progress['attempt_count'] or 0) + 1,
+            "correct_count": (progress['correct_count'] or 0) + (1 if is_correct else 0),
+        }, where={"id": progress['id']})
+    else:
+        db.insert("lesson_progress", {
+            "user_id": user_id, "lesson_id": lesson['id'], "current_step": 0,
+            "attempt_count": 1, "correct_count": 1 if is_correct else 0,
+        })
+
+    return jsonify({
+        "is_correct": is_correct,
+        "correct_option": correct_option,
+        "explanation": step.get('explanation') or "",
+    })
+
+
+@app.route('/api/lesson/<int:task_id>/progress', methods=['POST'])
+@login_required
+@rate_limit('400/hour', name='lesson_progress')
+def lesson_progress(user, task_id):
+    """Remember how far into a lesson the student got, so they can resume."""
+    user_id = user.data['id']
+    task, lesson, error = _load_lesson_for_task(user_id, task_id)
+    if error:
+        return jsonify({"error": error[0]}), error[1]
+    data = request.get_json(silent=True) or {}
+    try:
+        current_step = max(0, min(200, int(data.get('current_step', 0))))
+    except (TypeError, ValueError):
+        return jsonify({"error": "A step index is required."}), 400
+
+    existing = db.select_one("lesson_progress", where={"user_id": user_id, "lesson_id": lesson['id']})
+    if existing:
+        db.update("lesson_progress", {"current_step": current_step}, where={"id": existing['id']})
+    else:
+        db.insert("lesson_progress", {
+            "user_id": user_id, "lesson_id": lesson['id'], "current_step": current_step,
+        })
+    return jsonify({"success": True, "current_step": current_step})
+
+
+@app.route('/api/lesson/<int:task_id>/finish', methods=['POST'])
+@login_required
+@rate_limit('60/hour', name='lesson_finish')
+def lesson_finish(user, task_id):
+    """Close out a lesson: award XP scaled by how the in-lesson checks went."""
+    user_id = user.data['id']
+    task, lesson, error = _load_lesson_for_task(user_id, task_id)
+    if error:
+        return jsonify({"error": error[0]}), error[1]
+
+    summary = db.execute_for_one(
+        """SELECT COUNT(*) AS total, SUM(CASE WHEN la.is_correct THEN 1 ELSE 0 END) AS correct
+           FROM lesson_answers la
+           WHERE la.id IN (
+               SELECT MIN(a2.id) FROM lesson_answers a2
+               JOIN lesson_steps ls ON ls.id=a2.step_id
+               WHERE ls.lesson_id=? AND a2.user_id=?
+               GROUP BY a2.step_id)""",
+        (lesson['id'], user_id),
+    ) or {}
+    total = summary.get('total') or 0
+    correct = summary.get('correct') or 0
+    accuracy = correct / total if total else 1.0
+
+    progress = db.select_one("lesson_progress", where={"user_id": user_id, "lesson_id": lesson['id']})
+    already_awarded = (progress or {}).get('xp_earned') or 0
+    base = lesson.get('xp_reward') or 30
+    earned = int(round(base * (0.6 + 0.4 * accuracy)))
+    xp_delta = max(0, earned - already_awarded)
+
+    payload = {
+        "is_completed": True,
+        "xp_earned": max(earned, already_awarded),
+        "completed_at": datetime.utcnow().isoformat(sep=" ", timespec="seconds"),
     }
+    if progress:
+        db.update("lesson_progress", payload, where={"id": progress['id']})
+    else:
+        db.insert("lesson_progress", {
+            "user_id": user_id, "lesson_id": lesson['id'], "current_step": 0,
+            "correct_count": correct, "attempt_count": total, **payload,
+        })
 
-    strengths = test_path_info.get("strengths", "")
-    weaknesses = test_path_info.get("weaknesses", "")
+    return jsonify({
+        "success": True,
+        "correct": correct,
+        "total": total,
+        "xp_earned": xp_delta,
+        "total_points": _award_xp(user_id, xp_delta) if xp_delta else None,
+        "recap": lesson.get('recap') or "",
+    })
 
-    test_focus = test_path_info.get("test_focus", "sat")
-    test_date_str = test_path_info.get("test_date")
-    hours_per_week = test_path_info.get("hours_per_week")
 
-    current_scores = {
-        "current_sat_ebrw": test_path_info.get("current_sat_ebrw"),
-        "current_sat_math": test_path_info.get("current_sat_math"),
-        "current_act_composite": test_path_info.get("current_act_composite"),
-        "current_act_math": test_path_info.get("current_act_math"),
-        "current_act_reading": test_path_info.get("current_act_reading"),
-        "current_act_science": test_path_info.get("current_act_science"),
-    }
-    desired_scores = {
-        "desired_sat": test_path_info.get("desired_sat"),
-        "desired_act": test_path_info.get("desired_act"),
-    }
+# --- In-context AI coach ---------------------------------------------------
 
-    all_tasks = db.select(
-        "paths", where={"user_id": user_id, "category": "Test Prep"})
-    path_history = {
-        "completed": [t for t in all_tasks if t['is_completed']],
-        "incomplete": [t for t in all_tasks if not t['is_completed']]
-    }
+_COACH_SYSTEM = (
+    "You are the Mentics tutor helping a student who is in the middle of a lesson or practice "
+    "question right now. You can see exactly what they are looking at. Explain the specific thing "
+    "in front of them, using their own question and answer choices. Be concrete: name the rule, "
+    "show the step, point at the words or numbers that decide it. Never tell them to go read "
+    "something else. Under 180 words. Plain markdown, no headings. Warm and direct."
+)
 
-    stat_history = _get_stat_history_for_prompt(user_id)
-    quiz_results = _get_quiz_results_for_prompt(user_id)
-    sprint_results = _get_sprint_results_for_prompt(user_id)
+_COACH_HINT_SYSTEM = (
+    "You are the Mentics tutor. The student is looking at a question they have NOT answered yet, "
+    "so you must NOT tell them which choice is correct and must not eliminate choices for them. "
+    "Give one nudge: name what the question is really testing and the first move to make. Ask them "
+    "a question back that points at the deciding detail. Under 120 words. Plain markdown, no "
+    "headings. Encouraging and specific."
+)
 
-    path_progress_context = _get_path_progress_context(user_id, "Test Prep")
-    tasks = _get_test_prep_ai_tasks(
-        strengths=strengths,
-        weaknesses=weaknesses,
-        test_focus=test_focus,
-        current_scores=current_scores,
-        desired_scores=desired_scores,
-        test_date_str=test_date_str,
-        hours_per_week=hours_per_week,
-        chat_history=chat_history,
-        path_history=path_history,
-        stat_history=stat_history,
-        quiz_results=quiz_results,
-        sprint_results=sprint_results,
-        path_progress_context=path_progress_context,
+
+@app.route('/api/coach', methods=['POST'])
+@login_required
+@rate_limit('80/hour', name='coach')
+def coach(user):
+    """Answer a question about the exact lesson step or item on the student's screen.
+
+    This is what connects the path to the Mentics chatbot: the student never has
+    to re-explain their context, because the server looks it up by id.
+    """
+    user_id = user.data['id']
+    data = request.get_json(silent=True) or {}
+    kind = data.get('kind')
+    message = str(data.get('message') or '').strip()[:600]
+    try:
+        ref_id = int(data.get('ref_id'))
+    except (TypeError, ValueError):
+        return jsonify({"error": "A reference is required."}), 400
+
+    # A question the student has not attempted yet gets a hint, never the answer.
+    # The player only offers the tutor after an attempt, but the endpoint must
+    # hold that line on its own.
+    context = ""
+    answered = True
+    if kind == 'lesson_step':
+        step = db.execute_for_one(
+            """SELECT ls.*, l.skill_label, l.subject FROM lesson_steps ls
+               JOIN lessons l ON l.id=ls.lesson_id
+               JOIN paths p ON p.id=l.task_id
+               WHERE ls.id=? AND p.user_id=?""",
+            (ref_id, user_id),
+        )
+        if not step:
+            return jsonify({"error": "That lesson step is not yours."}), 404
+        if step['step_type'] == 'check':
+            options = json.loads(step['options']) if step.get('options') else []
+            answered = bool(db.execute_for_one(
+                "SELECT id FROM lesson_answers WHERE user_id=? AND step_id=? LIMIT 1",
+                (user_id, ref_id),
+            ))
+            context = (
+                f"Skill: {step.get('skill_label')} ({step.get('subject')})\n"
+                f"Stimulus: {step.get('source_or_prompt') or 'none'}\n"
+                f"Question: {step.get('question_text')}\n"
+                f"Choices: {'; '.join(options)}\n"
+            )
+            if answered:
+                context += (
+                    f"Correct choice: {options[int(step['correct_option'] or 0)] if options else 'unknown'}\n"
+                    f"Existing explanation: {step.get('explanation')}"
+                )
+        else:
+            context = (
+                f"Skill: {step.get('skill_label')} ({step.get('subject')})\n"
+                f"Lesson card: {step.get('title')}\n"
+                f"{step.get('body')}\n"
+                f"Worked example: {step.get('worked_example')}"
+            )
+    elif kind in ('sprint', 'quiz'):
+        query, result_table = _ASSESSMENT_SOURCES[kind]
+        question = db.execute_for_one(query, (ref_id, user_id))
+        if not question:
+            return jsonify({"error": "That question is not yours."}), 404
+        options = json.loads(question['options'])
+        prior_query = {
+            'quiz_results': "SELECT id FROM quiz_results WHERE user_id=? AND question_id=? LIMIT 1",
+            'sprint_results': "SELECT id FROM sprint_results WHERE user_id=? AND question_id=? LIMIT 1",
+        }[result_table]
+        answered = bool(db.execute_for_one(prior_query, (user_id, ref_id)))
+        context = (
+            f"Skill: {question.get('skill_label')} ({question.get('subject')})\n"
+            f"Stimulus: {question.get('source_or_prompt') or 'none'}\n"
+            f"Question: {question.get('question_text')}\n"
+            f"Choices: {'; '.join(options)}\n"
+        )
+        if answered:
+            context += (
+                f"Correct choice: {options[int(question['correct_option'])]}\n"
+                f"Existing explanation: {question.get('explanation')}"
+            )
+    else:
+        return jsonify({"error": "Unsupported coaching context."}), 400
+
+    if not os.getenv("GEMINI_API_KEY"):
+        return jsonify({"reply": "The Mentics tutor is offline right now, but the written explanation below covers this step."})
+
+    prompt = (
+        f"# WHAT THE STUDENT IS LOOKING AT\n{context}\n\n"
+        f"# THEIR QUESTION\n{message or 'Explain this to me more clearly.'}\n\n"
+        + ("Answer their question about this exact item."
+           if answered else
+           "They have not answered yet. Nudge them toward the reasoning without revealing "
+           "which choice is correct.")
+    )
+    try:
+        reply = _generate_text(
+            prompt, max_output_tokens=600, thinking_level="minimal",
+            system_instruction=_COACH_SYSTEM if answered else _COACH_HINT_SYSTEM,
+        )
+    except Exception:
+        app.logger.exception("Coach reply failed for user %s", user_id)
+        return jsonify({"error": "I couldn't reach the tutor just now. Try again in a moment."}), 502
+    return jsonify({"reply": reply})
+
+
+def _build_learner_profile(user_id, test_path_info, chat_history):
+    """Assemble everything the lesson planner needs about one student."""
+    test_focus = (test_path_info.get("test_focus") or "sat").lower()
+    focus_label = {"act": "ACT", "both": "Digital SAT and ACT"}.get(test_focus, "Digital SAT")
+
+    current = []
+    for key, label in (
+        ("current_sat_ebrw", "SAT Reading & Writing"), ("current_sat_math", "SAT Math"),
+        ("current_act_composite", "ACT Composite"), ("current_act_math", "ACT Math"),
+        ("current_act_reading", "ACT Reading"), ("current_act_science", "ACT Science"),
+    ):
+        if test_path_info.get(key):
+            current.append(f"{label} {test_path_info[key]}")
+
+    goals = []
+    if test_path_info.get("desired_sat"):
+        goals.append(f"SAT {test_path_info['desired_sat']}")
+    if test_path_info.get("desired_act"):
+        goals.append(f"ACT {test_path_info['desired_act']}")
+
+    test_date_info = "Not set"
+    if test_path_info.get("test_date"):
+        try:
+            user_tz = ZoneInfo(session.get('timezone', 'UTC'))
+            test_date = datetime.strptime(test_path_info["test_date"], '%Y-%m-%d').date()
+            days = (test_date - datetime.now(user_tz).date()).days
+            test_date_info = f"{test_date.strftime('%B %d, %Y')} ({days} days away)" if days >= 0 \
+                else f"{test_date.strftime('%B %d, %Y')} (already passed)"
+        except (ValueError, ZoneInfoNotFoundError, KeyError):
+            test_date_info = "Not set"
+
+    mastery_rows = _get_mastery_rows(user_id)
+    taught = db.execute(
+        """SELECT DISTINCT skill_label FROM paths
+           WHERE user_id=? AND category='Test Prep' AND node_type='lesson'
+             AND is_completed=True AND skill_label IS NOT NULL LIMIT 15""",
+        (user_id,),
+    ) or []
+    taught_labels = [row["skill_label"] for row in taught if row.get("skill_label")]
+
+    latest_request = next(
+        (m['content'] for m in reversed(chat_history or []) if m.get('role') == 'user'),
+        "No specific request -- build the best next unit from the data.",
     )
 
-    tasks = _complete_five_step_plan(tasks, "Test Prep")
-    if len(tasks) != 5:
-        raise ValueError("Path generation must produce exactly five usable tasks.")
+    # A rough ability read so the teaching call pitches at the right level.
+    scores = [int(test_path_info[k]) for k in ("current_sat_ebrw", "current_sat_math")
+              if str(test_path_info.get(k) or "").isdigit()]
+    if scores:
+        average = sum(scores) / len(scores)
+        level_hint = ("advanced -- already scoring high, so target the hardest question types"
+                      if average >= 700 else
+                      "solid mid-range -- knows the basics, loses points on multi-step and trap questions"
+                      if average >= 550 else
+                      "building fundamentals -- needs the underlying concept before test tactics")
+    else:
+        level_hint = "unknown baseline -- teach the fundamentals clearly before advanced tactics"
 
-    saved_tasks = []
+    return {
+        "focus": test_focus,
+        "focus_label": focus_label,
+        "current_scores": ", ".join(current) or "Not provided",
+        "goal_scores": ", ".join(goals) or "Not specified",
+        "test_date": test_date_info,
+        "hours_per_week": test_path_info.get("hours_per_week") or "Not specified",
+        "strengths": test_path_info.get("strengths") or "None listed",
+        "weaknesses": test_path_info.get("weaknesses") or "None listed",
+        "mastery_summary": learning.format_mastery_summary(mastery_rows),
+        "recent_mistakes": _get_recent_mistakes_for_prompt(user_id),
+        "taught_skills": ", ".join(taught_labels) or "None yet",
+        "latest_request": latest_request,
+        "chat_history": _format_chat_history_for_prompt(chat_history or []),
+        "level_hint": level_hint,
+        "skill_options": learning.skill_catalog(test_focus),
+        "_mastery_rows": mastery_rows,
+        "_completed_lessons": len(taught_labels),
+    }
+
+
+def _official_examples_for_skill(skill):
+    """Give the question writer a few real official items to imitate."""
+    test_type = "ACT" if skill.get("test") == "ACT" else "SAT"
+    examples = _extract_official_examples_for_ai(
+        test_type, skill["subject"], skill["skill_label"], count=2
+    )
+    if not examples or examples.startswith("No official examples"):
+        return ""
+    return f"# OFFICIAL QUESTIONS TO MATCH IN STYLE AND DIFFICULTY\n{examples}\n"
+
+
+def _persist_unit(user_id, unit, category="Test Prep"):
+    """Write a generated unit to the database as the student's active path."""
+    saved = []
     with db.transaction() as transaction:
         transaction.update("paths", {"is_active": False}, where={
-            "user_id": user_id, "category": "Test Prep", "is_active": True,
+            "user_id": user_id, "category": category, "is_active": True,
             "is_user_added": False,
         })
-        for i, task in enumerate(tasks):
-            task_format = task.get("task_format", "link")
+
+        for index, node in enumerate(unit["nodes"]):
+            skill = node["skill"]
+            node_type = node["node_type"]
+            task_format = {
+                "lesson": "lesson", "practice_sprint": "practice_sprint",
+                "quiz": "quiz", "boss_battle": "boss_battle",
+            }[node_type]
+
+            description = node["title"]
+            if node_type == "boss_battle":
+                description = (
+                    f"Boss Battle: sit a full, timed official {node['test_name']} practice test on "
+                    f"{node['platform']}, then log your score. [Official practice]({node['resource_url']})"
+                )
+
             task_data = {
-                "user_id": user_id, "task_order": i + 1,
-                "description": task.get("description"), "reason": task.get("reason"),
-                "type": task.get("type"), "stat_to_update": task.get("stat_to_update"),
-                "category": "Test Prep", "is_active": True,
-                "is_completed": False, "task_format": task_format,
+                "user_id": user_id, "task_order": index + 1,
+                "description": description,
+                "reason": node["reason"],
+                "type": "milestone" if node_type == "boss_battle" else "standard",
+                "stat_to_update": node.get("stat_to_update"),
+                "category": category, "is_active": True, "is_completed": False,
+                "task_format": task_format,
+                "skill_key": skill["skill_key"], "skill_label": skill["skill_label"],
+                "subject": skill["subject"], "node_type": node_type,
+                "objective": node["objective"], "xp_reward": node["xp_reward"],
+                "unit_title": unit["unit_title"],
             }
             task_id = transaction.insert("paths", task_data)
 
-            if task_format == 'quiz' and task.get('quiz_content'):
-                quiz_id = transaction.insert("quizzes", {
-                    "task_id": task_id,
-                    "title": task['quiz_content'].get("title", "Quiz"),
+            if node_type == "lesson":
+                lesson_id = transaction.insert("lessons", {
+                    "task_id": task_id, "title": node["title"],
+                    "skill_key": skill["skill_key"], "skill_label": skill["skill_label"],
+                    "subject": skill["subject"], "objective": node["objective"],
+                    "intro": node["teaching"].get("intro", ""),
+                    "recap": node["teaching"].get("recap", ""),
+                    "xp_reward": node["xp_reward"],
                 })
-                for question in task['quiz_content'].get("questions", []):
+                for order, step in enumerate(node["steps"]):
+                    transaction.insert("lesson_steps", {
+                        "lesson_id": lesson_id, "step_order": order,
+                        "step_type": step["step_type"], "title": step.get("title", ""),
+                        "body": step.get("body", ""),
+                        "worked_example": step.get("worked_example", ""),
+                        "takeaway": step.get("takeaway", ""), "trap": step.get("trap", ""),
+                        "source_or_prompt": step.get("source_or_prompt", ""),
+                        "question_text": step.get("question_text", ""),
+                        "options": json.dumps(step.get("options")) if step.get("options") else None,
+                        "correct_option": step.get("correct_option"),
+                        "explanation": step.get("explanation", ""),
+                    })
+                transaction.update("paths", {"task_content_id": lesson_id}, where={"id": task_id})
+
+            elif node_type == "practice_sprint":
+                sprint_id = transaction.insert("practice_sprints", {
+                    "task_id": task_id, "title": node["title"],
+                })
+                for question in node["questions"]:
+                    transaction.insert("sprint_questions", {
+                        "sprint_id": sprint_id,
+                        "source_or_prompt": question["source_or_prompt"],
+                        "question_text": question["question_text"],
+                        "options": json.dumps(question["options"]),
+                        "correct_option": question["correct_option"],
+                        "explanation": question["explanation"],
+                        "skill_key": question.get("skill_key") or skill["skill_key"],
+                        "difficulty": question.get("difficulty", "medium"),
+                    })
+                transaction.update("paths", {"task_content_id": sprint_id}, where={"id": task_id})
+
+            elif node_type == "quiz":
+                quiz_id = transaction.insert("quizzes", {
+                    "task_id": task_id, "title": node["title"],
+                })
+                for question in node["questions"]:
                     transaction.insert("quiz_questions", {
                         "quiz_id": quiz_id,
-                        "source_or_prompt": question.get("source_or_prompt"),
-                        "question_text": question.get("question_text"),
-                        "options": json.dumps(question.get("options")),
-                        "correct_option": question.get("correct_option"),
-                        "explanation": question.get("explanation"),
+                        "source_or_prompt": question["source_or_prompt"],
+                        "question_text": question["question_text"],
+                        "options": json.dumps(question["options"]),
+                        "correct_option": question["correct_option"],
+                        "explanation": question["explanation"],
+                        "skill_key": question.get("skill_key") or skill["skill_key"],
+                        "difficulty": question.get("difficulty", "medium"),
                     })
                 transaction.update("paths", {"task_content_id": quiz_id}, where={"id": task_id})
 
-            elif task_format == 'practice_sprint' and task.get('sprint_content') and task.get('strategy_article'):
-                sprint_id = transaction.insert("practice_sprints", {
-                    "task_id": task_id,
-                    "title": task['sprint_content'].get("title", "Practice Sprint"),
-                })
-                for question in task['sprint_content'].get("questions", []):
-                    transaction.insert("sprint_questions", {
-                        "sprint_id": sprint_id,
-                        "question_text": question.get("question_text"),
-                        "options": json.dumps(question.get("options")),
-                        "correct_option": question.get("correct_option"),
-                        "explanation": question.get("explanation"),
-                    })
-                article_id = transaction.insert("strategy_articles", {
-                    "task_id": task_id,
-                    "title": task['strategy_article'].get("title"),
-                    "content": task['strategy_article'].get("content"),
-                })
-                transaction.update("paths", {
-                    "task_content_id": sprint_id,
-                    "secondary_content_id": article_id,
-                }, where={"id": task_id})
-
-            saved_tasks.append({**task_data, "id": task_id})
+            saved.append({**task_data, "id": task_id})
 
         transaction.insert("activity_log", {
-            "user_id": user_id,
-            "activity_type": "path_generated",
-            "details": json.dumps({"category": "Test Prep"}),
+            "user_id": user_id, "activity_type": "path_generated",
+            "details": json.dumps({"category": category, "unit": unit["unit_title"]}),
         })
-    return saved_tasks
+    return saved
 
 
-def _get_test_prep_ai_chat_response(history, user_stats, stat_history="", quiz_results="", sprint_results="", user_id=None):
+def _generate_and_save_new_test_path(user_id, test_path_info, chat_history=None):
+    """Build the next adaptive unit: plan once, then generate every node's content.
+
+    Content generation is fanned out across several small Gemini calls rather
+    than one large one. A node whose content call fails is downgraded to a
+    format that still works instead of poisoning the whole path.
+    """
+    profile = _build_learner_profile(user_id, test_path_info or {}, chat_history or [])
+    shape = learning.choose_shape(profile["_mastery_rows"], profile["_completed_lessons"])
+
+    unit = learning.build_unit(
+        profile, shape=shape, official_examples_fn=_official_examples_for_skill,
+    )
+
+    # A drill node with no questions is worse than useless, so fall back to
+    # whatever official questions exist before giving up on the node.
+    for node in unit["nodes"]:
+        if node["node_type"] in ("practice_sprint", "quiz") and not node.get("questions"):
+            skill = node["skill"]
+            test_type = "ACT" if skill.get("test") == "ACT" else "SAT"
+            wanted = learning.EXERCISE_COUNT[node["node_type"]]
+            official = _get_official_questions_for_topic(
+                test_type, skill["subject"], skill["skill_label"], limit=wanted
+            )
+            node["questions"] = [{
+                "source_or_prompt": q.get("source_or_prompt") or "Official practice question.",
+                "question_text": q["question_text"], "options": q["options"],
+                "correct_option": q["correct_option"],
+                "explanation": q.get("explanation") or "Review the concept and retry a similar question.",
+                "difficulty": "medium",
+            } for q in official]
+
+    # Any drill still empty becomes a lesson on the same skill, so the student
+    # always receives teaching rather than an empty node.
+    for node in unit["nodes"]:
+        if node["node_type"] in ("practice_sprint", "quiz") and not node.get("questions"):
+            app.logger.warning(
+                "No questions available for %s node on %s; converting to a lesson.",
+                node["node_type"], node["skill"]["skill_key"],
+            )
+            node["node_type"] = "lesson"
+            node["xp_reward"] = learning.XP_BY_NODE["lesson"]
+            teaching = learning._fallback_teaching(node)
+            node["teaching"] = teaching
+            node["steps"] = learning._interleave_lesson(teaching, [])
+
+    saved = _persist_unit(user_id, unit, "Test Prep")
+    if len(saved) != 5:
+        raise ValueError("Path generation must produce exactly five usable steps.")
+    return saved
+
+
+def _get_test_prep_ai_chat_response(history, user_stats, stat_history="", user_id=None):
     if not os.getenv("GEMINI_API_KEY"):
         return "I'm in testing mode, but I'm saving our conversation!"
+
+    # Gathered here rather than passed in: an earlier signature took these as
+    # positional arguments and the call site shifted user_id into the quiz slot,
+    # which silently blinded the coach to the student's own path.
+    quiz_results = _get_quiz_results_for_prompt(user_id) if user_id else "No quiz data yet."
+    sprint_results = _get_sprint_results_for_prompt(user_id) if user_id else "No sprint data yet."
+    mastery_summary = learning.format_mastery_summary(_get_mastery_rows(user_id)) if user_id else "No graded work yet."
 
     test_path_info = user_stats.get("test_path", {})
     test_focus = test_path_info.get("test_focus", "not specified")
@@ -1900,7 +1910,7 @@ def _get_test_prep_ai_chat_response(history, user_stats, stat_history="", quiz_r
 
         "# MENTICS APPLICATION CONTEXT\n"
         "To answer user questions accurately, you must understand the app's key features:\n"
-        "- **AI Path Generation**: The core of Mentics. The app generates a visual, step-by-step roadmap of tasks for the student to follow for test prep and college planning.\n"
+        "- **AI Path Generation**: The core of Mentics. Each test-prep path is a five-node unit shaped like a language-app unit: a Lesson that teaches a skill card by card with checks along the way, a Practice drill on that skill, a second Lesson, a cumulative Review, and finally a Boss Battle that sends the student to a full official practice test. Every node except the Boss Battle contains its own content inside Mentics.\n"
         "- **AI Assistant (Your Role)**: You are the chat interface. You help users when they are stuck on a task, provide encouragement, and offer deeper explanations.\n"
         "- **Stats & Tracker**: A dashboard where users input their scores (GPA, SAT, ACT) and track their progress over time with charts.\n"
         "- **Gamification**: The app includes points and streaks for completing tasks to keep users motivated.\n"
@@ -1921,6 +1931,7 @@ def _get_test_prep_ai_chat_response(history, user_stats, stat_history="", quiz_r
         f"- Estimated Weekly Study Time: {hours_per_week} hours\n"
         f"- Historical Performance Data (from Tracker): {stat_history}\n"
         f"- Current Active Tasks (numbered):\n{current_tasks}\n\n"
+        f"## MEASURED SKILL MASTERY (from lessons, practice, and reviews inside Mentics)\n{mastery_summary}\n\n"
         f"## RECENT QUIZ PERFORMANCE (Incorrect Answers)\n{quiz_results}\n\n"
 
         f"## RECENT SPRINT PERFORMANCE (Incorrect Answers)\n{sprint_results}\n\n"
@@ -1930,7 +1941,7 @@ def _get_test_prep_ai_chat_response(history, user_stats, stat_history="", quiz_r
         "0.  **Initial Greeting**: Your first reply must be a warm, concise welcome. Mention once that the student can ask naturally to regenerate, replace, or refocus their path and include the focus they want.\n"
         "1.  **Primary Goal: Path & App Support**: Your main purpose is to help the user with their current, active Path. Answer their questions about specific tasks, why they were assigned, and how to approach them. You must also be able to answer general questions about using the Mentics application's features as described above.\n"
         f"2.  **Path Regeneration Protocol**: If the student asks to regen, regenerate, replace, rebuild, redo, refocus, or create a path—even in casual language or as a follow-up to an earlier request—respond with exactly `{PATH_REGENERATION_CONTROL}` and nothing else. Mentics will use that private control response to perform the update. Never say you lack access to the backend, dashboard, path, or app. If the student is only exploring an idea and has not asked to change the path, coach them normally.\n"
-        "3.  **Provide High-Quality Resources**: When a student is stuck or asks for help, provide specific, reputable, and free resources using markdown links (e.g., `[Khan Academy](https://...)`, official practice test PDFs, specific educational YouTube videos).\n"
+        "3.  **Teach It Yourself**: Mentics paths carry their own lessons, practice, and reviews, so the student never needs to hunt for material. When they are stuck, TEACH the concept directly here with a concrete worked example, and point them at the specific step of their path that drills it. Only link outside Mentics for full-length official practice tests (College Board Bluebook, official ACT). Never answer with 'go read an article about this'.\n"
         "4.  **Actionable Focus**: Every response must provide a clear next step, a useful tip, or actionable guidance. Never leave the user wondering what to do next.\n"
         "5.  **Adaptive Response Length**: \n"
         "    - For quick questions, provide short, concise answers KEEP THESE UNDER 100 WORDS).\n"
@@ -2372,10 +2383,37 @@ Recent notable entries:
 
 @app.route('/api/tracker-analysis')
 @login_required
+@rate_limit('20/hour', name='tracker_analysis', message='Tracker analysis is limited while it studies your data. Try again shortly.')
 def tracker_analysis(user):
     analysis_text = _get_tracker_ai_analysis(user)
     return jsonify({"analysis": analysis_text})
 # --- Standard Routes ---
+
+
+SSR_DIR = Path(app.root_path) / 'templates' / 'ssr'
+_SSR_CACHE = {}
+
+
+def _prerendered_markup(page):
+    """Return build-time HTML for a public page, or None to render client-side.
+
+    Prerendered markup is what crawlers and the first paint see; React hydrates
+    it on load. Pages built per-session are deliberately absent here.
+    """
+    if page not in seo.PUBLIC_PAGES:
+        return None
+    if page in _SSR_CACHE:
+        return _SSR_CACHE[page]
+    candidate = SSR_DIR / f'{page}.html'
+    try:
+        # Guard against a page name escaping the SSR directory.
+        candidate.resolve().relative_to(SSR_DIR.resolve())
+        markup = candidate.read_text(encoding='utf-8')
+    except (OSError, ValueError):
+        markup = None
+    if is_production:
+        _SSR_CACHE[page] = markup
+    return markup
 
 
 def render_react(page, bootstrap=None, title=None, status=200):
@@ -2383,14 +2421,29 @@ def render_react(page, bootstrap=None, title=None, status=200):
     data = dict(bootstrap or {})
     data['csrfToken'] = _csrf_token()
     g.csp_nonce = secrets.token_urlsafe(18)
+    meta = seo.page_meta(page, title)
     return render_template(
         "react_app.html",
         page=page,
         bootstrap=data,
-        title=title or "Mentics",
+        title=meta['title'],
+        meta=meta,
+        structured_data=seo.structured_data() if page == 'landing' else None,
+        site_verification=os.getenv('GOOGLE_SITE_VERIFICATION', ''),
+        prerendered=_prerendered_markup(page),
         csp_nonce=g.csp_nonce,
         asset_version=os.getenv('VERCEL_GIT_COMMIT_SHA', 'dev')[:12],
     ), status
+
+
+@app.route('/robots.txt')
+def robots():
+    return Response(seo.robots_txt(), mimetype='text/plain')
+
+
+@app.route('/sitemap.xml')
+def sitemap():
+    return Response(seo.sitemap_xml(), mimetype='application/xml')
 
 
 def _optional_number(value, minimum, maximum, label, *, integer=True):
@@ -2425,6 +2478,10 @@ def home():
 @app.route("/signup", methods=["GET", "POST"])
 def signup():
     if request.method == "POST":
+        allowed, retry_after = ratelimit.check(SIGNUP_LIMIT, name='signup')
+        if not allowed:
+            return ratelimit.too_many(
+                retry_after, 'Too many accounts created from this location. Please try again later.')
         email = request.form.get("email", "").strip().lower()[:254]
         name = request.form.get("name", "").strip()[:100]
         raw_password = request.form.get("password", "")
@@ -2459,17 +2516,45 @@ def signup():
     return render_react("signup", title="Create Account | Mentics")
 
 
+# Verifying this throwaway hash costs the same as verifying a real one, so a
+# failed sign-in takes the same time whether or not the address has an account.
+# Without it, response timing reveals which emails are registered.
+_DUMMY_PASSWORD_HASH = generate_password_hash(secrets.token_hex(16))
+
+LOGIN_IP_LIMIT = os.getenv('RATE_LIMIT_LOGIN_IP', '10/minute')
+LOGIN_IP_HOURLY_LIMIT = os.getenv('RATE_LIMIT_LOGIN_IP_HOURLY', '50/hour')
+LOGIN_ACCOUNT_LIMIT = os.getenv('RATE_LIMIT_LOGIN_ACCOUNT', '8/hour')
+SIGNUP_LIMIT = os.getenv('RATE_LIMIT_SIGNUP', '5/hour')
+
+
 @app.route("/login", methods=["GET", "POST"])
 def login():
     if "user" in session:
         return redirect(url_for("dashboard"))
     error = None
     if request.method == "POST":
-        email = request.form.get("email", "").strip().lower()
+        email = request.form.get("email", "").strip().lower()[:254]
         password = request.form.get("password", "")
 
-        user_record = db.select_one("users", where={"email": email})
-        if len(password) <= 128 and user_record and check_password_hash(user_record['password'], password):
+        # Throttle the source first, then the targeted account. The per-account
+        # bucket is what stops credential stuffing that rotates through proxies.
+        for rule, name in ((LOGIN_IP_LIMIT, 'login_ip'), (LOGIN_IP_HOURLY_LIMIT, 'login_ip_hourly')):
+            allowed, retry_after = ratelimit.check(rule, name=name)
+            if not allowed:
+                return ratelimit.too_many(
+                    retry_after, 'Too many sign-in attempts. Please wait before trying again.')
+        if email:
+            allowed, retry_after = ratelimit.check(
+                LOGIN_ACCOUNT_LIMIT, name='login_account', key=f'e{email}')
+            if not allowed:
+                return ratelimit.too_many(
+                    retry_after,
+                    'This account has had too many failed sign-in attempts. Please wait before trying again.')
+
+        user_record = db.select_one("users", where={"email": email}) if email else None
+        stored_hash = user_record['password'] if user_record else _DUMMY_PASSWORD_HASH
+        password_ok = len(password) <= 128 and check_password_hash(stored_hash, password)
+        if user_record and password_ok:
             session.clear()
             session["user"] = user_record['email']
             session["user_id"] = user_record['id']
@@ -2482,6 +2567,7 @@ def login():
 
 
 @app.route('/google-login')
+@rate_limit('20/hour', name='google_login')
 def google_login():
     # Preview URLs are unique per Vercel deployment and cannot be registered
     # permanently with Google. Start the flow on production so the OAuth state
@@ -2497,22 +2583,41 @@ def google_login():
 
 
 @app.route('/authorize')
+@rate_limit('20/hour', name='oauth_callback')
 def authorize():
     google_oauth = _get_oauth().google
-    token = google_oauth.authorize_access_token()
-    user_info = google_oauth.parse_id_token(token, nonce=session.get('nonce'))
+    try:
+        # authorize_access_token() validates state, exchanges the code, and
+        # verifies the ID token signature and nonce. A failure here means the
+        # callback was forged, replayed, or expired.
+        token = google_oauth.authorize_access_token()
+    except Exception as error:
+        app.logger.warning("Rejected Google OAuth callback: %s", error)
+        return render_react(
+            "login", {"error": "Google sign-in could not be completed. Please try again."},
+            "Sign In | Mentics", 400)
 
-    user_record = db.select_one("users", where={"email": user_info['email']})
+    user_info = token.get('userinfo') or {}
+    email = str(user_info.get('email') or '').strip().lower()[:254]
+    # Google will happily issue a token for an unverified address. Accepting one
+    # would let someone claim an account belonging to an email they do not own.
+    if not email or not user_info.get('email_verified'):
+        return render_react(
+            "login", {"error": "Your Google account needs a verified email address to sign in."},
+            "Sign In | Mentics", 400)
+    display_name = str(user_info.get('name') or email.split('@')[0]).strip()[:100]
+
+    user_record = db.select_one("users", where={"email": email})
 
     if user_record:
         authenticated_email = user_record['email']
         authenticated_id = user_record['id']
     else:
 
-        password_hash = generate_password_hash(os.urandom(16).hex())
+        password_hash = generate_password_hash(secrets.token_hex(32))
         user_id = db.insert("users", {
-            "email": user_info['email'],
-            "name": user_info['name'],
+            "email": email,
+            "name": display_name,
             "password": password_hash,
             "stats": json.dumps({
                 "sat_ebrw": "", "sat_math": "", "act_math": "",
@@ -2522,7 +2627,7 @@ def authorize():
         db.insert("gamification_stats", {
                   "user_id": user_id, "points": 0, "current_streak": 0})
 
-        authenticated_email = user_info['email']
+        authenticated_email = email
         authenticated_id = user_id
 
     session.clear()
@@ -2570,6 +2675,7 @@ def onboarding(user):
 
 
 @app.route('/set-timezone', methods=['POST'])
+@rate_limit('30/hour', name='set_timezone')
 def set_timezone():
     data = request.get_json(silent=True) or {}
     timezone = data.get('timezone')
@@ -2787,6 +2893,7 @@ def dashboard(user):
 
 @app.route("/api/get-suggestion")
 @login_required
+@rate_limit('40/hour', name='suggestion')
 def get_suggestion(user):
     """A new route to fetch the AI suggestion asynchronously."""
     today = datetime.now(ZoneInfo("UTC")).date().isoformat()
@@ -2800,6 +2907,7 @@ def get_suggestion(user):
 
 @app.route('/account', methods=['GET', 'POST'])
 @login_required
+@rate_limit('20/hour', name='account_update', methods={'POST'})
 def account(user):
     if request.method == 'POST':
         form_type = request.form.get('form_type')
@@ -2859,6 +2967,7 @@ def account(user):
 
 @app.route("/dashboard/test-path-builder", methods=["GET", "POST"])
 @login_required
+@rate_limit('12/hour', name='test_path_build', methods={'POST'}, message='Path generation is limited to a few runs an hour. Try again shortly.')
 def test_path_builder(user):
     stats = user.get_stats()
 
@@ -2918,6 +3027,7 @@ def test_path_view(user):
 
 @app.route("/dashboard/college-path-builder", methods=["GET", "POST"])
 @login_required
+@rate_limit('12/hour', name='college_path_build', methods={'POST'}, message='Path generation is limited to a few runs an hour. Try again shortly.')
 def college_path_builder(user):
     stats = user.get_stats()
     if request.method == "POST":
@@ -3055,6 +3165,7 @@ def edit_stats(user):
 
 @app.route('/api/submit_quiz_results', methods=['POST'])
 @login_required
+@rate_limit('60/hour', name='quiz_results')
 def submit_quiz_results(user):
     data = request.get_json(silent=True) or {}
     try:
@@ -3149,7 +3260,16 @@ def api_tasks(user):
                     "is_user_added": bool(r['is_user_added']),
                     "subtasks": subtasks,
                     "task_format": r.get('task_format', 'link'),
-                    "task_content_id": r.get('task_content_id')
+                    "task_content_id": r.get('task_content_id'),
+                    # Paths generated before the lesson engine kept their guide in
+                    # a separate article, which the step still links to.
+                    "secondary_content_id": r.get('secondary_content_id'),
+                    "node_type": r.get('node_type'),
+                    "skill_label": r.get('skill_label'),
+                    "subject": r.get('subject'),
+                    "objective": r.get('objective'),
+                    "xp_reward": r.get('xp_reward') or 10,
+                    "unit_title": r.get('unit_title'),
                 })
             return jsonify(tasks_with_subtasks)
 
@@ -3161,6 +3281,7 @@ def api_tasks(user):
 
 @app.route('/api/quiz/<int:task_id>')
 @login_required
+@rate_limit('60/hour', name='quiz')
 def get_quiz(user, task_id):
 
     task_info = db.select(
@@ -3287,9 +3408,11 @@ def api_update_task_status(user):
                      'description': description, 'category': category})
 
         # --- GAMIFICATION LOGIC ---
-        points_to_add = 25 if task_type == 'milestone' else 10
+        # Lesson and drill nodes carry their own XP value; older rows and
+        # personal steps fall back to the original flat award.
+        points_to_add = task_info.get('xp_reward') or (25 if task_type == 'milestone' else 10)
         if "boss battle" in description.lower():
-            points_to_add = 100
+            points_to_add = max(points_to_add, 100)
 
         game_stats_rows = db.select(
             "gamification_stats", where={"user_id": user_id})
@@ -3376,15 +3499,34 @@ def _is_path_regeneration_control(reply):
     return cleaned == PATH_REGENERATION_CONTROL
 
 
+IMPORT_TOKEN = os.getenv("IMPORT_API_TOKEN")
+MAX_IMPORT_BATCH = 500
+
+
 @app.route("/api/import_official_questions", methods=['POST'])
+@rate_limit('10/hour', name='question_import')
 def import_official_questions():
-    """Bulk import official SAT/ACT questions. Format: JSON array of question objects."""
+    """Bulk import official SAT/ACT questions. Format: JSON array of question objects.
+
+    This writes directly into the shared question bank, so it is an operator
+    tool, not a user-facing endpoint. It stays closed unless IMPORT_API_TOKEN is
+    configured, and the token is compared in constant time.
+    """
+    if not IMPORT_TOKEN:
+        return jsonify({"error": "Question import is not enabled."}), 404
+    supplied = request.headers.get("X-Import-Token", "")
+    if not hmac.compare_digest(supplied, IMPORT_TOKEN):
+        return jsonify({"error": "Not authorized."}), 401
     try:
         data = request.get_json(silent=True) or {}
         questions = data.get("questions", [])
-        
+
         if not isinstance(questions, list):
             return jsonify({"error": "Questions must be an array"}), 400
+        if len(questions) > MAX_IMPORT_BATCH:
+            return jsonify({
+                "error": f"Send at most {MAX_IMPORT_BATCH} questions per request."
+            }), 413
         
         imported_count = 0
         errors = []
@@ -3412,22 +3554,26 @@ def import_official_questions():
                     "source_or_prompt": q.get('source_or_prompt', ''),
                 })
                 imported_count += 1
-            except Exception as e:
-                errors.append(f"Question {idx}: {str(e)}")
-        
+            except Exception as error:
+                app.logger.warning("Question import rejected row %s: %s", idx, error)
+                errors.append(f"Question {idx}: could not be imported")
+
         return jsonify({
             "success": imported_count > 0,
             "imported": imported_count,
             "total": len(questions),
             "errors": errors if errors else None
         }), 200 if imported_count > 0 else 400
-    
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
+
+    except Exception as error:
+        app.logger.exception("Question import failed: %s", error)
+        return jsonify({"error": "Import failed."}), 500
 
 
 @app.route("/api/chat", methods=['POST'])
 @login_required
+@rate_limit('8/minute', name='chat_burst')
+@rate_limit('60/hour', name='chat', message='You have reached the coaching limit for this hour. Your conversation is saved.')
 def api_chat(user):
     user_id = user.data['id']
     stats = user.get_stats()
@@ -3502,6 +3648,7 @@ def get_chat_history(user):
 
 @app.route('/api/reset_chat', methods=['POST'])
 @login_required
+@rate_limit('20/hour', name='reset_chat')
 def reset_chat_history(user):
     user_id = user.data['id']
     data = request.get_json(silent=True) or {}
@@ -3519,6 +3666,7 @@ def reset_chat_history(user):
 
 @app.route("/api/update_stats", methods=['POST'])
 @login_required
+@rate_limit('60/hour', name='update_stats')
 def api_update_stats(user):
     data = request.get_json(silent=True) or {}
     stat_name = data.get("stat_name")
@@ -3577,6 +3725,7 @@ def api_update_stats(user):
 
 @app.route('/api/add_task', methods=['POST'])
 @login_required
+@rate_limit('60/hour', name='add_task')
 def add_task(user):
     user_id = user.data['id']
     data = request.get_json(silent=True) or {}
@@ -3633,6 +3782,7 @@ def add_task(user):
 
 @app.route('/api/add_subtask', methods=['POST'])
 @login_required
+@rate_limit('100/hour', name='add_subtask')
 def add_subtask(user):
     data = request.get_json(silent=True) or {}
     parent_task_id = data.get('parent_task_id')
@@ -3713,6 +3863,7 @@ def update_subtask(user):
 
 @app.route('/api/analyze_essay', methods=['POST'])
 @login_required
+@rate_limit('12/hour', name='essay', message='Essay reviews are limited to twelve an hour so feedback stays thorough.')
 def analyze_essay(user):
     data = request.get_json(silent=True) or {}
     essay_text = data.get('essay_text')
@@ -3872,6 +4023,7 @@ def forum(user):
 
 @app.route('/api/posts', methods=['POST'])
 @login_required
+@rate_limit('10/hour', name='forum_post', message='You have posted several discussions recently. Give others a moment to reply.')
 def create_post(user):
     data = request.get_json(silent=True) or {}
     title = data.get('title')
@@ -3893,9 +4045,13 @@ def create_post(user):
 
 @app.route('/api/replies', methods=['POST'])
 @login_required
+@rate_limit('30/hour', name='forum_reply')
 def create_reply(user):
     data = request.get_json(silent=True) or {}
-    post_id = data.get('post_id')
+    try:
+        post_id = int(data.get('post_id'))
+    except (TypeError, ValueError):
+        post_id = None
     content = data.get('content')
     if post_id and content:
         if not db.select_one('forum_posts', where={'id': post_id}):
@@ -3929,6 +4085,9 @@ if not DATABASE:
     DATABASE = os.path.join(app.instance_path, 'users.db')
 
 db = DatabaseHandler(DATABASE)
+# Counters share the application database so limits hold across serverless
+# invocations. Set RATE_LIMITS_ENABLED=0 only for local load testing.
+ratelimit.init_app(app, db, enabled=os.getenv('RATE_LIMITS_ENABLED', '1') != '0')
 
 if not is_production or os.getenv('INIT_DB_ON_STARTUP') == '1':
     with app.app_context():

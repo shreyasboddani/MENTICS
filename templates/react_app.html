@@ -3,18 +3,54 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <meta name="theme-color" content="#211a47">
-  <meta name="description" content="Mentics turns high school ambition into a focused, personalized path.">
+  <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#151033" media="(prefers-color-scheme: dark)">
   <title>{{ title or 'Mentics' }}</title>
+  <meta name="description" content="{{ meta.description }}">
+
+  {# Private pages must never enter the index, and previews must never compete
+     with production for the same queries. #}
+  {% if meta.indexable %}
+  <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1">
+  <link rel="canonical" href="{{ meta.canonical }}">
+  {% else %}
+  <meta name="robots" content="noindex, nofollow">
+  {% endif %}
+  {% if site_verification %}
+  <meta name="google-site-verification" content="{{ site_verification }}">
+  {% endif %}
+
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="Mentics">
+  <meta property="og:title" content="{{ title or 'Mentics' }}">
+  <meta property="og:description" content="{{ meta.description }}">
+  {% if meta.canonical %}<meta property="og:url" content="{{ meta.canonical }}">{% endif %}
+  <meta property="og:image" content="{{ url_for('static', filename='og-cover.png', _external=True) }}">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:type" content="image/png">
+  <meta property="og:image:alt" content="Mentics — stop guessing, start achieving.">
+  <meta property="og:locale" content="en_US">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="{{ title or 'Mentics' }}">
+  <meta name="twitter:description" content="{{ meta.description }}">
+  <meta name="twitter:image" content="{{ url_for('static', filename='og-cover.png', _external=True) }}">
+
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="preload" href="{{ url_for('static', filename='react/fonts/lalezar-latin.woff2') }}" as="font" type="font/woff2" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="icon" href="{{ url_for('static', filename='favicon.svg') }}" type="image/svg+xml">
   <link rel="stylesheet" href="{{ url_for('static', filename='react/app.css', v=asset_version) }}">
+
+  {% if structured_data %}
+  <script type="application/ld+json" nonce="{{ csp_nonce }}">{{ structured_data|tojson }}</script>
+  {% endif %}
 </head>
 <body>
-  <div id="root"></div>
+  {# Prerendered markup for public pages; React hydrates it. Signed-in pages
+     start empty and mount client-side. #}
+  <div id="root">{% if prerendered %}{{ prerendered|safe }}{% endif %}</div>
   <script nonce="{{ csp_nonce }}">
     window.__MENTICS__ = {{ {"page": page, "data": bootstrap}|tojson }};
   </script>

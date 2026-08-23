@@ -1,0 +1,682 @@
+/* Duolingo-style lesson and practice player.
+   Full-surface, one step at a time, with the primary action always in the same
+   place so the student builds muscle memory instead of hunting for a button. */
+
+.player-wrap {
+  position: fixed;
+  inset: 0;
+  z-index: 120;
+  display: flex;
+  justify-content: center;
+  background: var(--surface-page, #f6f5fb);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  animation: player-in .22s ease-out;
+}
+
+@keyframes player-in {
+  from { opacity: 0; transform: translateY(10px) }
+  to { opacity: 1; transform: none }
+}
+
+.player {
+  width: min(760px, 100%);
+  display: flex;
+  flex-direction: column;
+  min-height: 100%;
+  padding: 0 20px 40px;
+}
+
+/* --- Top bar ------------------------------------------------------------ */
+
+.player-bar {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 18px 0 14px;
+  background: linear-gradient(var(--surface-page, #f6f5fb) 70%, transparent);
+}
+
+.player-quit {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  border: 0;
+  border-radius: 12px;
+  background: rgba(15, 12, 40, .06);
+  color: #4a4560;
+  cursor: pointer;
+  transition: background .15s ease;
+}
+
+.player-quit:hover { background: rgba(15, 12, 40, .12) }
+.player-quit svg { width: 19px; height: 19px }
+
+.player-progress {
+  flex: 1;
+  height: 15px;
+  border-radius: 99px;
+  background: rgba(15, 12, 40, .09);
+  overflow: hidden;
+}
+
+.player-progress > span {
+  display: block;
+  height: 100%;
+  border-radius: 99px;
+  background: linear-gradient(90deg, #8b5cf6, #6366f1);
+  transition: width .4s cubic-bezier(.22, 1, .36, 1);
+}
+
+.player-hearts,
+.player-xp {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 15px;
+  font-weight: 700;
+  color: #4a4560;
+}
+
+.player-hearts svg,
+.player-xp svg { width: 18px; height: 18px }
+.player-hearts { color: #e0407a }
+.player-hearts.low { animation: heart-pulse 1s ease-in-out infinite }
+.player-xp { color: #a855f7 }
+
+@keyframes heart-pulse {
+  50% { transform: scale(1.12) }
+}
+
+/* --- Body --------------------------------------------------------------- */
+
+.player-body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  padding-top: 8px;
+}
+
+.player-kicker {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: .09em;
+  text-transform: uppercase;
+  color: #8b83a8;
+  margin-bottom: 14px;
+}
+
+.lesson-intro {
+  padding: 18px 20px;
+  margin-bottom: 22px;
+  border-radius: 16px;
+  background: rgba(139, 92, 246, .07);
+  border: 1px solid rgba(139, 92, 246, .16);
+}
+
+.lesson-objective {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 13px;
+  font-weight: 700;
+  color: #6d28d9;
+  margin-bottom: 8px;
+}
+
+.lesson-objective svg { width: 16px; height: 16px }
+.lesson-intro .markdown { font-size: 15px; color: #4a4560 }
+
+/* --- Teaching card ------------------------------------------------------ */
+
+.teach-step h3 {
+  font-size: clamp(24px, 4vw, 31px);
+  line-height: 1.2;
+  letter-spacing: -.02em;
+  margin: 0 0 16px;
+  color: #1a1630;
+}
+
+.teach-step .markdown {
+  font-size: 17px;
+  line-height: 1.62;
+  color: #2f2a45;
+}
+
+.teach-example,
+.teach-takeaway,
+.teach-trap {
+  margin-top: 18px;
+  border-radius: 14px;
+  padding: 16px 18px;
+}
+
+.teach-example {
+  background: #fff;
+  border: 1px solid rgba(15, 12, 40, .1);
+  box-shadow: 0 1px 3px rgba(15, 12, 40, .04);
+}
+
+.teach-example > small {
+  display: block;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .1em;
+  color: #8b83a8;
+  margin-bottom: 8px;
+}
+
+.teach-example .markdown { font-size: 15.5px; line-height: 1.6 }
+
+.teach-takeaway,
+.teach-trap {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  font-size: 15.5px;
+  line-height: 1.55;
+}
+
+.teach-takeaway {
+  background: rgba(16, 185, 129, .09);
+  border: 1px solid rgba(16, 185, 129, .22);
+  color: #065f46;
+}
+
+.teach-trap {
+  background: rgba(245, 158, 11, .1);
+  border: 1px solid rgba(245, 158, 11, .25);
+  color: #7c4a03;
+}
+
+.teach-takeaway svg,
+.teach-trap svg { flex: none; width: 19px; height: 19px; margin-top: 1px }
+.teach-takeaway p, .teach-trap p { margin: 0 }
+
+/* --- Check / question --------------------------------------------------- */
+
+.check-replay {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  margin-bottom: 16px;
+  border-radius: 99px;
+  font-size: 13px;
+  font-weight: 600;
+  background: rgba(245, 158, 11, .12);
+  color: #7c4a03;
+}
+
+.check-replay svg { width: 15px; height: 15px }
+
+.check-source {
+  padding: 18px 20px;
+  margin-bottom: 20px;
+  border-radius: 14px;
+  background: #fff;
+  border: 1px solid rgba(15, 12, 40, .1);
+}
+
+.check-source > small {
+  display: block;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .1em;
+  color: #8b83a8;
+  margin-bottom: 9px;
+}
+
+.check-source .markdown {
+  font-size: 16px;
+  line-height: 1.65;
+  color: #2f2a45;
+}
+
+.check-question {
+  font-size: clamp(19px, 3vw, 23px);
+  line-height: 1.36;
+  font-weight: 650;
+  letter-spacing: -.01em;
+  color: #1a1630;
+  margin: 0 0 20px;
+}
+
+.check-options {
+  display: grid;
+  gap: 11px;
+}
+
+.check-option {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+  padding: 15px 17px;
+  text-align: left;
+  font: inherit;
+  font-size: 16px;
+  line-height: 1.45;
+  color: #2f2a45;
+  background: #fff;
+  border: 2px solid rgba(15, 12, 40, .12);
+  border-bottom-width: 4px;
+  border-radius: 14px;
+  cursor: pointer;
+  transition: border-color .13s ease, background .13s ease, transform .08s ease;
+}
+
+.check-option:hover:not(:disabled) { background: rgba(139, 92, 246, .05); border-color: rgba(139, 92, 246, .4) }
+.check-option:active:not(:disabled) { transform: translateY(1px); border-bottom-width: 2px }
+.check-option:disabled { cursor: default }
+
+.check-option > i {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  font-style: normal;
+  font-size: 13px;
+  font-weight: 700;
+  background: rgba(15, 12, 40, .07);
+  color: #6b6485;
+}
+
+.check-option.picked { border-color: #8b5cf6; background: rgba(139, 92, 246, .09) }
+.check-option.picked > i { background: #8b5cf6; color: #fff }
+.check-option.right { border-color: #10b981; background: rgba(16, 185, 129, .11) }
+.check-option.right > i { background: #10b981; color: #fff }
+.check-option.wrong { border-color: #ef4444; background: rgba(239, 68, 68, .09) }
+.check-option.wrong > i { background: #ef4444; color: #fff }
+
+.check-feedback {
+  margin-top: 20px;
+  padding: 18px 20px;
+  border-radius: 14px;
+  animation: feedback-in .2s ease-out;
+}
+
+@keyframes feedback-in {
+  from { opacity: 0; transform: translateY(6px) }
+  to { opacity: 1; transform: none }
+}
+
+.check-step.is-right .check-feedback { background: rgba(16, 185, 129, .1); border: 1px solid rgba(16, 185, 129, .25) }
+.check-step.is-wrong .check-feedback { background: rgba(239, 68, 68, .08); border: 1px solid rgba(239, 68, 68, .22) }
+
+.check-feedback h4 {
+  margin: 0 0 8px;
+  font-size: 18px;
+  letter-spacing: -.01em;
+}
+
+.check-step.is-right .check-feedback h4 { color: #047857 }
+.check-step.is-wrong .check-feedback h4 { color: #b91c1c }
+.check-feedback .markdown { font-size: 15.5px; line-height: 1.6; color: #2f2a45 }
+
+/* --- Actions ------------------------------------------------------------ */
+
+.player-actions {
+  position: sticky;
+  bottom: 0;
+  margin-top: 28px;
+  padding: 16px 0 4px;
+  background: linear-gradient(transparent, var(--surface-page, #f6f5fb) 32%);
+}
+
+.player-cta {
+  width: 100%;
+  justify-content: center;
+  font-size: 16px;
+  padding: 15px 22px;
+}
+
+/* --- Tutor -------------------------------------------------------------- */
+
+.coach-open {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 18px;
+  padding: 10px 16px;
+  border: 1px dashed rgba(139, 92, 246, .45);
+  border-radius: 99px;
+  background: rgba(139, 92, 246, .05);
+  color: #6d28d9;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background .15s ease;
+}
+
+.coach-open:hover { background: rgba(139, 92, 246, .12) }
+.coach-open svg { width: 16px; height: 16px }
+
+.coach-box {
+  margin-top: 18px;
+  padding: 16px 18px;
+  border-radius: 14px;
+  background: rgba(139, 92, 246, .07);
+  border: 1px solid rgba(139, 92, 246, .2);
+}
+
+.coach-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+  font-size: 13px;
+  font-weight: 700;
+  color: #6d28d9;
+}
+
+.coach-head span { display: inline-flex; align-items: center; gap: 7px }
+.coach-head svg { width: 16px; height: 16px }
+
+.coach-head button {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: #6d28d9;
+  cursor: pointer;
+}
+
+.coach-head button:hover { background: rgba(139, 92, 246, .15) }
+.coach-box .markdown { font-size: 15px; line-height: 1.6; color: #2f2a45 }
+
+.coach-box form {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.coach-box input {
+  flex: 1;
+  min-width: 0;
+  padding: 10px 14px;
+  font: inherit;
+  font-size: 14.5px;
+  border: 1px solid rgba(139, 92, 246, .3);
+  border-radius: 10px;
+  background: #fff;
+  color: #2f2a45;
+}
+
+.coach-box input:focus { outline: 2px solid rgba(139, 92, 246, .45); outline-offset: 1px }
+
+.coach-box form button {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 40px;
+  border: 0;
+  border-radius: 10px;
+  background: #8b5cf6;
+  color: #fff;
+  cursor: pointer;
+}
+
+.coach-box form button:disabled { opacity: .45; cursor: default }
+.coach-box form button svg { width: 17px; height: 17px }
+
+.coach-thinking { display: flex; gap: 5px; padding: 6px 0 }
+
+.coach-thinking i {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #a78bfa;
+  animation: coach-dot 1.1s infinite ease-in-out;
+}
+
+.coach-thinking i:nth-child(2) { animation-delay: .15s }
+.coach-thinking i:nth-child(3) { animation-delay: .3s }
+
+@keyframes coach-dot {
+  0%, 60%, 100% { opacity: .3; transform: translateY(0) }
+  30% { opacity: 1; transform: translateY(-4px) }
+}
+
+/* --- Completion and recovery ------------------------------------------- */
+
+.player-done,
+.player-refill,
+.player-error {
+  text-align: center;
+  padding: 30px 0 0;
+}
+
+.player-refill, .player-error { text-align: left }
+
+.player-done-mark {
+  display: grid;
+  place-items: center;
+  width: 78px;
+  height: 78px;
+  margin: 0 auto 20px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #fbbf24, #f59e0b);
+  color: #fff;
+  box-shadow: 0 10px 30px rgba(245, 158, 11, .35);
+}
+
+.player-done-mark svg { width: 38px; height: 38px }
+
+.player-done h2,
+.player-refill h2,
+.player-error h2 {
+  font-size: clamp(25px, 4vw, 32px);
+  letter-spacing: -.02em;
+  margin: 0 0 12px;
+  color: #1a1630;
+}
+
+.player-score {
+  font-size: 17px;
+  color: #4a4560;
+  margin: 0 0 16px;
+}
+
+.player-score span {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 3px 11px;
+  border-radius: 99px;
+  font-size: 14px;
+  font-weight: 700;
+  background: rgba(139, 92, 246, .12);
+  color: #6d28d9;
+}
+
+.player-xp-award {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 20px;
+  margin-bottom: 20px;
+  border-radius: 99px;
+  font-size: 17px;
+  font-weight: 700;
+  background: rgba(168, 85, 247, .12);
+  color: #7e22ce;
+}
+
+.player-xp-award svg { width: 19px; height: 19px }
+
+.player-recap {
+  text-align: left;
+  padding: 18px 20px;
+  margin-bottom: 24px;
+  border-radius: 14px;
+  background: #fff;
+  border: 1px solid rgba(15, 12, 40, .1);
+}
+
+.player-recap .markdown { font-size: 15.5px; line-height: 1.62; color: #2f2a45 }
+
+.player-refill > p { font-size: 16px; color: #4a4560; margin: 0 0 20px }
+
+.refill-list { display: grid; gap: 14px; margin-bottom: 26px }
+
+.refill-item {
+  padding: 16px 18px;
+  border-radius: 14px;
+  background: #fff;
+  border: 1px solid rgba(15, 12, 40, .1);
+}
+
+.refill-question { font-weight: 650; margin: 0 0 8px; color: #1a1630 }
+.refill-item .markdown { font-size: 15px; line-height: 1.58; color: #4a4560 }
+
+.player-error > p { font-size: 16px; color: #b91c1c; margin: 0 0 22px }
+
+.player-loading { display: grid; gap: 14px; padding-top: 22px }
+.player-loading .skeleton { height: 22px; border-radius: 10px }
+.player-loading .skeleton:first-child { height: 34px; width: 65% }
+.player-loading .skeleton:last-child { width: 82% }
+
+/* --- Task modal additions ---------------------------------------------- */
+
+.task-objective {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  font-size: 15px;
+  line-height: 1.5;
+  color: #4a4560;
+  margin: 0 0 16px;
+}
+
+.task-objective svg { flex: none; width: 17px; height: 17px; margin-top: 2px; color: #8b5cf6 }
+
+.task-kind {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 16px;
+  margin-bottom: 18px;
+  border-radius: 14px;
+  background: rgba(139, 92, 246, .07);
+  border: 1px solid rgba(139, 92, 246, .17);
+}
+
+.task-kind-icon {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  border-radius: 12px;
+  background: #8b5cf6;
+  color: #fff;
+}
+
+.task-kind-icon svg { width: 21px; height: 21px }
+.task-kind > div { flex: 1; min-width: 0 }
+.task-kind b { display: block; font-size: 14px; color: #1a1630 }
+.task-kind p { margin: 2px 0 0; font-size: 13.5px; line-height: 1.45; color: #4a4560 }
+
+.task-kind-xp {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 13px;
+  font-weight: 700;
+  color: #7e22ce;
+}
+
+.task-kind-xp svg { width: 15px; height: 15px }
+.task-kind--boss_battle { background: rgba(245, 158, 11, .1); border-color: rgba(245, 158, 11, .28) }
+.task-kind--boss_battle .task-kind-icon { background: linear-gradient(135deg, #fbbf24, #f59e0b) }
+
+.task-primary { margin-bottom: 20px }
+
+.task-start {
+  width: 100%;
+  justify-content: center;
+  font-size: 16px;
+  padding: 15px 22px;
+  text-decoration: none;
+}
+
+.task-why {
+  padding: 15px 17px;
+  margin-bottom: 16px;
+  border-radius: 12px;
+  background: rgba(15, 12, 40, .035);
+}
+
+.task-why > small {
+  display: block;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .1em;
+  color: #8b83a8;
+  margin-bottom: 7px;
+}
+
+.task-why .markdown { font-size: 14.5px; line-height: 1.58; color: #4a4560 }
+
+.task-more {
+  width: 100%;
+  padding: 11px;
+  border: 0;
+  border-top: 1px solid rgba(15, 12, 40, .09);
+  background: transparent;
+  font: inherit;
+  font-size: 14px;
+  color: #6b6485;
+  cursor: pointer;
+}
+
+.task-more:hover { color: #6d28d9 }
+.task-details { padding-top: 8px }
+.journey-skill { display: block; font-size: 12px; color: #8b83a8; font-style: normal; margin-top: 2px }
+
+/* --- Dark theme --------------------------------------------------------- */
+
+@media (prefers-color-scheme: dark) {
+  .player-wrap { background: #14121f }
+  .player-bar { background: linear-gradient(#14121f 70%, transparent) }
+  .player-actions { background: linear-gradient(transparent, #14121f 32%) }
+  .player-quit { background: rgba(255, 255, 255, .08); color: #cfc9e4 }
+  .player-progress { background: rgba(255, 255, 255, .11) }
+  .player-hearts, .player-xp { color: #cfc9e4 }
+  .teach-step h3, .check-question, .player-done h2, .player-refill h2, .player-error h2,
+  .refill-question, .task-kind b { color: #f2f0f8 }
+  .teach-step .markdown, .check-source .markdown, .check-feedback .markdown,
+  .coach-box .markdown, .player-recap .markdown, .teach-example .markdown { color: #cfc9e4 }
+  .teach-example, .check-source, .check-option, .player-recap, .refill-item {
+    background: rgba(255, 255, 255, .045);
+    border-color: rgba(255, 255, 255, .12);
+  }
+  .check-option { color: #e6e2f2 }
+  .check-option > i { background: rgba(255, 255, 255, .1); color: #cfc9e4 }
+  .coach-box input { background: rgba(255, 255, 255, .06); color: #e6e2f2; border-color: rgba(167, 139, 250, .35) }
+  .teach-takeaway { color: #6ee7b7 }
+  .teach-trap { color: #fcd34d }
+  .task-why { background: rgba(255, 255, 255, .05) }
+  .task-more { border-top-color: rgba(255, 255, 255, .1) }
+}
+
+.task-legacy-guide {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 16px;
+  text-decoration: none;
+}

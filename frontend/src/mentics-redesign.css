@@ -7,7 +7,14 @@
   src: url('/static/react/fonts/lalezar-latin.woff2') format('woff2');
   font-style: normal;
   font-weight: 400;
-  font-display: block;
+  /* swap, not block. block hides the wordmark for up to 3s and then falls back
+     PERMANENTLY for that page load if the file has not arrived — which is how a
+     slow or cold connection ends up stuck on the fallback face, rendering the
+     wrong typeface at the wrong width and clipping the mark. swap paints the
+     metrics-matched fallback immediately and upgrades to Lalezar whenever it
+     lands, however late. See the Lalezar Fallback face in design-system.css:
+     it is width-matched, so the upgrade does not shift the layout. */
+  font-display: swap;
 }
 
 :root {

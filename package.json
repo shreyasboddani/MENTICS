@@ -5,8 +5,11 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
-    "check": "eslint frontend/src --max-warnings=0"
+    "build": "npm run build:client && npm run build:ssr && npm run prerender",
+    "check": "eslint frontend/src --max-warnings=0",
+    "build:client": "vite build",
+    "build:ssr": "vite build --config vite.ssr.config.js",
+    "prerender": "node prerender.mjs"
   },
   "dependencies": {
     "@vitejs/plugin-react": "6.0.5",

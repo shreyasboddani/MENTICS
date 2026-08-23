@@ -223,6 +223,19 @@ class DatabaseHandler:
                  f"ON CONFLICT({', '.join(conflict_target)}) DO UPDATE SET {set_clause}")  # nosec B608
         self.execute(query, tuple(data.values()))
 
+    def execute_returning_one(self, query, params=None):
+        """Run a mutation that RETURNS a row and commit it, e.g. an atomic upsert."""
+        conn = self._connect()
+        try:
+            cursor = conn.cursor()
+            cursor.execute(self._query(query), params or ())
+            row = cursor.fetchone()
+            result = self._row(row)
+            conn.commit()
+            return result
+        finally:
+            conn.close()
+
     def execute_for_one(self, query, params=None):
         conn = self._connect()
         try:

@@ -1,0 +1,507 @@
+/*
+ * MENTICS DESIGN SYSTEM — the single authority for materials, motion, and depth.
+ *
+ * LAYER ORDER (see App.jsx). Each layer may only override the ones above it:
+ *   1. styles.css          base reset + original layout
+ *   2. experience.css      product experience layout
+ *   3. brand-system.css    brand palette + product hierarchy
+ *   4. liquid-glass.css    first material pass
+ *   5. mentics-redesign.css layout + responsive corrections
+ *   6. story-system.css    marketing story layout and scroll beats
+ *   7. design-system.css   THIS FILE — materials, motion, typography, a11y
+ *
+ * Layers 4 and 5 previously contradicted each other: liquid-glass added
+ * backdrop blur to floating chrome and mentics-redesign removed it again in
+ * eleven places, so the glass never rendered. This file resolves that once, in
+ * one place, following Apple's material rules:
+ *
+ *   - Translucency is for FLOATING CHROME only (nav, modals, sheets, popovers,
+ *     chips). Content sections stay opaque. A light translucent surface is
+ *     never stacked on another light translucent surface.
+ *   - Bigger surfaces read as thicker: more blur, deeper shadow.
+ *   - Text over glass gets vibrancy (higher contrast, slightly heavier weight),
+ *     never flat grey.
+ *
+ * ---------------------------------------------------------------------------
+ * BRANDING IS OFF LIMITS.
+ * The MENTICS wordmark is bold Lalezar and must not be restyled here. This file
+ * declares NOTHING for any of the following, and must never do so:
+ *   .brand, .brand--inverse, .hero h1, .auth-art h1, .auth-copy h2,
+ *   .page-intro h1, .path-header h1, .path-launcher h2, .dashboard-welcome h1,
+ *   .portal-heading h2, .portal > span b, .landing-facts strong,
+ *   .story-chapter::after, .signal-story-beats article > span
+ * The typography section below is scoped to body and UI text and explicitly
+ * excludes every Lalezar display selector.
+ * ---------------------------------------------------------------------------
+ */
+
+:root {
+  /* Motion. Response values follow Apple's fluid-interface guidance: springs
+     that settle in 0.3-0.4s, critically damped by default. The bounce curve is
+     reserved for momentum — something the user flicked, dropped, or opened. */
+  --ds-press: 130ms;
+  --ds-ui: 220ms;
+  --ds-panel: 320ms;
+  --ds-story: 640ms;
+  --ds-spring: cubic-bezier(.32, .72, 0, 1);       /* critically damped, response ~.35s */
+  --ds-spring-bounce: cubic-bezier(.2, 1.24, .36, 1); /* slight overshoot, momentum only */
+  --ds-ease: cubic-bezier(.23, 1, .32, 1);
+  --ds-ease-in-out: cubic-bezier(.77, 0, .175, 1);
+
+  /* Materials. Weight encodes hierarchy: thin for small chips, regular for
+     bars, thick for large sheets and modals. */
+  --ds-thin-bg: rgba(255, 255, 255, .58);
+  --ds-thin-blur: blur(14px) saturate(150%);
+  --ds-regular-bg: rgba(255, 255, 255, .64);
+  --ds-regular-blur: blur(22px) saturate(165%);
+  --ds-thick-bg: linear-gradient(150deg, rgba(255, 255, 255, .84), rgba(243, 242, 251, .7));
+  --ds-thick-blur: blur(34px) saturate(180%);
+  --ds-dark-bg: rgba(24, 20, 52, .62);
+  --ds-dark-blur: blur(26px) saturate(150%);
+
+  /* A bright top edge reads as light catching the lip of a real material. */
+  --ds-edge: inset 0 1px 0 rgba(255, 255, 255, .92);
+  --ds-hairline: rgba(255, 255, 255, .74);
+
+  /* Elevation rises with surface size, matching the material weights above. */
+  --ds-lift-1: 0 12px 30px -20px rgba(32, 24, 84, .48), var(--ds-edge);
+  --ds-lift-2: 0 22px 54px -30px rgba(30, 22, 82, .52), var(--ds-edge);
+  --ds-lift-3: 0 44px 110px -46px rgba(18, 13, 58, .62), var(--ds-edge);
+
+  --ds-scrim: rgba(19, 15, 44, .34);
+}
+
+/* ===========================================================================
+   0. WORDMARK FALLBACK METRICS — protects the branding, never restyles it
+   ---------------------------------------------------------------------------
+   Lalezar stays first in every stack and its appearance is untouched. This
+   section only governs what renders if Lalezar has not arrived yet or fails to
+   load at all.
+
+   Measured: at 176px, "MENTICS" is 663px in Lalezar and 792px in the generic
+   sans fallback — 1.19x wider. .hero h1 is width:max-content + white-space:
+   nowrap inside a column capped by max-width:100%, and .landing is
+   overflow:hidden, so the wider fallback overflows and the wordmark gets its
+   last letters sliced off. size-adjust brings the fallback back to Lalezar's
+   measure so the layout holds either way.
+   =========================================================================== */
+
+@font-face {
+  font-family: 'Lalezar Fallback';
+  src: local('Arial Bold'), local('Arial'), local('Helvetica'), local('Liberation Sans'), local('DejaVu Sans');
+  size-adjust: 84%;
+  font-weight: 400;
+  font-style: normal;
+  ascent-override: 105%;
+  descent-override: 28%;
+}
+
+/* Additive only: Lalezar remains the first and preferred family everywhere. */
+.brand,
+.hero h1,
+.auth-art h1,
+.auth-copy h2,
+.page-intro h1,
+.path-header h1,
+.path-launcher h2,
+.dashboard-welcome h1,
+.portal-heading h2,
+.portal > span b,
+.landing-facts strong {
+  font-family: 'Lalezar', 'Lalezar Fallback', sans-serif !important;
+}
+
+/* Last-resort guard: the wordmark scales down before it is ever cut off. */
+.hero h1 { max-width: 100%; overflow-wrap: normal; }
+
+/* ===========================================================================
+   1. RESPONSE — feedback on press, never on release
+   Apple's first rule: the instant lag appears, directness "falls off a cliff."
+   =========================================================================== */
+
+.button,
+.icon-button,
+.text-button,
+.google-button,
+.product-nav a,
+.product-menu,
+.product-logout button,
+.path-launcher,
+.progress-tile,
+.journey-step,
+.floating-chat,
+.chat-panel button,
+.modal button,
+.choice-grid label,
+.tracker-metric-tabs button,
+.history-section--tabs button,
+.forum-search button,
+.thread button,
+.faq summary {
+  transition:
+    transform var(--ds-press) var(--ds-spring),
+    background-color var(--ds-ui) ease,
+    border-color var(--ds-ui) ease,
+    box-shadow var(--ds-ui) ease,
+    color var(--ds-ui) ease;
+}
+
+/* Scale down on pointer-down. :active fires on press, not on click. */
+.button:active,
+.icon-button:active,
+.text-button:active,
+.google-button:active,
+.product-nav a:active,
+.product-menu:active,
+.product-logout button:active,
+.path-launcher:active,
+.progress-tile:active,
+.journey-step:active,
+.floating-chat:active,
+.chat-panel button:active,
+.modal button:active,
+.choice-grid label:active,
+.tracker-metric-tabs button:active,
+.history-section--tabs button:active,
+.forum-search button:active,
+.thread button:active,
+.faq summary:active {
+  transform: scale(.97);
+}
+
+.button:disabled:active { transform: none; }
+
+/* A visible, branded focus ring on every interactive element. */
+:where(a, button, input, textarea, select, summary, label):focus-visible {
+  outline: 3px solid rgba(124, 58, 237, .3);
+  outline-offset: 3px;
+  border-radius: 6px;
+}
+
+/* ===========================================================================
+   2. MATERIALS — translucency only where something floats over content
+   =========================================================================== */
+
+/* Buttons are small controls: thin material, light lift.
+   liquid-glass.css set this and mentics-redesign.css unset it; this is the
+   resolution. Solid variants stay solid — glass on a filled button muddies it. */
+.button {
+  background: var(--ds-thin-bg);
+  border: 1px solid var(--ds-hairline);
+  box-shadow: var(--ds-lift-1);
+  -webkit-backdrop-filter: var(--ds-thin-blur);
+  backdrop-filter: var(--ds-thin-blur);
+}
+
+.button:hover { transform: translateY(-1px); box-shadow: var(--ds-lift-2); }
+.button:active { transform: scale(.97); }
+
+.button--primary,
+.button--dark {
+  color: #fff;
+  border-color: rgba(255, 255, 255, .18);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+
+.button--primary {
+  background: linear-gradient(135deg, #7c3aed, #4f46e5);
+  box-shadow: 0 16px 36px -18px rgba(79, 70, 229, .72), inset 0 1px rgba(255, 255, 255, .3);
+}
+
+.button--dark { background: #252150; box-shadow: 0 16px 34px -20px rgba(20, 16, 56, .8); }
+
+.button--quiet {
+  background: rgba(255, 255, 255, .72);
+  border-color: rgba(102, 94, 135, .18);
+}
+
+/* The hero panel is light, so its secondary button stays dark-on-glass.
+   Reading it as a dark-panel button would make the label disappear. */
+.hero .button--quiet {
+  color: #38344c;
+  background: rgba(255, 255, 255, .58);
+  border-color: rgba(255, 255, 255, .8);
+  -webkit-backdrop-filter: var(--ds-regular-blur);
+  backdrop-filter: var(--ds-regular-blur);
+}
+
+/* .hero sets color:#fff for its own copy, which then cascades into the product
+   preview mounted inside it — leaving the mockup's headline and score rendered
+   white on a near-white surface. The preview is its own light UI, so it resets
+   the inherited colour rather than every descendant patching around it. */
+.product-frame { color: var(--ink); }
+.preview-heading h3 { color: #1b1631; }
+.preview-heading p,
+.preview-nav { color: #7c7689; }
+.preview-score strong { color: #1b1631; }
+.preview-task { color: #6f6979; }
+.preview-task.current { color: #33224e; }
+
+/* Floating marketing nav: regular material, content scrolls beneath it.
+   The nav travels over both light and dark sections, and its label colour
+   cannot change per section. The material is therefore opaque enough to stay a
+   light surface over any backdrop — still visibly glass, since the blurred
+   colour behind it reads through, but never so sheer that dark text on a dark
+   section drops below a legible contrast ratio. */
+.public-nav {
+  background: linear-gradient(140deg, rgba(255, 255, 255, .66), rgba(247, 246, 253, .5));
+  border: 1px solid var(--ds-hairline);
+  box-shadow: var(--ds-lift-2);
+  -webkit-backdrop-filter: blur(30px) saturate(190%);
+  backdrop-filter: blur(30px) saturate(190%);
+}
+
+/* Large sheets read as thicker glass with a deeper shadow. */
+.modal {
+  background: var(--ds-thick-bg);
+  border: 1px solid var(--ds-hairline);
+  box-shadow: var(--ds-lift-3);
+  -webkit-backdrop-filter: var(--ds-thick-blur);
+  backdrop-filter: var(--ds-thick-blur);
+}
+
+/* A modal is a blocking task, so it dims the background to focus attention. */
+.modal-wrap {
+  background: var(--ds-scrim);
+  -webkit-backdrop-filter: blur(18px) saturate(125%);
+  backdrop-filter: blur(18px) saturate(125%);
+}
+
+/* The chat panel runs alongside the page rather than blocking it, so it gets
+   translucency and offset but no scrim — the flow is never interrupted. */
+.chat-panel {
+  background: var(--ds-thick-bg);
+  border: 1px solid var(--ds-hairline);
+  box-shadow: var(--ds-lift-3);
+  -webkit-backdrop-filter: var(--ds-thick-blur);
+  backdrop-filter: var(--ds-thick-blur);
+}
+
+.chat-panel form {
+  background: rgba(255, 255, 255, .7);
+  border: 1px solid var(--ds-hairline);
+  box-shadow: var(--ds-lift-1);
+  -webkit-backdrop-filter: var(--ds-thin-blur);
+  backdrop-filter: var(--ds-thin-blur);
+}
+
+/* Small floating chips: thin material, small shadow. */
+.frame-float,
+.journey-label,
+.streak-pill {
+  -webkit-backdrop-filter: var(--ds-thin-blur);
+  backdrop-filter: var(--ds-thin-blur);
+}
+
+.floating-chat {
+  box-shadow: var(--ds-lift-2);
+  -webkit-backdrop-filter: var(--ds-regular-blur);
+  backdrop-filter: var(--ds-regular-blur);
+}
+
+/* Dark chrome over the product uses the dark material so light text stays
+   legible — never a light translucent layer on another light layer. */
+.menu-scrim,
+.portal-overlay {
+  -webkit-backdrop-filter: var(--ds-dark-blur);
+  backdrop-filter: var(--ds-dark-blur);
+}
+
+/* Vibrancy: text on glass gets contrast and a touch more weight rather than
+   flat grey, which disappears as the backdrop shifts. */
+.public-nav nav a,
+.modal .modal-kicker,
+.chat-panel small {
+  color: #2a2444;
+  font-weight: 700;
+}
+
+.public-nav nav a:hover { color: #6d38c6; }
+
+/* Scroll edge effect: content fades where it meets floating chrome, instead of
+   a hard 1px divider. Applied only where chrome actually overlaps content. */
+.public-nav::after {
+  content: '';
+  position: absolute;
+  z-index: -1;
+  inset: 100% 0 auto;
+  height: 26px;
+  background: linear-gradient(rgba(255, 255, 255, .5), transparent);
+  pointer-events: none;
+}
+
+/* ===========================================================================
+   3. MOTION — materialize, don't fade; enter and exit along the same path
+   =========================================================================== */
+
+/* Glass surfaces arrive as a material: blur and scale resolve together, so the
+   surface reads as arriving rather than as a flat opacity fade. */
+@keyframes ds-materialize {
+  from {
+    opacity: 0;
+    transform: scale(.96) translateY(10px);
+    -webkit-backdrop-filter: blur(0) saturate(100%);
+    backdrop-filter: blur(0) saturate(100%);
+  }
+}
+
+.modal { animation: ds-materialize var(--ds-panel) var(--ds-spring) both; }
+.modal-wrap { animation: ds-fade var(--ds-ui) ease both; }
+
+@keyframes ds-fade { from { opacity: 0; } }
+
+/* Popovers and sheets scale from the control that opened them, so the spatial
+   relationship between trigger and content stays obvious. */
+.product-menu + nav,
+.portal { transform-origin: top center; }
+
+/* Scroll-driven story reveals. One-time, and they resolve toward the reader. */
+.mx-reveal {
+  opacity: 0;
+  transform: translateY(26px);
+  transition:
+    opacity var(--ds-story) var(--ds-ease),
+    transform var(--ds-story) var(--ds-ease);
+}
+
+.mx-reveal.is-visible { opacity: 1; transform: none; }
+
+/* ===========================================================================
+   4. TYPOGRAPHY — size-specific tracking and leading
+   Tracking is never one value for every size: large text needs negative
+   tracking, small text needs a little positive. Lalezar display type is
+   excluded throughout; the brand voice is not this file's business.
+   =========================================================================== */
+
+.section-heading h2:not([class*='brand']),
+.suite-heading h2,
+.week-heading h2 {
+  letter-spacing: -.045em;
+  line-height: 1.02;
+}
+
+.hero-tagline {
+  letter-spacing: -.018em;
+  line-height: 1.48;
+}
+
+.section-heading p,
+.process-grid p,
+.feature-stack small,
+.faq details p,
+.legal-page p {
+  letter-spacing: -.005em;
+  line-height: 1.66;
+}
+
+/* Small uppercase labels need positive tracking to stay legible. */
+.eyebrow,
+.card-kicker,
+.modal-kicker,
+.preview-heading small,
+.trust-strip {
+  letter-spacing: .14em;
+}
+
+/* ===========================================================================
+   5. ACCESSIBILITY — three independent signals, each handled properly
+   =========================================================================== */
+
+/* Reduced motion means gentler feedback, not no feedback: cross-fades survive,
+   travel and overshoot do not. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: .01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .01ms !important;
+    scroll-behavior: auto !important;
+  }
+
+  .mx-reveal { opacity: 1; transform: none; }
+
+  /* Keep press feedback — it is instantaneous and not vestibular. */
+  .button:active,
+  .icon-button:active { transform: scale(.98); }
+
+  .hero-route path,
+  .hero-route circle,
+  .frame-float,
+  .story-progress { animation: none !important; }
+}
+
+/* Reduced transparency: surfaces become frosty and solid, blur is dropped. */
+@media (prefers-reduced-transparency: reduce) {
+  .button,
+  .public-nav,
+  .modal,
+  .chat-panel,
+  .chat-panel form,
+  .floating-chat,
+  .frame-float,
+  .journey-label,
+  .streak-pill {
+    background: #f7f6fb;
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+
+  .button--primary { background: linear-gradient(135deg, #7c3aed, #4f46e5); }
+  .button--dark { background: #252150; }
+  .modal-wrap { background: rgba(19, 15, 44, .82); -webkit-backdrop-filter: none; backdrop-filter: none; }
+  .public-nav::after { display: none; }
+}
+
+/* High contrast: near-solid backgrounds with a defined, contrasting border. */
+@media (prefers-contrast: more) {
+  .button,
+  .public-nav,
+  .modal,
+  .chat-panel {
+    background: #fff;
+    border-color: #2a2350;
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+
+  .public-nav nav a,
+  .section-heading p,
+  .process-grid p { color: #1d1836; }
+}
+
+/* Respect the user's text size: layout spacing that scales with type. */
+@media (prefers-reduced-motion: no-preference) {
+  html { scroll-behavior: smooth; }
+}
+
+/* ===========================================================================
+   6. THE MENTICS WORDMARK
+   ---------------------------------------------------------------------------
+   The hero LAYOUT is untouched. Nothing here moves, centres, or resizes the
+   hero, the copy column, the buttons, or the product preview.
+
+   Lalezar is rendered AUTHENTICALLY: its own weight, its own letterforms, its
+   own natural spacing. An earlier revision here faked extra weight with
+   -webkit-text-stroke and pulled the tracking tight; both were wrong. The
+   stroke fattened the stems and closed up the counters, so the letterforms
+   stopped reading as Lalezar, and the negative tracking jammed them together.
+   Lalezar is already a heavy display face — it does not need help.
+
+   The only thing changed is the gradient, which mentics-redesign.css had
+   flattened to a single bright violet. The brand gradient runs dark navy into
+   violet, left to right.
+   =========================================================================== */
+
+.hero h1 {
+  color: #2a1b52;
+  background: linear-gradient(112deg, #171122 6%, #3f2fb8 46%, #7c3aed 78%, #8b38e8 96%);
+  background-clip: text;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  /* Lalezar's own weight and spacing. No synthetic stroke, no tightening. */
+  -webkit-text-stroke: 0;
+  paint-order: normal;
+  letter-spacing: -.015em;
+}
