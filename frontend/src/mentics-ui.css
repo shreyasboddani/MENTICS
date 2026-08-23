@@ -1396,6 +1396,17 @@
 /* iPhone navigation: keep the menu in a dedicated, tappable layer above its
    backdrop.  Safari is especially prone to losing fixed descendants of a
    blurred header, so the menu uses an opaque glass material instead. */
+.community-aside {
+  color: #fff;
+  border-color: rgba(255, 255, 255, .1) !important;
+  background: radial-gradient(circle at 85% 8%, rgba(139, 92, 246, .44), transparent 30%), linear-gradient(155deg, #312968, #201b41) !important;
+  box-shadow: 0 22px 48px -30px rgba(26, 18, 67, .68), inset 0 1px rgba(255, 255, 255, .12);
+}
+
+.community-aside > svg { color: #c4b5fd; }
+.community-aside h3, .community-aside strong { color: #fff; }
+.community-aside span, .community-aside p { color: #d8d5e8; }
+
 @media (max-width: 759px) {
   /* Prevent iOS Safari from dropping the label on primary actions when the
      glass rules are composed together (for example, New discussion). */
