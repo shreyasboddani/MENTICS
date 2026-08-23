@@ -2436,7 +2436,12 @@ def login():
 
 @app.route('/google-login')
 def google_login():
-    redirect_uri = url_for('authorize', _external=True)
+    # Vercel preview deployments have a unique hostname for every build. Keep
+    # OAuth callbacks on the stable production domain when configured, rather
+    # than requiring each preview URL to be added to Google Cloud.
+    redirect_uri = os.getenv("GOOGLE_REDIRECT_URI", "").strip()
+    if not redirect_uri:
+        redirect_uri = url_for('authorize', _external=True)
     return _get_oauth().google.authorize_redirect(redirect_uri)
 
 # NEW: Google Authorize Route (Callback) - UPDATED

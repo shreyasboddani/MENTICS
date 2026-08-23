@@ -94,6 +94,7 @@ To get a local copy up and running, follow these simple steps.
     GEMINI_MODEL='gemini-3.5-flash-lite'  # Optional; this is the default
     GOOGLE_CLIENT_ID='YOUR_GOOGLE_CLIENT_ID'
     GOOGLE_CLIENT_SECRET='YOUR_GOOGLE_CLIENT_SECRET'
+    GOOGLE_REDIRECT_URI='https://mentics.vercel.app/authorize'  # Vercel only
     SECRET_KEY='A_LONG_RANDOM_VALUE'
     ```
 5.  **Initialize the database and run the application:**
@@ -118,6 +119,8 @@ User data is stored in PostgreSQL so it survives serverless restarts.
    - `GEMINI_API_KEY`
    - `GEMINI_MODEL` (optional; defaults to `gemini-3.5-flash-lite`)
    - `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` if using Google sign-in
+   - `GOOGLE_REDIRECT_URI=https://mentics.vercel.app/authorize` for a stable
+     callback across production and preview deployments
 4. Deploy. The database tables are created automatically on the first start.
 5. In Google Cloud Console, add `https://YOUR-DOMAIN/authorize`
    as an authorized redirect URI for the production OAuth client.
