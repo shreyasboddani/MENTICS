@@ -424,6 +424,7 @@ function PathPage() {
   const isTest = category === 'Test Prep'
   const [tasks, setTasks] = useState([])
   const [loading, setLoading] = useState(true)
+  const [regenerating, setRegenerating] = useState(false)
   const [error, setError] = useState('')
   const [selected, setSelected] = useState(null)
   const [chatOpen, setChatOpen] = useState(() => window.matchMedia('(min-width: 1050px)').matches)
@@ -433,12 +434,12 @@ function PathPage() {
   const builder = isTest ? '/dashboard/test-path-builder' : '/dashboard/college-path-builder'
   const loadTasks = async (regenerate = false) => {
     const requestId = ++pathRequest.current
-    setLoading(true); setError('')
+    setLoading(true); setRegenerating(regenerate); setError('')
     try {
       const data = await api(`/api/tasks?category=${encodeURIComponent(category)}`, regenerate ? { method: 'POST' } : {})
       if (!Array.isArray(data)) throw new Error('Your path could not be loaded.')
       if (requestId === pathRequest.current) setTasks(data.map(normalizeTask))
-    } catch (e) { if (requestId === pathRequest.current) setError(e.message) } finally { if (requestId === pathRequest.current) setLoading(false) }
+    } catch (e) { if (requestId === pathRequest.current) setError(e.message) } finally { if (requestId === pathRequest.current) { setLoading(false); setRegenerating(false) } }
   }
   useEffect(() => {
     const requestId = ++pathRequest.current
@@ -491,7 +492,7 @@ function PathPage() {
     <div className="path-header"><div><div className="eyebrow"><span /> {category.toUpperCase()}</div><h1>Your five-step path.</h1><p>Finish what is in front of you. The path adapts from there.</p></div><div className="path-header-actions">{!isTest && <button className="button button--quiet" onClick={() => setEssayOpen(true)}><PenLine size={17} /> Essay feedback</button>}{!chatOpen && <button className="button button--quiet" onClick={() => setChatOpen(true)}><MessageCircle size={17} /> Ask Mentics</button>}<a className="button button--dark" href={builder}>Edit goals <ArrowRight size={16} /></a></div></div>
     <div className="path-progress"><span style={{ width: `${completed / progressTotal * 100}%` }} /><p><b><span>{completed}</span><i>/</i><span>{progressTotal}</span></b><span>core steps complete</span></p></div>
     {error && <div className="error-banner">{error}<button onClick={() => loadTasks()}>Try again</button></div>}
-    {loading ? <PathSkeleton /> : <section className="journey-map" style={{ height: journeyHeight }} aria-label={`${category} learning journey`}>
+    {loading && !tasks.length ? <PathSkeleton /> : <section className={`journey-map ${regenerating ? 'journey-map--regenerating' : ''}`} style={{ height: journeyHeight }} aria-label={`${category} learning journey`} aria-busy={regenerating}>
       <svg className="journey-route" viewBox={`0 0 640 ${journeyHeight}`} preserveAspectRatio="none" aria-hidden="true"><defs><linearGradient id="journey-gradient" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#8b5cf6" /><stop offset="1" stopColor="#4f46e5" /></linearGradient></defs><path className="journey-route-shadow" d={journeyCurve} /><path className="journey-route-progress" d={journeyCurve} pathLength="100" style={{ strokeDasharray: `${tasks.length ? Math.min(100, completed / tasks.length * 100) : 0} 100` }} /></svg>
       {tasks.map((task, index) => {
         const locked = index > activeIndex && activeIndex !== -1; const kind = taskKind(task); const meta = kind ? nodeKinds[kind] : null; const milestone = kind === 'boss_battle'; const NodeIcon = meta?.icon; const point = journeyPoints[index]; const status = task.is_skipped ? 'skipped' : task.is_completed ? 'completed' : index === activeIndex ? 'current' : 'locked'; return <button key={task.id || index} disabled={locked} style={{ left: `${point.x / 640 * 100}%`, top: point.y }} className={`journey-step ${task.is_completed ? 'done' : index === activeIndex ? 'current' : 'locked'} ${task.is_skipped ? 'skipped' : ''} ${milestone ? 'milestone' : ''} ${kind ? `journey-step--${kind}` : ''}`} onClick={() => setSelected(task)} aria-haspopup="dialog" aria-current={index === activeIndex ? 'step' : undefined}>
@@ -501,8 +502,9 @@ function PathPage() {
           <span className={`journey-label ${point.x < 320 ? 'label-right' : point.x > 320 ? 'label-left' : index % 2 ? 'label-left' : 'label-right'}`}><small>{task.is_skipped ? 'SKIPPED' : task.is_completed ? 'COMPLETED' : task.is_user_added ? 'PERSONAL STEP' : meta ? meta.label.toUpperCase() : `STEP ${index + 1}`}</small><b><PlainText value={task.description} /></b>{task.skill_label && kind !== 'boss_battle' && <em className="journey-skill">{task.skill_label}</em>}{task.due_date && <em><CalendarDays /> {task.due_date}</em>}</span>
         </button>
       })}
+      {regenerating && <div className="path-regenerating-overlay" role="status" aria-live="polite"><span className="path-regenerating-orbit"><Sparkles /></span><div><b>Rebuilding your path</b><small>Mentics is shaping your next five steps.</small></div></div>}
     </section>}
-    <div className="path-footer-actions"><button className="button button--quiet" onClick={() => setAdding(true)}><Plus /> Add your own step</button><button className="text-button" onClick={() => loadTasks(true)}><RotateCcw /> {isTest ? 'Regenerate five steps' : 'Start next coaching loop'}</button></div>
+    <div className="path-footer-actions"><button className="button button--quiet" onClick={() => setAdding(true)} disabled={regenerating}><Plus /> Add your own step</button><button className="text-button" onClick={() => loadTasks(true)} disabled={regenerating}><RotateCcw /> {regenerating ? 'Rebuilding your path…' : isTest ? 'Regenerate five steps' : 'Start next coaching loop'}</button></div>
     {selected && <TaskModal task={selected} category={category} onClose={() => setSelected(null)} onUpdate={(next) => { setTasks(items => items.map(t => t.id === next.id ? next : t)); setSelected(next) }} onCompleted={finishTask} onReported={tasks => finishTask(null, tasks)} />}
     {adding && <AddTask category={category} onClose={() => setAdding(false)} onAdded={t => { setTasks(items => [...items, normalizeTask(t)]); setAdding(false) }} />}
     {essayOpen && <EssayCoach onClose={() => setEssayOpen(false)} />}

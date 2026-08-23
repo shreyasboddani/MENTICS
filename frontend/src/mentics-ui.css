@@ -1418,6 +1418,19 @@
 .forum-edit-form > div { display: flex; gap: 8px; flex-wrap: wrap; }
 .forum-edit-form .button { min-height: 38px; font-size: 13px; }
 
+/* Keep the existing route visible while a fresh five-step path is generated;
+   this makes the wait intentional and prevents accidental taps on stale steps. */
+.journey-map--regenerating { overflow: hidden; }
+.journey-map--regenerating > :not(.path-regenerating-overlay) { filter: blur(2px); opacity: .42; pointer-events: none; }
+.path-regenerating-overlay { position: absolute; z-index: 12; inset: 0; display: grid; place-content: center; justify-items: center; gap: 13px; padding: 24px; text-align: center; color: #fff; background: rgba(26, 21, 57, .55); -webkit-backdrop-filter: blur(5px); backdrop-filter: blur(5px); }
+.path-regenerating-overlay > div { display: grid; gap: 5px; }
+.path-regenerating-overlay b { font-size: 18px; letter-spacing: -.02em; }
+.path-regenerating-overlay small { color: rgba(255, 255, 255, .78); font-size: 13px; }
+.path-regenerating-orbit { display: grid; place-items: center; width: 48px; height: 48px; border: 1px solid rgba(255,255,255,.4); border-radius: 50%; background: linear-gradient(135deg,#8b5cf6,#4f46e5); box-shadow: 0 0 0 8px rgba(139,92,246,.12); animation: path-regenerating-orbit 1.15s linear infinite; }
+.path-regenerating-orbit svg { width: 20px; height: 20px; }
+@keyframes path-regenerating-orbit { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .path-regenerating-orbit { animation: none; } }
+
 @media (max-width: 759px) {
   /* Prevent iOS Safari from dropping the label on primary actions when the
      glass rules are composed together (for example, New discussion). */
