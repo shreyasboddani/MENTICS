@@ -8,8 +8,6 @@ from functools import wraps
 import json
 import hmac
 import mimetypes
-from google import genai
-from google.genai import types
 import os
 import secrets
 from dotenv import load_dotenv
@@ -17,7 +15,6 @@ import re
 from pathlib import Path
 from datetime import datetime, timedelta, date
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
-from authlib.integrations.flask_client import OAuth
 from werkzeug.middleware.proxy_fix import ProxyFix
 
 mimetypes.add_type('font/woff2', '.woff2')
@@ -44,7 +41,8 @@ app.url_map.strict_slashes = False
 app.permanent_session_lifetime = timedelta(minutes=10)
 
 gemini_api_key = os.getenv("GEMINI_API_KEY")
-gemini_client = genai.Client(api_key=gemini_api_key) if gemini_api_key else None
+gemini_client = None
+gemini_types = None
 GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-3.5-flash-lite")
 GEMINI_CHAT_MESSAGES = 12
 GEMINI_CHAT_CHARACTERS = 12000
@@ -70,7 +68,10 @@ def add_security_headers(response):
         "img-src 'self' data:; connect-src 'self'; "
         "object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self'"
     )
-    if session.get('user'):
+    if is_production and request.path.startswith('/static/'):
+        response.headers['Cache-Control'] = 'public, max-age=31536000, immutable'
+        response.headers.pop('Vary', None)
+    elif session.get('user'):
         response.headers.setdefault('Cache-Control', 'private, no-store')
     if is_production:
         response.headers.setdefault('Strict-Transport-Security', 'max-age=31536000; includeSubDomains')
@@ -98,14 +99,23 @@ def protect_state_changing_requests():
     return 'Invalid or expired request. Refresh the page and try again.', 400
 
 
-oauth = OAuth(app)
-oauth.register(
-    name='google',
-    server_metadata_url='https://accounts.google.com/.well-known/openid-configuration',
-    client_id=os.getenv("GOOGLE_CLIENT_ID"),
-    client_secret=os.getenv("GOOGLE_CLIENT_SECRET"),
-    client_kwargs={'scope': 'openid email profile'}
-)
+oauth = None
+
+
+def _get_oauth():
+    """Load the optional OAuth stack only when Google sign-in is used."""
+    global oauth
+    if oauth is None:
+        from authlib.integrations.flask_client import OAuth
+        oauth = OAuth(app)
+        oauth.register(
+            name='google',
+            server_metadata_url='https://accounts.google.com/.well-known/openid-configuration',
+            client_id=os.getenv("GOOGLE_CLIENT_ID"),
+            client_secret=os.getenv("GOOGLE_CLIENT_SECRET"),
+            client_kwargs={'scope': 'openid email profile'}
+        )
+    return oauth
 
 
 def init_db():
@@ -427,12 +437,27 @@ def time_ago_filter(s):
 # --- AI HELPER FUNCTIONS (UPDATED) ---
 
 
+def _get_gemini_client():
+    """Load the Gemini SDK only when an AI feature is actually requested."""
+    global gemini_client, gemini_types
+    if not gemini_api_key:
+        return None
+    if gemini_client is None:
+        from google import genai
+        from google.genai import types as loaded_types
+        gemini_types = loaded_types
+        gemini_client = genai.Client(api_key=gemini_api_key)
+    return gemini_client
+
+
 def _gemini_config(max_output_tokens, *, system_instruction=None,
                    json_output=False, thinking_level="minimal"):
     """Return a conservative generation config tuned for latency and cost."""
-    config = types.GenerateContentConfig(
+    if _get_gemini_client() is None:
+        raise RuntimeError("Gemini is not configured.")
+    config = gemini_types.GenerateContentConfig(
         max_output_tokens=max_output_tokens,
-        thinking_config=types.ThinkingConfig(thinking_level=thinking_level),
+        thinking_config=gemini_types.ThinkingConfig(thinking_level=thinking_level),
         system_instruction=system_instruction,
     )
     if json_output:
@@ -443,9 +468,10 @@ def _gemini_config(max_output_tokens, *, system_instruction=None,
 def _generate_text(prompt, *, max_output_tokens=800, json_output=False,
                    thinking_level="minimal", system_instruction=None):
     """Generate validated text through the single configured Gemini model."""
-    if gemini_client is None:
+    client = _get_gemini_client()
+    if client is None:
         raise RuntimeError("Gemini is not configured.")
-    response = gemini_client.models.generate_content(
+    response = client.models.generate_content(
         model=GEMINI_MODEL,
         contents=prompt,
         config=_gemini_config(
@@ -529,7 +555,8 @@ def _is_path_regeneration_request(message):
 
 def _generate_chat_reply(history, system_instruction):
     """Generate a concise mentor reply using only the useful recent context."""
-    if gemini_client is None:
+    client = _get_gemini_client()
+    if client is None:
         raise RuntimeError("Gemini is not configured.")
     gemini_history = _compact_chat_history(history)
     if not gemini_history:
@@ -539,7 +566,7 @@ def _generate_chat_reply(history, system_instruction):
         last_user_message = gemini_history[-1]["parts"][0]["text"]
         prior_history = gemini_history[:-1]
 
-    chat = gemini_client.chats.create(
+    chat = client.chats.create(
         model=GEMINI_MODEL,
         history=prior_history,
         config=_gemini_config(
@@ -2314,6 +2341,7 @@ def render_react(page, bootstrap=None, title=None, status=200):
         bootstrap=data,
         title=title or "Mentics",
         csp_nonce=g.csp_nonce,
+        asset_version=os.getenv('VERCEL_GIT_COMMIT_SHA', 'dev')[:12],
     ), status
 
 
@@ -2408,15 +2436,16 @@ def login():
 @app.route('/google-login')
 def google_login():
     redirect_uri = url_for('authorize', _external=True)
-    return oauth.google.authorize_redirect(redirect_uri)
+    return _get_oauth().google.authorize_redirect(redirect_uri)
 
 # NEW: Google Authorize Route (Callback) - UPDATED
 
 
 @app.route('/authorize')
 def authorize():
-    token = oauth.google.authorize_access_token()
-    user_info = oauth.google.parse_id_token(token, nonce=session.get('nonce'))
+    google_oauth = _get_oauth().google
+    token = google_oauth.authorize_access_token()
+    user_info = google_oauth.parse_id_token(token, nonce=session.get('nonce'))
 
     user_record = db.select_one("users", where={"email": user_info['email']})
 
@@ -3639,7 +3668,7 @@ def analyze_essay(user):
     if len(essay_text) > 20000:
         return jsonify({"error": "Essay text must be 20,000 characters or fewer."}), 400
     essay_prompt = str(essay_prompt).strip()[:500]
-    if gemini_client is None:
+    if _get_gemini_client() is None:
         return jsonify({"error": "AI essay feedback is not configured."}), 503
 
     prompt = (
@@ -3845,14 +3874,15 @@ if not DATABASE:
 
 db = DatabaseHandler(DATABASE)
 
-with app.app_context():
-    print(f"Connecting to {'PostgreSQL' if db.is_postgres else DATABASE}...")
-    try:
-        init_db()
-        print("Database schema check complete. All tables and columns are present.")
-    except Exception as e:
-        print(f"!!! CRITICAL: FAILED TO INITIALIZE OR MIGRATE DATABASE: {e}")
-        if is_production:
-            raise
+if not is_production or os.getenv('INIT_DB_ON_STARTUP') == '1':
+    with app.app_context():
+        print(f"Connecting to {'PostgreSQL' if db.is_postgres else DATABASE}...")
+        try:
+            init_db()
+            print("Database schema check complete. All tables and columns are present.")
+        except Exception as e:
+            print(f"!!! CRITICAL: FAILED TO INITIALIZE OR MIGRATE DATABASE: {e}")
+            if is_production:
+                raise
 if __name__ == "__main__":
     app.run(debug=os.getenv("FLASK_DEBUG") == "1")
