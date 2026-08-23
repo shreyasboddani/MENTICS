@@ -98,7 +98,7 @@ function Landing() {
         <div className="product-frame" aria-label="Mentics product preview">
           <div className="frame-float frame-float--signal" aria-hidden="true"><Sparkles /> Path recalibrated</div>
           <div className="frame-float frame-float--focus" aria-hidden="true"><Target /> One clear move</div>
-          <div className="frame-top"><span /><span /><span /><div>app.mentics</div></div>
+          <div className="frame-top"><span /><span /><span /><div>mentics.vercel.app</div></div>
           <div className="preview-shell">
             <aside className="preview-rail"><Brand /><div className="preview-nav active"><House size={16} /> Home</div><div className="preview-nav"><Target size={16} /> My path</div><div className="preview-nav"><BarChart3 size={16} /> Progress</div></aside>
             <div className="preview-main">
