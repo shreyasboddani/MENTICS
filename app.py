@@ -604,8 +604,37 @@ def _get_current_numbered_tasks(user_id, category):
     return "\n".join(numbered_tasks)
 
 
+def _task_fingerprint(description):
+    """Return the meaningful words in a task for duplicate detection."""
+    plain = re.sub(r"\[[^\]]+\]\([^)]+\)", " ", str(description or "").lower())
+    words = re.findall(r"[a-z0-9]{3,}", plain)
+    ignored = {
+        "about", "after", "and", "complete", "digital", "guide", "lesson",
+        "official", "practice", "review", "sat", "step", "strategy", "task",
+        "test", "the", "then", "this", "using", "with", "write", "your",
+    }
+    return frozenset(word for word in words if word not in ignored)
+
+
+def _is_duplicate_task(description, fingerprints):
+    fingerprint = _task_fingerprint(description)
+    if not fingerprint:
+        return True
+    for existing in fingerprints:
+        overlap = len(fingerprint & existing)
+        if overlap == len(fingerprint) == len(existing):
+            return True
+        if overlap >= 3 and overlap / max(len(fingerprint | existing), 1) >= 0.6:
+            return True
+    return False
+
+
 def _complete_five_step_plan(tasks, category):
-    """Guarantee five usable tasks when an AI response is incomplete."""
+    """Return exactly five valid, non-repeating AI path tasks.
+
+    Gemini is allowed to be creative, but it is never trusted to control the
+    persisted path size or to add near-identical steps.
+    """
     defaults = {
         "Test Prep": [
             {"task_format": "link", "description": "Review one weak skill with an official SAT or ACT lesson and write down three takeaways.", "reason": "A focused review gives the rest of this path a clear foundation.", "type": "standard", "stat_to_update": None, "category": "Test Prep", "difficulty": "easy"},
@@ -623,23 +652,59 @@ def _complete_five_step_plan(tasks, category):
         ],
     }
     normalized = []
-    seen = set()
+    fingerprints = []
+    allowed_formats = {"link", "quiz", "strategy", "review", "practice_sprint"}
+    allowed_difficulties = {"easy", "medium", "hard", "epic"}
     for task in tasks or []:
         if not isinstance(task, dict) or not task.get("description"):
             continue
-        description_key = task["description"].strip().lower()
-        if not description_key or description_key in seen:
+        task = dict(task)
+        task["description"] = str(task["description"]).strip()[:700]
+        if _is_duplicate_task(task["description"], fingerprints):
             continue
+        task["reason"] = str(task.get("reason") or "This step builds directly on your current path.").strip()[:900]
+        task["task_format"] = task.get("task_format") if task.get("task_format") in allowed_formats else "link"
+        task["type"] = "milestone" if task.get("type") == "milestone" else "standard"
+        task["difficulty"] = task.get("difficulty") if task.get("difficulty") in allowed_difficulties else "medium"
+        task["category"] = category
         normalized.append(task)
-        seen.add(description_key)
+        fingerprints.append(_task_fingerprint(task["description"]))
         if len(normalized) == 5:
             break
     for fallback in defaults[category]:
         if len(normalized) == 5:
             break
-        if fallback["description"].lower() not in seen:
+        if not _is_duplicate_task(fallback["description"], fingerprints):
             normalized.append(dict(fallback))
+            fingerprints.append(_task_fingerprint(fallback["description"]))
     return normalized[:5]
+
+
+def _repair_legacy_active_path(user_id, category):
+    """Hide surplus AI-generated steps left by older path-builder versions.
+
+    Personal steps remain active. Historical AI rows are retained for progress
+    history, but only the first five generated steps form the live roadmap.
+    """
+    generated = db.select(
+        "paths",
+        where={
+            "user_id": user_id,
+            "category": category,
+            "is_active": True,
+            "is_user_added": False,
+        },
+        order_by="task_order ASC",
+    )
+    if len(generated) <= 5:
+        return
+    with db.transaction() as transaction:
+        for task in generated[5:]:
+            transaction.update("paths", {"is_active": False}, where={"id": task["id"]})
+    app.logger.warning(
+        "Deactivated %s surplus legacy path steps for user %s (%s)",
+        len(generated) - 5, user_id, category,
+    )
 
 
 def _get_sprint_results_for_prompt(user_id):
@@ -1323,19 +1388,8 @@ def _get_test_prep_ai_tasks(strengths, weaknesses, test_focus, current_scores=No
         f"- **Data-Driven Justification:** The `reason` for each task is critical. It MUST explicitly reference the student's personal data (e.g., 'This is important because you listed Geometry as a weakness...').\n\n"
         f"- **Math:** is the user is struggling in math the biggest thing to ensure is they know how to use desmos regression for the tricky constant questions. table regressiopn, tilde regression, and system of eqs regression and also normalizing the x values. This is like a starting point for math but get specific with other topics if they need specific practice.\n\n"
 
-        f"## `practice_sprint` & `strategy_article` GENERATION (CRITICAL)\n"
-        f"This format is ONLY for tasks that require the user to practice questions. When you create a `practice_sprint`, you MUST ALSO generate a corresponding `strategy_article`.\n"
-        f"1.  **Hyper-Focused Sprint:** The `sprint_content` must contain exactly 5 SAT-level questions targeting a single, narrow skill (e.g., 'verb tense consistency' or 'solving systems of linear equations'). This skill must be chosen based on the student's weaknesses or incorrect answers.\n"
-        f"2.  **Actionable Strategy Article:** The `strategy_article` must be a high-quality, concise guide (using Markdown) that teaches the student how to master the specific skill in the sprint.\n\n"
-
-        f"## `quiz` GENERATION DIRECTIVES (CRITICAL)\n"
-        f"A `quiz` is different from a sprint and has the task type `quiz`. It is a CUMULATIVE review of a broader topic and should be used to test overall knowledge, not for focused practice.\n"
-        f"1.  **Strategic Placement:** A quiz should ideally follow a 'Resource Task' (`link`).\n"
-        f"2.  **Complete Source or Prompt:** Every quiz question MUST include `source_or_prompt`. Put the full passage, excerpt, equation, data set, scenario, or chart/diagram description the question depends on in this field. Never refer to a passage, table, graph, or text that is not included. For a standalone problem, put its complete setup in `source_or_prompt`, then use `question_text` only for the question being asked. Include a source name and markdown link when adapting attributed material; otherwise identify it as an original Mentics practice prompt.\n"
-        f"3.  **SAT-Level Comprehensiveness:** Questions must mirror official SAT complexity, including complete reading passages, 'words in context', and multi-step math problems.\n"
-        f"4.  **Targeted Content:** The quiz topic MUST address one of the student's listed weaknesses.\n"
-        f"5.  **Detailed Explanations:** Every question must have an explanation.\n"
-        f"6.  Each quiz should have 5-10 questions.\n\n"
+        f"## ASSESSMENT CONTENT (SERVER-OWNED)\n"
+        f"For `practice_sprint` or `quiz`, output ONLY the task metadata and the narrow skill/topic in the description. Do NOT output questions, passages, sources, articles, or nested content. Mentics attaches curated questions and a complete guide server-side. This keeps the plan reliable and inexpensive.\n\n"
 
         f"# CRITICAL DIRECTIVES & JSON SCHEMA\n"
         f"1.  **JSON Output ONLY**: Your output MUST be a single, raw JSON object.\n"
@@ -1355,19 +1409,7 @@ def _get_test_prep_ai_tasks(strengths, weaknesses, test_focus, current_scores=No
         f'      "type": "Either \'standard\' or \'milestone\'.",\n'
         f'      "stat_to_update": "Valid stat name ONLY if type is milestone, otherwise null.",\n'
         f'      "category": "This MUST be the string \'Test Prep\'.",\n'
-        f'      "difficulty": "Either \'easy\', \'medium\', \'hard\', or \'epic\'.",\n'
-        f'      "quiz_content": {{  // For \'quiz\' format ONLY. 5-10 questions. \n'
-        f'          "title": "Title of the quiz",\n'
-        f'          "questions": [ {{"source_or_prompt": "Complete passage, problem setup, data, or attributed source with link", "question_text": "Question asked about the source or prompt", "options": [], "correct_option": 0, "explanation": "..."}} ]\n'
-        f'      }},\n'
-        f'      "sprint_content": {{  // REQUIRED if task_format is \'practice_sprint\', otherwise null.\n'
-        f'          "title": "Title of the sprint (e.g., \'Algebra: Functions Practice\')",\n'
-        f'          "questions": [ {{"question_text": "...", "options": [], "correct_option": 0, "explanation": "..."}} ] // EXACTLY 5 questions on ONE skill\n'
-        f'      }},\n'
-        f'      "strategy_article": {{ // REQUIRED if task_format is \'practice_sprint\', otherwise null.\n'
-        f'          "title": "Article Title (e.g., \'Strategies for Tackling Function Questions\')",\n'
-        f'          "content": "Full article text in Markdown format. Explain key concepts and provide 2-3 actionable strategies."\n'
-        f'      }}\n'
+        f'      "difficulty": "Either \'easy\', \'medium\', \'hard\', or \'epic\'."\n'
         f'    }}\n'
         f'  ]\n'
         f'}}'
@@ -1375,7 +1417,10 @@ def _get_test_prep_ai_tasks(strengths, weaknesses, test_focus, current_scores=No
     try:
         raw_text = _generate_text(
             prompt,
-            max_output_tokens=6000,
+            # The server creates sprint, quiz, and guide content from its
+            # curated sources. Asking Gemini to emit all of that nested data
+            # wastes tokens and increases malformed/duplicate plan responses.
+            max_output_tokens=1800,
             json_output=True,
             thinking_level="low",
         )
@@ -1740,7 +1785,8 @@ def _generate_and_save_new_test_path(user_id, test_path_info, chat_history=None)
     saved_tasks = []
     with db.transaction() as transaction:
         transaction.update("paths", {"is_active": False}, where={
-            "user_id": user_id, "category": "Test Prep", "is_active": True
+            "user_id": user_id, "category": "Test Prep", "is_active": True,
+            "is_user_added": False,
         })
         for i, task in enumerate(tasks):
             task_format = task.get("task_format", "link")
@@ -2097,6 +2143,7 @@ def _generate_and_save_new_college_path(user_id, college_context, chat_history=N
             "user_id": user_id,
             "category": "College Planning",
             "is_active": True,
+            "is_user_added": False,
         })
         for index, task in enumerate(tasks):
             path_data = {
@@ -3048,6 +3095,7 @@ def api_tasks(user):
         if category not in {'Test Prep', 'College Planning'}:
             return jsonify({"error": "Invalid category"}), 400
 
+        _repair_legacy_active_path(user_id, category)
         active_path = db.select(
             "paths",
             where={
