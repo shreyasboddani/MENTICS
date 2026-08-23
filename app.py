@@ -2436,12 +2436,14 @@ def login():
 
 @app.route('/google-login')
 def google_login():
-    # Vercel preview deployments have a unique hostname for every build. Keep
-    # OAuth callbacks on the stable production domain when configured, rather
-    # than requiring each preview URL to be added to Google Cloud.
-    redirect_uri = os.getenv("GOOGLE_REDIRECT_URI", "").strip()
-    if not redirect_uri:
-        redirect_uri = url_for('authorize', _external=True)
+    # Preview URLs are unique per Vercel deployment and cannot be registered
+    # permanently with Google. Start the flow on production so the OAuth state
+    # cookie and callback always share the same stable hostname.
+    if os.getenv("VERCEL_ENV") == "preview":
+        app_url = os.getenv("PUBLIC_APP_URL", "https://mentics.vercel.app").rstrip('/')
+        return redirect(f"{app_url}/google-login")
+
+    redirect_uri = url_for('authorize', _external=True)
     return _get_oauth().google.authorize_redirect(redirect_uri)
 
 # NEW: Google Authorize Route (Callback) - UPDATED
