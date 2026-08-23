@@ -1407,6 +1407,17 @@
 .community-aside h3, .community-aside strong { color: #fff; }
 .community-aside span, .community-aside p { color: #d8d5e8; }
 
+.thread > header { position: relative; }
+.thread > header .forum-edit { margin-left: auto; }
+.reply-meta { display: flex; align-items: center; gap: 8px; }
+.forum-edit { display: inline-flex; align-items: center; gap: 5px; padding: 5px 7px; border: 0; border-radius: 8px; color: var(--mx-violet, #6f42d7); background: rgba(113, 66, 215, .09); font: inherit; font-size: 12px; font-weight: 700; cursor: pointer; }
+.forum-edit:hover { background: rgba(113, 66, 215, .16); }
+.forum-edit-form { display: grid; gap: 10px; margin: 14px 0; }
+.forum-edit-form input, .forum-edit-form textarea { width: 100%; border: 1px solid rgba(103, 91, 142, .24); border-radius: 10px; padding: 10px 12px; color: var(--mx-ink, #171427); background: rgba(255, 255, 255, .9); font: inherit; }
+.forum-edit-form textarea { min-height: 104px; resize: vertical; }
+.forum-edit-form > div { display: flex; gap: 8px; flex-wrap: wrap; }
+.forum-edit-form .button { min-height: 38px; font-size: 13px; }
+
 @media (max-width: 759px) {
   /* Prevent iOS Safari from dropping the label on primary actions when the
      glass rules are composed together (for example, New discussion). */

@@ -4382,6 +4382,7 @@ def forum(user):
 
     return render_react("forum", {
         "name": user.get_name(),
+        "viewerId": user.data['id'],
         "posts": posts_with_replies,
         "todaysThreads": todays_threads,
         "searchQuery": search_query,
@@ -4434,6 +4435,40 @@ def create_reply(user):
         })
         return jsonify({'success': True})
     return jsonify({'success': False, 'error': 'Post ID and content are required'}), 400
+
+
+@app.route('/api/posts/<int:post_id>', methods=['PATCH'])
+@login_required
+@rate_limit('30/hour', name='forum_edit')
+def update_post(user, post_id):
+    post = db.select_one('forum_posts', where={'id': post_id})
+    if not post:
+        return jsonify({'success': False, 'error': 'Discussion not found'}), 404
+    if post['user_id'] != user.data['id']:
+        return jsonify({'success': False, 'error': 'You can only edit your own discussions'}), 403
+    data = request.get_json(silent=True) or {}
+    title = str(data.get('title') or '').strip()[:200]
+    content = str(data.get('content') or '').strip()[:5000]
+    if not title or not content:
+        return jsonify({'success': False, 'error': 'Title and content are required'}), 400
+    db.update('forum_posts', {'title': title, 'content': content}, where={'id': post_id})
+    return jsonify({'success': True})
+
+
+@app.route('/api/replies/<int:reply_id>', methods=['PATCH'])
+@login_required
+@rate_limit('30/hour', name='forum_edit')
+def update_reply(user, reply_id):
+    reply = db.select_one('forum_replies', where={'id': reply_id})
+    if not reply:
+        return jsonify({'success': False, 'error': 'Reply not found'}), 404
+    if reply['user_id'] != user.data['id']:
+        return jsonify({'success': False, 'error': 'You can only edit your own replies'}), 403
+    content = str((request.get_json(silent=True) or {}).get('content') or '').strip()[:5000]
+    if not content:
+        return jsonify({'success': False, 'error': 'Reply content is required'}), 400
+    db.update('forum_replies', {'content': content}, where={'id': reply_id})
+    return jsonify({'success': True})
 
 
 @app.cli.command("init-db")
