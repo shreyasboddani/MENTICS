@@ -903,57 +903,6 @@ def _is_duplicate_task(description, fingerprints):
     return False
 
 
-def _complete_five_step_plan(tasks, category):
-    """Return exactly five valid, non-repeating AI path tasks.
-
-    Gemini is allowed to be creative, but it is never trusted to control the
-    persisted path size or to add near-identical steps.
-    """
-    defaults = {
-        "Test Prep": [
-            {"task_format": "link", "description": "Review one weak skill with an official SAT or ACT lesson and write down three takeaways.", "reason": "A focused review gives the rest of this path a clear foundation.", "type": "standard", "stat_to_update": None, "category": "Test Prep", "difficulty": "easy"},
-            {"task_format": "link", "description": "Complete a timed set of ten official practice questions in your weakest section.", "reason": "A short timed set reveals the exact mistakes worth fixing next.", "type": "standard", "stat_to_update": None, "category": "Test Prep", "difficulty": "medium"},
-            {"task_format": "review", "description": "Build an error log for every missed question and label each mistake by concept, process, or timing.", "reason": "An error log turns practice results into a repeatable improvement system.", "type": "standard", "stat_to_update": None, "category": "Test Prep", "difficulty": "medium"},
-            {"task_format": "link", "description": "Redo the missed questions without notes and explain the correct method in your own words.", "reason": "Retrieval and explanation confirm that the correction will stick.", "type": "standard", "stat_to_update": None, "category": "Test Prep", "difficulty": "medium"},
-            {"task_format": "link", "description": "Boss Battle: Take a timed official practice module and record your updated score.", "reason": "A timed checkpoint measures whether this cycle improved accuracy and pacing.", "type": "milestone", "stat_to_update": None, "category": "Test Prep", "difficulty": "hard"},
-        ],
-        "College Planning": [
-            {"description": "Define your three non-negotiables for college fit and rank them in order.", "reason": "Clear criteria keep your college search focused on schools that genuinely fit you.", "type": "standard", "stat_to_update": None, "category": "College Planning", "difficulty": "easy"},
-            {"description": "Research five colleges against your fit criteria and save one concrete note about each.", "reason": "Evidence-based research creates a balanced, intentional school list.", "type": "standard", "stat_to_update": None, "category": "College Planning", "difficulty": "medium"},
-            {"description": "Create a deadline tracker for applications, financial aid, testing, and recommendations.", "reason": "One source of truth reduces missed deadlines and application stress.", "type": "standard", "stat_to_update": None, "category": "College Planning", "difficulty": "easy"},
-            {"description": "Draft a one-page activities inventory with impact, scope, and time commitment for each activity.", "reason": "A strong inventory makes future application writing faster and more specific.", "type": "standard", "stat_to_update": None, "category": "College Planning", "difficulty": "medium"},
-            {"description": "Write a first personal-statement outline built around one specific experience and what changed because of it.", "reason": "A focused narrative foundation prevents a generic personal statement.", "type": "milestone", "stat_to_update": None, "category": "College Planning", "difficulty": "hard"},
-        ],
-    }
-    normalized = []
-    fingerprints = []
-    allowed_formats = {"link", "quiz", "strategy", "review", "practice_sprint"}
-    allowed_difficulties = {"easy", "medium", "hard", "epic"}
-    for task in tasks or []:
-        if not isinstance(task, dict) or not task.get("description"):
-            continue
-        task = dict(task)
-        task["description"] = str(task["description"]).strip()[:700]
-        if _is_duplicate_task(task["description"], fingerprints):
-            continue
-        task["reason"] = str(task.get("reason") or "This step builds directly on your current path.").strip()[:900]
-        task["task_format"] = task.get("task_format") if task.get("task_format") in allowed_formats else "link"
-        task["type"] = "milestone" if task.get("type") == "milestone" else "standard"
-        task["difficulty"] = task.get("difficulty") if task.get("difficulty") in allowed_difficulties else "medium"
-        task["category"] = category
-        normalized.append(task)
-        fingerprints.append(_task_fingerprint(task["description"]))
-        if len(normalized) == 5:
-            break
-    for fallback in defaults[category]:
-        if len(normalized) == 5:
-            break
-        if not _is_duplicate_task(fallback["description"], fingerprints):
-            normalized.append(dict(fallback))
-            fingerprints.append(_task_fingerprint(fallback["description"]))
-    return normalized[:5]
-
-
 def _repair_legacy_active_path(user_id, category):
     """Hide surplus AI-generated steps left by older path-builder versions.
 
@@ -1498,6 +1447,235 @@ def lesson_progress(user, task_id):
     return jsonify({"success": True, "current_step": current_step})
 
 
+# --- Boss battle: logging a real official practice test -------------------
+# A boss battle is the only step whose work happens outside Mentics, so the
+# score is the only evidence it produced anything. Section scores are captured
+# rather than a bare total: the total alone cannot tell the planner which half
+# of the test moved, and it never reaches the stats page.
+
+TEST_SECTIONS = {
+    'SAT': [
+        ('sat_ebrw', 'Reading & Writing', 200, 800),
+        ('sat_math', 'Math', 200, 800),
+    ],
+    'ACT': [
+        ('act_math', 'Math', 1, 36),
+        ('act_reading', 'Reading', 1, 36),
+        ('act_science', 'Science', 1, 36),
+    ],
+}
+
+
+def _boss_battle_test_type(task):
+    label = f"{task.get('description') or ''} {task.get('stat_to_update') or ''}".lower()
+    return 'ACT' if 'act' in label and 'sat' not in label else 'SAT'
+
+
+@app.route('/api/boss_battle/<int:task_id>', methods=['GET'])
+@login_required
+@rate_limit('120/hour', name='boss_battle_detail')
+def boss_battle_detail(user, task_id):
+    """Describe the score fields this boss battle expects."""
+    user_id = user.data['id']
+    task = db.select_one("paths", where={"id": task_id, "user_id": user_id, "is_active": True})
+    if not task:
+        return jsonify({"error": "That step is not part of your active path."}), 404
+    if _has_incomplete_earlier_task(user_id, task):
+        return jsonify({"error": "Complete the earlier path step first."}), 409
+
+    test_type = _boss_battle_test_type(task)
+    stats = user.get_stats()
+    sections = []
+    for key, label, minimum, maximum in TEST_SECTIONS[test_type]:
+        sections.append({
+            "key": key, "label": label, "min": minimum, "max": maximum,
+            "previous": stats.get(key) or None,
+        })
+    return jsonify({
+        "task_id": task_id, "test_type": test_type, "sections": sections,
+        "is_completed": bool(task.get('is_completed')),
+    })
+
+
+@app.route('/api/boss_battle/<int:task_id>/result', methods=['POST'])
+@login_required
+@rate_limit('20/hour', name='boss_battle_result')
+def boss_battle_result(user, task_id):
+    """Record a full official practice test, then close out the step."""
+    user_id = user.data['id']
+    task = db.select_one("paths", where={"id": task_id, "user_id": user_id, "is_active": True})
+    if not task:
+        return jsonify({"error": "That step is not part of your active path."}), 404
+    if _has_incomplete_earlier_task(user_id, task):
+        return jsonify({"error": "Complete the earlier path step first."}), 409
+
+    test_type = _boss_battle_test_type(task)
+    submitted = (request.get_json(silent=True) or {}).get('scores') or {}
+    if not isinstance(submitted, dict):
+        return jsonify({"error": "Scores must be provided per section."}), 400
+
+    stats = user.get_stats()
+    # A student who has not logged a test here still gave a baseline in the path
+    # builder. Without this fallback their first boss battle reports no change
+    # even though the starting score is known.
+    baseline = stats.get("test_path") or {}
+    previous = {}
+    recorded = {}
+    for key, label, minimum, maximum in TEST_SECTIONS[test_type]:
+        raw = submitted.get(key)
+        if raw is None or str(raw).strip() == "":
+            return jsonify({"error": f"Enter your {label} score to log this test."}), 400
+        try:
+            value = int(float(raw))
+        except (TypeError, ValueError):
+            return jsonify({"error": f"{label} must be a number."}), 400
+        if not minimum <= value <= maximum:
+            return jsonify({"error": f"{label} must be between {minimum} and {maximum}."}), 400
+        previous[key] = stats.get(key) or baseline.get(f"current_{key}")
+        recorded[key] = value
+
+    # Section scores drive the stats page, so they are written to the profile as
+    # well as to history. The composite is derived, never entered by hand.
+    for key, value in recorded.items():
+        stats[key] = value
+        db.insert("stat_history", {
+            "user_id": user_id, "stat_name": key, "stat_value": value,
+        })
+    user.set_stats(stats)
+
+    if test_type == 'SAT':
+        composite_key, composite = 'sat_total', sum(recorded.values())
+        previous_composite = None
+        if all(previous.get(k) for k in recorded):
+            try:
+                previous_composite = sum(int(previous[k]) for k in recorded)
+            except (TypeError, ValueError):
+                previous_composite = None
+    else:
+        composite_key = 'act_composite'
+        composite = round(sum(recorded.values()) / len(recorded))
+        previous_composite = None
+        prior = [previous.get(k) for k in recorded]
+        if all(prior):
+            try:
+                previous_composite = round(sum(int(v) for v in prior) / len(prior))
+            except (TypeError, ValueError):
+                previous_composite = None
+
+    db.insert("stat_history", {
+        "user_id": user_id, "stat_name": composite_key, "stat_value": composite,
+    })
+    log_activity(user_id, 'test_logged', {
+        'test_type': test_type, 'composite': composite, 'sections': recorded,
+    })
+
+    newly_completed = _record_task_completion(user_id, task)
+    xp = 0
+    if newly_completed:
+        xp = task.get('xp_reward') or 100
+        _award_xp(user_id, xp)
+
+    return jsonify({
+        "success": True,
+        "test_type": test_type,
+        "composite": composite,
+        "composite_label": 'Total' if test_type == 'SAT' else 'Composite',
+        "previous_composite": previous_composite,
+        "delta": (composite - previous_composite) if previous_composite is not None else None,
+        "sections": recorded,
+        "xp_earned": xp,
+    })
+
+
+# --- College milestone: logging a real deliverable -------------------------
+# The college equivalent of a boss battle. The work happens outside Mentics, so
+# the recorded number is the evidence, and it is what the next unit builds on.
+
+MILESTONE_FIELDS = {
+    'colleges_researched': ("How many colleges are on your list now?", "colleges", 0, 1000),
+    'applications_submitted': ("How many applications have you submitted?", "applications", 0, 1000),
+    'essay_progress': ("Where is your personal statement?", "stage", 1, 2),
+}
+
+
+@app.route('/api/milestone/<int:task_id>', methods=['GET'])
+@login_required
+@rate_limit('120/hour', name='milestone_detail')
+def milestone_detail(user, task_id):
+    user_id = user.data['id']
+    task = db.select_one("paths", where={"id": task_id, "user_id": user_id, "is_active": True})
+    if not task or task.get('task_format') != 'milestone':
+        return jsonify({"error": "That step is not a milestone."}), 404
+    if _has_incomplete_earlier_task(user_id, task):
+        return jsonify({"error": "Complete the earlier path step first."}), 409
+
+    stat = task.get('stat_to_update')
+    field = MILESTONE_FIELDS.get(stat)
+    stats = user.get_stats()
+    return jsonify({
+        "task_id": task_id,
+        "objective": task.get('objective') or task.get('description'),
+        "stat_name": stat if field else None,
+        "label": field[0] if field else None,
+        "unit": field[1] if field else None,
+        "min": field[2] if field else None,
+        "max": field[3] if field else None,
+        "previous": stats.get(stat) if field else None,
+        "is_completed": bool(task.get('is_completed')),
+    })
+
+
+@app.route('/api/milestone/<int:task_id>/result', methods=['POST'])
+@login_required
+@rate_limit('30/hour', name='milestone_result')
+def milestone_result(user, task_id):
+    user_id = user.data['id']
+    task = db.select_one("paths", where={"id": task_id, "user_id": user_id, "is_active": True})
+    if not task or task.get('task_format') != 'milestone':
+        return jsonify({"error": "That step is not a milestone."}), 404
+    if _has_incomplete_earlier_task(user_id, task):
+        return jsonify({"error": "Complete the earlier path step first."}), 409
+
+    stat = task.get('stat_to_update')
+    field = MILESTONE_FIELDS.get(stat)
+    previous = None
+    value = None
+    if field:
+        raw = (request.get_json(silent=True) or {}).get('value')
+        if raw is None or str(raw).strip() == "":
+            return jsonify({"error": f"Enter a number to finish this step."}), 400
+        try:
+            value = int(float(raw))
+        except (TypeError, ValueError):
+            return jsonify({"error": "That needs to be a number."}), 400
+        if not field[2] <= value <= field[3]:
+            return jsonify({"error": f"Enter a value between {field[2]} and {field[3]}."}), 400
+
+        stats = user.get_stats()
+        previous = stats.get(stat)
+        stats[stat] = value
+        user.set_stats(stats)
+        db.insert("stat_history", {
+            "user_id": user_id, "stat_name": stat, "stat_value": value,
+        })
+        log_activity(user_id, 'milestone_logged', {'stat_name': stat, 'stat_value': value})
+
+    newly_completed = _record_task_completion(user_id, task)
+    xp = 0
+    if newly_completed:
+        xp = task.get('xp_reward') or 90
+        _award_xp(user_id, xp)
+
+    try:
+        delta = int(value) - int(previous) if value is not None and previous not in (None, "") else None
+    except (TypeError, ValueError):
+        delta = None
+    return jsonify({
+        "success": True, "value": value, "previous": previous, "delta": delta,
+        "unit": field[1] if field else None, "xp_earned": xp,
+    })
+
+
 @app.route('/api/lesson/<int:task_id>/finish', methods=['POST'])
 @login_required
 @rate_limit('60/hour', name='lesson_finish')
@@ -1762,6 +1940,7 @@ def _build_learner_profile(user_id, test_path_info, chat_history):
         "recent_mistakes": _get_recent_mistakes_for_prompt(user_id),
         "taught_skills": ", ".join(taught_labels) or "None yet",
         "latest_request": latest_request,
+        "standing_focus": _describe_standing_focus(test_path_info),
         "chat_history": _format_chat_history_for_prompt(chat_history or []),
         "level_hint": level_hint,
         "skill_options": learning.skill_catalog(test_focus),
@@ -1796,6 +1975,8 @@ def _persist_unit(user_id, unit, category="Test Prep"):
             task_format = {
                 "lesson": "lesson", "practice_sprint": "practice_sprint",
                 "quiz": "quiz", "boss_battle": "boss_battle",
+                # A college unit ends in a real deliverable rather than a test.
+                "milestone": "milestone",
             }[node_type]
 
             description = node["title"]
@@ -1809,7 +1990,7 @@ def _persist_unit(user_id, unit, category="Test Prep"):
                 "user_id": user_id, "task_order": index + 1,
                 "description": description,
                 "reason": node["reason"],
-                "type": "milestone" if node_type == "boss_battle" else "standard",
+                "type": "milestone" if node_type in ("boss_battle", "milestone") else "standard",
                 "stat_to_update": node.get("stat_to_update"),
                 "category": category, "is_active": True, "is_completed": False,
                 "task_format": task_format,
@@ -2046,109 +2227,98 @@ def _get_test_prep_ai_chat_response(history, user_stats, stat_history="", user_i
         return "Sorry, I encountered an error connecting to the AI."
 
 
-def _get_college_planning_ai_tasks(college_context, user_stats, path_history, chat_history=None, stat_history=""):
-    """Generates hyper-intelligent, adaptive college planning tasks with a detailed, gamified prompt."""
+def _build_college_profile(user_id, college_context, chat_history):
+    """Assemble what the college planner needs about one student."""
+    stats = {}
+    record = db.select_one("users", where={"id": user_id})
+    if record:
+        try:
+            stats = json.loads(record["stats"]) or {}
+        except (TypeError, ValueError):
+            stats = {}
 
-    chat_history = chat_history or []
+    grade = str(college_context.get("grade") or "").strip() or "not specified"
+    stage = (college_context.get("planning_stage") or "researching").lower()
 
-    def get_mock_tasks_reliably():
-        print("--- DEBUG: Running corrected College Planning mock generator. ---")
-        all_mock_tasks = [
-            {"description": "Research 5 colleges that match your interests.", "reason": "Finding the right fit is the first step to a successful college experience.",
-                "type": "standard", "stat_to_update": None, "category": "College Planning", "difficulty": "medium"},
-            {"description": "Write a rough draft of your Common App personal statement.", "reason": "This is your chance to tell your story and show admissions officers who you are.",
-                "type": "milestone", "stat_to_update": "essay_progress", "category": "College Planning", "difficulty": "hard"},
-            {"description": "Update your GPA in your profile.", "reason": "Keeping your academic information up-to-date is important for tracking your progress.",
-                "type": "milestone", "stat_to_update": "gpa", "category": "College Planning", "difficulty": "easy"},
-            {"description": "Request three letters of recommendation from teachers.", "reason": "Strong letters of recommendation can make a big difference in your application.",
-                "type": "standard", "stat_to_update": None, "category": "College Planning", "difficulty": "medium"},
-            {"description": "Create a spreadsheet to track application deadlines.", "reason": "Staying organized is key to a stress-free application season.",
-                "type": "standard", "stat_to_update": None, "category": "College Planning", "difficulty": "easy"}
-        ]
-        return all_mock_tasks
+    academics = []
+    if stats.get("gpa"):
+        academics.append(f"GPA {stats['gpa']}")
+    if stats.get("sat_ebrw") and stats.get("sat_math"):
+        try:
+            academics.append(
+                f"SAT {int(stats['sat_ebrw']) + int(stats['sat_math'])} "
+                f"(RW {stats['sat_ebrw']}, Math {stats['sat_math']})"
+            )
+        except (TypeError, ValueError):
+            pass
+    act_sections = [stats.get(k) for k in ("act_math", "act_reading", "act_science")]
+    if all(act_sections):
+        try:
+            academics.append(f"ACT composite about {round(sum(int(v) for v in act_sections) / 3)}")
+        except (TypeError, ValueError):
+            pass
 
-    if not os.getenv("GEMINI_API_KEY"):
-        return get_mock_tasks_reliably()
-
-    completed_tasks_str = "\n".join(
-        [f"- {task['description']}" for task in path_history.get('completed', [])]) or "None."
-    incomplete_tasks_str = "\n".join(
-        [f"- {task['description']}" for task in path_history.get('incomplete', [])]) or "None."
-    chat_history_str = _format_chat_history_for_prompt(chat_history)
-    latest_user_message = next((msg['content'] for msg in reversed(
-        chat_history) if msg['role'] == 'user'), "N/A")
-
-    prompt = (
-        f"# MISSION\n"
-        f"You are an expert AI college admissions counselor for the Mentics platform. Your mission is to generate an intelligent, 5-step roadmap that provides a clear, logical, and motivating path for a high school student. The plan must be a thoughtful continuation of their journey, not just a random list of tasks.\n\n"
-
-        f"## CRITICAL SCENARIO ANALYSIS (ACTION REQUIRED)\n"
-        f"First, determine the student's current situation and choose your generation strategy:\n"
-        f"1.  **Regeneration Request:** This generation was initiated from the student's path conversation. Treat the student's most recent substantive path request as an explicit override: every task must directly reflect its requested focus, constraints, deadlines, or changed goal. If the final message is only a short follow-up such as 'why?' or 'do it,' resolve it against the preceding user messages instead of using the short follow-up as the plan focus.\n"
-        f"2.  **Post-Path Continuation:** If the student has just completed all tasks in their previous path, the new plan MUST be a logical next step in the college planning process (e.g., moving from 'researching colleges' to 'drafting supplemental essays'). It should feel like a natural progression.\n"
-        f"3.  **Standard Generation:** If neither of the above applies, generate a standard path that is appropriate for their grade level and builds upon their historical data.\n\n"
-
-        f"# STUDENT ANALYSIS DATA\n"
-        f"- Current Grade: {college_context.get('grade', 'N/A')}\n"
-        f"- Stated Planning Stage: {college_context.get('planning_stage', 'N/A')}\n"
-        f"- Interested Majors: {college_context.get('majors', 'N/A')}\n"
-        f"- Target Colleges: {college_context.get('target_colleges', 'None specified')}\n"
-        f"- Current GPA: {user_stats.get('gpa', 'N/A')}\n\n"
-
-        f"## HISTORICAL & CONVERSATIONAL CONTEXT\n"
-        f"This is CRITICAL for creating an intelligent, continuous learning journey.\n"
-        f"- **Most Recent User Request:** '{latest_user_message}' <== **If this is a regeneration request, it takes precedence over all other data.**\n"
-        f"- Recently Completed Tasks: {completed_tasks_str}\n"
-        f"- Incomplete Tasks from Previous Path: {incomplete_tasks_str}\n"
-        f"- Full Conversation History: {chat_history_str}\n"
-        f"- Historical Performance Data (Tracker):\n{stat_history}\n\n"
-
-        f"# YOUR TASK: GENERATE EXACTLY 5 NEW STEPS\n"
-        f"- Return exactly five unique tasks. Do not repeat an old task unless the student's latest request clearly requires it.\n"
-        f"- **Synthesize, Don't Just List:** Your primary function is to connect the student's grade, goals, and history to create hyper-specific tasks. Generic tasks like 'Work on your essay' are forbidden.\n"
-        f"- **Extreme Specificity & Actionable Verbs:** Descriptions must be granular and start with a strong verb (e.g., 'Draft', 'Research', 'Finalize'). Instead of 'Explore majors', generate 'Research the core curriculum for a Computer Science major at {college_context.get('target_colleges', 'one of your target schools')} to see if it aligns with your interests.'\n"
-        f"- **Incorporate Multiple Formats:** The plan must include a mix of task types. Include at least one **Resource Task** (e.g., 'Watch this guide on financial aid'), one **Action Task** (e.g., 'Draft your Common App activity list'), and one **Strategic/Review Task** (e.g., 'Analyze the supplemental essay prompts for your target schools and categorize them by theme').\n"
-        f"- **Data-Driven Justification:** The `reason` for each task is critical. It MUST explicitly reference the student's personal data (grade, major, goals). For example: 'As an 11th grader interested in Biology, it is crucial to start identifying teachers for your recommendation letters now.'\n\n"
-
-        f"# CRITICAL DIRECTIVES & JSON SCHEMA\n"
-        f"1.  **JSON Output ONLY**: Your entire output MUST be a single, raw JSON object. No extra text.\n"
-        f"2.  **New Task Formats**: You can now use `strategy` and `review` in the `task_format` field for tasks focused on planning or self-evaluation. These do not require a markdown link.\n"
-        f"3.  **Data-Driven Justification**: The `reason` field is mandatory and must explain *why* this task is relevant to *this specific student* by referencing their data (e.g., '...because you're in 12th grade and application deadlines are approaching').\n"
-        f"4.  **Meaningful Milestones & 'Boss Battles'**: Use 'milestone' for significant achievements (e.g., completing an essay draft, submitting an application). A 'Boss Battle' description must begin with 'Boss Battle:'.\n"
-        f"5.  **Refer to Test Prep Path**: If test prep is relevant, do not create a task for it. Instead, create a task that instructs the user to work on their 'Test Prep Path' within the Mentics app.\n\n"
-
-        f"# JSON OUTPUT STRUCTURE\n"
-        f"{{\n"
-        f'  "tasks": [\n'
-        f'    {{\n'
-        f'      "task_format": "Either \'link\', \'strategy\', or \'review\'.",\n'
-        f'      "description": "Hyper-specific instruction. MUST include a markdown link if format is \'link\'.",\n'
-        f'      "reason": "Mandatory, data-driven justification referencing the student\'s specific grade, goals, or history.",\n'
-        f'      "type": "Either \'standard\' or \'milestone\'.",\n'
-        f'      "stat_to_update": "A string (\'gpa\', \'essay_progress\', \'applications_submitted\') ONLY if type is milestone, otherwise null.",\n'
-        f'      "category": "This MUST be the string \'College Planning\'.",\n'
-        f'      "difficulty": "Either \'easy\', \'medium\', \'hard\', or \'epic\'."\n'
-        f'    }}\n'
-        f'  ]\n'
-        f'}}'
-    )
-    try:
-        response_text = _generate_text(
-            prompt,
-            max_output_tokens=2500,
-            json_output=True,
-            thinking_level="low",
+    progress = []
+    if stats.get("colleges_researched"):
+        progress.append(f"{stats['colleges_researched']} colleges researched")
+    if stats.get("applications_submitted"):
+        progress.append(f"{stats['applications_submitted']} applications submitted")
+    if stats.get("essay_progress"):
+        progress.append(
+            "personal statement finalized" if str(stats["essay_progress"]) == "2"
+            else "personal statement drafted"
         )
-        response_data = json.loads(response_text)
-        tasks = response_data.get("tasks", [])
-        if isinstance(tasks, list) and len(tasks) > 0:
-            return tasks
-        raise ValueError("Invalid format from AI")
-    except Exception as e:
-        print(
-            f"\n--- GEMINI API ERROR IN _get_college_planning_ai_tasks: {e} ---\n")
-        return get_mock_tasks_reliably()
+    done = db.execute(
+        """SELECT skill_label FROM paths
+           WHERE user_id=? AND category='College Planning' AND is_completed=True
+             AND skill_label IS NOT NULL LIMIT 20""",
+        (user_id,),
+    ) or []
+    taught = sorted({row["skill_label"] for row in done if row.get("skill_label")})
 
+    latest_request = next(
+        (m['content'] for m in reversed(chat_history or []) if m.get('role') == 'user'),
+        "No specific request -- build the best next unit for their stage.",
+    )
+
+    return {
+        "grade": grade,
+        "stage": stage,
+        "majors": college_context.get("majors") or "undecided",
+        "target_colleges": college_context.get("target_colleges") or "none listed yet",
+        "academics": ", ".join(academics) or "not provided",
+        "progress": ", ".join(progress) or "nothing recorded yet",
+        "taught_skills": ", ".join(taught) or "None yet",
+        "latest_request": latest_request,
+        "standing_focus": _describe_standing_focus(college_context),
+        "chat_history": _format_chat_history_for_prompt(chat_history or []),
+        "skill_options": learning.college_skill_options(stage),
+    }
+
+
+def _generate_and_save_new_college_path(user_id, college_context, chat_history=None):
+    """Build the next college unit: teach the judgement, then a real deliverable."""
+    profile = _build_college_profile(user_id, college_context or {}, chat_history or [])
+    unit = learning.build_college_unit(profile)
+
+    # A drill with no questions would be an empty step, so it becomes a lesson
+    # on the same skill instead.
+    for node in unit["nodes"]:
+        if node["node_type"] in ("practice_sprint", "quiz") and not node.get("questions"):
+            app.logger.warning(
+                "No college questions for %s node on %s; converting to a lesson.",
+                node["node_type"], node["skill"]["skill_key"],
+            )
+            node["node_type"] = "lesson"
+            node["xp_reward"] = learning.COLLEGE_XP["lesson"]
+            teaching = learning._fallback_college_teaching(node)
+            node["teaching"] = teaching
+            node["steps"] = learning._interleave_lesson(teaching, [])
+
+    saved = _persist_unit(user_id, unit, "College Planning")
+    if len(saved) != 5:
+        raise ValueError("College path generation must produce exactly five usable steps.")
+    return saved
 
 def _get_college_planning_ai_chat_response(history, user_stats, stat_history="", user_id=None):
     """Generates a proactive and context-aware chat response for college planning."""
@@ -2210,62 +2380,6 @@ def _get_college_planning_ai_chat_response(history, user_stats, stat_history="",
         print(
             f"\n--- GEMINI API ERROR IN _get_college_planning_ai_chat_response: {e} ---\n")
         return "Sorry, I encountered an error connecting to the AI."
-
-
-def _generate_and_save_new_college_path(user_id, college_context, chat_history=None):
-    """Gathers all context, generates, and saves a new college planning path."""
-    chat_history = chat_history or []
-    user_record = db.select_one("users", where={"id": user_id})
-    if not user_record:
-        raise ValueError(f"User with ID {user_id} not found.")
-    user_stats = json.loads(user_record['stats'])
-
-    all_college_tasks = db.select(
-        "paths", where={"user_id": user_id, "category": "College Planning"})
-    path_history = {
-        "completed": [task for task in all_college_tasks if task['is_completed']],
-        "incomplete": [task for task in all_college_tasks if not task['is_completed']],
-    }
-    stat_history = _get_stat_history_for_prompt(user_id)
-    tasks = _complete_five_step_plan(
-        _get_college_planning_ai_tasks(
-            college_context, user_stats, path_history, chat_history, stat_history
-        ),
-        "College Planning",
-    )
-    if len(tasks) != 5:
-        raise ValueError("Path generation must produce exactly five usable tasks.")
-
-    saved_tasks = []
-    with db.transaction() as transaction:
-        transaction.update("paths", {"is_active": False}, where={
-            "user_id": user_id,
-            "category": "College Planning",
-            "is_active": True,
-            "is_user_added": False,
-        })
-        for index, task in enumerate(tasks):
-            path_data = {
-                "user_id": user_id,
-                "task_order": index + 1,
-                "description": task.get("description"),
-                "reason": task.get("reason"),
-                "type": task.get("type"),
-                "stat_to_update": task.get("stat_to_update"),
-                "category": "College Planning",
-                "is_active": True,
-                "is_completed": False,
-                "task_format": task.get("task_format", "link"),
-            }
-            task_id = transaction.insert("paths", path_data)
-            saved_tasks.append({**task, **path_data, "id": task_id})
-
-        transaction.insert("activity_log", {
-            "user_id": user_id,
-            "activity_type": "path_generated",
-            "details": json.dumps({"category": "College Planning"}),
-        })
-    return saved_tasks
 
 
 @app.route("/dashboard/tracker")
@@ -3155,54 +3269,137 @@ def college_path_view(user):
 # --- Stats & Tracker Routes ---
 
 
+def _path_snapshot(user_id, category):
+    """Where the student currently stands in one path."""
+    tasks = db.select(
+        "paths",
+        where={"user_id": user_id, "category": category, "is_active": True},
+        order_by="task_order ASC",
+    ) or []
+    tasks = sorted(tasks, key=lambda t: t["task_order"])
+    if not tasks:
+        return None
+    completed = sum(1 for t in tasks if t["is_completed"])
+    current = next((t for t in tasks if not t["is_completed"]), None)
+    return {
+        "unitTitle": next((t.get("unit_title") for t in tasks if t.get("unit_title")), None),
+        "completed": completed,
+        "total": len(tasks),
+        "currentStep": current["task_order"] if current else None,
+        "currentTitle": (current or {}).get("description"),
+        "currentSkill": (current or {}).get("skill_label"),
+        "currentType": (current or {}).get("node_type"),
+        "steps": [{
+            "order": t["task_order"],
+            "nodeType": t.get("node_type"),
+            "skill": t.get("skill_label"),
+            "done": bool(t["is_completed"]),
+        } for t in tasks],
+    }
+
+
+def _practice_totals(user_id):
+    """Every graded answer the student has given inside Mentics."""
+    rows = db.execute_for_one(
+        """SELECT
+             (SELECT COUNT(*) FROM quiz_results WHERE user_id=?) AS quiz_total,
+             (SELECT COUNT(*) FROM quiz_results WHERE user_id=? AND is_correct=1) AS quiz_correct,
+             (SELECT COUNT(*) FROM sprint_results WHERE user_id=?) AS sprint_total,
+             (SELECT COUNT(*) FROM sprint_results WHERE user_id=? AND is_correct=1) AS sprint_correct,
+             (SELECT COUNT(*) FROM lesson_answers WHERE user_id=?) AS lesson_total,
+             (SELECT COUNT(*) FROM lesson_answers WHERE user_id=? AND is_correct=1) AS lesson_correct""",
+        (user_id,) * 6,
+    ) or {}
+    total = sum(rows.get(k) or 0 for k in ("quiz_total", "sprint_total", "lesson_total"))
+    correct = sum(rows.get(k) or 0 for k in ("quiz_correct", "sprint_correct", "lesson_correct"))
+    return {
+        "answered": total,
+        "correct": correct,
+        "accuracy": round(correct / total * 100) if total else None,
+    }
+
+
 @app.route("/dashboard/stats", methods=["GET"])
 @login_required
 def stats(user):
+    """A snapshot built from what the student has actually done, not just typed in.
+
+    The old page showed four numbers the student entered by hand, which is why it
+    never reflected the work. Everything here except GPA now comes from graded
+    answers, logged tests, and live path state.
+    """
     stats = user.get_stats()
     user_id = user.data['id']
-    all_tasks = db.select("paths", where={"user_id": user_id})
 
-    sat_ebrw = stats.get("sat_ebrw")
-    sat_math = stats.get("sat_math")
-    sat_total = None
-    if sat_ebrw and sat_math:
+    def as_int(value):
         try:
-            sat_total = int(sat_ebrw) + int(sat_math)
-        except (ValueError, TypeError):
-            sat_total = None
+            return int(value)
+        except (TypeError, ValueError):
+            return None
 
-    act_scores = []
-    if stats.get("act_math"):
-        act_scores.append(int(stats.get("act_math")))
-    if stats.get("act_reading"):
-        act_scores.append(int(stats.get("act_reading")))
-    if stats.get("act_science"):
-        act_scores.append(int(stats.get("act_science")))
+    sat_ebrw, sat_math = as_int(stats.get("sat_ebrw")), as_int(stats.get("sat_math"))
+    sat_total = sat_ebrw + sat_math if sat_ebrw and sat_math else None
+    act_sections = [as_int(stats.get(k)) for k in ("act_math", "act_reading", "act_science")]
+    act_average = round(sum(v for v in act_sections if v) / len([v for v in act_sections if v])) \
+        if any(act_sections) else None
 
-    act_average = None
-    if act_scores:
-        act_average = round(sum(act_scores) / len(act_scores))
+    test_path = stats.get("test_path") or {}
+    goal_sat = as_int(test_path.get("desired_sat"))
+    goal_act = as_int(test_path.get("desired_act"))
 
-    total_test_prep_completed = sum(
-        1 for t in all_tasks if t['is_completed'] and t['category'] == 'Test Prep')
-    total_college_planning_completed = sum(
-        1 for t in all_tasks if t['is_completed'] and t['category'] == 'College Planning')
+    # Mastery, ranked. This is the part that makes the page reflect the paths.
+    mastery = sorted(_get_mastery_rows(user_id), key=lambda r: (r["accuracy"], -r["attempts"]))
+    measured = [m for m in mastery if m["attempts"] >= 3]
+    by_subject = {}
+    for row in mastery:
+        bucket = by_subject.setdefault(row["subject"] or "Other", {"attempts": 0, "correct": 0})
+        bucket["attempts"] += row["attempts"]
+        bucket["correct"] += row["correct"]
+    subjects = [{
+        "subject": name,
+        "accuracy": round(v["correct"] / v["attempts"] * 100) if v["attempts"] else 0,
+        "attempts": v["attempts"],
+    } for name, v in by_subject.items() if v["attempts"]]
+    subjects.sort(key=lambda s: -s["attempts"])
+
+    game = db.select_one("gamification_stats", where={"user_id": user_id}) or {}
+    all_tasks = db.select("paths", where={"user_id": user_id}) or []
+
+    open_mistakes = db.execute_for_one(
+        "SELECT COUNT(*) AS n FROM mistake_bank WHERE user_id=? AND resolved=False", (user_id,)
+    ) or {}
 
     return render_react("stats", {
         "name": user.get_name(),
         "gpa": stats.get("gpa", ""),
-        "satEbrw": sat_ebrw,
-        "satMath": sat_math,
-        "satTotal": sat_total,
-        "actMath": stats.get("act_math", ""),
-        "actReading": stats.get("act_reading", ""),
-        "actScience": stats.get("act_science", ""),
-        "actAverage": act_average,
-        "totalTestPrepCompleted": total_test_prep_completed,
-        "totalCollegePlanningCompleted": total_college_planning_completed,
+        "satEbrw": sat_ebrw, "satMath": sat_math, "satTotal": sat_total,
+        "actMath": stats.get("act_math", ""), "actReading": stats.get("act_reading", ""),
+        "actScience": stats.get("act_science", ""), "actAverage": act_average,
+        "goalSat": goal_sat, "goalAct": goal_act,
+        "testDate": test_path.get("test_date"),
+        "points": game.get("points") or 0,
+        "streak": game.get("current_streak") or 0,
+        "practice": _practice_totals(user_id),
+        "subjects": subjects,
+        "weakest": [{
+            "skill": m["skill_label"], "subject": m["subject"],
+            "accuracy": round(m["accuracy"] * 100), "attempts": m["attempts"], "level": m["level"],
+        } for m in measured[:5]],
+        "strongest": [{
+            "skill": m["skill_label"], "subject": m["subject"],
+            "accuracy": round(m["accuracy"] * 100), "attempts": m["attempts"], "level": m["level"],
+        } for m in reversed(measured[-5:])] if measured else [],
+        "openMistakes": open_mistakes.get("n") or 0,
+        "testPath": _path_snapshot(user_id, "Test Prep"),
+        "collegePath": _path_snapshot(user_id, "College Planning"),
+        "collegesResearched": as_int(stats.get("colleges_researched")) or 0,
+        "applicationsSubmitted": as_int(stats.get("applications_submitted")) or 0,
+        "essayProgress": as_int(stats.get("essay_progress")),
+        "totalTestPrepCompleted": sum(
+            1 for t in all_tasks if t['is_completed'] and t['category'] == 'Test Prep'),
+        "totalCollegePlanningCompleted": sum(
+            1 for t in all_tasks if t['is_completed'] and t['category'] == 'College Planning'),
     }, "Progress | Mentics")
-
-
 @app.route("/dashboard/stats/edit", methods=["GET", "POST"])
 @login_required
 def edit_stats(user):
@@ -3514,6 +3711,43 @@ def api_update_task_status(user):
     return jsonify({"success": True})
 
 
+def _remember_path_focus(user, category, history):
+    """Persist the focus a student asked for so it outlives one regeneration.
+
+    Without this the request only shapes the unit generated in that moment; the
+    next unit forgets it and drifts back to whatever the scores suggest, which
+    reads as the app ignoring what they said.
+    """
+    request_text = next(
+        (m['content'] for m in reversed(history or []) if m.get('role') == 'user'), ""
+    ).strip()
+    if not request_text:
+        return
+    stats = user.get_stats()
+    key = "college_path" if category == 'College Planning' else "test_path"
+    section = dict(stats.get(key) or {})
+    section["focus_request"] = request_text[:600]
+    section["focus_set_at"] = date.today().isoformat()
+    stats[key] = section
+    user.set_stats(stats)
+
+
+def _describe_standing_focus(section):
+    """Render a previously stated focus for the planner, with its age."""
+    focus = (section or {}).get("focus_request")
+    if not focus:
+        return "None stated."
+    when = (section or {}).get("focus_set_at")
+    if when:
+        try:
+            days = (date.today() - date.fromisoformat(when)).days
+            age = "today" if days == 0 else f"{days} day(s) ago"
+            return f'"{focus}" (asked {age})'
+        except (TypeError, ValueError):
+            pass
+    return f'"{focus}"'
+
+
 def _regenerate_path_from_chat(user_id, stats, category, history):
     """Generate, persist, and return a path without leaking control messages."""
     try:
@@ -3663,7 +3897,8 @@ def api_chat(user):
         if message['role'] == 'user'
     ), "")
     if _is_path_regeneration_request(user_message):
-        return _regenerate_path_from_chat(user_id, stats, category, history)
+        _remember_path_focus(user, category, history)
+        return _regenerate_path_from_chat(user_id, user.get_stats(), category, history)
 
     # Fetch tracker data only for regular coaching replies. Regeneration already
     # gathers the richer task, assessment, and tracker context it needs.
@@ -3677,7 +3912,8 @@ def api_chat(user):
             history, stats, stat_history, user_id)
 
     if _is_path_regeneration_control(reply):
-        return _regenerate_path_from_chat(user_id, stats, category, history)
+        _remember_path_focus(user, category, history)
+        return _regenerate_path_from_chat(user_id, user.get_stats(), category, history)
 
     history.append({"role": "assistant", "content": reply})
 

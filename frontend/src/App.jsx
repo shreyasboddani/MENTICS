@@ -19,6 +19,7 @@ import './mentics-redesign.css'
 import './story-system.css'
 import './design-system.css'  // last: owns materials, motion, typography, a11y
 import './lesson-player.css'
+import './mentics-ui.css'  // last: owns chat guide, task modal, and map performance
 
 import { boot } from './boot'
 
@@ -405,7 +406,8 @@ const nodeKinds = {
   lesson: { label: 'Lesson', icon: BookOpen, cta: 'Start lesson', resume: 'Continue lesson', blurb: 'Mentics teaches this skill step by step, checking your understanding as you go.' },
   practice_sprint: { label: 'Practice', icon: Zap, cta: 'Start practice', resume: 'Keep practicing', blurb: 'Short drill on what you just learned. Instant feedback on every answer.' },
   quiz: { label: 'Review', icon: Brain, cta: 'Start review', resume: 'Keep reviewing', blurb: 'A mixed review of everything this unit covered.' },
-  boss_battle: { label: 'Boss battle', icon: Trophy, cta: 'Open official test', resume: 'Open official test', blurb: 'A full, timed official practice test. Log your score when you finish.' }
+  boss_battle: { label: 'Boss battle', icon: Trophy, cta: 'Open official test', resume: 'Open official test', blurb: 'A full, timed official practice test. Log your score when you finish.' },
+  milestone: { label: 'Milestone', icon: Award, cta: 'Start this milestone', resume: 'Finish this milestone', blurb: 'Real work outside Mentics. Log what you produced and the next unit builds on it.' }
 }
 
 function taskKind(task) {
@@ -547,6 +549,171 @@ const milestoneStats = {
   essay_progress: { label: 'Essay progress', placeholder: '1 = draft, 2 = final', min: 1, max: 2 }
 }
 
+// A boss battle is the one step whose work happens outside Mentics, so the
+// score is the only evidence it happened. This captures section scores rather
+// than a bare total: the total alone cannot tell the planner which half of the
+// test moved, and it never reaches the stats page.
+function BossBattle({ task, onClose, onCompleted }) {
+  const [detail, setDetail] = useState(null)
+  const [scores, setScores] = useState({})
+  const [result, setResult] = useState(null)
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState('')
+
+  useEffect(() => {
+    let live = true
+    api(`/api/boss_battle/${task.id}`).then(d => {
+      if (!live) return
+      setDetail(d)
+      setScores(Object.fromEntries(d.sections.map(s => [s.key, s.previous ? String(s.previous) : ''])))
+    }).catch(e => { if (live) setError(e.message) })
+    return () => { live = false }
+  }, [task.id])
+
+  const link = firstLink(task.description) || 'https://satsuite.collegeboard.org/sat/practice-preparation/practice-tests'
+  const ready = detail && detail.sections.every(s => String(scores[s.key] ?? '').trim() !== '')
+
+  const submit = async () => {
+    setBusy(true); setError('')
+    try {
+      setResult(await api(`/api/boss_battle/${task.id}/result`, { method: 'POST', body: JSON.stringify({ scores }) }))
+    } catch (e) { setError(e.message) } finally { setBusy(false) }
+  }
+
+  if (result) {
+    const up = result.delta != null && result.delta > 0
+    return <Modal onClose={() => onCompleted({ ...task, is_completed: true })}>
+      <div className="boss-result">
+        <div className="boss-result-mark"><Trophy /></div>
+        <div className="modal-kicker">TEST LOGGED</div>
+        <h2>{result.composite_label} {result.composite}</h2>
+        {result.delta != null && <p className={`boss-delta ${up ? 'up' : result.delta < 0 ? 'down' : ''}`}>
+          {up ? '▲' : result.delta < 0 ? '▼' : '—'} {Math.abs(result.delta)} point{Math.abs(result.delta) === 1 ? '' : 's'} vs your last {result.composite_label.toLowerCase()}
+        </p>}
+        <div className="boss-sections">
+          {Object.entries(result.sections).map(([key, value]) => <div key={key}>
+            <small>{(detail?.sections.find(s => s.key === key)?.label) || key}</small><b>{value}</b>
+          </div>)}
+        </div>
+        {result.xp_earned > 0 && <div className="player-xp-award"><Zap /> +{result.xp_earned} XP</div>}
+        <p className="boss-note">Your scores are saved to your stats and tracker, and your next path will be built around whichever section moved least.</p>
+        <button className="button button--primary task-start" onClick={() => onCompleted({ ...task, is_completed: true })}>Build on this <ArrowRight /></button>
+      </div>
+    </Modal>
+  }
+
+  return <Modal onClose={onClose}>
+    <div className="modal-kicker">BOSS BATTLE · {detail?.test_type || 'Official test'}</div>
+    <h2>Take a full official test, then log the score.</h2>
+
+    <div className="task-kind task-kind--boss_battle">
+      <span className="task-kind-icon"><Trophy /></span>
+      <div><b>Timed and official</b><p>Everything this unit drilled in short bursts, under real pacing and fatigue.</p></div>
+      {task.xp_reward ? <span className="task-kind-xp"><Zap /> {task.xp_reward} XP</span> : null}
+    </div>
+
+    <ol className="boss-steps">
+      <li><span>1</span><div><b>Sit the test</b><p>Full length, timed, no interruptions — the score only means something if the conditions are real.</p>
+        <a className="button button--primary task-start" href={link} target="_blank" rel="noreferrer">Open official practice <ArrowRight /></a></div></li>
+      <li><span>2</span><div><b>Log your section scores</b><p>Enter what you actually scored. This is what tells Mentics which section to attack next.</p>
+        {detail ? <div className="boss-score-grid">
+          {detail.sections.map(s => <label key={s.key}>
+            {s.label}
+            <input type="number" inputMode="numeric" min={s.min} max={s.max} value={scores[s.key] ?? ''}
+              onChange={e => setScores(v => ({ ...v, [s.key]: e.target.value }))} placeholder={`${s.min}–${s.max}`} />
+            {s.previous ? <em>last: {s.previous}</em> : null}
+          </label>)}
+        </div> : <div className="boss-score-grid boss-score-grid--loading"><span className="skeleton" /><span className="skeleton" /></div>}
+      </div></li>
+    </ol>
+
+    {error && <p className="form-error">{error}</p>}
+    <button className="button button--primary task-start" disabled={!ready || busy} onClick={submit}>
+      {busy ? 'Saving…' : 'Log my score and finish'} <Check />
+    </button>
+    <p className="boss-note">You need a real score to finish this step — it is what the next path is built from.</p>
+  </Modal>
+}
+
+// A college unit ends in real work rather than a practice test. The number the
+// student records here is the evidence it happened, and it is what the next
+// unit is planned against.
+function MilestoneStep({ task, onClose, onCompleted }) {
+  const [detail, setDetail] = useState(null)
+  const [value, setValue] = useState('')
+  const [result, setResult] = useState(null)
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState('')
+
+  useEffect(() => {
+    let live = true
+    api(`/api/milestone/${task.id}`).then(d => {
+      if (!live) return
+      setDetail(d)
+      if (d.previous != null) setValue(String(d.previous))
+    }).catch(e => { if (live) setError(e.message) })
+    return () => { live = false }
+  }, [task.id])
+
+  const needsValue = Boolean(detail?.stat_name)
+  const ready = detail && (!needsValue || String(value).trim() !== '')
+
+  const submit = async () => {
+    setBusy(true); setError('')
+    try {
+      setResult(await api(`/api/milestone/${task.id}/result`, { method: 'POST', body: JSON.stringify({ value: needsValue ? value : null }) }))
+    } catch (e) { setError(e.message) } finally { setBusy(false) }
+  }
+
+  if (result) {
+    const up = result.delta != null && result.delta > 0
+    return <Modal onClose={() => onCompleted({ ...task, is_completed: true })}>
+      <div className="boss-result">
+        <div className="boss-result-mark boss-result-mark--milestone"><Award /></div>
+        <div className="modal-kicker">MILESTONE COMPLETE</div>
+        <h2>{result.value != null ? `${result.value} ${result.unit || ''}`.trim() : 'Logged'}</h2>
+        {up && <p className="boss-delta up">▲ {result.delta} more than last time</p>}
+        {result.xp_earned > 0 && <div className="player-xp-award"><Zap /> +{result.xp_earned} XP</div>}
+        <p className="boss-note">Saved to your stats and tracker. Your next unit is planned from where this leaves you.</p>
+        <button className="button button--primary task-start" onClick={() => onCompleted({ ...task, is_completed: true })}>Keep going <ArrowRight /></button>
+      </div>
+    </Modal>
+  }
+
+  return <Modal onClose={onClose}>
+    <div className="modal-kicker">COLLEGE PLANNING · MILESTONE</div>
+    <h2><PlainText value={task.description} /></h2>
+
+    <div className="task-kind task-kind--milestone">
+      <span className="task-kind-icon"><Award /></span>
+      <div><b>Real work</b><p>This is the part an admissions officer actually sees. The unit taught the judgement; now produce the thing.</p></div>
+      {task.xp_reward ? <span className="task-kind-xp"><Zap /> {task.xp_reward} XP</span> : null}
+    </div>
+
+    {detail?.objective && <p className="task-objective"><Target /> {detail.objective}</p>}
+    {task.reason && <div className="task-why"><small>WHY THIS STEP</small><Markdown>{task.reason}</Markdown></div>}
+
+    {needsValue && <div className="milestone-log">
+      <label>{detail.label}
+        {detail.stat_name === 'essay_progress'
+          ? <select value={value} onChange={e => setValue(e.target.value)}>
+            <option value="">Choose one…</option>
+            <option value="1">First full draft done</option>
+            <option value="2">Revised and final</option>
+          </select>
+          : <input type="number" inputMode="numeric" min={detail.min} max={detail.max} value={value}
+            onChange={e => setValue(e.target.value)} placeholder={`${detail.min}–${detail.max}`} />}
+      </label>
+      {detail.previous != null && <em>Last recorded: {detail.previous}</em>}
+    </div>}
+
+    {error && <p className="form-error">{error}</p>}
+    <button className="button button--primary task-start" disabled={!ready || busy} onClick={submit}>
+      {busy ? 'Saving…' : needsValue ? 'Log it and finish' : 'Mark this done'} <Check />
+    </button>
+  </Modal>
+}
+
 function TaskModal({ task, category, onClose, onUpdate, onCompleted }) {
   const [note, setNote] = useState(''); const [busy, setBusy] = useState(false); const [playing, setPlaying] = useState(false); const [dueDate, setDueDate] = useState(task.due_date || ''); const [statPrompt, setStatPrompt] = useState(false); const [statValue, setStatValue] = useState(''); const [error, setError] = useState(''); const [detailsOpen, setDetailsOpen] = useState(false)
   const stat = milestoneStats[task.stat_to_update]
@@ -568,6 +735,10 @@ function TaskModal({ task, category, onClose, onUpdate, onCompleted }) {
     if (stat) setStatPrompt(true); else onCompleted(next)
   }
 
+  // A boss battle has its own flow: sit the official test, then log real
+  // section scores. It is the only step that cannot be "marked complete".
+  if (kind === 'boss_battle' && !task.is_completed) return <BossBattle task={task} onClose={onClose} onCompleted={onCompleted} />
+  if (kind === 'milestone' && !task.is_completed) return <MilestoneStep task={task} onClose={onClose} onCompleted={onCompleted} />
   if (playing && kind === 'lesson') return <LessonPlayer task={task} onClose={() => setPlaying(false)} onCompleted={finishPlay} />
   if (playing) return <AssessmentPlayer task={task} onClose={() => setPlaying(false)} onCompleted={finishPlay} />
 
@@ -956,13 +1127,93 @@ function AssessmentRun({ data, kind, task, onClose, onCompleted }) {
 
 function EssayCoach({ onClose }) { const [prompt, setPrompt] = useState(''); const [essay, setEssay] = useState(''); const [feedback, setFeedback] = useState(''); const [busy, setBusy] = useState(false); const analyze = async () => { if (essay.trim().length < 50) return; setBusy(true); try { setFeedback((await api('/api/analyze_essay', { method: 'POST', body: JSON.stringify({ essay_text: essay, essay_prompt: prompt || 'a general college application essay' }) })).feedback) } catch (e) { setFeedback(e.message) } finally { setBusy(false) } }; return <Modal onClose={onClose} wide><div className="modal-kicker">MENTICS ESSAY COACH</div><h2>Strengthen the essay without losing your voice.</h2><div className="essay-workspace"><label>Essay prompt<input value={prompt} onChange={e => setPrompt(e.target.value)} placeholder="Common App prompt or supplemental question" /></label><label>Essay draft<textarea value={essay} onChange={e => setEssay(e.target.value)} rows="12" maxLength="20000" placeholder="Paste your draft here..." /></label><button className="button button--primary" onClick={analyze} disabled={busy || essay.trim().length < 50}>{busy ? 'Analyzing…' : 'Get structured feedback'} <Sparkles /></button>{feedback && <div className="essay-feedback"><Markdown>{feedback}</Markdown></div>}</div></Modal> }
 
+// Starter prompts do real work: a blank chat gets asked nothing, and these name
+// the things the guide is actually good at from where the student is standing.
+const chatStarters = {
+  'Test Prep': [
+    { icon: Target, label: 'What should I focus on?' },
+    { icon: Brain, label: 'Explain my weakest skill' },
+    { icon: RotateCcw, label: 'Rebuild my path around math' },
+    { icon: CalendarDays, label: 'Am I on pace for my test date?' },
+  ],
+  'College Planning': [
+    { icon: Target, label: 'What should I do this month?' },
+    { icon: GraduationCap, label: 'Is my college list balanced?' },
+    { icon: PenLine, label: 'Help me start my personal statement' },
+    { icon: RotateCcw, label: 'Rebuild my path around applications' },
+  ],
+}
+
 function ChatPanel({ open, onClose, category, onNewPath }) {
-  const [messages, setMessages] = useState([]); const [input, setInput] = useState(''); const [busy, setBusy] = useState(false); const [historyError, setHistoryError] = useState(''); const scroller = useRef(null)
-  useEffect(() => { if (open && messages.length === 0) { api(`/api/chat_history?category=${encodeURIComponent(category)}`).then(h => setMessages(Array.isArray(h) && h.length ? h : [{ role: 'assistant', content: `I’m here with your ${category.toLowerCase()} path. Ask about any step, concept, or roadblock.` }])).catch(() => { setHistoryError('I couldn’t restore the earlier conversation, but you can start a new one here.'); setMessages([{ role: 'assistant', content: `I’m ready to help with your ${category.toLowerCase()} path.` }]) }) } }, [open, category, messages.length])
+  const [messages, setMessages] = useState([]); const [input, setInput] = useState(''); const [busy, setBusy] = useState(false); const [historyError, setHistoryError] = useState(''); const scroller = useRef(null); const composer = useRef(null)
+  const starters = chatStarters[category] || chatStarters['Test Prep']
+  const conversationStarted = messages.some(m => m.role === 'user')
+
+  useEffect(() => { if (open && messages.length === 0) { api(`/api/chat_history?category=${encodeURIComponent(category)}`).then(h => setMessages(Array.isArray(h) && h.length ? h : [{ role: 'assistant', content: `I'm here with your ${category.toLowerCase()} path. Ask about any step, concept, or roadblock — I can see exactly where you are.` }])).catch(() => { setHistoryError('I could not restore the earlier conversation, but you can start a new one here.'); setMessages([{ role: 'assistant', content: `I'm ready to help with your ${category.toLowerCase()} path.` }]) }) } }, [open, category, messages.length])
   useEffect(() => { const node = scroller.current; if (node) node.scrollTo({ top: node.scrollHeight, behavior: 'smooth' }) }, [messages, busy])
-  const send = async e => { e.preventDefault(); if (!input.trim() || busy) return; const next = [...messages, { role: 'user', content: input.trim() }]; setMessages(next); setInput(''); setBusy(true); try { const r = await api(`/api/chat?category=${encodeURIComponent(category)}`, { method: 'POST', body: JSON.stringify({ history: next }) }); if (Object.prototype.hasOwnProperty.call(r, 'new_path')) { if (!Array.isArray(r.new_path) || r.new_path.length !== 5) throw new Error('Mentics could not build a complete five-step path. Your current path is unchanged.'); onNewPath(r.new_path); setMessages([...next, { role: 'assistant', content: r.reply || 'Your new five-step path is ready. I used our conversation to shape it.' }]) } else setMessages([...next, { role: 'assistant', content: r.reply }]) } catch (x) { setMessages([...next, { role: 'assistant', content: x.message }]) } finally { setBusy(false) } }
+
+  // The composer grows with the draft instead of scrolling a one-line box.
+  useEffect(() => {
+    const node = composer.current
+    if (!node) return
+    node.style.height = 'auto'
+    node.style.height = `${Math.min(node.scrollHeight, 140)}px`
+  }, [input])
+
+  const ask = async (text) => {
+    if (!text.trim() || busy) return
+    const next = [...messages, { role: 'user', content: text.trim() }]
+    setMessages(next); setInput(''); setBusy(true)
+    try {
+      const r = await api(`/api/chat?category=${encodeURIComponent(category)}`, { method: 'POST', body: JSON.stringify({ history: next }) })
+      if (Object.prototype.hasOwnProperty.call(r, 'new_path')) {
+        if (!Array.isArray(r.new_path) || r.new_path.length !== 5) throw new Error('Mentics could not build a complete five-step path. Your current path is unchanged.')
+        onNewPath(r.new_path)
+        setMessages([...next, { role: 'assistant', content: r.reply || 'Your new path is ready. I used our conversation to shape it.' }])
+      } else setMessages([...next, { role: 'assistant', content: r.reply }])
+    } catch (x) { setMessages([...next, { role: 'assistant', content: x.message }]) } finally { setBusy(false) }
+  }
+
+  const send = e => { e.preventDefault(); ask(input) }
   const reset = async () => { try { await api('/api/reset_chat', { method: 'POST', body: JSON.stringify({ category }) }); setHistoryError(''); setMessages([{ role: 'assistant', content: `Fresh start. What would you like help with on your ${category.toLowerCase()} path?` }]) } catch (error) { setHistoryError(error.message) } }
-  return <aside className={`chat-panel ${open ? 'chat-panel--open' : ''}`} aria-hidden={!open} inert={!open || undefined}><header><span><i><Sparkles /></i><b>Mentics guide</b><small>Present with your current path</small></span><div><button onClick={reset} aria-label="Reset chat"><RotateCcw /></button><button onClick={onClose} aria-label="Close chat"><X /></button></div></header>{historyError && <div className="chat-notice" role="status">{historyError}</div>}<div className="chat-messages" ref={scroller}>{messages.map((m, i) => <div className={`chat-message chat-message--${m.role}`} key={i}>{m.role === 'assistant' ? <Markdown>{m.content}</Markdown> : m.content}</div>)}{busy && <div className="chat-thinking"><i /><i /><i /></div>}</div><form onSubmit={send}><textarea name="message" aria-label="Ask Mentics about your path" value={input} onChange={e => setInput(e.target.value)} onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(e) } }} placeholder="Ask about your path…" rows={1} /><button disabled={!input.trim() || busy} aria-label="Send"><Send /></button></form><p>Mentics can make mistakes. Check important information.</p></aside>
+
+  return <aside className={`chat-panel ${open ? 'chat-panel--open' : ''}`} aria-hidden={!open} inert={!open || undefined}>
+    <header className="chat-head">
+      <span className="chat-identity">
+        <i className="chat-mark"><Sparkles /></i>
+        <span>
+          <b>Mentics guide</b>
+          <small><em className="chat-live" /> Reading your {category.toLowerCase()} path</small>
+        </span>
+      </span>
+      <div className="chat-head-actions">
+        <button onClick={reset} aria-label="Start a new conversation" title="New conversation"><RotateCcw /></button>
+        <button onClick={onClose} aria-label="Close chat" title="Close"><X /></button>
+      </div>
+    </header>
+
+    {historyError && <div className="chat-notice" role="status">{historyError}</div>}
+
+    <div className="chat-messages" ref={scroller}>
+      {messages.map((m, i) => <div className={`chat-message chat-message--${m.role}`} key={i}>
+        {m.role === 'assistant' && <i className="chat-avatar"><Sparkles /></i>}
+        <div className="chat-bubble">{m.role === 'assistant' ? <Markdown>{m.content}</Markdown> : m.content}</div>
+      </div>)}
+      {busy && <div className="chat-message chat-message--assistant"><i className="chat-avatar"><Sparkles /></i><div className="chat-bubble chat-bubble--thinking"><span /><span /><span /></div></div>}
+      {!conversationStarted && !busy && <div className="chat-starters">
+        <small>TRY ASKING</small>
+        {starters.map(({ icon: Icon, label }) => <button key={label} onClick={() => ask(label)}><Icon /> {label}</button>)}
+      </div>}
+    </div>
+
+    <form className="chat-composer" onSubmit={send}>
+      <div className="chat-composer-field">
+        <textarea ref={composer} name="message" aria-label={`Ask Mentics about your ${category.toLowerCase()} path`} value={input} onChange={e => setInput(e.target.value)} onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(e) } }} placeholder="Ask about your path…" rows={1} maxLength={4000} />
+        <button disabled={!input.trim() || busy} aria-label="Send message"><Send /></button>
+      </div>
+      <p>Mentics can make mistakes. Check important information.</p>
+    </form>
+  </aside>
 }
 
 function PageIntro({ kicker, title, copy, actions }) {
@@ -1001,18 +1252,208 @@ function Onboarding() {
   return <div className="onboarding-page"><header><Brand /><span>Step {step + 1} of 3</span></header><main><div className="onboarding-progress"><i style={{ width: `${(step + 1) / 3 * 100}%` }} /></div>{boot.data.error && <div className="form-error">{boot.data.error}</div>}<form method="POST" onSubmit={submitOnlyFromButton}><section className={step === 0 ? 'active' : ''}><div className="eyebrow"><span /> START WITH DIRECTION</div><h1>What are we building toward?</h1><p>This sets the first version of your Mentics workspace.</p><div className="choice-grid choice-grid--two">{[['test_prep', 'Test preparation', BookOpen, 'Build confidence for the SAT or ACT'], ['college_planning', 'College planning', GraduationCap, 'Turn applications into a clear process']].map(([value, label, Icon, copy]) => <label className={goal === value ? 'selected' : ''} key={value}><input type="radio" name="goal" value={value} required checked={goal === value} onChange={() => setGoal(value)} /><Icon /><b>{label}</b><small>{copy}</small></label>)}</div></section><section className={step === 1 ? 'active' : ''}><div className="eyebrow"><span /> MAKE IT YOURS</div><h1>How do you learn best?</h1><p>Your tasks and explanations will use this preference.</p><div className="choice-grid">{learningOptions.map(([value, label, Icon, copy]) => <label className={style === value ? 'selected' : ''} key={value}><input type="radio" name="learning_style" value={value} required checked={style === value} onChange={() => setStyle(value)} /><Icon /><b>{label}</b><small>{copy}</small></label>)}</div></section><section className={step === 2 ? 'active' : ''}><div className="eyebrow"><span /> ONE LAST THING</div><h1>What feels hardest right now?</h1><p>Be honest. This helps Mentics meet you where you are.</p><textarea name="anxieties" rows="6" value={anxieties} onChange={event => setAnxieties(event.target.value)} onKeyDown={event => event.stopPropagation()} placeholder="Time management, test anxiety, essays, choosing schools..." /></section><div className="onboarding-actions">{step > 0 ? <button type="button" className="button button--quiet" onClick={() => setStep(step - 1)}><ArrowLeft /> Back</button> : <span />}{step < 2 ? <button type="button" className="button button--primary" disabled={!canNext} onClick={() => setStep(step + 1)}>Continue <ArrowRight /></button> : <button type="button" className="button button--primary" onClick={finishOnboarding}>Build my workspace <ArrowRight /></button>}</div></form></main></div>
 }
 
-function StatsPage() {
-  const d = boot.data; const value = v => v || '—'
-  return <AppShell name={d.name}><main className="app-main"><PageIntro kicker="YOUR PROGRESS" title="The numbers behind the work." copy="A clear snapshot of where you are and how far you have moved." actions={<a className="button button--primary" href="/dashboard/stats/edit">Update scores <ArrowRight /></a>} /><section className="stat-hero-grid"><article className="stat-feature stat-feature--gpa"><small>CURRENT GPA</small><strong>{value(d.gpa)}</strong><p>Your academic foundation</p></article><article className="stat-feature stat-feature--tasks"><small>PATH MILESTONES</small><strong>{(d.totalTestPrepCompleted || 0) + (d.totalCollegePlanningCompleted || 0)}</strong><p>{d.totalTestPrepCompleted || 0} test prep · {d.totalCollegePlanningCompleted || 0} college</p></article></section><section className="score-panels"><article><div><small>SAT SNAPSHOT</small><h2>{value(d.satTotal)}</h2></div><dl><div><dt>Reading & writing</dt><dd>{value(d.satEbrw)}</dd></div><div><dt>Math</dt><dd>{value(d.satMath)}</dd></div></dl></article><article><div><small>ACT SNAPSHOT</small><h2>{value(d.actAverage)}</h2></div><dl><div><dt>Math</dt><dd>{value(d.actMath)}</dd></div><div><dt>Reading</dt><dd>{value(d.actReading)}</dd></div><div><dt>Science</dt><dd>{value(d.actScience)}</dd></div></dl></article></section></main></AppShell>
+// --- Charts ---------------------------------------------------------------
+// One series per chart, so identity never rides on color alone and no legend is
+// needed: the title names the series. Grid and axes stay recessive; the value
+// labels wear text tokens rather than the series color.
+
+function niceScale(min, max) {
+  if (!Number.isFinite(min) || !Number.isFinite(max)) return { lo: 0, hi: 1, ticks: [0, 1] }
+  if (min === max) { const pad = Math.max(1, Math.abs(min) * .1); min -= pad; max += pad }
+  const span = max - min
+  const step = Math.pow(10, Math.floor(Math.log10(span / 4)))
+  const norm = span / 4 / step
+  const nice = (norm <= 1 ? 1 : norm <= 2 ? 2 : norm <= 5 ? 5 : 10) * step
+  const lo = Math.floor(min / nice) * nice
+  const hi = Math.ceil(max / nice) * nice
+  const ticks = []
+  for (let v = lo; v <= hi + nice / 2; v += nice) ticks.push(Math.round(v * 100) / 100)
+  return { lo, hi, ticks }
 }
 
-const scoreFields = [['gpa', 'GPA', '0', '5', '0.01'], ['sat_ebrw', 'SAT reading & writing', '200', '800', '10'], ['sat_math', 'SAT math', '200', '800', '10'], ['act_math', 'ACT math', '1', '36', '1'], ['act_reading', 'ACT reading', '1', '36', '1'], ['act_science', 'ACT science', '1', '36', '1']]
-function EditStats() { const d = boot.data; const values = { gpa: d.gpa, sat_ebrw: d.satEbrw, sat_math: d.satMath, act_math: d.actMath, act_reading: d.actReading, act_science: d.actScience }; return <AppShell name={d.name}><main className="app-main form-page"><PageIntro kicker="UPDATE PROGRESS" title="Keep your snapshot honest." copy="New numbers help every future path respond to your real progress." /><form method="POST" className="settings-form"><div className="form-field-grid">{scoreFields.map(([name, label, min, max, step]) => <label key={name}>{label}<small>{min}–{max}</small><input type="number" name={name} min={min} max={max} step={step} defaultValue={values[name] || ''} /></label>)}</div><div className="form-actions"><a className="button button--quiet" href="/dashboard/stats">Cancel</a><button className="button button--primary" type="submit">Save progress <Check /></button></div></form></main></AppShell> }
+function TrendChart({ records = [], label, height = 230 }) {
+  const [hover, setHover] = useState(null)
+  const wrap = useRef(null)
+  const points = records.map(r => ({ date: String(r.date), value: Number(r.value) })).filter(p => Number.isFinite(p.value))
 
-function Field({ name, label, textarea = false, value, ...props }) { return <label>{label}{textarea ? <textarea name={name} rows="4" defaultValue={value || ''} {...props} /> : <input name={name} defaultValue={value || ''} {...props} />}</label> }
-function BuilderPage({ kind }) { const d = boot.data; const test = kind === 'test'; const [focus, setFocus] = useState(d.test_focus || ''); return <AppShell name={d.name}><main className="app-main form-page"><PageIntro kicker={test ? 'TEST PREPARATION' : 'COLLEGE PLANNING'} title={test ? 'Design your next five steps.' : 'Build a college plan that fits.'} copy={test ? 'Tell Mentics what the score alone cannot show.' : 'Turn a wide-open process into focused, personal action.'} /><form method="POST" className="settings-form builder-form">{test ? <><fieldset><legend>Which test are you preparing for?</legend><div className="choice-grid choice-grid--three">{[['sat', 'SAT only'], ['act', 'ACT only'], ['both', 'SAT + ACT']].map(([value, label]) => <label className={focus === value ? 'selected' : ''} key={value}><input type="radio" name="test_focus" value={value} required checked={focus === value} onChange={() => setFocus(value)} /><BookOpen /><b>{label}</b></label>)}</div></fieldset><div className="form-field-grid"><Field name="desired_sat" label="Desired SAT" type="number" min="400" max="1600" step="10" value={d.desired_sat} /><Field name="desired_act" label="Desired ACT" type="number" min="1" max="36" value={d.desired_act} /><Field name="current_sat_ebrw" label="Current SAT reading & writing" type="number" min="200" max="800" value={d.current_sat_ebrw} /><Field name="current_sat_math" label="Current SAT math" type="number" min="200" max="800" value={d.current_sat_math} /><Field name="current_act_composite" label="Current ACT composite" type="number" min="1" max="36" value={d.current_act_composite} /><Field name="current_act_math" label="Current ACT math" type="number" min="1" max="36" value={d.current_act_math} /><Field name="current_act_reading" label="Current ACT reading" type="number" min="1" max="36" value={d.current_act_reading} /><Field name="current_act_science" label="Current ACT science" type="number" min="1" max="36" value={d.current_act_science} /><Field name="hours_per_week" label="Hours available each week" type="number" min="1" max="40" value={d.hours_per_week} /></div><Field name="strengths" label="Your strengths" textarea value={d.strengths} /><Field name="weaknesses" label="Where you need the most help" textarea required value={d.weaknesses} /><Field name="test_date" label="Test date" type="date" value={d.test_date} /></> : <><div className="form-field-grid"><label>Current grade<select name="current_grade" required defaultValue={d.grade || ''}><option value="">Choose grade</option>{['9', '10', '11', '12'].map(v => <option value={v} key={v}>{v}th grade</option>)}</select></label><label>Planning stage<select name="planning_stage" required defaultValue={d.planning_stage || ''}><option value="">Choose stage</option><option value="exploring">Exploring options</option><option value="researching">Researching colleges</option><option value="applying">Ready to apply</option></select></label></div><Field name="interested_majors" label="Interested majors" textarea value={d.majors} /><Field name="target_colleges" label="Target colleges" textarea value={d.target_colleges} /></>}<div className="form-actions"><a className="button button--quiet" href="/dashboard">Cancel</a><button className="button button--primary" type="submit">Build my five-step path <ArrowRight /></button></div></form></main></AppShell> }
+  if (points.length === 0) return <div className="chart-empty"><BarChart3 /><p>No data logged yet. Finish a boss battle or update your scores and this fills in.</p></div>
 
-function HistoryBars({ records = [] }) { const vals = records.map(r => Number(r.value) || 0); const max = Math.max(...vals, 1); return <div className="history-bars">{records.slice(-12).map((r, i) => <div key={`${r.date}-${i}`}><i style={{ height: `${Math.max(8, (Number(r.value) || 0) / max * 100)}%` }} /><small>{String(r.date).slice(5)}</small></div>)}</div> }
+  const W = 720, H = height, padL = 46, padR = 18, padT = 16, padB = 30
+  const values = points.map(p => p.value)
+  const { lo, hi, ticks } = niceScale(Math.min(...values), Math.max(...values))
+  const x = i => padL + (points.length === 1 ? (W - padL - padR) / 2 : i * (W - padL - padR) / (points.length - 1))
+  const y = v => padT + (H - padT - padB) * (1 - (v - lo) / (hi - lo || 1))
+  const line = points.map((p, i) => `${i ? 'L' : 'M'}${x(i).toFixed(1)},${y(p.value).toFixed(1)}`).join(' ')
+  const area = `${line} L${x(points.length - 1).toFixed(1)},${H - padB} L${x(0).toFixed(1)},${H - padB} Z`
+  const last = points[points.length - 1]
+  const first = points[0]
+  const change = points.length > 1 ? last.value - first.value : null
+
+  const onMove = e => {
+    const box = wrap.current?.getBoundingClientRect()
+    if (!box) return
+    const px = (e.clientX - box.left) / box.width * W
+    let best = 0
+    points.forEach((_, i) => { if (Math.abs(x(i) - px) < Math.abs(x(best) - px)) best = i })
+    setHover(best)
+  }
+
+  return <div className="chart" ref={wrap} onMouseMove={onMove} onMouseLeave={() => setHover(null)}>
+    <div className="chart-head">
+      <div><small>{label}</small><strong>{last.value.toLocaleString()}</strong></div>
+      {change != null && change !== 0 && <span className={`chart-change ${change > 0 ? 'up' : 'down'}`}>
+        {change > 0 ? '▲' : '▼'} {Math.abs(Math.round(change * 100) / 100)} since {first.date.slice(5)}
+      </span>}
+    </div>
+    <svg viewBox={`0 0 ${W} ${H}`} role="img" aria-label={`${label} over time, currently ${last.value}`} preserveAspectRatio="none" className="chart-svg">
+      <defs>
+        <linearGradient id="chart-fill" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stopColor="var(--viz-series-1)" stopOpacity=".18" />
+          <stop offset="1" stopColor="var(--viz-series-1)" stopOpacity="0" />
+        </linearGradient>
+      </defs>
+      {ticks.map(t => <g key={t}>
+        <line className="chart-grid" x1={padL} x2={W - padR} y1={y(t)} y2={y(t)} />
+        <text className="chart-tick" x={padL - 8} y={y(t)} textAnchor="end" dominantBaseline="middle">{t}</text>
+      </g>)}
+      {points.length > 1 && <path d={area} fill="url(#chart-fill)" />}
+      <path d={line} className="chart-line" />
+      {points.map((p, i) => (i === points.length - 1 || i === hover || points.length <= 8) &&
+        <circle key={i} cx={x(i)} cy={y(p.value)} r={i === hover ? 6 : 4.5} className={`chart-dot ${i === hover ? 'active' : ''}`} />)}
+      {hover != null && <line className="chart-crosshair" x1={x(hover)} x2={x(hover)} y1={padT} y2={H - padB} />}
+      {points.map((p, i) => (i === 0 || i === points.length - 1) &&
+        <text key={`d${i}`} className="chart-tick" x={x(i)} y={H - 10} textAnchor={i === 0 ? 'start' : 'end'}>{p.date.slice(5)}</text>)}
+    </svg>
+    {hover != null && <div className="chart-tip" style={{ left: `${x(hover) / W * 100}%` }}>
+      <b>{points[hover].value.toLocaleString()}</b><small>{points[hover].date}</small>
+    </div>}
+  </div>
+}
+
+function MasteryRow({ skill, subject, accuracy, attempts, level }) {
+  const tone = accuracy >= 85 ? 'strong' : accuracy >= 65 ? 'fair' : 'weak'
+  return <li className={`mastery-row mastery-row--${tone}`}>
+    <div className="mastery-label"><b>{skill}</b><small>{subject} · {attempts} question{attempts === 1 ? '' : 's'}</small></div>
+    <div className="mastery-track"><i style={{ width: `${Math.max(4, accuracy)}%` }} /></div>
+    <span className="mastery-value">{accuracy}%</span>
+    <span className="mastery-level" title={`Mastery level ${level} of 5`}>{'●'.repeat(level)}{'○'.repeat(5 - level)}</span>
+  </li>
+}
+
+function PathProgressCard({ title, snapshot, href, accent }) {
+  if (!snapshot) return <article className={`path-card path-card--${accent} path-card--empty`}>
+    <h3>{title}</h3><p>No path yet.</p>
+    <a className="button button--quiet" href={href}>Build one <ArrowRight /></a>
+  </article>
+  const pct = snapshot.total ? Math.round(snapshot.completed / snapshot.total * 100) : 0
+  return <article className={`path-card path-card--${accent}`}>
+    <header><h3>{title}</h3><span>{snapshot.completed}/{snapshot.total}</span></header>
+    {snapshot.unitTitle && <p className="path-card-unit">{snapshot.unitTitle}</p>}
+    <div className="path-card-track"><i style={{ width: `${pct}%` }} /></div>
+    <ol className="path-card-steps">
+      {snapshot.steps.map(s => <li key={s.order} className={s.done ? 'done' : s.order === snapshot.currentStep ? 'current' : ''}>
+        <i>{s.done ? <Check /> : s.order}</i>
+        <span>{s.skill || s.nodeType || `Step ${s.order}`}</span>
+      </li>)}
+    </ol>
+    <a className="button button--quiet" href={href}>{snapshot.currentStep ? 'Continue' : 'Open path'} <ArrowRight /></a>
+  </article>
+}
+
+function GoalMeter({ label, current, goal, min }) {
+  if (!current) return null
+  const pct = goal && goal > min ? Math.min(100, Math.round((current - min) / (goal - min) * 100)) : null
+  return <div className="goal-meter">
+    <div><small>{label}</small><strong>{current}</strong>{goal ? <em>goal {goal}</em> : null}</div>
+    {pct != null && <><div className="goal-track"><i style={{ width: `${pct}%` }} /></div>
+      <span className="goal-caption">{pct >= 100 ? 'Goal reached' : `${goal - current} points to go`}</span></>}
+  </div>
+}
+
+function StatsPage() {
+  const d = boot.data
+  const p = d.practice || {}
+  const hasMastery = (d.weakest?.length || 0) > 0
+
+  return <AppShell name={d.name}><main className="app-main">
+    <PageIntro kicker="YOUR PROGRESS" title="Everything you have actually done."
+      copy="Scores you log, questions you answer, and where both paths stand right now."
+      actions={<a className="button button--primary" href="/dashboard/stats/edit">Update scores <ArrowRight /></a>} />
+
+    {/* Headline numbers: the ones earned by work come first. */}
+    <section className="stat-tiles">
+      <article className="stat-tile stat-tile--accent"><small>TOTAL XP</small><strong>{d.points.toLocaleString()}</strong><p>Earned from completed steps</p></article>
+      <article className="stat-tile"><small>DAY STREAK</small><strong>{d.streak}<i><Flame /></i></strong><p>{d.streak > 0 ? 'Keep it alive today' : 'Finish a step to start one'}</p></article>
+      <article className="stat-tile"><small>QUESTIONS ANSWERED</small><strong>{p.answered || 0}</strong><p>{p.accuracy != null ? `${p.accuracy}% correct overall` : 'Across lessons and practice'}</p></article>
+      <article className="stat-tile"><small>CURRENT GPA</small><strong>{d.gpa || '—'}</strong><p>Your academic foundation</p></article>
+    </section>
+
+    <section className="stat-columns">
+      <div className="stat-col">
+        <h2 className="section-title">Where you stand</h2>
+        <div className="goal-grid">
+          <GoalMeter label="SAT total" current={d.satTotal} goal={d.goalSat} min={400} />
+          <GoalMeter label="ACT composite" current={d.actAverage} goal={d.goalAct} min={1} />
+        </div>
+        {(d.satEbrw || d.satMath) && <div className="section-scores">
+          {d.satEbrw ? <span><small>SAT Reading &amp; Writing</small><b>{d.satEbrw}</b></span> : null}
+          {d.satMath ? <span><small>SAT Math</small><b>{d.satMath}</b></span> : null}
+          {d.actMath ? <span><small>ACT Math</small><b>{d.actMath}</b></span> : null}
+          {d.actReading ? <span><small>ACT Reading</small><b>{d.actReading}</b></span> : null}
+          {d.actScience ? <span><small>ACT Science</small><b>{d.actScience}</b></span> : null}
+        </div>}
+
+        <h2 className="section-title">Skill mastery</h2>
+        {hasMastery ? <>
+          <p className="section-note">Measured from every question you have answered in Mentics. Your next path is built from the bottom of this list.</p>
+          <ul className="mastery-list">
+            {d.weakest.map(m => <MasteryRow key={m.skill} {...m} />)}
+          </ul>
+          {d.strongest?.length > 0 && <details className="mastery-more">
+            <summary>Your strongest skills</summary>
+            <ul className="mastery-list">{d.strongest.map(m => <MasteryRow key={m.skill} {...m} />)}</ul>
+          </details>}
+          {d.openMistakes > 0 && <p className="section-note section-note--flag">
+            <Target /> {d.openMistakes} missed question{d.openMistakes === 1 ? '' : 's'} are queued for your next unit to teach against.
+          </p>}
+        </> : <div className="chart-empty"><Brain /><p>Finish a lesson or practice step and your per-skill mastery appears here.</p></div>}
+
+        {d.subjects?.length > 0 && <div className="subject-split">
+          {d.subjects.map(s => <div key={s.subject}>
+            <small>{s.subject}</small>
+            <div className="mastery-track"><i style={{ width: `${Math.max(4, s.accuracy)}%` }} /></div>
+            <b>{s.accuracy}%</b>
+          </div>)}
+        </div>}
+      </div>
+
+      <div className="stat-col">
+        <h2 className="section-title">Your paths</h2>
+        <PathProgressCard title="Test Prep" snapshot={d.testPath} href="/dashboard/test-path-view" accent="violet" />
+        <PathProgressCard title="College Planning" snapshot={d.collegePath} href="/dashboard/college-path-view" accent="teal" />
+
+        <h2 className="section-title">Application progress</h2>
+        <div className="app-progress">
+          <span><small>Colleges researched</small><b>{d.collegesResearched}</b></span>
+          <span><small>Applications submitted</small><b>{d.applicationsSubmitted}</b></span>
+          <span><small>Personal statement</small><b>{d.essayProgress === 2 ? 'Final' : d.essayProgress === 1 ? 'Drafted' : 'Not started'}</b></span>
+        </div>
+        <div className="app-progress">
+          <span><small>Test prep steps done</small><b>{d.totalTestPrepCompleted}</b></span>
+          <span><small>College steps done</small><b>{d.totalCollegePlanningCompleted}</b></span>
+        </div>
+      </div>
+    </section>
+  </main></AppShell>
+}
+
+const metricLabels = {
+  sat_total: 'SAT total', sat_math: 'SAT math', sat_ebrw: 'SAT reading & writing',
+  act_composite: 'ACT composite', act_math: 'ACT math', act_reading: 'ACT reading',
+  act_science: 'ACT science', gpa: 'GPA', colleges_researched: 'Colleges researched',
+  applications_submitted: 'Applications submitted', essay_progress: 'Essay progress',
+}
+
 function TrackerPage() {
   const d = boot.data
   const metricKeys = Object.keys(d.statHistory || {}).filter(key => d.statHistory[key]?.length)
@@ -1023,8 +1464,65 @@ function TrackerPage() {
   const analyze = async () => { setLoading(true); try { setAnalysis((await api('/api/tracker-analysis')).analysis) } catch (e) { setAnalysis(e.message) } finally { setLoading(false) } }
   const records = d.statHistory?.[metric] || []
   const history = historyTab === 'test' ? d.testPrepHistory : d.collegePlanningHistory
-  return <AppShell name={d.name}><main className="app-main"><PageIntro kicker="PROGRESS TRACKER" title="See the shape of your effort." copy="Scores, paths, and patterns come together here." actions={<button className="button button--primary" onClick={analyze} disabled={loading}><Brain /> {loading ? 'Analyzing…' : 'Analyze my progress'}</button>} />{analysis && <article className="analysis-panel"><div><Sparkles /><small>MENTICS ANALYSIS</small></div><Markdown>{analysis}</Markdown></article>}<section className="tracker-layout"><article className="trend-panel"><div className="tracker-metric-tabs">{metricKeys.length ? metricKeys.slice(0, 7).map(key => <button className={metric === key ? 'active' : ''} onClick={() => setMetric(key)} key={key}>{key.replaceAll('_', ' ')}</button>) : <span>No score history yet</span>}</div><div className="card-top"><div><small>PRIMARY TREND</small><h2>{metric?.replaceAll('_', ' ') || 'No history yet'}</h2></div><LineChart /></div>{records.length ? <HistoryBars records={records} /> : <div className="empty-state"><LineChart /><p>Update your scores to begin a trend line.</p></div>}</article><article className="kpi-panel"><small>KEY METRICS</small>{Object.entries(d.kpis || {}).slice(0, 6).map(([key, v]) => <div key={key}><span>{key.replaceAll('_', ' ')}</span><b>{v.latest}</b><small>{v.improvement > 0 ? `+${v.improvement}` : v.improvement || 'No change'}</small></div>)}</article></section><section className="history-section history-section--tabs"><header><h2>Path history</h2><div><button className={historyTab === 'test' ? 'active' : ''} onClick={() => setHistoryTab('test')}>Test Prep</button><button className={historyTab === 'college' ? 'active' : ''} onClick={() => setHistoryTab('college')}>College Planning</button></div></header><article>{history?.length ? history.slice(0, 8).map((gen, i) => <details key={i}><summary>{String(gen.date).slice(0, 10)} <span>{gen.tasks?.filter(t => t.is_completed).length || 0}/{gen.tasks?.length || 0} complete</span></summary><ol>{gen.tasks?.map(t => <li key={t.id} className={t.is_completed ? 'done' : ''}>{t.description}</li>)}</ol></details>) : <p>No paths yet.</p>}</article></section></main></AppShell>
+  const kpi = d.kpis?.[metric]
+
+  return <AppShell name={d.name}><main className="app-main">
+    <PageIntro kicker="PROGRESS TRACKER" title="See the shape of your effort."
+      copy="Every score you have logged, and every path you have worked through."
+      actions={<button className="button button--primary" onClick={analyze} disabled={loading}><Brain /> {loading ? 'Analyzing…' : 'Analyze my progress'}</button>} />
+
+    {analysis && <article className="analysis-panel"><div><Sparkles /><small>MENTICS ANALYSIS</small></div><Markdown>{analysis}</Markdown></article>}
+
+    <section className="tracker-panel">
+      {metricKeys.length > 0 ? <>
+        <div className="metric-switch" role="tablist" aria-label="Choose a metric">
+          {metricKeys.map(key => <button key={key} role="tab" aria-selected={metric === key}
+            className={metric === key ? 'active' : ''} onClick={() => setMetric(key)}>
+            {metricLabels[key] || key.replace(/_/g, ' ')}
+          </button>)}
+        </div>
+        {kpi && <div className="kpi-row">
+          <span><small>LATEST</small><b>{kpi.latest}</b></span>
+          <span><small>BEST</small><b>{kpi.best}</b></span>
+          <span className={kpi.improvement > 0 ? 'up' : kpi.improvement < 0 ? 'down' : ''}>
+            <small>CHANGE</small><b>{kpi.improvement > 0 ? '+' : ''}{Math.round(kpi.improvement * 100) / 100}</b>
+          </span>
+        </div>}
+        <TrendChart records={records} label={metricLabels[metric] || metric} />
+        <details className="chart-table">
+          <summary>View as a table</summary>
+          <table><thead><tr><th>Date</th><th>{metricLabels[metric] || metric}</th></tr></thead>
+            <tbody>{records.slice().reverse().map((r, i) => <tr key={`${r.date}-${i}`}><td>{r.date}</td><td>{r.value}</td></tr>)}</tbody></table>
+        </details>
+      </> : <div className="chart-empty"><BarChart3 /><p>No scores logged yet. Finish a boss battle or update your scores and your trend line starts here.</p></div>}
+    </section>
+
+    <section className="tracker-panel">
+      <div className="metric-switch" role="tablist" aria-label="Choose a path">
+        <button role="tab" aria-selected={historyTab === 'test'} className={historyTab === 'test' ? 'active' : ''} onClick={() => setHistoryTab('test')}>Test prep</button>
+        <button role="tab" aria-selected={historyTab === 'college'} className={historyTab === 'college' ? 'active' : ''} onClick={() => setHistoryTab('college')}>College planning</button>
+      </div>
+      {history?.length ? <ol className="unit-history">
+        {history.slice(0, 8).map((gen, i) => {
+          const done = gen.tasks.filter(t => t.is_completed).length
+          return <li key={`${gen.date}-${i}`}>
+            <header><b>{gen.tasks[0]?.unit_title || 'Unit'}</b><span>{done}/{gen.tasks.length} complete</span><em>{String(gen.date).slice(0, 10)}</em></header>
+            <ul>{gen.tasks.map(t => <li key={t.id} className={t.is_completed ? 'done' : ''}>
+              <i>{t.is_completed ? <Check /> : t.task_order}</i>
+              <span>{t.skill_label || String(t.description).replace(/\[([^\]]+)\]\([^)]+\)/g, '$1').slice(0, 70)}</span>
+            </li>)}</ul>
+          </li>
+        })}
+      </ol> : <div className="chart-empty"><Target /><p>No {historyTab === 'test' ? 'test prep' : 'college planning'} units yet.</p></div>}
+    </section>
+  </main></AppShell>
 }
+
+const scoreFields = [['gpa', 'GPA', '0', '5', '0.01'], ['sat_ebrw', 'SAT reading & writing', '200', '800', '10'], ['sat_math', 'SAT math', '200', '800', '10'], ['act_math', 'ACT math', '1', '36', '1'], ['act_reading', 'ACT reading', '1', '36', '1'], ['act_science', 'ACT science', '1', '36', '1']]
+function EditStats() { const d = boot.data; const values = { gpa: d.gpa, sat_ebrw: d.satEbrw, sat_math: d.satMath, act_math: d.actMath, act_reading: d.actReading, act_science: d.actScience }; return <AppShell name={d.name}><main className="app-main form-page"><PageIntro kicker="UPDATE PROGRESS" title="Keep your snapshot honest." copy="New numbers help every future path respond to your real progress." /><form method="POST" className="settings-form"><div className="form-field-grid">{scoreFields.map(([name, label, min, max, step]) => <label key={name}>{label}<small>{min}–{max}</small><input type="number" name={name} min={min} max={max} step={step} defaultValue={values[name] || ''} /></label>)}</div><div className="form-actions"><a className="button button--quiet" href="/dashboard/stats">Cancel</a><button className="button button--primary" type="submit">Save progress <Check /></button></div></form></main></AppShell> }
+
+function Field({ name, label, textarea = false, value, ...props }) { return <label>{label}{textarea ? <textarea name={name} rows="4" defaultValue={value || ''} {...props} /> : <input name={name} defaultValue={value || ''} {...props} />}</label> }
+function BuilderPage({ kind }) { const d = boot.data; const test = kind === 'test'; const [focus, setFocus] = useState(d.test_focus || ''); return <AppShell name={d.name}><main className="app-main form-page"><PageIntro kicker={test ? 'TEST PREPARATION' : 'COLLEGE PLANNING'} title={test ? 'Design your next five steps.' : 'Build a college plan that fits.'} copy={test ? 'Tell Mentics what the score alone cannot show.' : 'Turn a wide-open process into focused, personal action.'} /><form method="POST" className="settings-form builder-form">{test ? <><fieldset><legend>Which test are you preparing for?</legend><div className="choice-grid choice-grid--three">{[['sat', 'SAT only'], ['act', 'ACT only'], ['both', 'SAT + ACT']].map(([value, label]) => <label className={focus === value ? 'selected' : ''} key={value}><input type="radio" name="test_focus" value={value} required checked={focus === value} onChange={() => setFocus(value)} /><BookOpen /><b>{label}</b></label>)}</div></fieldset><div className="form-field-grid"><Field name="desired_sat" label="Desired SAT" type="number" min="400" max="1600" step="10" value={d.desired_sat} /><Field name="desired_act" label="Desired ACT" type="number" min="1" max="36" value={d.desired_act} /><Field name="current_sat_ebrw" label="Current SAT reading & writing" type="number" min="200" max="800" value={d.current_sat_ebrw} /><Field name="current_sat_math" label="Current SAT math" type="number" min="200" max="800" value={d.current_sat_math} /><Field name="current_act_composite" label="Current ACT composite" type="number" min="1" max="36" value={d.current_act_composite} /><Field name="current_act_math" label="Current ACT math" type="number" min="1" max="36" value={d.current_act_math} /><Field name="current_act_reading" label="Current ACT reading" type="number" min="1" max="36" value={d.current_act_reading} /><Field name="current_act_science" label="Current ACT science" type="number" min="1" max="36" value={d.current_act_science} /><Field name="hours_per_week" label="Hours available each week" type="number" min="1" max="40" value={d.hours_per_week} /></div><Field name="strengths" label="Your strengths" textarea value={d.strengths} /><Field name="weaknesses" label="Where you need the most help" textarea required value={d.weaknesses} /><Field name="test_date" label="Test date" type="date" value={d.test_date} /></> : <><div className="form-field-grid"><label>Current grade<select name="current_grade" required defaultValue={d.grade || ''}><option value="">Choose grade</option>{['9', '10', '11', '12'].map(v => <option value={v} key={v}>{v}th grade</option>)}</select></label><label>Planning stage<select name="planning_stage" required defaultValue={d.planning_stage || ''}><option value="">Choose stage</option><option value="exploring">Exploring options</option><option value="researching">Researching colleges</option><option value="applying">Ready to apply</option></select></label></div><Field name="interested_majors" label="Interested majors" textarea value={d.majors} /><Field name="target_colleges" label="Target colleges" textarea value={d.target_colleges} /></>}<div className="form-actions"><a className="button button--quiet" href="/dashboard">Cancel</a><button className="button button--primary" type="submit">Build my five-step path <ArrowRight /></button></div></form></main></AppShell> }
 
 function ForumPage() { const d = boot.data; const [creating, setCreating] = useState(false); const [busy, setBusy] = useState(false); const submitPost = async e => { e.preventDefault(); setBusy(true); const form = new FormData(e.currentTarget); try { await api('/api/posts', { method: 'POST', body: JSON.stringify({ title: form.get('title'), content: form.get('content') }) }); window.location.reload() } finally { setBusy(false) } }; const reply = async (postId, e) => { e.preventDefault(); setBusy(true); const form = new FormData(e.currentTarget); try { await api('/api/replies', { method: 'POST', body: JSON.stringify({ post_id: postId, content: form.get('content') }) }); window.location.reload() } finally { setBusy(false) } }; return <AppShell name={d.name}><main className="app-main"><PageIntro kicker="MENTICS COMMUNITY" title="Students helping students." copy="Compare approaches, ask better questions, and move forward together." actions={<button className="button button--primary" onClick={() => setCreating(!creating)}><Plus /> New discussion</button>} />{creating && <form className="new-post-panel" onSubmit={submitPost}><Field name="title" label="Discussion title" required /><Field name="content" label="What do you want to share or ask?" textarea required /><button className="button button--primary" disabled={busy}>Publish discussion</button></form>}<form className="forum-search" method="GET"><Search /><input name="search" defaultValue={d.searchQuery || ''} placeholder="Search discussions" /><button>Search</button></form><section className="forum-layout"><div className="thread-list">{d.posts?.length ? d.posts.map(post => <article className="thread" key={post.id}><header><span>{String(post.user_name || 'M').slice(0, 1)}</span><div><b>{post.title}</b><small>{post.user_name} · {String(post.created_at).slice(0, 10)}</small></div></header><p>{post.content}</p>{post.replies?.length > 0 && <div className="replies">{post.replies.map(r => <div key={r.id}><b>{r.user_name}</b><p>{r.content}</p></div>)}</div>}<form onSubmit={e => reply(post.id, e)}><input name="content" required placeholder="Add a thoughtful reply" /><button disabled={busy}><Send /></button></form></article>) : <div className="empty-state"><MessageCircle /><p>No discussions match this search yet.</p></div>}</div><aside className="community-aside"><UsersRound /><h3>Today in Mentics</h3><strong>{d.todaysThreads?.length || 0}</strong><span>new discussions</span><p>Keep posts specific, respectful, and useful to the next student.</p></aside></section></main></AppShell> }
 

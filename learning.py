@@ -501,12 +501,18 @@ Questions this student recently answered incorrectly:
 Skills already taught in earlier units (do not re-teach unless mastery is below 70%):
 {profile['taught_skills']}
 
-# CONVERSATION
-Most recent request from the student (highest priority if it asks for a change):
+# WHAT THE STUDENT HAS ASKED FOR
+Standing focus they set (keep honouring this until they change it): {profile.get('standing_focus', 'None stated.')}
+
+Most recent request (highest priority if it asks for a change):
 {profile['latest_request']}
 
 Recent conversation:
 {profile['chat_history']}
+
+A stated focus outranks what the scores alone would suggest. If the student asked for math,
+this unit is a math unit, and you pick the math skills their results say are weakest. Only
+ignore a standing focus if they have clearly since asked for something else.
 
 # UNIT SHAPE (FIXED - DO NOT CHANGE)
 {shape_lines}
@@ -523,8 +529,16 @@ How the nodes relate to each other:
 {catalog}
 
 # YOUR JOB
-Choose the skills that will move this student's score the most, using the measured
-performance above. Prefer a weakness with real evidence behind it over a self-reported one.
+Choose the skills that will move this student's score the most. Work in this order of
+authority:
+1. A standing or latest focus the student asked for. Honour it.
+2. Measured mastery and the specific questions they got wrong. A skill they are failing at
+   40% beats a skill they merely listed as a weakness.
+3. Self-reported weaknesses, then score gaps, then high-yield defaults.
+
+Do not re-teach a skill they are already above 85% on unless they asked for it. If their
+recent mistakes cluster around one sub-skill, teach that sub-skill specifically rather than
+the broad topic it sits in.
 The two lesson nodes should teach two DIFFERENT skills.
 
 For each node write a `syllabus`: 4 concrete sub-concepts, written as specific teachable
@@ -1171,3 +1185,633 @@ def format_mastery_summary(rows):
             f"mastery level {row.get('level', 0)}/5"
         )
     return "\n".join(lines)
+
+
+# ==========================================================================
+# College planning
+# ==========================================================================
+# College prep is taught the same way as test prep, because the failure mode is
+# the same: a student told to "research colleges" does not know what good looks
+# like. So the unit teaches the judgement first -- what separates a strong
+# activities entry from a weak one, what a balanced list actually means -- and
+# checks it with comparison questions, which is the form this material grades
+# well in. The unit then ends in a real deliverable rather than a practice test.
+
+COLLEGE_TAXONOMY = {
+    # Foundation and self-knowledge
+    "narrative_core": ("Your Application Narrative", "Applying", "narrative"),
+    "fit_criteria": ("Defining College Fit", "Research", "research"),
+    "college_list": ("Building a Balanced List", "Research", "research"),
+    "affordability": ("Cost, Aid, and Net Price", "Money", "money"),
+    "financial_aid_forms": ("FAFSA and CSS Profile", "Money", "money"),
+    "scholarships": ("Finding and Winning Scholarships", "Money", "money"),
+    # Profile building
+    "course_rigor": ("Course Rigor and Schedule Planning", "Profile", "profile"),
+    "activity_depth": ("Building Depth in Activities", "Profile", "profile"),
+    "activities_list": ("Writing the Activities List", "Applying", "writing"),
+    "honors_awards": ("Presenting Honors and Awards", "Applying", "writing"),
+    "summer_planning": ("Making Summers Count", "Profile", "profile"),
+    # Testing strategy
+    "testing_strategy": ("Test Strategy and Test-Optional Decisions", "Testing", "testing"),
+    # Essays
+    "essay_topic": ("Finding Your Personal Statement Topic", "Essays", "writing"),
+    "essay_structure": ("Structuring the Personal Statement", "Essays", "writing"),
+    "essay_revision": ("Revising for Voice and Specificity", "Essays", "writing"),
+    "why_us_essay": ("Writing the 'Why Us' Essay", "Essays", "writing"),
+    "why_major_essay": ("Writing the 'Why This Major' Essay", "Essays", "writing"),
+    "community_essay": ("Community and Identity Essays", "Essays", "writing"),
+    "supplement_strategy": ("Managing Supplemental Essays", "Essays", "writing"),
+    # Mechanics and people
+    "recommendations": ("Requesting Strong Recommendations", "Applying", "people"),
+    "common_app_mechanics": ("Common App Mechanics", "Applying", "mechanics"),
+    "deadline_strategy": ("ED, EA, and Deadline Strategy", "Applying", "mechanics"),
+    "demonstrated_interest": ("Demonstrated Interest", "Research", "research"),
+    "interviews": ("College Interviews", "Applying", "people"),
+    # Endgame
+    "comparing_offers": ("Comparing Offers and Aid Packages", "Money", "money"),
+    "waitlist_appeals": ("Waitlists and Aid Appeals", "Applying", "mechanics"),
+}
+
+COLLEGE_ALIASES = {
+    "essay_topic": ["essay idea", "what to write about", "brainstorm", "personal statement topic"],
+    "essay_structure": ["outline", "essay structure", "draft my essay"],
+    "essay_revision": ["revise", "edit my essay", "make it better", "feedback"],
+    "why_us_essay": ["why us", "why this college", "supplemental"],
+    "college_list": ["college list", "school list", "reach", "safety", "target",
+                     "balanced list", "where to apply", "my list"],
+    "fit_criteria": ["fit", "what i want", "campus", "size", "location"],
+    "affordability": ["cost", "tuition", "net price", "afford", "expensive"],
+    "financial_aid_forms": ["fafsa", "css profile", "financial aid form"],
+    "scholarships": ["scholarship", "merit aid", "grants"],
+    "activities_list": ["activities", "extracurriculars list", "common app activities"],
+    "activity_depth": ["extracurricular", "clubs", "leadership", "volunteering"],
+    "recommendations": ["recommendation", "rec letter", "teacher letter", "counselor"],
+    "deadline_strategy": ["early decision", "early action", "deadline", "regular decision", "ed", "ea"],
+    "common_app_mechanics": ["common app", "application form", "submit"],
+    "testing_strategy": ["test optional", "should i submit my score", "superscore"],
+    "interviews": ["interview", "alumni interview"],
+    "course_rigor": ["classes", "schedule", "ap", "honors", "course load"],
+    "comparing_offers": ["decide", "which college", "compare offers", "award letter"],
+}
+
+# What the unit drives toward for each stage. The final node is a real
+# deliverable, tracked the way a boss battle tracks a test score.
+COLLEGE_MILESTONES = {
+    "exploring": {
+        "title": "Save five colleges worth exploring",
+        "action": "Research five colleges against the fit criteria you just defined, and record one concrete note about each.",
+        "stat": "colleges_researched",
+        "unit": "colleges",
+        "label": "How many colleges did you research?",
+    },
+    "researching": {
+        "title": "Lock in a balanced college list",
+        "action": "Finish a list with reach, target, and likely schools, each checked against cost and fit.",
+        "stat": "colleges_researched",
+        "unit": "colleges",
+        "label": "How many colleges are on your list now?",
+    },
+    "applying": {
+        "title": "Move an application to submitted",
+        "action": "Complete and submit one full application, essays and activities list included.",
+        "stat": "applications_submitted",
+        "unit": "applications",
+        "label": "How many applications have you submitted?",
+    },
+}
+
+# Stage drives what a student can usefully act on right now.
+COLLEGE_STAGE_FOCUS = {
+    "exploring": ["fit_criteria", "activity_depth", "course_rigor", "narrative_core",
+                  "affordability", "summer_planning", "testing_strategy"],
+    "researching": ["college_list", "fit_criteria", "affordability", "essay_topic",
+                    "activity_depth", "recommendations", "testing_strategy", "deadline_strategy"],
+    "applying": ["essay_structure", "essay_revision", "activities_list", "why_us_essay",
+                 "supplement_strategy", "common_app_mechanics", "deadline_strategy",
+                 "recommendations", "why_major_essay", "financial_aid_forms"],
+}
+
+COLLEGE_SHAPE = ["lesson", "practice_sprint", "lesson", "quiz", "milestone"]
+
+COLLEGE_XP = {"lesson": 30, "practice_sprint": 20, "quiz": 40, "milestone": 90}
+
+
+def college_skill_options(stage):
+    """Skills to offer the planner, weighted to the student's stage."""
+    stage = (stage or "researching").lower()
+    focus = COLLEGE_STAGE_FOCUS.get(stage, COLLEGE_STAGE_FOCUS["researching"])
+    rest = [k for k in COLLEGE_TAXONOMY if k not in focus]
+    return focus + rest
+
+
+def resolve_college_skill(skill_key, fallback_label=""):
+    """Map a key or phrase onto the college taxonomy."""
+    key = re.sub(r"[^a-z0-9_]+", "_", str(skill_key or "").strip().lower()).strip("_")
+    if key in COLLEGE_TAXONOMY:
+        label, subject, domain = COLLEGE_TAXONOMY[key]
+        return {"skill_key": key, "skill_label": label, "subject": subject,
+                "domain": domain, "test": "COLLEGE"}
+
+    haystack = re.sub(r"[^a-z ]+", " ", f"{key.replace('_', ' ')} {fallback_label}".lower())
+    haystack = re.sub(r"\s+", " ", haystack).strip()
+    best_key, best_score = None, 0.0
+    for candidate, (label, _, _) in COLLEGE_TAXONOMY.items():
+        score = 0.0
+        for word in re.split(r"[^a-z]+", label.lower()):
+            if len(word) > 3 and re.search(rf"\b{word}", haystack):
+                score += len(word)
+        for alias in COLLEGE_ALIASES.get(candidate, []):
+            if alias in haystack:
+                score += 2 * len(alias)
+        if score > best_score:
+            best_key, best_score = candidate, score
+    if best_key and best_score >= 5:
+        label, subject, domain = COLLEGE_TAXONOMY[best_key]
+        return {"skill_key": best_key, "skill_label": label, "subject": subject,
+                "domain": domain, "test": "COLLEGE"}
+    label, subject, domain = COLLEGE_TAXONOMY["narrative_core"]
+    return {"skill_key": "narrative_core", "skill_label": label, "subject": subject,
+            "domain": domain, "test": "COLLEGE"}
+
+
+SYSTEM_COUNSELOR = (
+    "You are the Mentics college counselor: an experienced admissions advisor who writes the "
+    "actual guidance, not instructions telling a student to go research it. You never say "
+    "'look up how to write an essay'. You show them, with real example sentences, real list "
+    "entries, and real comparisons between a weak version and a strong one. You are honest "
+    "about what admissions officers actually notice and never promise outcomes. You always "
+    "reply with a single raw JSON object and nothing else."
+)
+
+_COLLEGE_FACTS = (
+    "Facts you must respect: the Common App activities list allows 10 activities with a 50-character "
+    "position field and a 150-character description. The personal statement is 650 words. Most "
+    "supplements are 100-400 words. Early Decision is binding; Early Action is not. FAFSA opens in "
+    "the fall of senior year. Many colleges are test-optional, which is a strategic decision, not a "
+    "free pass. Never invent a college's specific deadline, requirement, or acceptance rate -- speak "
+    "about how to find and evaluate them instead."
+)
+
+
+def plan_college_unit(profile, shape):
+    """Plan a college unit: what to teach now, given where the student is."""
+    options = profile["skill_options"][:22]
+    catalog = "\n".join(
+        f"- {key}: {COLLEGE_TAXONOMY[key][0]}" for key in options if key in COLLEGE_TAXONOMY
+    )
+    shape_lines = "\n".join(
+        f"{i + 1}. {node}" for i, node in enumerate(shape)
+    )
+    milestone = profile["milestone"]
+
+    prompt = f"""# ROLE
+Design one college-application learning unit for a high school student.
+
+{_COLLEGE_FACTS}
+
+# STUDENT
+- Grade: {profile['grade']}
+- Stage of the process: {profile['stage']}
+- Intended majors or fields: {profile['majors']}
+- Colleges they are considering: {profile['target_colleges']}
+- Academic profile: {profile['academics']}
+- Application progress so far: {profile['progress']}
+- Skills already taught in earlier units (do not repeat): {profile['taught_skills']}
+
+# WHAT THE STUDENT HAS ASKED FOR
+Standing focus they set (keep honouring this until they change it): {profile.get('standing_focus', 'None stated.')}
+
+Most recent request (highest priority if it asks for something specific):
+{profile['latest_request']}
+
+Recent conversation:
+{profile['chat_history']}
+
+A stated focus outranks what their stage alone would suggest. If they asked for help with
+essays, this unit is an essay unit.
+
+# UNIT SHAPE (FIXED)
+{shape_lines}
+
+How the nodes relate:
+- A `lesson` teaches ONE application skill from scratch, with real examples.
+- The `practice_sprint` drills judgement on the skill from the lesson before it: give it that
+  same skill_key. Its questions compare weak and strong versions so the student learns to tell
+  them apart.
+- The `quiz` reviews the skills taught in this unit. Use the most important one's key.
+- Node 5 is a real deliverable and is handled by the server. Ignore it.
+
+# SKILL CATALOG (use these exact keys)
+{catalog}
+
+# YOUR JOB
+Pick the skills that unblock this student RIGHT NOW at their stage, working toward this
+deliverable: "{milestone['action']}". A senior in October needs essays and mechanics, not a
+lecture on choosing activities. A sophomore needs profile building, not supplements.
+The two lessons must teach DIFFERENT skills.
+
+Each node needs a `syllabus`: 4 concrete, teachable claims -- not topic names.
+Bad: "understand the activities list". Good: "lead the 150-character description with the
+outcome you produced, not the role you held".
+
+The `reason` must reference this student's own situation.
+
+# OUTPUT
+Raw JSON only:
+{{
+  "unit_title": "short name for this unit, 2-5 words",
+  "unit_summary": "one sentence on what the student will be able to do after this unit",
+  "nodes": [
+    {{
+      "node_type": "{shape[0]}",
+      "skill_key": "exact key from the catalog",
+      "title": "student-facing title, max 8 words",
+      "objective": "one sentence: what they will be able to do",
+      "syllabus": ["claim 1", "claim 2", "claim 3", "claim 4"],
+      "reason": "why this now, citing their grade, stage, majors, or progress",
+      "difficulty": "easy | medium | hard"
+    }}
+  ]
+}}
+Return exactly {len(shape) - 1} nodes, for positions 1 through {len(shape) - 1}."""
+
+    return _call(prompt, tokens=2600, system=SYSTEM_COUNSELOR, expect_key="nodes", retries=1)
+
+
+def generate_college_teaching(node, profile):
+    """Teaching cards for a college lesson: show the work, never assign reading."""
+    skill = node["skill"]
+    syllabus = "\n".join(f"- {item}" for item in node["syllabus"])
+
+    prompt = f"""# TASK
+Write the teaching content for a lesson on **{skill['skill_label']}** for a student in
+grade {profile['grade']} who is at the "{profile['stage']}" stage of applying to college.
+
+{_COLLEGE_FACTS}
+
+# LESSON OBJECTIVE
+{node['objective']}
+
+# SUB-CONCEPTS TO COVER (one card each, in this order)
+{syllabus}
+
+# STUDENT CONTEXT
+- Intended majors: {profile['majors']}
+- Colleges under consideration: {profile['target_colleges']}
+- Academic profile: {profile['academics']}
+- Progress so far: {profile['progress']}
+- Why this lesson: {node['reason']}
+
+# RULES
+1. TEACH. Never tell the student to go read, watch, or research something. You are the lesson.
+2. `worked_example` must show the real thing: an actual activities-list entry, an actual opening
+   paragraph, an actual list of criteria. Where it helps, show a weak version and then the strong
+   rewrite, and say exactly what changed and why it matters.
+3. `body` is 70-130 words of direct, practical explanation. Markdown emphasis and short lists are
+   fine. No headings inside the body.
+4. `takeaway` is one sentence the student could act on today.
+5. `trap` names the specific mistake students make here and how to catch it.
+6. Never use bracketed placeholders. Write the real thing.
+7. Be honest and concrete. No hype, no promises about admission, no invented statistics about
+   specific colleges.
+
+# OUTPUT
+Raw JSON only:
+{{
+  "intro": "2-3 sentences on what this lesson fixes and why it matters at their stage",
+  "cards": [
+    {{
+      "title": "short card title, max 7 words",
+      "body": "70-130 words that teach the sub-concept",
+      "worked_example": "a real example, ideally weak version then strong rewrite",
+      "takeaway": "one actionable sentence",
+      "trap": "the specific mistake to avoid"
+    }}
+  ],
+  "recap": "3-5 sentence summary to review before the practice"
+}}
+Return exactly {len(node['syllabus'])} cards, one per sub-concept, in order."""
+
+    data = _call(prompt, tokens=4200, system=SYSTEM_COUNSELOR, expect_key="cards", retries=1)
+    cards = []
+    for raw in data.get("cards", []) if isinstance(data, dict) else []:
+        if not isinstance(raw, dict):
+            continue
+        body = _clean(raw.get("body"), 2200)
+        if len(body) < 80 or re.search(r"\[(?:core|insert|concept|example|topic|your)\b[^\]]*\]", body, re.I):
+            continue
+        cards.append({
+            "title": _clean(raw.get("title"), 90) or skill["skill_label"],
+            "body": body,
+            "worked_example": _clean(raw.get("worked_example"), 2500),
+            "takeaway": _clean(raw.get("takeaway"), 400),
+            "trap": _clean(raw.get("trap"), 600),
+        })
+    if not cards:
+        raise ValueError("no usable college teaching cards")
+    return {
+        "intro": _clean(data.get("intro"), 900),
+        "cards": cards[:TEACH_CARD_COUNT],
+        "recap": _clean(data.get("recap"), 1200),
+    }
+
+
+def generate_college_exercises(node, profile, count, *, cumulative_skills=None):
+    """Judgement drills: which version is stronger, and why.
+
+    Application material has no answer key, so the gradeable skill is
+    discrimination -- telling a specific, evidenced entry from a vague one.
+    """
+    skill = node["skill"]
+    syllabus = "\n".join(f"- {item}" for item in node["syllabus"]) or f"- Core {skill['skill_label']} judgement"
+
+    if cumulative_skills:
+        catalog = "\n".join(
+            f"- {key}: {COLLEGE_TAXONOMY[key][0]}" for key in cumulative_skills if key in COLLEGE_TAXONOMY
+        )
+        coverage = ("This is a cumulative review. Spread questions across these skills and tag each "
+                    "question with the key of the skill it tests:\n" + catalog)
+        skill_field = '      "skill_key": "which skill from the list above this question tests",\n'
+    else:
+        coverage = f"Every question tests judgement about {skill['skill_label']}."
+        skill_field = ""
+
+    prompt = f"""# TASK
+Write {count} multiple-choice judgement questions on **{skill['skill_label']}** for a student in
+grade {profile['grade']} at the "{profile['stage']}" stage.
+
+{_COLLEGE_FACTS}
+
+# COVERAGE
+{coverage}
+
+# SUB-CONCEPTS THE STUDENT JUST STUDIED
+{syllabus}
+
+# STUDENT CONTEXT
+- Intended majors: {profile['majors']}
+- Colleges under consideration: {profile['target_colleges']}
+
+# QUESTION DESIGN
+There is no answer key in college admissions, so test the judgement that separates strong
+material from weak. Good question shapes:
+- Put a realistic scenario in `source_or_prompt`, then ask which next move is strongest.
+- Show four versions of the same activities entry, essay opening, or email, and ask which is
+  most effective. Make the wrong ones wrong for DIFFERENT reasons: vague, generic, boastful
+  without evidence, or answering a different question than the one asked.
+- Give a student profile and ask which choice best fits their situation.
+
+# RULES
+1. `source_or_prompt` must contain the scenario, draft, or profile the question depends on.
+   Write it yourself, 30-160 words. The student sees only what you put in these fields.
+2. Exactly 4 choices, exactly one clearly strongest. Every distractor must be a mistake a real
+   student actually makes.
+3. `explanation` says why the best answer works AND what is wrong with each other option.
+   40-120 words. Be specific about the principle, not just "it's more detailed".
+4. Vary `correct_option` across the set. Do not make it 0 every time.
+5. Never reference a specific college's real deadline, requirement, or acceptance rate.
+6. Never write a question whose answer depends on information you did not include.
+
+# OUTPUT
+Raw JSON only:
+{{
+  "questions": [
+    {{
+{skill_field}      "source_or_prompt": "the scenario, draft, or profile the question depends on",
+      "question_text": "the question itself",
+      "options": ["choice A", "choice B", "choice C", "choice D"],
+      "correct_option": 0,
+      "explanation": "why the best answer works and what is wrong with each other option",
+      "difficulty": "easy | medium | hard"
+    }}
+  ]
+}}
+Return exactly {count} questions."""
+
+    data = _call(prompt, tokens=950 * count + 800, system=SYSTEM_COUNSELOR,
+                 expect_key="questions", retries=1)
+    allowed = set(cumulative_skills or ())
+    items = []
+    for raw in data.get("questions", []) if isinstance(data, dict) else []:
+        valid = _valid_question(raw, needs_prompt=True)
+        if not valid:
+            continue
+        tagged = str(raw.get("skill_key") or "").strip()
+        valid["skill_key"] = tagged if tagged in allowed else skill["skill_key"]
+        items.append(valid)
+    items = _dedupe(items)
+    if len(items) < max(2, count // 2):
+        raise ValueError(f"only {len(items)} of {count} college questions were usable")
+    return items[:count]
+
+
+def _college_milestone_node(profile):
+    milestone = profile["milestone"]
+    return {
+        "node_type": "milestone",
+        "skill": resolve_college_skill("narrative_core"),
+        "title": milestone["title"],
+        "objective": milestone["action"],
+        "syllabus": [],
+        "reason": (
+            "This unit taught the judgement. This step is where you actually produce something, "
+            "which is the only part an admissions officer ever sees."
+        ),
+        "difficulty": "hard",
+        "stat_to_update": milestone["stat"],
+        "stat_label": milestone["label"],
+        "stat_unit": milestone["unit"],
+    }
+
+
+def _normalize_college_plan(data, shape, profile):
+    """Force the college plan onto the server-owned shape."""
+    raw_nodes = data.get("nodes") if isinstance(data, dict) else None
+    raw_nodes = raw_nodes if isinstance(raw_nodes, list) else []
+    candidates = [k for k in profile["skill_options"] if k in COLLEGE_TAXONOMY]
+
+    nodes, used_keys, used_order = [], set(), []
+    for index, node_type in enumerate(shape):
+        if node_type == "milestone":
+            nodes.append(_college_milestone_node(profile))
+            continue
+
+        raw = raw_nodes[index] if index < len(raw_nodes) and isinstance(raw_nodes[index], dict) else {}
+        skill = resolve_college_skill(raw.get("skill_key"), raw.get("title") or "")
+
+        if not raw.get("skill_key"):
+            previous = nodes[-1] if nodes else None
+            if node_type == "quiz" and used_order:
+                skill = resolve_college_skill(used_order[0])
+            elif node_type == "practice_sprint" and previous and previous["node_type"] == "lesson":
+                skill = dict(previous["skill"])
+            else:
+                skill = resolve_college_skill(next(
+                    (k for k in candidates if k not in used_keys), candidates[0]
+                ))
+        if skill["skill_key"] in used_keys and node_type == "lesson":
+            replacement = next((k for k in candidates if k not in used_keys), None)
+            if replacement:
+                skill = resolve_college_skill(replacement)
+        if skill["skill_key"] not in used_keys:
+            used_keys.add(skill["skill_key"])
+            used_order.append(skill["skill_key"])
+
+        syllabus = [
+            _clean(item, 240) for item in (raw.get("syllabus") or [])
+            if isinstance(item, str) and len(_clean(item, 240)) > 12
+        ][:5]
+        if len(syllabus) < 2:
+            syllabus = _default_college_syllabus(skill)
+
+        difficulty = (raw.get("difficulty") or "medium").lower()
+        nodes.append({
+            "node_type": node_type,
+            "skill": skill,
+            "title": _clean(raw.get("title"), 90) or skill["skill_label"],
+            "objective": _clean(raw.get("objective"), 300) or
+                         f"Handle {skill['skill_label']} with judgement instead of guesswork.",
+            "syllabus": syllabus,
+            "reason": _clean(raw.get("reason"), 700) or
+                      f"This is the piece of {skill['skill_label']} that is blocking your next move.",
+            "difficulty": difficulty if difficulty in {"easy", "medium", "hard"} else "medium",
+        })
+
+    unit_title = _clean(data.get("unit_title"), 80) if isinstance(data, dict) else ""
+    unit_summary = _clean(data.get("unit_summary"), 300) if isinstance(data, dict) else ""
+    teaching = [n for n in nodes if n["node_type"] != "milestone"]
+    if not unit_title and teaching:
+        unit_title = teaching[0]["skill"]["skill_label"]
+    if not unit_summary and teaching:
+        unit_summary = teaching[0]["objective"]
+    return {"unit_title": unit_title or "Your next unit", "unit_summary": unit_summary, "nodes": nodes}
+
+
+def _default_college_syllabus(skill):
+    label = skill["skill_label"]
+    return [
+        f"What admissions readers are actually looking for in {label}.",
+        f"The difference between a specific and a generic approach to {label}.",
+        f"A repeatable process for producing your own {label} material.",
+        f"How to check your own work on {label} before you submit it.",
+    ]
+
+
+def _fallback_college_teaching(node):
+    """A real lesson when generation fails, never a placeholder."""
+    skill = node["skill"]
+    label = skill["skill_label"]
+    cards = []
+    for item in node["syllabus"][:4]:
+        cards.append({
+            "title": item[:80],
+            "body": (
+                f"**{item}**\n\nThe thing that separates strong application material from weak "
+                f"material is almost never effort, it is specificity. On {label}, a reader can tell "
+                "within one line whether you are describing something that actually happened to you "
+                "or something that could be copied onto anyone's application. Name the concrete "
+                "detail: the number, the moment, the decision you made, the thing that changed "
+                "because you were there. Generic writing is not penalized because it is badly "
+                "written; it is penalized because it carries no information."
+            ),
+            "worked_example": (
+                "Weak: 'Participated in debate club and improved my public speaking skills.'\n\n"
+                "Strong: 'Ran weekly novice drills; grew the team from 6 to 19 and coached two "
+                "first-year debaters to a regional quarterfinal.'\n\n"
+                "What changed: the second version reports outcomes only this student could report. "
+                "It answers 'what happened because you were there' instead of 'what were you in'."
+            ),
+            "takeaway": f"On {label}, replace every claim about yourself with the evidence for it.",
+            "trap": "Describing the role you held rather than the result you produced.",
+        })
+    if not cards:
+        cards = [{
+            "title": label,
+            "body": (
+                f"{label} rewards specificity and honesty. Decide what you actually want a reader to "
+                "know, say it in concrete terms, and cut anything that could appear on someone "
+                "else's application unchanged."
+            ),
+            "worked_example": "",
+            "takeaway": f"Be specific and honest on {label}; vagueness reads as having nothing to say.",
+            "trap": "Writing what you think admissions wants to hear instead of what is true.",
+        }]
+    return {
+        "intro": f"This lesson is about {label}. {node['objective']}",
+        "cards": cards,
+        "recap": (
+            f"On {label}: lead with evidence, cut anything generic, and check that every line "
+            "could only have been written by you."
+        ),
+    }
+
+
+def build_college_unit(profile, *, max_workers=6):
+    """Plan a college unit, then generate its content concurrently."""
+    profile = dict(profile)
+    stage = (profile.get("stage") or "researching").lower()
+    if stage not in COLLEGE_MILESTONES:
+        stage = "researching"
+    profile["stage"] = stage
+    profile["milestone"] = COLLEGE_MILESTONES[stage]
+    profile.setdefault("skill_options", college_skill_options(stage))
+
+    try:
+        raw_plan = plan_college_unit(profile, COLLEGE_SHAPE)
+    except Exception as error:  # noqa: BLE001
+        _log("learning: college planner failed (%s); using stage-ranked fallback", error)
+        raw_plan = {}
+    plan = _normalize_college_plan(raw_plan, COLLEGE_SHAPE, profile)
+
+    taught_keys, taught_labels = [], []
+    for node in plan["nodes"]:
+        if node["node_type"] in ("lesson", "practice_sprint") and node["skill"]["skill_key"] not in taught_keys:
+            taught_keys.append(node["skill"]["skill_key"])
+            taught_labels.append(node["skill"]["skill_label"])
+
+    jobs = []
+    for index, node in enumerate(plan["nodes"]):
+        if node["node_type"] == "milestone":
+            continue
+        if node["node_type"] == "lesson":
+            jobs.append((index, "teaching", node, None))
+            jobs.append((index, "checks", node, LESSON_CHECK_COUNT))
+        else:
+            jobs.append((index, "exercises", node, EXERCISE_COUNT[node["node_type"]]))
+
+    def run(job):
+        index, kind, node, count = job
+        try:
+            if kind == "teaching":
+                return index, kind, generate_college_teaching(node, profile)
+            if kind == "checks":
+                return index, kind, generate_college_exercises(node, profile, count)
+            cumulative = taught_keys if node["node_type"] == "quiz" else None
+            return index, kind, generate_college_exercises(
+                node, profile, count, cumulative_skills=cumulative
+            )
+        except Exception as error:  # noqa: BLE001
+            _log("learning: college %s failed for node %s (%s): %s",
+                 kind, index + 1, node["skill"]["skill_key"], error)
+            return index, kind, None
+
+    results = {}
+    if jobs:
+        with ThreadPoolExecutor(max_workers=min(max_workers, len(jobs))) as pool:
+            for index, kind, payload in pool.map(run, jobs):
+                results[(index, kind)] = payload
+
+    for index, node in enumerate(plan["nodes"]):
+        node["xp_reward"] = COLLEGE_XP[node["node_type"]]
+        if node["node_type"] == "lesson":
+            teaching = results.get((index, "teaching")) or _fallback_college_teaching(node)
+            checks = results.get((index, "checks")) or []
+            node["teaching"] = teaching
+            node["checks"] = checks
+            node["steps"] = _interleave_lesson(teaching, checks)
+        elif node["node_type"] in ("practice_sprint", "quiz"):
+            node["questions"] = results.get((index, "exercises")) or []
+
+    plan["taught_labels"] = taught_labels
+    plan["taught_keys"] = taught_keys
+    return plan
