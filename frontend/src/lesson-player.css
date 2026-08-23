@@ -339,6 +339,31 @@
   padding: 15px 22px;
 }
 
+/* iOS Safari can apply its own disabled text treatment to a button, which was
+   leaving the lesson action as an unlabeled grey bar. Keep both states explicit
+   and reserve room above the browser's bottom controls. */
+@media (max-width: 759px) {
+  .player-actions {
+    padding: 16px 0 calc(12px + env(safe-area-inset-bottom));
+  }
+
+  .player-cta,
+  .player-cta:disabled {
+    min-height: 54px;
+    color: #fff;
+    -webkit-text-fill-color: #fff;
+    opacity: 1;
+  }
+
+  .player-cta:disabled {
+    color: #ddd9ed;
+    -webkit-text-fill-color: #ddd9ed;
+    border-color: rgba(255, 255, 255, .1);
+    background: #56516c;
+    box-shadow: none;
+  }
+}
+
 /* --- Tutor -------------------------------------------------------------- */
 
 .coach-open {
