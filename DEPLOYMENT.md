@@ -20,6 +20,33 @@
 | Variable | Default | Purpose |
 | --- | --- | --- |
 | `IMPORT_API_TOKEN` | *(unset)* | Enables `POST /api/import_official_questions`. **While unset the endpoint returns 404 and cannot write anything.** Only set it when you are actively importing, and send it as the `X-Import-Token` header. Use a long random value (`python -c "import secrets;print(secrets.token_urlsafe(32))"`). |
+| `INIT_DB_ON_STARTUP` | *(unset)* | Runs `init_db()` at boot. See **Schema migrations** below. |
+
+## Schema migrations
+
+`init_db()` creates every table and adds every new column, and it is safe to run
+repeatedly. Locally it runs on every start. **In production it runs only when
+`INIT_DB_ON_STARTUP=1`**, so that ordinary cold starts do not issue DDL.
+
+That means any release which adds a table or column needs one deploy with the
+flag on:
+
+1. Set `INIT_DB_ON_STARTUP=1` in the Vercel project's environment variables.
+2. Redeploy and load any page, so one function invocation boots and applies the DDL.
+3. Remove the variable (or set it to `0`) and redeploy.
+
+Skipping this leaves the new tables absent, and the first request that touches
+them fails. The adaptive lesson engine added `lessons`, `lesson_steps`,
+`lesson_progress`, `lesson_answers`, `skill_mastery`, and `mistake_bank`, plus
+the `skill_key`, `skill_label`, `subject`, `node_type`, `objective`,
+`xp_reward`, `xp_awarded`, and `unit_title` columns on `paths` — so it needs
+this step.
+
+## Function duration
+
+Generating a unit fans out several concurrent Gemini calls and takes roughly ten
+to fifteen seconds. `vercel.json` sets `maxDuration` to 60s for `app.py`; do not
+lower it below about 30s or path generation will start returning 504s.
 
 ### Rate limits
 Counters live in the `rate_limits` table so they hold across serverless
