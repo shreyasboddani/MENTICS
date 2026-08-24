@@ -2725,6 +2725,12 @@ def home():
     return render_react("landing", {"isLoggedIn": is_logged_in}, "Mentics | Stop Guessing. Start Achieving.")
 
 
+@app.get("/google05c3788b5b10db5e.html")
+def google_site_verification():
+    """Serve Google's Search Console ownership token at the required root URL."""
+    return app.send_static_file("google05c3788b5b10db5e.html")
+
+
 @app.route("/signup", methods=["GET", "POST"])
 def signup():
     if request.method == "POST":
