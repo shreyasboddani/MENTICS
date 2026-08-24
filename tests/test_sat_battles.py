@@ -72,6 +72,7 @@ def test_sat_battle_queues_a_beatable_bot_after_thirty_seconds(tmp_path, monkeyp
     database.update("sat_battles", {
         "created_at": (app_module._utc_now() - timedelta(seconds=31)).isoformat(),
     }, where={"id": waiting["id"]})
+    database.delete("users", where={"email": app_module.SAT_BATTLE_BOT_EMAIL})
 
     active = app_module._battle_payload(
         database.select_one("sat_battles", where={"id": waiting["id"]}), challenger.data["id"]

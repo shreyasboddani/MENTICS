@@ -4548,6 +4548,23 @@ def _battle_questions():
 
 
 def _battle_bot():
+    bot = db.select_one('users', where={'email': SAT_BATTLE_BOT_EMAIL})
+    if bot:
+        return bot
+    # The arena can be released after its table migration has already run. Make
+    # the system opponent available on demand so a normal production boot never
+    # depends on a second DDL-enabled deploy just to start a fallback match.
+    try:
+        db.insert('users', {
+            'email': SAT_BATTLE_BOT_EMAIL,
+            'password': generate_password_hash(secrets.token_urlsafe(32)),
+            'stats': '{}',
+            'name': 'Mentics Arena Bot',
+            'onboarding_completed': True,
+        })
+    except Exception:
+        # A concurrent serverless request may have created the same unique user.
+        pass
     return db.select_one('users', where={'email': SAT_BATTLE_BOT_EMAIL})
 
 
