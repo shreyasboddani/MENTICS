@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import { createPortal } from 'react-dom'
 import DOMPurify from 'dompurify'
 import { marked } from 'marked'
@@ -1645,9 +1645,17 @@ function BattleArena() {
   const [error, setError] = useState('')
   const [secondsLeft, setSecondsLeft] = useState(null)
   const [activeQuestion, setActiveQuestion] = useState(0)
-  const [cinematic, setCinematic] = useState(false)
+  const [cinematic, setCinematic] = useState('')
   const previousStatus = useRef(d.currentBattle?.status)
   const stageRef = useRef(null)
+  const cinematicTimers = useRef([])
+  const clearCinematic = useCallback(() => { cinematicTimers.current.forEach(window.clearTimeout); cinematicTimers.current = [] }, [])
+  const launchCinematic = useCallback(() => {
+    clearCinematic()
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
+    setCinematic('3')
+    ;[['2', 700], ['1', 1400], ['fight', 2100], ['', 2860]].forEach(([phase, delay]) => cinematicTimers.current.push(window.setTimeout(() => setCinematic(phase), delay)))
+  }, [clearCinematic])
   const refresh = async id => { try { setBattle(await api(`/api/sat-battles/${id}`)) } catch (x) { setError(x.message) } }
   useEffect(() => {
     if (!battle?.id || !['waiting', 'active'].includes(battle.status)) return undefined
@@ -1664,13 +1672,11 @@ function BattleArena() {
     const previous = previousStatus.current
     previousStatus.current = battle?.status
     if (previous !== 'waiting' || battle?.status !== 'active') return undefined
-    setCinematic(true)
-  }, [battle?.status])
+    launchCinematic()
+  }, [battle?.status, launchCinematic])
   useEffect(() => {
-    if (!cinematic) return undefined
-    const timer = window.setTimeout(() => setCinematic(false), 1200)
-    return () => window.clearTimeout(timer)
-  }, [cinematic])
+    return () => clearCinematic()
+  }, [clearCinematic])
   useEffect(() => {
     if (battle?.status !== 'active') return undefined
     const frame = window.requestAnimationFrame(() => stageRef.current?.scrollIntoView({ block: 'start', behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' }))
@@ -1683,7 +1689,7 @@ function BattleArena() {
     const timer = window.setTimeout(burst, 240)
     return () => window.clearTimeout(timer)
   }, [battle?.id, battle?.status, battle?.youWon])
-  const startBattle = nextBattle => { setAnswers({}); setActiveQuestion(0); setBattle(nextBattle); if (nextBattle?.status === 'active') setCinematic(true) }
+  const startBattle = nextBattle => { setAnswers({}); setActiveQuestion(0); setBattle(nextBattle); if (nextBattle?.status === 'active') launchCinematic() }
   const join = async () => { setBusy(true); setError(''); try { startBattle(await api('/api/sat-battles/queue', { method: 'POST' })) } catch (x) { setError(x.message) } finally { setBusy(false) } }
   const train = async () => { setBusy(true); setError(''); try { startBattle(await api('/api/sat-battles/train', { method: 'POST' })) } catch (x) { setError(x.message) } finally { setBusy(false) } }
   const cancelQueue = async () => { if (!battle) return; setBusy(true); setError(''); try { await api(`/api/sat-battles/${battle.id}/cancel`, { method: 'POST' }); setBattle(null) } catch (x) { setError(x.message) } finally { setBusy(false) } }
@@ -1710,10 +1716,11 @@ function BattleArena() {
     {error && <div className="error-banner">{error}<button onClick={() => setError('')}>Dismiss</button></div>}
     {idle && <section className="battle-training"><div><small>TRAINING GROUND</small><h2>Build speed before you put rating on the line.</h2><p>Start a private two-minute round with Mentics Arena Bot. Same five-question format, instant result, and zero leaderboard impact.</p></div><button className="button button--primary" onClick={train} disabled={busy}><Brain /> Start a bot drill <ArrowRight /></button></section>}
     {waiting && <section className="battle-stage battle-stage--waiting" aria-live="polite"><span className="battle-search-orbit"><Swords /></span><div><small>MATCHMAKING</small><h2>Finding your challenger</h2><p>Your question set is locked. If nobody joins within 30 seconds, Mentics Arena Bot steps in automatically.</p></div><div className="battle-wait-actions"><button className="text-button" onClick={() => refresh(battle.id)}>Check match status <RotateCcw /></button><button className="text-button" disabled={busy} onClick={cancelQueue}>Leave queue</button></div></section>}
-    {active && <section ref={stageRef} className="battle-stage battle-stage--active" aria-label="Active SAT battle">
-      {cinematic && <div className="arena-cinematic" role="status" aria-live="polite"><span className="arena-cinematic-ring" /><div className="arena-cinematic-versus"><b>YOU</b><i>VS</i><b>{battle.opponentName || 'ARENA BOT'}</b></div><strong>Match locked. Go.</strong></div>}
+    {active && <section ref={stageRef} className={`battle-stage battle-stage--active ${answers[currentQuestionIndex] != null ? 'is-striking' : ''}`} aria-label="Active SAT battle">
+      {cinematic && <div className="arena-cinematic" data-phase={cinematic} role="status" aria-live="assertive"><Starfield warp tone="violet" /><div className="arena-cinematic-fighters" aria-hidden="true"><span className="arena-cinematic-fighter arena-cinematic-fighter--you">{String(d.name || 'Y').slice(0, 1)}</span><i>VS</i><span className="arena-cinematic-fighter arena-cinematic-fighter--rival">{String(battle.opponentName || 'B').slice(0, 1)}</span></div><div className="arena-cinematic-count"><small>{cinematic === 'fight' ? 'MENTICS ARENA' : 'ARENA LINK ESTABLISHED'}</small><strong>{cinematic === 'fight' ? 'FIGHT' : cinematic}</strong><span>{cinematic === 'fight' ? 'MAKE EVERY SECOND COUNT' : 'PREPARE TO THINK FAST'}</span></div>{cinematic !== 'fight' && <button type="button" onClick={() => { clearCinematic(); setCinematic('') }}>Skip intro</button>}</div>}
       <header className="battle-status"><span><i /><b>{battle.mode === 'training' ? 'PRIVATE BOT DRILL' : `${battleDifficulty} SAT BATTLE`}</b><small>vs {battle.opponentName || 'your challenger'}</small></span><strong className={secondsLeft < 20 ? 'urgent' : ''}><Clock3 /> {clock}</strong></header>
       {battle.submitted ? <div className="battle-locked"><span className="battle-search-orbit"><Check /></span><h2>Answers locked.</h2><p>{battle.mode === 'training' ? 'Mentics Arena Bot is scoring your round now.' : `Waiting for ${battle.opponentName || 'your challenger'} to finish. The arena will reveal the result automatically.`}</p></div> : <>
+        <div className="battle-combat-hud" aria-label={`You versus ${battle.opponentName || 'Arena bot'}`}><article className="battle-combatant battle-combatant--you"><span>{String(d.name || 'Y').slice(0, 1)}</span><div><small>YOU</small><b>{d.name || 'Challenger'}</b><i><em style={{ width: `${Math.max(14, 28 + answeredCount * 14)}%` }} /></i><strong>FOCUS {answeredCount}/{questionCount}</strong></div></article><div className="battle-clash"><i /><b>VS</b><span>{currentQuestion?.skill || 'SAT ARENA'}</span></div><article className="battle-combatant battle-combatant--rival"><div><small>RIVAL</small><b>{battle.opponentName || 'Arena Bot'}</b><i><em /></i><strong>READY TO RACE</strong></div><span>{String(battle.opponentName || 'B').slice(0, 1)}</span></article></div>
         <div className="battle-question-progress" aria-label={`Question ${currentQuestionIndex + 1} of ${questionCount}`}>{battle.questions.map((_, index) => <button type="button" key={index} className={`${answers[index] != null ? 'done' : ''} ${currentQuestionIndex === index ? 'current' : ''}`} onClick={() => setActiveQuestion(index)} aria-label={`Go to question ${index + 1}${answers[index] != null ? ', answered' : ''}`}>{index + 1}</button>)}</div>
         <div className="battle-round-heading"><span>ROUND {currentQuestionIndex + 1} OF {questionCount}</span><b>{answeredCount}/{questionCount} LOCKED IN</b></div>
         {currentQuestion && <div className="battle-questions"><article className="battle-question battle-question--focus" key={currentQuestionIndex}><header><small>QUESTION {currentQuestionIndex + 1} · {currentQuestion.skill}</small><span>{answers[currentQuestionIndex] != null ? 'ANSWERED' : 'UNANSWERED'}</span></header><h2>{currentQuestion.question_text}</h2><div>{currentQuestion.options.map((option, optionIndex) => <button key={optionIndex} className={answers[currentQuestionIndex] === optionIndex ? 'selected' : ''} onClick={() => select(currentQuestionIndex, optionIndex)}><i>{String.fromCharCode(65 + optionIndex)}</i><span>{option}</span></button>)}</div></article></div>}

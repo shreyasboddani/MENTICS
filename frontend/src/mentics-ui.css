@@ -1619,6 +1619,70 @@
 @keyframes arena-ring-in { from { opacity: 0; transform: scale(.62); } to { opacity: 1; transform: none; } }
 @keyframes arena-cinematic-exit { 0%, 63% { opacity: 1; } 100% { opacity: 0; visibility: hidden; } }
 @keyframes arena-confetti-fall { from { opacity: 0; transform: translate3d(0, 0, 0) rotate(0); } 12% { opacity: 1; } to { opacity: 0; transform: translate3d(calc((var(--arena-index) - 6) * 11px), 210px, 0) rotate(250deg); } }
+
+/* In-match mode is deliberately a darker, denser game space than the arena lobby. */
+.battle-stage--active { color: #f7f4ff; border-color: rgba(174, 145, 255, .3); background: radial-gradient(circle at 50% -10%, rgba(139, 90, 250, .34), transparent 35%), radial-gradient(circle at 10% 80%, rgba(55, 201, 255, .13), transparent 28%), linear-gradient(145deg, #161132, #100d26 68%, #19133e); box-shadow: 0 34px 75px -40px rgba(13, 8, 42, .95), inset 0 1px rgba(255,255,255,.12), inset 0 0 0 1px rgba(126, 84, 221, .11); }
+.battle-stage--active::after { position: absolute; z-index: -1; inset: 0; content: ''; pointer-events: none; opacity: .26; background-image: linear-gradient(rgba(205, 188, 255, .14) 1px, transparent 1px), linear-gradient(90deg, rgba(205, 188, 255, .14) 1px, transparent 1px); background-size: 34px 34px; mask-image: linear-gradient(150deg, #000, transparent 75%); }
+.battle-stage--active .battle-status { position: relative; z-index: 1; border-color: rgba(223, 215, 255, .14); }
+.battle-stage--active .battle-status b { color: #f5f1ff; }
+.battle-stage--active .battle-status small { color: #bdb4d8; }
+.battle-stage--active .battle-status > strong { color: #c2adff; }
+.battle-stage--active .battle-status > strong.urgent { color: #ff9eaf; }
+.battle-stage--active .battle-status > span i { background: #40e1b2; box-shadow: 0 0 0 4px rgba(64, 225, 178, .13), 0 0 18px rgba(64, 225, 178, .55); }
+.battle-combat-hud { position: relative; z-index: 1; display: grid; grid-template-columns: minmax(0, 1fr) 132px minmax(0, 1fr); align-items: center; gap: 15px; padding: 20px 0 13px; }
+.battle-combatant { display: flex; align-items: center; gap: 11px; min-width: 0; }
+.battle-combatant--rival { justify-content: flex-end; text-align: right; }
+.battle-combatant > span { display: grid; flex: none; place-items: center; width: 48px; height: 48px; border: 1px solid rgba(224, 213, 255, .46); border-radius: 15px; color: #fff; background: linear-gradient(135deg, #a17bff, #5145d3); box-shadow: 0 11px 24px -13px rgba(135, 89, 250, .9), inset 0 1px rgba(255,255,255,.42); font-size: 18px; font-weight: 900; }
+.battle-combatant--rival > span { background: linear-gradient(135deg, #ff7b9d, #9a3eae); box-shadow: 0 11px 24px -13px rgba(233, 78, 143, .72), inset 0 1px rgba(255,255,255,.42); }
+.battle-combatant > div { display: grid; min-width: 0; gap: 3px; }
+.battle-combatant small,.battle-combatant strong { color: #a89cc9; font-size: 9px; font-weight: 850; letter-spacing: .12em; }
+.battle-combatant b { overflow: hidden; color: #fbfaff; font-size: 13px; text-overflow: ellipsis; white-space: nowrap; }
+.battle-combatant i { display: block; width: min(180px, 100%); height: 6px; overflow: hidden; border: 1px solid rgba(255,255,255,.13); border-radius: 999px; background: rgba(255,255,255,.08); }
+.battle-combatant i em { display: block; width: 86%; height: 100%; border-radius: inherit; background: linear-gradient(90deg, #6ce4c7, #80a6ff); box-shadow: 0 0 12px rgba(92, 229, 194, .5); transition: width 220ms cubic-bezier(.23, 1, .32, 1); }
+.battle-combatant--rival i em { background: linear-gradient(90deg, #f084a1, #f5b8a7); box-shadow: 0 0 12px rgba(242, 111, 147, .42); }
+.battle-clash { position: relative; display: grid; place-items: center; min-height: 70px; color: #d9ccff; text-align: center; }
+.battle-clash i { position: absolute; right: -17px; left: -17px; top: 34px; height: 2px; background: linear-gradient(90deg, transparent, #8f71ff 27%, #ff9cb6 73%, transparent); box-shadow: 0 0 15px rgba(175, 120, 255, .75); }
+.battle-clash b { position: relative; z-index: 1; display: grid; place-items: center; width: 39px; height: 39px; border: 1px solid rgba(255,255,255,.35); border-radius: 50%; color: #fff; background: #30245c; box-shadow: 0 0 0 6px rgba(79, 61, 145, .34); font-size: 10px; letter-spacing: .1em; }
+.battle-clash span { position: absolute; bottom: -1px; max-width: 126px; overflow: hidden; color: #bdb1e0; font-size: 8px; font-weight: 850; letter-spacing: .1em; text-overflow: ellipsis; text-transform: uppercase; white-space: nowrap; }
+.battle-stage--active.is-striking .battle-clash i { animation: arena-strike .48s cubic-bezier(.23, 1, .32, 1) both; }
+.battle-stage--active .battle-question-progress { position: relative; z-index: 1; padding-top: 10px; border-top: 1px solid rgba(223, 215, 255, .12); }
+.battle-stage--active .battle-question-progress button { color: #a79bbe; background: rgba(255,255,255,.09); }
+.battle-stage--active .battle-question-progress button.done { color: #fff; background: #6f4cda; }
+.battle-stage--active .battle-question-progress button.current { color: #fff; background: linear-gradient(135deg, #a07aff, #5a48df); box-shadow: 0 0 0 4px rgba(139, 99, 242, .2), 0 0 18px rgba(130, 88, 238, .45); }
+.battle-stage--active .battle-round-heading { color: #afa2cf; }
+.battle-stage--active .battle-round-heading b { color: #c5b2ff; }
+.battle-stage--active .battle-question { position: relative; overflow: hidden; border-color: rgba(193, 172, 255, .24); background: linear-gradient(145deg, rgba(39, 30, 80, .94), rgba(23, 18, 54, .97)); box-shadow: 0 19px 38px -28px rgba(5, 3, 18, .95), inset 0 1px rgba(255,255,255,.1); }
+.battle-stage--active .battle-question::before { position: absolute; top: 0; left: 0; width: 80px; height: 2px; content: ''; background: linear-gradient(90deg, #a77bff, transparent); }
+.battle-stage--active .battle-question header small { color: #b99dff; }
+.battle-stage--active .battle-question header span { color: #b9adc9; }
+.battle-stage--active .battle-question h2 { color: #fff; font-size: clamp(1.08rem, 2vw, 1.32rem); }
+.battle-stage--active .battle-question button { border-color: rgba(213, 202, 255, .14); color: #eeeaff; background: rgba(255,255,255,.055); }
+.battle-stage--active .battle-question button i { color: #c2b8d8; background: rgba(255,255,255,.11); }
+.battle-stage--active .battle-question button.selected { border-color: #ad8aff; color: #fff; background: linear-gradient(135deg, rgba(132, 85, 233, .62), rgba(75, 60, 186, .62)); box-shadow: 0 0 0 1px #ad8aff, 0 0 25px rgba(138, 85, 234, .28), inset 0 1px rgba(255,255,255,.2); }
+.battle-stage--active .battle-question button.selected i { background: #cab7ff; color: #392176; }
+.battle-stage--active .battle-round-actions p { color: #c5bdd7; }
+.battle-stage--active .battle-round-actions .button { color: #f5f1ff; border-color: rgba(223, 215, 255, .22); background: rgba(255,255,255,.08); }
+.battle-stage--active .battle-lock { box-shadow: 0 16px 32px -17px rgba(122, 70, 242, .86), inset 0 1px rgba(255,255,255,.35); }
+
+/* MENTICS warp-inspired match intro. It is short, skippable, and only appears once per match. */
+.arena-cinematic { z-index: 12; gap: 0; pointer-events: auto; background: radial-gradient(circle at center, rgba(92, 56, 187, .23), rgba(7, 5, 22, .97) 66%); animation: arena-intro-in .18s ease-out both; }
+.arena-cinematic .warp-field { position: absolute; inset: 0; width: 100%; height: 100%; opacity: .85; }
+.arena-cinematic-fighters { position: relative; z-index: 1; display: flex; align-items: center; gap: clamp(16px, 4vw, 38px); }
+.arena-cinematic-fighter { display: grid; place-items: center; width: clamp(86px, 13vw, 138px); aspect-ratio: 1; border: 1px solid rgba(231, 221, 255, .52); border-radius: 28px; color: #fff; background: linear-gradient(145deg, #a680ff, #4b3bd2); box-shadow: 0 0 0 10px rgba(145, 100, 255, .12), 0 22px 46px -22px rgba(115, 69, 236, .92), inset 0 1px rgba(255,255,255,.45); font-size: clamp(2rem, 5vw, 3.6rem); font-weight: 900; animation: arena-fighter-left .68s cubic-bezier(.23, 1, .32, 1) both; }
+.arena-cinematic-fighter--rival { background: linear-gradient(145deg, #ff89a9, #952c9d); box-shadow: 0 0 0 10px rgba(255, 112, 155, .11), 0 22px 46px -22px rgba(238, 69, 135, .86), inset 0 1px rgba(255,255,255,.45); animation-name: arena-fighter-right; }
+.arena-cinematic-fighters > i { display: grid; place-items: center; width: 44px; height: 44px; border: 1px solid rgba(255,255,255,.4); border-radius: 50%; color: #fff; background: rgba(255,255,255,.11); box-shadow: 0 0 0 9px rgba(255,255,255,.06); font-size: 12px; font-style: normal; font-weight: 900; letter-spacing: .12em; }
+.arena-cinematic-count { position: relative; z-index: 1; display: grid; justify-items: center; margin-top: 23px; }
+.arena-cinematic-count small,.arena-cinematic-count span { color: #d8cfff; font-size: 10px; font-weight: 850; letter-spacing: .16em; text-transform: uppercase; }
+.arena-cinematic-count strong { margin: -5px 0 -3px; color: #fff; font-size: clamp(7rem, 18vw, 12rem); font-weight: 950; letter-spacing: -.1em; line-height: 1; text-shadow: 0 0 34px rgba(185, 151, 255, .72); animation: arena-count-pop .58s cubic-bezier(.23, 1, .32, 1) both; }
+.arena-cinematic[data-phase="fight"] .arena-cinematic-count strong { color: #f4d9ff; font-size: clamp(4.2rem, 12vw, 8rem); letter-spacing: -.07em; }
+.arena-cinematic button { position: absolute; z-index: 2; right: 20px; bottom: 18px; border: 0; color: #d9d0ee; background: transparent; font: inherit; font-size: 11px; font-weight: 750; letter-spacing: .08em; cursor: pointer; }
+.arena-cinematic button:hover { color: #fff; }
+@keyframes arena-intro-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes arena-fighter-left { from { opacity: 0; transform: translateX(-55px) rotate(-8deg); } to { opacity: 1; transform: none; } }
+@keyframes arena-fighter-right { from { opacity: 0; transform: translateX(55px) rotate(8deg); } to { opacity: 1; transform: none; } }
+@keyframes arena-count-pop { from { opacity: 0; transform: scale(.55); } 60% { opacity: 1; transform: scale(1.08); } to { opacity: 1; transform: none; } }
+@keyframes arena-strike { 0% { opacity: .2; transform: scaleX(.45); } 48% { opacity: 1; transform: scaleX(1.1); box-shadow: 0 0 28px #fff, 0 0 48px #ae74ff; } 100% { opacity: .8; transform: none; } }
+@media (max-width: 759px) { .battle-combat-hud { grid-template-columns: minmax(0, 1fr) 48px minmax(0, 1fr); gap: 5px; padding: 15px 0 10px; } .battle-combatant { gap: 7px; } .battle-combatant > span { width: 37px; height: 37px; border-radius: 12px; font-size: 14px; } .battle-combatant b { font-size: 10px; } .battle-combatant small,.battle-combatant strong { font-size: 7px; letter-spacing: .08em; } .battle-combatant i { height: 5px; } .battle-clash { min-height: 53px; } .battle-clash i { right: -4px; left: -4px; top: 25px; } .battle-clash b { width: 29px; height: 29px; font-size: 8px; } .battle-clash span { bottom: 0; max-width: 74px; font-size: 6px; } .arena-cinematic-fighter { border-radius: 21px; } .arena-cinematic-fighters > i { width: 34px; height: 34px; font-size: 9px; } .arena-cinematic button { right: 14px; bottom: 12px; } }
 @media (hover: hover) and (pointer: fine) { .battle-question-progress button:hover { transform: translateY(-1px); background: #e4ddf7; } .battle-question-progress button.current:hover { background: linear-gradient(135deg, #9268ef, #5547d3); transform: scale(1.12); } }
 @media (max-width: 759px) { .battle-page--in-match .battle-hero,.battle-page--in-match .battle-rank-strip { display: none; } .battle-page--in-match .battle-stage { margin-top: 6px; } .battle-question--focus { min-height: 0; } .battle-round-actions { align-items: stretch; flex-direction: column; gap: 10px; } .battle-round-actions .button { width: 100%; } .battle-round-heading { margin-top: 1px; } .arena-cinematic-versus { gap: 10px; font-size: 1.08rem; } }
 @media (prefers-reduced-motion: reduce) { .arena-cinematic,.arena-cinematic-ring,.battle-question--focus,.arena-confetti i { animation: none; } .arena-cinematic { display: none; } .battle-question-progress button { transition-duration: .01ms; } }
