@@ -4702,6 +4702,48 @@ SAT_BATTLE_RANKS = [
     (0, "Bronze", "bronze"),
 ]
 
+ARENA_AVATAR_DEFAULT = {
+    'body': 'striker', 'palette': 'nova', 'gear': 'visor', 'aura': 'pulse',
+}
+ARENA_AVATAR_OPTIONS = {
+    'body': {'striker', 'sentinel', 'scout'},
+    'palette': {'nova', 'solar', 'glacier', 'volt'},
+    'gear': {'visor', 'comms', 'crown', 'none'},
+    'aura': {'pulse', 'flare', 'orbit', 'none'},
+}
+
+
+def _normalize_arena_avatar(value):
+    """Return a small, stable cosmetic loadout safe to expose to opponents."""
+    source = value if isinstance(value, dict) else {}
+    return {
+        key: str(source.get(key) or default).strip().lower()
+        if str(source.get(key) or default).strip().lower() in ARENA_AVATAR_OPTIONS[key]
+        else default
+        for key, default in ARENA_AVATAR_DEFAULT.items()
+    }
+
+
+def _arena_avatar_for_user(user_id, bot_rank=None):
+    bot = db.select_one('users', where={'email': SAT_BATTLE_BOT_EMAIL})
+    if bot and user_id == bot['id']:
+        bot_loadouts = {
+            'bronze': {'body': 'scout', 'palette': 'solar', 'gear': 'comms', 'aura': 'none'},
+            'silver': {'body': 'scout', 'palette': 'glacier', 'gear': 'visor', 'aura': 'pulse'},
+            'gold': {'body': 'striker', 'palette': 'solar', 'gear': 'visor', 'aura': 'flare'},
+            'platinum': {'body': 'striker', 'palette': 'nova', 'gear': 'comms', 'aura': 'orbit'},
+            'diamond': {'body': 'sentinel', 'palette': 'glacier', 'gear': 'crown', 'aura': 'orbit'},
+            'master': {'body': 'sentinel', 'palette': 'volt', 'gear': 'crown', 'aura': 'flare'},
+            'grandmaster': {'body': 'sentinel', 'palette': 'nova', 'gear': 'crown', 'aura': 'orbit'},
+        }
+        return _normalize_arena_avatar(bot_loadouts.get(bot_rank, bot_loadouts['gold']))
+    row = db.select_one('users', where={'id': user_id}) if user_id else None
+    try:
+        stats = json.loads((row or {}).get('stats') or '{}')
+    except (TypeError, ValueError, json.JSONDecodeError):
+        stats = {}
+    return _normalize_arena_avatar(stats.get('arena_avatar'))
+
 
 def _utc_now():
     return datetime.now(ZoneInfo("UTC"))
@@ -5081,20 +5123,29 @@ def _battle_payload(battle, user_id):
         return None
     is_challenger = battle['challenger_id'] == user_id
     opponent_name = battle.get('opponent_name') if is_challenger else battle['challenger_name']
+    opponent_id = battle.get('opponent_id') if is_challenger else battle['challenger_id']
     own_answers = _battle_answers(battle.get('challenger_answers') if is_challenger else battle.get('opponent_answers'))
+    try:
+        battle_questions = json.loads(battle.get('questions') or '[]')
+    except (TypeError, ValueError, json.JSONDecodeError):
+        battle_questions = []
+    battle_difficulty = battle_questions[0].get('difficulty', 'bronze') if battle_questions else 'bronze'
+    bot = _battle_bot()
+    is_bot_battle = bool(bot and battle.get('opponent_id') == bot['id'])
     result = {
         'id': battle['id'], 'status': battle['status'], 'opponentName': opponent_name,
         'startedAt': battle.get('started_at'), 'durationSeconds': SAT_BATTLE_DURATION_SECONDS,
         'submitted': bool(own_answers), 'createdAt': battle.get('created_at'),
-        'isBotBattle': bool(_battle_bot() and battle.get('opponent_id') == _battle_bot()['id']),
+        'isBotBattle': is_bot_battle,
         'mode': _battle_mode(battle),
+        'playerAvatar': _arena_avatar_for_user(user_id, battle_difficulty),
+        'opponentAvatar': _arena_avatar_for_user(opponent_id, battle_difficulty),
     }
     stats = db.select_one('sat_battle_stats', where={'user_id': user_id})
     result['rank'] = _battle_rank(stats['rating'] if stats else 1000)
     if battle['status'] in {'active', 'complete'}:
-        questions = json.loads(battle['questions'])
-        result['difficulty'] = questions[0].get('difficulty', 'bronze') if questions else 'bronze'
-        result['questions'] = [{'question_text': q['question_text'], 'options': q['options'], 'skill': q['skill']} for q in questions]
+        result['difficulty'] = battle_difficulty
+        result['questions'] = [{'question_text': q['question_text'], 'options': q['options'], 'skill': q['skill']} for q in battle_questions]
     if battle['status'] == 'complete':
         questions = json.loads(battle['questions'])
         challenger_score = _battle_score(questions, _battle_answers(battle.get('challenger_answers')))
@@ -5132,11 +5183,24 @@ def battle_arena(user):
     return render_react('battles', {
         'name': user.get_name(),
         'currentBattle': _battle_payload(current, user.data['id']) if current else None,
+        'arenaAvatar': _arena_avatar_for_user(user.data['id']),
         'battleRank': _battle_rank(stats['rating'] if stats else 1000),
         'battleStats': stats or {'wins': 0, 'losses': 0, 'draws': 0, 'battles_played': 0},
         'leaderboard': leaderboard,
         'spotlight': spotlight[0] if spotlight else None,
     }, 'SAT Battles | Mentics')
+
+
+@app.route('/api/sat-battles/avatar', methods=['POST'])
+@login_required
+@rate_limit('30/hour', name='sat_battle_avatar')
+def update_sat_battle_avatar(user):
+    payload = request.get_json(silent=True) or {}
+    avatar = _normalize_arena_avatar(payload)
+    stats = user.get_stats()
+    stats['arena_avatar'] = avatar
+    user.set_stats(stats)
+    return jsonify({'avatar': avatar})
 
 
 @app.route('/api/sat-battles/queue', methods=['POST'])

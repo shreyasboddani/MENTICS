@@ -182,6 +182,45 @@ def test_sat_battle_rank_ladder_covers_bronze_through_grandmaster():
     assert app_module._battle_rank(1750)["label"] == "Grandmaster"
 
 
+def test_arena_avatar_loadout_is_validated_and_persisted(tmp_path, monkeypatch):
+    database = DatabaseHandler(str(tmp_path / "arena-avatar.db"))
+    monkeypatch.setattr(app_module, "db", database)
+    app_module.init_db()
+    player = _user(database, "fighter@example.test", "Fighter")
+    save_avatar = inspect.unwrap(app_module.update_sat_battle_avatar)
+
+    with app_module.app.test_request_context("/api/sat-battles/avatar", method="POST", json={
+        "body": "sentinel", "palette": "glacier", "gear": "crown", "aura": "orbit",
+    }):
+        saved = save_avatar(player).get_json()["avatar"]
+
+    assert saved == {"body": "sentinel", "palette": "glacier", "gear": "crown", "aura": "orbit"}
+    stored = json.loads(database.select_one("users", where={"id": player.data["id"]})["stats"])
+    assert stored["arena_avatar"] == saved
+
+    sanitized = app_module._normalize_arena_avatar({"body": "javascript", "palette": "", "gear": 42})
+    assert sanitized == app_module.ARENA_AVATAR_DEFAULT
+
+
+def test_battle_payload_carries_both_fighter_loadouts(tmp_path, monkeypatch):
+    database = DatabaseHandler(str(tmp_path / "arena-versus-avatars.db"))
+    monkeypatch.setattr(app_module, "db", database)
+    app_module.init_db()
+    challenger = _user(database, "fighter-one@example.test", "Fighter One")
+    opponent = _user(database, "fighter-two@example.test", "Fighter Two")
+    challenger.set_stats({"arena_avatar": {"body": "scout", "palette": "solar", "gear": "comms", "aura": "flare"}})
+    opponent.set_stats({"arena_avatar": {"body": "sentinel", "palette": "volt", "gear": "crown", "aura": "orbit"}})
+    queue = inspect.unwrap(app_module.queue_sat_battle)
+
+    with app_module.app.test_request_context("/api/sat-battles/queue", method="POST", json={}):
+        queue(challenger)
+    with app_module.app.test_request_context("/api/sat-battles/queue", method="POST", json={}):
+        active = queue(opponent).get_json()
+
+    assert active["playerAvatar"]["palette"] == "volt"
+    assert active["opponentAvatar"]["palette"] == "solar"
+
+
 def test_sat_battle_questions_are_original_sat_style_and_scale_by_rank():
     tiers = {
         "bronze": 1000, "silver": 1050, "gold": 1150, "platinum": 1250,

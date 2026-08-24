@@ -1647,6 +1647,94 @@ const BATTLE_TRAINING_RANKS = [
   ['grandmaster', 'Grandmaster', 'Hardest SAT-style sets'],
 ]
 
+const ARENA_AVATAR_DEFAULT = { body: 'striker', palette: 'nova', gear: 'visor', aura: 'pulse' }
+const ARENA_AVATAR_PALETTES = {
+  nova: ['#8b5cf6', '#4f46e5', '#f1eaff'],
+  solar: ['#ffb340', '#e95d43', '#fff1c7'],
+  glacier: ['#48d8ff', '#3974e8', '#e2fbff'],
+  volt: ['#b5f33d', '#31a878', '#efffc6'],
+}
+
+function ArenaFighter({ avatar, label = 'Arena fighter', size = 'full', facing = 'right', state = 'idle' }) {
+  const loadout = { ...ARENA_AVATAR_DEFAULT, ...(avatar || {}) }
+  const colors = ARENA_AVATAR_PALETTES[loadout.palette] || ARENA_AVATAR_PALETTES.nova
+  return <div
+    className={`arena-fighter arena-fighter--${loadout.body} arena-fighter--${size} arena-fighter--${state}`}
+    data-facing={facing}
+    data-gear={loadout.gear}
+    data-aura={loadout.aura}
+    style={{ '--fighter-main': colors[0], '--fighter-deep': colors[1], '--fighter-light': colors[2] }}
+    role="img"
+    aria-label={label}
+  >
+    <i className="arena-fighter-aura" aria-hidden="true" />
+    <i className="arena-fighter-shadow" aria-hidden="true" />
+    <div className="arena-fighter-rig" aria-hidden="true">
+      <i className="arena-fighter-crown"><b /><b /><b /></i>
+      <span className="arena-fighter-head"><i className="arena-fighter-hair" /><i className="arena-fighter-face"><b /><b /></i><i className="arena-fighter-visor" /><i className="arena-fighter-comms" /></span>
+      <span className="arena-fighter-torso"><i className="arena-fighter-core"><Zap /></i><b /></span>
+      <i className="arena-fighter-arm arena-fighter-arm--left"><b /></i>
+      <i className="arena-fighter-arm arena-fighter-arm--right"><b /></i>
+      <i className="arena-fighter-leg arena-fighter-leg--left"><b /></i>
+      <i className="arena-fighter-leg arena-fighter-leg--right"><b /></i>
+    </div>
+  </div>
+}
+
+function ArenaCustomizer({ avatar, onChange, onSave, onClose, saving }) {
+  const groups = [
+    ['body', 'Build', [['striker', 'Striker'], ['sentinel', 'Sentinel'], ['scout', 'Scout']]],
+    ['palette', 'Suit color', [['nova', 'Nova'], ['solar', 'Solar'], ['glacier', 'Glacier'], ['volt', 'Volt']]],
+    ['gear', 'Head gear', [['visor', 'Visor'], ['comms', 'Comms'], ['crown', 'Crown'], ['none', 'None']]],
+    ['aura', 'Power aura', [['pulse', 'Pulse'], ['flare', 'Flare'], ['orbit', 'Orbit'], ['none', 'None']]],
+  ]
+  return <div className="arena-customizer-backdrop" role="presentation" onMouseDown={event => { if (event.target === event.currentTarget) onClose() }}>
+    <section className="arena-customizer" role="dialog" aria-modal="true" aria-labelledby="arena-customizer-title">
+      <header><div><small>LOCKER</small><h2 id="arena-customizer-title">Build your fighter</h2><p>Your loadout follows you into every Arena screen.</p></div><button type="button" onClick={onClose} aria-label="Close fighter locker" autoFocus><X /></button></header>
+      <div className="arena-customizer-body">
+        <div className="arena-customizer-preview"><i className="arena-preview-light" /><ArenaFighter avatar={avatar} label="Your customized Arena fighter" /><strong>LIVE LOADOUT</strong></div>
+        <div className="arena-customizer-options">{groups.map(([key, title, choices]) => <fieldset key={key}><legend>{title}</legend><div>{choices.map(([value, label]) => <button type="button" key={value} className={avatar[key] === value ? 'selected' : ''} onClick={() => onChange({ ...avatar, [key]: value })}>{key === 'palette' && <i style={{ background: ARENA_AVATAR_PALETTES[value]?.[0] }} />}<span>{label}</span>{avatar[key] === value && <Check />}</button>)}</div></fieldset>)}</div>
+      </div>
+      <footer><span>Cosmetics never affect question difficulty or rank.</span><button type="button" className="arena-save-loadout" onClick={onSave} disabled={saving}>{saving ? 'SAVING…' : 'EQUIP LOADOUT'} <Check /></button></footer>
+    </section>
+  </div>
+}
+
+function ArenaGameLobby({ name, rank, rankProgress, avatar, openCustomizer, mode, setMode, trainingRank, setTrainingRank, selectedTier, busy, join, train }) {
+  const ranked = mode === 'ranked'
+  return <section className="arena-game-shell" data-mode={mode} aria-label="SAT Battle Arena game lobby">
+    <div className="arena-game-sky" aria-hidden="true"><i /><i /><i /><i /></div>
+    <header className="arena-game-bar"><span><i /> MENTICS ARENA</span><b>SEASON 01</b><em>ONLINE</em></header>
+    <div className="arena-game-grid">
+      <nav className="arena-mode-rail" aria-label="Choose game mode">
+        <small>PLAYLIST</small>
+        <button type="button" className={ranked ? 'selected' : ''} onClick={() => setMode('ranked')}><i><Swords /></i><span><b>Ranked duel</b><small>Climb the ladder</small></span></button>
+        <button type="button" className={!ranked ? 'selected' : ''} onClick={() => setMode('training')}><i><Brain /></i><span><b>Training room</b><small>Choose any tier</small></span></button>
+        <div className="arena-season-card"><Trophy /><span><small>CURRENT RANK</small><b>{rank?.label || 'Bronze'}</b><em>{rank?.rating || 1000} RP</em></span><i><b style={{ width: `${rankProgress}%` }} /></i></div>
+      </nav>
+      <section className="arena-player-stage">
+        <div className="arena-stage-rig" aria-hidden="true"><i /><i /><i /></div>
+        <div className="arena-spotlight" aria-hidden="true" />
+        <ArenaFighter avatar={avatar} label={`${name || 'Your'} Arena fighter`} />
+        <div className="arena-stage-name"><small>READY PLAYER</small><h1>{name || 'Arena player'}</h1><span><i /> LOADOUT ONLINE</span></div>
+        <button type="button" className="arena-locker-button" onClick={openCustomizer}><Sparkles /> CUSTOMIZE FIGHTER</button>
+        <div className="arena-stage-platform" aria-hidden="true"><i /><b>MENTICS</b><i /></div>
+      </section>
+      <aside className="arena-match-console">
+        <header><small>{ranked ? 'RANKED PLAY' : 'TRAINING SIM'}</small><span>{ranked ? <Swords /> : <Brain />}</span></header>
+        <h2>{ranked ? 'Enter the live arena.' : `Challenge ${selectedTier[1]}.`}</h2>
+        <p>{ranked ? 'Face a student on one shared set. No opponent after 30 seconds? An Arena bot drops in.' : 'Pick any rank and sharpen your speed without risking RP.'}</p>
+        {!ranked && <div className="arena-rank-selector" role="radiogroup" aria-label="Bot question rank">{BATTLE_TRAINING_RANKS.map(([key, label]) => <button type="button" role="radio" aria-checked={trainingRank === key} className={trainingRank === key ? 'selected' : ''} key={key} onClick={() => setTrainingRank(key)}><i data-rank={key} /><span>{label}</span></button>)}</div>}
+        <div className="arena-difficulty-callout"><Target /><span><small>QUESTION TIER</small><b>{ranked ? `${rank?.label || 'Bronze'} matchmaking` : `${selectedTier[1]} simulation`}</b></span></div>
+        <p className="arena-scale-copy">Every rank gets full-length, original SAT-style questions. Higher ranks add denser passages, tighter traps, multi-constraint math, and dramatically harder reasoning.</p>
+        <button type="button" className="arena-deploy-button" onClick={ranked ? join : train} disabled={busy}><span>{busy ? 'INITIALIZING…' : ranked ? 'FIND A MATCH' : 'START TRAINING'}</span><i>{ranked ? <Swords /> : <Zap />}</i></button>
+        <footer><span><b>05</b> QUESTIONS</span><span><b>2:00</b> CLOCK</span><span><b>{ranked ? 'RP' : '0 RP'}</b> {ranked ? 'AT STAKE' : 'RISK'}</span></footer>
+      </aside>
+    </div>
+    <footer className="arena-game-ticker"><span>NEW AI-AUTHORED SET EVERY ROUND</span><i /><span>ACCURACY WINS · SPEED BREAKS THE TIE</span><i /><span>GRANDMASTER = MAXIMUM SAT DIFFICULTY</span></footer>
+  </section>
+}
+
 function BattleArena() {
   const d = boot.data
   const [battle, setBattle] = useState(d.currentBattle)
@@ -1658,6 +1746,9 @@ function BattleArena() {
   const [cinematic, setCinematic] = useState('')
   const [lobbyMode, setLobbyMode] = useState('ranked')
   const [trainingRank, setTrainingRank] = useState(d.battleRank?.key || 'bronze')
+  const [avatar, setAvatar] = useState({ ...ARENA_AVATAR_DEFAULT, ...(d.arenaAvatar || d.currentBattle?.playerAvatar || {}) })
+  const [customizing, setCustomizing] = useState(false)
+  const [savingAvatar, setSavingAvatar] = useState(false)
   const [musicEnabled, setMusicEnabled] = useState(true)
   const previousStatus = useRef(d.currentBattle?.status)
   const stageRef = useRef(null)
@@ -1763,6 +1854,14 @@ function BattleArena() {
     return () => stopArenaMusic()
   }, [stopArenaMusic])
   useEffect(() => {
+    if (!customizing) return undefined
+    const previousOverflow = document.body.style.overflow
+    const closeOnEscape = event => { if (event.key === 'Escape') setCustomizing(false) }
+    document.body.style.overflow = 'hidden'
+    window.addEventListener('keydown', closeOnEscape)
+    return () => { document.body.style.overflow = previousOverflow; window.removeEventListener('keydown', closeOnEscape) }
+  }, [customizing])
+  useEffect(() => {
     if (battle?.status !== 'active') return undefined
     const frame = window.requestAnimationFrame(() => stageRef.current?.scrollIntoView({ block: 'start', behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' }))
     return () => window.cancelAnimationFrame(frame)
@@ -1778,6 +1877,7 @@ function BattleArena() {
   const join = async () => { startArenaMusic(); setBusy(true); setError(''); try { startBattle(await api('/api/sat-battles/queue', { method: 'POST' })) } catch (x) { stopArenaMusic(); setError(x.message) } finally { setBusy(false) } }
   const train = async () => { startArenaMusic(); setBusy(true); setError(''); try { startBattle(await api('/api/sat-battles/train', { method: 'POST', body: JSON.stringify({ rank: trainingRank }) })) } catch (x) { stopArenaMusic(); setError(x.message) } finally { setBusy(false) } }
   const cancelQueue = async () => { if (!battle) return; setBusy(true); setError(''); try { await api(`/api/sat-battles/${battle.id}/cancel`, { method: 'POST' }); stopArenaMusic(); setBattle(null) } catch (x) { setError(x.message) } finally { setBusy(false) } }
+  const saveAvatar = async () => { setSavingAvatar(true); setError(''); try { const saved = await api('/api/sat-battles/avatar', { method: 'POST', body: JSON.stringify(avatar) }); setAvatar(saved.avatar); setCustomizing(false); toast.success('Fighter loadout equipped') } catch (x) { setError(x.message) } finally { setSavingAvatar(false) } }
   const select = (questionIndex, selectedOption) => setAnswers(current => ({ ...current, [questionIndex]: selectedOption }))
   const submit = async () => { if (!battle || Object.keys(answers).length !== battle.questions.length) return; setBusy(true); setError(''); try { setBattle(await api(`/api/sat-battles/${battle.id}/submit`, { method: 'POST', body: JSON.stringify({ answers: Object.entries(answers).map(([question_index, selected_option]) => ({ question_index: Number(question_index), selected_option })) }) })) } catch (x) { setError(x.message) } finally { setBusy(false) } }
   const clock = secondsLeft == null ? '2:00' : `${Math.floor(secondsLeft / 60)}:${String(secondsLeft % 60).padStart(2, '0')}`
@@ -1793,14 +1893,16 @@ function BattleArena() {
   const selectedTrainingTier = BATTLE_TRAINING_RANKS.find(([key]) => key === trainingRank) || BATTLE_TRAINING_RANKS[0]
   const advanceQuestion = () => setActiveQuestion(index => Math.min(index + 1, Math.max(0, questionCount - 1)))
   return <AppShell name={d.name}><main className={`app-main battle-page ${active ? 'battle-page--in-match' : waiting ? 'battle-page--queue' : complete ? 'battle-page--complete' : ''}`}>
+    {idle && <ArenaGameLobby name={d.name} rank={rank} rankProgress={rankProgress} avatar={avatar} openCustomizer={() => setCustomizing(true)} mode={lobbyMode} setMode={setLobbyMode} trainingRank={trainingRank} setTrainingRank={setTrainingRank} selectedTier={selectedTrainingTier} busy={busy} join={join} train={train} />}
+    {idle && customizing && <ArenaCustomizer avatar={avatar} onChange={setAvatar} onSave={saveAvatar} onClose={() => setCustomizing(false)} saving={savingAvatar} />}
     {idle && <section className="arena-lobby arena-lobby--game" data-mode={lobbyMode} aria-label="SAT Battle Arena lobby"><header className="arena-lobby-topline"><span><i /> MENTICS SAT ARENA</span><b>SEASON 01</b><span>ONLINE · READY</span></header><div className="arena-lobby-main"><aside className={`arena-lobby-pilot arena-lobby-rank--${rank?.key || 'bronze'}`}><small>YOUR PLAYER</small><span className="arena-pilot-avatar">{String(d.name || 'M').slice(0, 1)}</span><b>{d.name || 'Arena player'}</b><em><i /> READY TO PLAY</em><div className="arena-pilot-rank"><span><Trophy /></span><div><small>{rank?.label || 'Bronze'} RANK</small><b>{rank?.rating || 1000} RP</b></div></div><p>{rank?.nextAt ? `${Math.max(0, rank.nextAt - rank.rating)} RP to ${rank.nextLabel}` : 'You are at the top of the arena.'}</p><i className="arena-rank-progress"><b style={{ width: `${rankProgress}%` }} /></i></aside><section className="arena-lobby-playlist"><header><small>SELECTED PLAYLIST</small><span>{lobbyMode === 'ranked' ? 'RANKED PLAY' : 'PRIVATE SESSION'}</span></header><div className="arena-playlist-title"><i>{lobbyMode === 'ranked' ? <Swords /> : <Brain />}</i><div><h1>{lobbyMode === 'ranked' ? 'Ranked duel' : 'Training room'}</h1><p>{lobbyMode === 'ranked' ? 'Match with a student, put RP on the line, and race through a shared SAT-style set.' : 'Choose the exact question tier you want to train against. Your rating never moves.'}</p></div></div>{lobbyMode === 'training' && <div className="arena-training-ranks" role="radiogroup" aria-label="Choose bot difficulty">{BATTLE_TRAINING_RANKS.map(([key, label, note]) => <button type="button" role="radio" aria-checked={trainingRank === key} className={trainingRank === key ? 'selected' : ''} data-rank={key} key={key} onClick={() => setTrainingRank(key)}><b>{label}</b><small>{note}</small></button>)}</div>}<div className="arena-playlist-action"><div><small>{lobbyMode === 'ranked' ? 'MATCH FORMAT' : 'BOT OPPONENT'}</small><b>{lobbyMode === 'ranked' ? '5 questions · 2 minutes · RP at stake' : `Mentics ${selectedTrainingTier[1]} Bot · ${selectedTrainingTier[2]}`}</b></div><button className="arena-ready-button" onClick={lobbyMode === 'ranked' ? join : train} disabled={busy}>{busy ? (lobbyMode === 'ranked' ? 'SEARCHING…' : 'LOADING…') : (lobbyMode === 'ranked' ? 'READY UP' : `PLAY ${selectedTrainingTier[1].toUpperCase()}`)} <ArrowRight /></button></div></section><aside className="arena-difficulty-board"><header><small>QUESTION DIFFICULTY</small><Target /></header><h2>Rank changes the set.</h2><p>Every tier uses original SAT-style questions. The higher the rank, the denser the reasoning, pacing, and traps become.</p><ol>{BATTLE_TRAINING_RANKS.map(([key, label]) => <li key={key} className={key === (lobbyMode === 'training' ? trainingRank : rank?.key) ? 'current' : ''}><i data-rank={key} /><span>{label}</span>{key === 'grandmaster' && <b>MAX</b>}</li>)}</ol><footer>{lobbyMode === 'ranked' ? 'Ranked matches use the stronger player’s tier so neither player gets a soft set.' : `This drill will use the ${selectedTrainingTier[1]} question tier.`}</footer></aside></div><footer className="arena-lobby-format"><div className="arena-playlist-switch" role="tablist" aria-label="Arena playlists"><button type="button" role="tab" aria-selected={lobbyMode === 'ranked'} className={lobbyMode === 'ranked' ? 'selected' : ''} onClick={() => setLobbyMode('ranked')}><Swords /> Ranked duel <small>RP on the line</small></button><button type="button" role="tab" aria-selected={lobbyMode === 'training'} className={lobbyMode === 'training' ? 'selected' : ''} onClick={() => setLobbyMode('training')}><Brain /> Training room <small>Choose any bot tier</small></button></div><span><i>05</i><b>QUESTIONS</b><small>One shared SAT-style set per round.</small></span><span><i>2:00</i><b>ROUND CLOCK</b><small>Accuracy wins; speed breaks a tie.</small></span></footer></section>}
     {error && <div className="error-banner">{error}<button onClick={() => setError('')}>Dismiss</button></div>}
-    {waiting && <section className="battle-stage battle-stage--waiting" aria-live="polite"><span className="battle-search-orbit"><Swords /></span><div><small>MATCHMAKING</small><h2>Finding your challenger</h2><p>Your question set is locked. If another student joins, both players receive the same live round. If nobody joins within 30 seconds, Mentics Arena Bot steps in automatically.</p></div><div className="battle-wait-actions"><button className="text-button" onClick={() => refresh(battle.id)}>Check match status <RotateCcw /></button><button className="text-button" onClick={toggleArenaMusic}>{musicEnabled ? <Volume2 /> : <VolumeX />} Music {musicEnabled ? 'on' : 'off'}</button><button className="text-button" disabled={busy} onClick={cancelQueue}>Leave queue</button></div></section>}
+    {waiting && <section className="battle-stage battle-stage--waiting arena-queue-stage" aria-live="polite"><div className="arena-queue-world"><div className="arena-queue-podium arena-queue-podium--you"><div className="arena-queue-light" /><ArenaFighter avatar={battle.playerAvatar || avatar} label={`${d.name || 'Your'} fighter waiting for a match`} size="medium" /><strong>{d.name || 'YOU'}</strong><span>READY</span></div><div className="arena-queue-core"><span className="battle-search-orbit"><Swords /></span><small>MATCHMAKING</small><h2>Searching the Arena</h2><p>Scanning for a live challenger</p><i><b /></i><em>BOT DROP-IN AT 0:30</em></div><div className="arena-queue-podium arena-queue-podium--rival"><div className="arena-queue-light" /><div className="arena-mystery-fighter">?</div><strong>CHALLENGER</strong><span>SEARCHING</span></div></div><p className="arena-queue-note">Both players receive the same fresh SAT set. If nobody joins within 30 seconds, an Arena bot enters automatically.</p><div className="battle-wait-actions"><button className="text-button" onClick={() => refresh(battle.id)}>Check status <RotateCcw /></button><button className="text-button" onClick={toggleArenaMusic}>{musicEnabled ? <Volume2 /> : <VolumeX />} Music {musicEnabled ? 'on' : 'off'}</button><button className="text-button" disabled={busy} onClick={cancelQueue}>Leave queue</button></div></section>}
     {active && <section ref={stageRef} className={`battle-stage battle-stage--active ${answers[currentQuestionIndex] != null ? 'is-striking' : ''}`} aria-label="Active SAT battle">
-      {cinematic && <div className="arena-cinematic" data-phase={cinematic} role="status" aria-live="assertive"><Starfield warp tone="violet" /><div className="arena-cinematic-fighters" aria-hidden="true"><span className="arena-cinematic-fighter arena-cinematic-fighter--you">{String(d.name || 'Y').slice(0, 1)}</span><i>VS</i><span className="arena-cinematic-fighter arena-cinematic-fighter--rival">{String(battle.opponentName || 'B').slice(0, 1)}</span></div><div className="arena-cinematic-count"><small>{cinematic === 'fight' ? 'MENTICS ARENA' : 'ARENA LINK ESTABLISHED'}</small><strong>{cinematic === 'fight' ? 'FIGHT' : cinematic}</strong><span>{cinematic === 'fight' ? 'MAKE EVERY SECOND COUNT' : 'PREPARE TO THINK FAST'}</span></div>{cinematic !== 'fight' && <button type="button" onClick={() => { clearCinematic(); setCinematic('') }}>Skip intro</button>}</div>}
+      {cinematic && <div className="arena-cinematic" data-phase={cinematic} role="status" aria-live="assertive"><Starfield warp tone="violet" /><div className="arena-cinematic-fighters" aria-hidden="true"><div className="arena-cinematic-fighter arena-cinematic-fighter--you"><ArenaFighter avatar={battle.playerAvatar || avatar} size="medium" state="combat" /><b>{d.name || 'YOU'}</b></div><i>VS</i><div className="arena-cinematic-fighter arena-cinematic-fighter--rival"><ArenaFighter avatar={battle.opponentAvatar} size="medium" facing="left" state="combat" /><b>{battle.opponentName || 'RIVAL'}</b></div></div><div className="arena-cinematic-count"><small>{cinematic === 'fight' ? 'MENTICS ARENA' : 'ARENA LINK ESTABLISHED'}</small><strong>{cinematic === 'fight' ? 'FIGHT' : cinematic}</strong><span>{cinematic === 'fight' ? 'MAKE EVERY SECOND COUNT' : 'PREPARE TO THINK FAST'}</span></div>{cinematic !== 'fight' && <button type="button" onClick={() => { clearCinematic(); setCinematic('') }}>Skip intro</button>}</div>}
       <header className="battle-status"><span><i /><b>{battle.mode === 'training' ? 'PRIVATE BOT DRILL' : `${battleDifficulty} SAT BATTLE`}</b><small>vs {battle.opponentName || 'your challenger'}</small></span><button className="arena-audio-toggle" type="button" onClick={toggleArenaMusic} aria-label={musicEnabled ? 'Mute arena music' : 'Play arena music'}>{musicEnabled ? <Volume2 /> : <VolumeX />} <span>Music {musicEnabled ? 'on' : 'off'}</span></button><strong className={secondsLeft < 20 ? 'urgent' : ''}><Clock3 /> {clock}</strong></header>
       {battle.submitted ? <div className="battle-locked"><span className="battle-search-orbit"><Check /></span><h2>Answers locked.</h2><p>{battle.mode === 'training' ? 'Mentics Arena Bot is scoring your round now.' : `Waiting for ${battle.opponentName || 'your challenger'} to finish. The arena will reveal the result automatically.`}</p></div> : <>
-        <div className="battle-combat-hud" aria-label={`You versus ${battle.opponentName || 'Arena bot'}`}><article className="battle-combatant battle-combatant--you"><span>{String(d.name || 'Y').slice(0, 1)}</span><div><small>YOU</small><b>{d.name || 'Challenger'}</b><i><em style={{ width: `${Math.max(14, 28 + answeredCount * 14)}%` }} /></i><strong>FOCUS {answeredCount}/{questionCount}</strong></div></article><div className="battle-clash"><i /><b>VS</b><span>{currentQuestion?.skill || 'SAT ARENA'}</span></div><article className="battle-combatant battle-combatant--rival"><div><small>RIVAL</small><b>{battle.opponentName || 'Arena Bot'}</b><i><em /></i><strong>READY TO RACE</strong></div><span>{String(battle.opponentName || 'B').slice(0, 1)}</span></article></div>
+        <div className="battle-combat-hud" aria-label={`You versus ${battle.opponentName || 'Arena bot'}`}><article className="battle-combatant battle-combatant--you"><ArenaFighter avatar={battle.playerAvatar || avatar} label="Your fighter" size="portrait" state="combat" /><div><small>YOU</small><b>{d.name || 'Challenger'}</b><i><em style={{ width: `${Math.max(14, 28 + answeredCount * 14)}%` }} /></i><strong>FOCUS {answeredCount}/{questionCount}</strong></div></article><div className="battle-clash"><i /><b>VS</b><span>{currentQuestion?.skill || 'SAT ARENA'}</span></div><article className="battle-combatant battle-combatant--rival"><div><small>RIVAL</small><b>{battle.opponentName || 'Arena Bot'}</b><i><em /></i><strong>READY TO RACE</strong></div><ArenaFighter avatar={battle.opponentAvatar} label={`${battle.opponentName || 'Rival'} fighter`} size="portrait" facing="left" state="combat" /></article></div>
         <div className="battle-question-progress" aria-label={`Question ${currentQuestionIndex + 1} of ${questionCount}`}>{battle.questions.map((_, index) => <button type="button" key={index} className={`${answers[index] != null ? 'done' : ''} ${currentQuestionIndex === index ? 'current' : ''}`} onClick={() => setActiveQuestion(index)} aria-label={`Go to question ${index + 1}${answers[index] != null ? ', answered' : ''}`}>{index + 1}</button>)}</div>
         <div className="battle-round-heading"><span>ROUND {currentQuestionIndex + 1} OF {questionCount}</span><b>{answeredCount}/{questionCount} LOCKED IN</b></div>
         {currentQuestion && <div className="battle-questions"><article className="battle-question battle-question--focus" key={currentQuestionIndex}><header><small>QUESTION {currentQuestionIndex + 1} · {currentQuestion.skill}</small><span>{answers[currentQuestionIndex] != null ? 'ANSWERED' : 'UNANSWERED'}</span></header><h2>{currentQuestion.question_text}</h2><div>{currentQuestion.options.map((option, optionIndex) => <button key={optionIndex} className={answers[currentQuestionIndex] === optionIndex ? 'selected' : ''} onClick={() => select(currentQuestionIndex, optionIndex)}><i>{String.fromCharCode(65 + optionIndex)}</i><span>{option}</span></button>)}</div></article></div>}
@@ -1808,7 +1910,7 @@ function BattleArena() {
         <button className="button button--primary battle-lock" disabled={busy || answeredCount !== questionCount} onClick={submit}>{busy ? 'Locking answers…' : `Lock in ${answeredCount}/${questionCount} answers`} <ArrowRight /></button>
       </>}
     </section>}
-    {complete && <section className={`battle-result ${battle.youWon ? 'won' : battle.draw ? 'draw' : 'lost'}`}>{(battle.youWon || battle.draw) && <div className="arena-confetti" aria-hidden="true">{Array.from({ length: 12 }, (_, index) => <i key={index} style={{ '--arena-index': index }} />)}</div>}<div className="battle-result-mark">{battle.youWon ? <Trophy /> : battle.draw ? <Target /> : <Swords />}</div><small>{battle.mode === 'training' ? 'BOT DRILL COMPLETE' : battle.youWon ? 'VICTORY' : battle.draw ? 'DRAW' : 'BATTLE COMPLETE'}</small><h2>{battle.mode === 'training' ? 'A sharper round in the bank.' : battle.youWon ? 'You won the race.' : battle.draw ? 'A dead-even finish.' : 'A strong round. Run it back.'}</h2><p><b>{battle.yourScore}</b> correct <span>vs</span> <b>{battle.opponentScore}</b> correct</p>{battle.mode === 'training' ? <em className="battle-training-note">This private drill did not affect your rating.</em> : <em className={`battle-result-rank battle-result-rank--${battle.rank?.key}`}>{battle.rank?.label} · {battle.rank?.rating} RP</em>}<button className="button button--primary" onClick={() => { setBattle(null); setAnswers({}); setActiveQuestion(0) }}>{battle.mode === 'training' ? 'Train again' : 'Find another battle'} <Swords /></button></section>}
+    {complete && <section className={`battle-result battle-result--fighters ${battle.youWon ? 'won' : battle.draw ? 'draw' : 'lost'}`}>{(battle.youWon || battle.draw) && <div className="arena-confetti" aria-hidden="true">{Array.from({ length: 12 }, (_, index) => <i key={index} style={{ '--arena-index': index }} />)}</div>}<div className="battle-result-mark">{battle.youWon ? <Trophy /> : battle.draw ? <Target /> : <Swords />}</div><small>{battle.mode === 'training' ? 'BOT DRILL COMPLETE' : battle.youWon ? 'VICTORY' : battle.draw ? 'DRAW' : 'BATTLE COMPLETE'}</small><h2>{battle.mode === 'training' ? 'A sharper round in the bank.' : battle.youWon ? 'You won the race.' : battle.draw ? 'A dead-even finish.' : 'A strong round. Run it back.'}</h2><div className="arena-result-versus"><article className={battle.youWon ? 'winner' : ''}><ArenaFighter avatar={battle.playerAvatar || avatar} label="Your fighter" size="medium" state={battle.youWon ? 'victory' : 'idle'} /><b>{d.name || 'YOU'}</b><strong>{battle.yourScore}</strong><span>CORRECT</span></article><i>VS</i><article className={!battle.youWon && !battle.draw ? 'winner' : ''}><ArenaFighter avatar={battle.opponentAvatar} label={`${battle.opponentName || 'Rival'} fighter`} size="medium" facing="left" state={!battle.youWon && !battle.draw ? 'victory' : 'idle'} /><b>{battle.opponentName || 'RIVAL'}</b><strong>{battle.opponentScore}</strong><span>CORRECT</span></article></div>{battle.mode === 'training' ? <em className="battle-training-note">This private drill did not affect your rating.</em> : <em className={`battle-result-rank battle-result-rank--${battle.rank?.key}`}>{battle.rank?.label} · {battle.rank?.rating} RP</em>}<button className="button button--primary" onClick={() => { setBattle(null); setAnswers({}); setActiveQuestion(0) }}>{battle.mode === 'training' ? 'Train again' : 'Find another battle'} <Swords /></button></section>}
     <section className="battle-lower"><div className="battle-rules"><small>HOW IT WORKS</small><h2>One clean round. No fluff.</h2><div><article><b>01</b><span><strong>Match</strong><p>We pair you with one student and serve the same question set.</p></span></article><article><b>02</b><span><strong>Race</strong><p>Answer all five in two minutes. Your clock starts together.</p></span></article><article><b>03</b><span><strong>Climb</strong><p>Accuracy takes it. Faster completion breaks a tied score.</p></span></article></div></div><aside className="battle-leaderboard"><header><span><Trophy /> BATTLE LEADERBOARD</span><a href="#battle-rankings">View rankings</a></header>{d.leaderboard?.length ? d.leaderboard.slice(0, 5).map((row, index) => <div key={row.user_id}><i>{index + 1}</i><span>{String(row.user_name || 'M').slice(0, 1)}</span><b>{row.user_name}<small className={`battle-rank-label battle-rank-label--${row.rank.key}`}>{row.rank.label}</small></b><strong>{row.rating}</strong></div>) : <p>The first completed battle earns a place here.</p>}</aside></section>
     <section className="battle-spotlight" id="battle-rankings"><div><small>ARENA SPOTLIGHT</small><h2>{spotlight ? `${spotlight.challenger_name} vs ${spotlight.opponent_name}` : 'The next great battle starts with you.'}</h2><p>{spotlight ? 'The latest completed head-to-head round in the Mentics arena.' : 'Enter the arena to set the first battle on the board.'}</p></div><div>{spotlight ? <><strong>{spotlight.winner_id ? 'WINNER DECIDED' : 'DRAW'}</strong><span>Latest completed battle</span></> : <><strong>OPEN</strong><span>Matchmaking is ready</span></>}</div></section>
   </main></AppShell>
