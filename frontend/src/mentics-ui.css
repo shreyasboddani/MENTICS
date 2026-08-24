@@ -1434,6 +1434,40 @@
 /* SAT Battle Arena — a distinct competitive space that still uses the Mentics
    violet, indigo, and glass vocabulary. */
 .battle-page { max-width: 1280px; }
+.battle-dashboard-card { grid-column: span 6; position: relative; display: flex; align-items: center; justify-content: space-between; min-height: 205px; overflow: hidden; padding: 30px 36px; color: #fff; border: 1px solid rgba(255,255,255,.13) !important; background: radial-gradient(circle at 86% 15%, rgba(167,122,255,.52), transparent 25%), linear-gradient(140deg, #272052, #19152f 70%) !important; box-shadow: 0 26px 58px -40px rgba(23,15,67,.88); }
+.battle-dashboard-card:before { content: ''; position: absolute; inset: 0; pointer-events: none; opacity: .15; background-image: linear-gradient(rgba(255,255,255,.28) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.28) 1px, transparent 1px); background-size: 28px 28px; mask-image: linear-gradient(115deg, transparent 20%, #000); }
+.battle-dashboard-card > * { position: relative; z-index: 1; }
+.battle-dashboard-card > div { max-width: 430px; }
+.battle-dashboard-card small { color: #d4c8fa; font-size: 10px; font-weight: 800; letter-spacing: .13em; }
+.battle-dashboard-card h2 { margin: 7px 0; color: #fff; font-size: clamp(1.8rem, 3vw, 2.65rem); letter-spacing: -.055em; }
+.battle-dashboard-card p { margin: 0; color: #d1cbe7; font-size: 13px; line-height: 1.55; }
+.battle-dashboard-card b { display: flex; align-items: center; gap: 6px; margin-top: 15px; color: #fff; font-size: 13px; }
+.battle-dashboard-card > span { display: grid; place-items: center; align-content: center; width: 118px; aspect-ratio: 1; border: 1px solid rgba(255,255,255,.18); border-radius: 50%; background: rgba(255,255,255,.08); box-shadow: inset 0 0 0 9px rgba(255,255,255,.035); }
+.battle-dashboard-card > span svg { width: 29px; height: 29px; color: #d6c4ff; }
+.battle-dashboard-card > span i { margin-top: 2px; color: #fff; font-size: 1.35rem; font-style: normal; font-weight: 850; letter-spacing: -.08em; }
+.battle-dashboard-card > span small { color: #d2c9ed; font-size: 9px; }
+.battle-landing { display: grid; grid-template-columns: minmax(0, .95fr) minmax(340px, .75fr); align-items: center; gap: clamp(36px, 8vw, 130px); padding: 110px max(28px, calc((100vw - 1120px) / 2)); overflow: hidden; color: #fff; background: radial-gradient(circle at 80% 8%, rgba(130,96,238,.48), transparent 25%), radial-gradient(circle at 7% 90%, rgba(63,88,208,.4), transparent 34%), linear-gradient(145deg, #1a1537, #2c235f 62%, #1b1a43); }
+.battle-landing-copy h2 { max-width: 11ch; margin: 13px 0 16px; color: #fff; font-size: clamp(3rem, 5.1vw, 5.1rem); line-height: .94; letter-spacing: -.07em; }
+.battle-landing-copy p { max-width: 560px; color: #d4cee9; font-size: 1rem; line-height: 1.7; }
+.battle-landing-copy .eyebrow { color: #d8c9ff; }
+.battle-landing-copy > a { margin-top: 13px; }
+.battle-landing-preview { width: min(100%, 420px); margin-inline: auto; padding: 17px; border: 1px solid rgba(255,255,255,.18); border-radius: 24px; background: linear-gradient(145deg, rgba(255,255,255,.14), rgba(255,255,255,.06)); box-shadow: 0 35px 70px -38px #0d0a27, inset 0 1px rgba(255,255,255,.18); transform: rotate(3deg); }
+.battle-landing-preview header { display: flex; justify-content: space-between; align-items: center; padding-bottom: 15px; color: #e6deff; font-size: 10px; font-weight: 800; letter-spacing: .09em; }
+.battle-landing-preview header span { display: flex; align-items: center; gap: 7px; }
+.battle-landing-preview header span i { width: 7px; height: 7px; border-radius: 50%; background: #38d69b; box-shadow: 0 0 0 3px rgba(56,214,155,.14); }
+.battle-landing-preview header strong { display: flex; align-items: center; gap: 5px; color: #fff; font-size: 13px; }
+.battle-landing-preview header svg { width: 14px; }
+.battle-landing-preview > div { display: grid; gap: 10px; padding: 20px; border-radius: 17px; background: #f8f7fd; box-shadow: inset 0 1px #fff; }
+.battle-landing-preview > div > small { color: #7652cf; font-size: 9px; font-weight: 800; letter-spacing: .1em; }
+.battle-landing-preview > div > b { margin-bottom: 4px; color: #2a2541; font-size: 16px; line-height: 1.38; }
+.battle-landing-preview > div > span { display: flex; align-items: center; gap: 9px; min-height: 38px; padding: 7px 10px; border: 1px solid #e2deed; border-radius: 10px; color: #514a63; font-size: 12px; }
+.battle-landing-preview > div > span i { display: grid; place-items: center; width: 20px; height: 20px; border-radius: 6px; color: #7e748d; background: #eeeaf4; font-size: 10px; font-style: normal; font-weight: 800; }
+.battle-landing-preview > div > span.selected { border-color: #8257df; color: #392363; background: #f1eaff; box-shadow: inset 0 0 0 1px #8257df; }
+.battle-landing-preview > div > span.selected i { color: #fff; background: #7d54db; }
+.battle-landing-preview > div > span svg { width: 15px; margin-left: auto; color: #724bd2; }
+.battle-landing-preview footer { display: flex; align-items: center; justify-content: space-between; padding: 17px 5px 2px; color: #ded6f4; font-size: 11px; font-weight: 800; letter-spacing: .08em; }
+.battle-landing-preview footer > i { color: #a894d4; font-style: normal; font-size: 10px; }
+.battle-landing-preview footer b { color: #fff; font-size: 19px; letter-spacing: -.05em; }
 .battle-hero { position: relative; display: grid; grid-template-columns: minmax(0, 1fr) 260px; align-items: center; gap: 36px; min-height: 310px; padding: 44px 50px; overflow: hidden; border: 1px solid rgba(255,255,255,.18); border-radius: 28px; color: #fff; background: radial-gradient(circle at 78% 20%, rgba(157,104,255,.5), transparent 22%), radial-gradient(circle at 16% 100%, rgba(76,91,224,.38), transparent 35%), linear-gradient(135deg, #17132f, #2b225d 62%, #24255c); box-shadow: 0 32px 74px -42px rgba(26,17,75,.92), inset 0 1px rgba(255,255,255,.15); }
 .battle-hero:after { content: ''; position: absolute; inset: 0; pointer-events: none; opacity: .24; background-image: linear-gradient(rgba(255,255,255,.15) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.15) 1px, transparent 1px); background-size: 34px 34px; mask-image: linear-gradient(120deg, #000, transparent 70%); }
 .battle-hero > * { position: relative; z-index: 1; }
@@ -1515,9 +1549,11 @@
 .battle-spotlight > div:last-child { display: grid; gap: 5px; min-width: 145px; padding: 15px 18px; border-radius: 14px; color: #fff; background: linear-gradient(135deg, #7b54db, #4d52d1); }
 .battle-spotlight > div:last-child strong { font-size: 11px; letter-spacing: .08em; }
 .battle-spotlight > div:last-child span { color: #e5dfff; font-size: 11px; }
+@media (min-width: 1450px) { .battle-dashboard-card { grid-column: span 4; } }
 @keyframes battle-orbit { to { transform: rotate(360deg); } }
 @media (hover: hover) and (pointer: fine) { .battle-question button:hover { border-color: rgba(116,80,220,.58); transform: translateY(-1px); } }
 @media (max-width: 759px) { .battle-hero { grid-template-columns: 1fr; min-height: 0; padding: 36px 24px 30px; text-align: center; } .battle-hero .eyebrow { justify-content: center; } .battle-hero h1 { margin-inline: auto; font-size: clamp(3.3rem, 15vw, 4.8rem); } .battle-hero p { margin-inline: auto; } .battle-hero-mark { width: 156px; } .battle-hero-mark i { width: 46px; height: 46px; border-radius: 15px; } .battle-hero-mark span { font-size: 1.7rem; } .battle-stage,.battle-result { padding: 22px 17px; border-radius: 20px; } .battle-question { padding: 17px; } .battle-question > div { grid-template-columns: 1fr; } .battle-question button { min-height: 46px; } .battle-status { align-items: flex-start; } .battle-status > strong { font-size: 1.05rem; } .battle-lower { grid-template-columns: 1fr; } .battle-rules,.battle-leaderboard { padding: 22px; border-radius: 20px; } .battle-spotlight { align-items: flex-start; flex-direction: column; padding: 24px; } .battle-spotlight > div:last-child { width: 100%; } }
+@media (max-width: 759px) { .battle-dashboard-card { grid-column: auto; min-height: 210px; padding: 27px 23px; } .battle-dashboard-card > span { width: 90px; } .battle-dashboard-card > span svg { width: 23px; } .battle-dashboard-card h2 { max-width: 8ch; } .battle-landing { grid-template-columns: 1fr; gap: 40px; padding: 82px 23px; text-align: center; } .battle-landing-copy .eyebrow { justify-content: center; } .battle-landing-copy h2 { margin-inline: auto; font-size: 3.4rem; } .battle-landing-copy p { margin-inline: auto; } .battle-landing-preview { transform: none; } }
 @media (prefers-reduced-motion: reduce) { .battle-search-orbit { animation: none; } .battle-question-progress i,.battle-question button { transition-duration: .01ms; } }
 
 @media (max-width: 759px) {

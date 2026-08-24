@@ -207,7 +207,12 @@ function Landing() {
         </div>
       </section>
 
-      <section className="section platform story-chapter" data-chapter="04" id="platform">
+      <section className="battle-landing story-chapter" data-chapter="04" aria-labelledby="battle-landing-title">
+        <div className="battle-landing-copy"><div className="eyebrow"><span /> SAT BATTLE ARENA</div><h2 id="battle-landing-title">A faster way to prove what you know.</h2><p>Meet one student in a clean, timed five-question SAT round. Both of you get the same original questions. Accuracy decides it; speed breaks the tie.</p><a className="button button--primary" href={loggedIn ? '/battles' : '/signup'}><Swords /> {loggedIn ? 'Enter the arena' : 'Build your path first'} <ArrowRight size={17} /></a></div>
+        <div className="battle-landing-preview" aria-hidden="true"><header><span><i /> LIVE ROUND</span><strong><Clock3 /> 1:18</strong></header><div><small>QUESTION 3 · ALGEBRA</small><b>If 3x + 8 = 29, what is x?</b><span><i>A</i> 5</span><span className="selected"><i>B</i> 7 <Check /></span><span><i>C</i> 9</span></div><footer><span>YOU <b>2</b></span><i>VS</i><span><b>2</b> RIVAL</span></footer></div>
+      </section>
+
+      <section className="section platform story-chapter" data-chapter="05" id="platform">
         <div className="platform-copy"><div className="eyebrow eyebrow--light"><span /> ONE FOCUSED WORKSPACE</div><h2>Less noise.<br />More momentum.</h2><p>Test prep, college planning, progress, and contextual guidance belong in one calm place.</p><a href={loggedIn ? '/dashboard' : '/signup'}>Explore the platform <ArrowRight size={17} /></a></div>
         <div className="feature-stack">
           <div><Target /><span><b>Adaptive paths</b><small>Five clear steps that respond to your goals and performance.</small></span></div>
@@ -364,6 +369,7 @@ function Dashboard() {
     <section className="dashboard-welcome"><div><small>{today}</small><h1>Welcome back, <span>{first}</span></h1><p>Your dashboard is ready. Let’s build momentum.</p></div><div className="dashboard-totals"><span><Flame /><b>{d.gameStats?.streak || 0}</b><small>DAY STREAK</small></span><span><Zap /><b>{d.gameStats?.points || 0}</b><small>POINTS</small></span></div></section>
     <section className="command-grid">
       <button className="path-launcher" onClick={() => setPortalOpen(true)}><span className="path-launcher-grid" /><div><small>THE CORE EXPERIENCE</small><h2>Path Builder</h2><p>Launch the Mentics portal to generate or update your personalized roadmap.</p><b>Open portal <ArrowRight /></b></div><div className="path-radar"><i /><i /><i /><Target /></div></button>
+      <a className="dash-module battle-dashboard-card" href="/battles"><div><small>SAT BATTLE ARENA</small><h2>Put your speed to the test.</h2><p>Race a matched student through five SAT-style questions. Accuracy wins; speed settles the tie.</p><b>Enter the arena <ArrowRight /></b></div><span><Swords /><i>1:1</i><small>LIVE</small></span></a>
       <ProgressTile type="test" value={d.testPrepCompleted || 0} /><ProgressTile type="college" value={d.collegePlanningCompleted || 0} />
       <article className="dash-module activity-module"><header><div><small>ACTIVITY TREND</small><h2>Focus intensity</h2></div><BarChart3 /></header><div className="command-chart">{chart.map((v, i) => <div key={i}><b>{v}</b><i style={{ height: `${Math.max(7, v / max * 100)}%` }} /><small>{d.activityData?.labels?.[i]}</small></div>)}</div></article>
       <article className="dash-module vital-module"><header><small>VITAL STATS</small><a href="/dashboard/stats/edit">Update</a></header><dl><div><dt>GPA</dt><dd>{d.gpa}</dd></div><div><dt>SAT</dt><dd>{d.satTotal}</dd></div><div><dt>ACT</dt><dd>{d.actAverage}</dd></div></dl></article>
