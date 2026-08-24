@@ -96,6 +96,26 @@ def test_training_round_starts_immediately_and_does_not_rank(tmp_path, monkeypat
     assert training["isBotBattle"] is True
 
 
+def test_training_room_can_target_every_arena_rank(tmp_path, monkeypatch):
+    database = DatabaseHandler(str(tmp_path / "tiered-training.db"))
+    monkeypatch.setattr(app_module, "db", database)
+    app_module.init_db()
+    challenger = _user(database, "tiered-training@example.test", "Tiered Student")
+    train = inspect.unwrap(app_module.train_with_sat_battle_bot)
+
+    for rank, label in [
+        ("bronze", "Bronze"), ("silver", "Silver"), ("gold", "Gold"),
+        ("platinum", "Platinum"), ("diamond", "Diamond"), ("master", "Master"),
+        ("grandmaster", "Grandmaster"),
+    ]:
+        with app_module.app.test_request_context("/api/sat-battles/train", method="POST", json={"rank": rank}):
+            training = train(challenger).get_json()
+        assert training["mode"] == "training"
+        assert training["difficulty"] == rank
+        assert training["opponentName"] == f"Mentics {label} Bot"
+        database.update("sat_battles", {"status": "expired"}, where={"id": training["id"]})
+
+
 def test_training_round_supports_the_original_arena_table_without_mode(tmp_path, monkeypatch):
     database = DatabaseHandler(str(tmp_path / "legacy-training.db"))
     monkeypatch.setattr(app_module, "db", database)

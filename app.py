@@ -4611,6 +4611,15 @@ def _battle_rank(rating):
     raise AssertionError('Bronze rank must cover every rating')
 
 
+def _battle_rank_by_key(value):
+    """Return a canonical arena tier for a client-selected training rank."""
+    key = str(value or '').strip().lower()
+    for minimum, _label, rank_key in SAT_BATTLE_RANKS:
+        if rank_key == key:
+            return _battle_rank(minimum)
+    return None
+
+
 def _battle_difficulty_for_rating(rating):
     return _battle_rank(rating)['key']
 
@@ -4667,10 +4676,18 @@ def _battle_bot_answers(questions):
     return answers
 
 
+def _training_bot_name(rank=None):
+    return f"Mentics {rank['label']} Bot" if rank else 'Mentics Training Bot'
+
+
 def _battle_mode(battle):
     # Training rounds are identified from existing fields as well as the newer
     # optional column, so deployments with the first Arena schema still work.
-    return 'training' if battle.get('mode') == 'training' or battle.get('opponent_name') == 'Mentics Training Bot' else 'ranked'
+    opponent_name = str(battle.get('opponent_name') or '')
+    training_names = {'Mentics Training Bot'} | {
+        _training_bot_name(_battle_rank(minimum)) for minimum, _label, _key in SAT_BATTLE_RANKS
+    }
+    return 'training' if battle.get('mode') == 'training' or opponent_name in training_names else 'ranked'
 
 
 def _battle_answers(value):
@@ -4849,11 +4866,15 @@ def train_with_sat_battle_bot(user):
     current = _user_current_battle(user.data['id'])
     if current:
         return jsonify({'error': 'Finish or leave your current battle first.'}), 409
+    payload = request.get_json(silent=True) or {}
+    requested_rank = _battle_rank_by_key(payload.get('rank')) if payload.get('rank') is not None else None
+    if payload.get('rank') is not None and not requested_rank:
+        return jsonify({'error': 'Choose a valid training rank.'}), 400
     bot = _battle_bot()
     battle_id = db.insert('sat_battles', {
         'status': 'active', 'challenger_id': user.data['id'],
-        'challenger_name': user.get_name(), 'opponent_id': bot['id'], 'opponent_name': 'Mentics Training Bot',
-        'questions': json.dumps(_battle_questions(_battle_rating_value(user.data['id']))), 'started_at': _utc_now().isoformat(),
+        'challenger_name': user.get_name(), 'opponent_id': bot['id'], 'opponent_name': _training_bot_name(requested_rank),
+        'questions': json.dumps(_battle_questions(requested_rank['minimum'] if requested_rank else _battle_rating_value(user.data['id']))), 'started_at': _utc_now().isoformat(),
     })
     return jsonify(_battle_payload(db.select_one('sat_battles', where={'id': battle_id}), user.data['id']))
 
