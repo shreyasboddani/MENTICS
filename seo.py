@@ -10,8 +10,8 @@ from datetime import date
 
 SITE_NAME = "Mentics"
 DEFAULT_DESCRIPTION = (
-    "Mentics builds a personalized SAT, ACT, and college application plan from your "
-    "real scores, then coaches you through it one focused step at a time."
+    "Mentics is an AI-powered SAT and ACT prep platform that turns real scores, "
+    "skill mastery, and mistakes into a personalized study path, with college planning too."
 )
 
 # Only these routes are indexable. Each entry drives the canonical tag, the
@@ -19,9 +19,49 @@ DEFAULT_DESCRIPTION = (
 PUBLIC_PAGES = {
     "landing": {
         "path": "/",
-        "title": "Mentics | Stop Guessing. Start Achieving.",
+        "title": "Mentics — Personalized AI SAT & ACT Prep",
         "description": DEFAULT_DESCRIPTION,
         "priority": "1.0",
+        "changefreq": "weekly",
+    },
+    "ai-sat-prep": {
+        "path": "/ai-sat-prep",
+        "title": "AI SAT Prep That Adapts to You | Mentics",
+        "description": (
+            "Use AI SAT prep that learns from your scores, skill mastery, and mistakes to build "
+            "a focused five-step study path with lessons, practice, and measurable progress."
+        ),
+        "priority": "0.9",
+        "changefreq": "weekly",
+    },
+    "sat-prep": {
+        "path": "/sat-prep",
+        "title": "Personalized SAT Prep, Practice & Progress | Mentics",
+        "description": (
+            "Prepare for SAT Math and Reading and Writing with personalized study paths, "
+            "original SAT-style practice, skill tracking, and competitive timed battles."
+        ),
+        "priority": "0.9",
+        "changefreq": "weekly",
+    },
+    "act-prep": {
+        "path": "/act-prep",
+        "title": "Personalized ACT Prep & Study Planning | Mentics",
+        "description": (
+            "Turn your ACT scores, target, schedule, and weaknesses into a focused study plan "
+            "that updates as you complete work and log new results."
+        ),
+        "priority": "0.8",
+        "changefreq": "weekly",
+    },
+    "college-planning": {
+        "path": "/college-planning",
+        "title": "AI College Planning, Essays & Application Tasks | Mentics",
+        "description": (
+            "Get a personalized college planning path with short lessons, real application tasks, "
+            "essay guidance, deadlines, and AI coaching that remembers your progress."
+        ),
+        "priority": "0.8",
         "changefreq": "weekly",
     },
     "login": {
@@ -146,41 +186,69 @@ def sitemap_xml():
     )
 
 
-def structured_data():
-    """JSON-LD describing the product, so Google can render a rich result."""
+def structured_data(page="landing"):
+    """Accurate JSON-LD for the public product and its indexable pages."""
     base = site_url()
-    return {
-        "@context": "https://schema.org",
-        "@graph": [
-            {
-                "@type": "Organization",
-                "@id": f"{base}/#organization",
-                "name": SITE_NAME,
-                "url": base,
-                "logo": f"{base}/static/favicon.svg",
-                "description": DEFAULT_DESCRIPTION,
+    graph = [
+        {
+            "@type": "Organization",
+            "@id": f"{base}/#organization",
+            "name": SITE_NAME,
+            "url": base,
+            "logo": f"{base}/static/favicon.svg",
+            "description": DEFAULT_DESCRIPTION,
+        },
+        {
+            "@type": "WebSite",
+            "@id": f"{base}/#website",
+            "url": base,
+            "name": SITE_NAME,
+            "description": DEFAULT_DESCRIPTION,
+            "publisher": {"@id": f"{base}/#organization"},
+            "inLanguage": "en-US",
+        },
+    ]
+    if page == "landing":
+        graph.append({
+            "@type": "SoftwareApplication",
+            "name": SITE_NAME,
+            "applicationCategory": "EducationalApplication",
+            "operatingSystem": "Web",
+            "url": base,
+            "description": DEFAULT_DESCRIPTION,
+            "offers": {
+                "@type": "Offer",
+                "price": "0",
+                "priceCurrency": "USD",
             },
+        })
+    elif page in PUBLIC_PAGES:
+        entry = PUBLIC_PAGES[page]
+        graph.extend([
             {
-                "@type": "WebSite",
-                "@id": f"{base}/#website",
-                "url": base,
-                "name": SITE_NAME,
-                "description": DEFAULT_DESCRIPTION,
-                "publisher": {"@id": f"{base}/#organization"},
+                "@type": "WebPage",
+                "@id": f"{base}{entry['path']}#webpage",
+                "url": f"{base}{entry['path']}",
+                "name": entry["title"],
+                "description": entry["description"],
+                "isPartOf": {"@id": f"{base}/#website"},
+                "about": {"@id": f"{base}/#organization"},
                 "inLanguage": "en-US",
             },
             {
-                "@type": "SoftwareApplication",
-                "name": SITE_NAME,
-                "applicationCategory": "EducationalApplication",
-                "operatingSystem": "Web",
-                "url": base,
-                "description": DEFAULT_DESCRIPTION,
-                "offers": {
-                    "@type": "Offer",
-                    "price": "0",
-                    "priceCurrency": "USD",
-                },
+                "@type": "BreadcrumbList",
+                "itemListElement": [
+                    {"@type": "ListItem", "position": 1, "name": "Mentics", "item": base},
+                    {
+                        "@type": "ListItem",
+                        "position": 2,
+                        "name": entry["title"].split(" | ")[0],
+                        "item": f"{base}{entry['path']}",
+                    },
+                ],
             },
-        ],
+        ])
+    return {
+        "@context": "https://schema.org",
+        "@graph": graph,
     }

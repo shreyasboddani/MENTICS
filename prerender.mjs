@@ -15,6 +15,10 @@ const outDir = resolve(root, 'templates/ssr')
 // Must stay in sync with PUBLIC_PAGES in seo.py.
 const PAGES = [
   { page: 'landing', data: { isLoggedIn: false } },
+  { page: 'ai-sat-prep', data: {} },
+  { page: 'sat-prep', data: {} },
+  { page: 'act-prep', data: {} },
+  { page: 'college-planning', data: {} },
   { page: 'login', data: {} },
   { page: 'signup', data: {} },
   { page: 'privacy', data: {} },

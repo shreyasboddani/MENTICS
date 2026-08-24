@@ -2678,7 +2678,7 @@ def render_react(page, bootstrap=None, title=None, status=200):
         bootstrap=data,
         title=meta['title'],
         meta=meta,
-        structured_data=seo.structured_data() if page == 'landing' else None,
+        structured_data=seo.structured_data(page) if page in seo.PUBLIC_PAGES else None,
         site_verification=os.getenv('GOOGLE_SITE_VERIFICATION', ''),
         prerendered=_prerendered_markup(page),
         csp_nonce=g.csp_nonce,
@@ -2722,7 +2722,27 @@ def terms():
 @app.route("/")
 def home():
     is_logged_in = "user" in session
-    return render_react("landing", {"isLoggedIn": is_logged_in}, "Mentics | Stop Guessing. Start Achieving.")
+    return render_react("landing", {"isLoggedIn": is_logged_in})
+
+
+@app.get("/ai-sat-prep")
+def ai_sat_prep():
+    return render_react("ai-sat-prep")
+
+
+@app.get("/sat-prep")
+def sat_prep():
+    return render_react("sat-prep")
+
+
+@app.get("/act-prep")
+def act_prep():
+    return render_react("act-prep")
+
+
+@app.get("/college-planning")
+def college_planning_public():
+    return render_react("college-planning")
 
 
 @app.get("/google05c3788b5b10db5e.html")

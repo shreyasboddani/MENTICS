@@ -60,6 +60,159 @@ function Brand({ inverse = false }) {
   return <a className={`brand ${inverse ? 'brand--inverse' : ''}`} href="/" aria-label="Mentics home">MENTICS</a>
 }
 
+const productPages = {
+  'ai-sat-prep': {
+    eyebrow: 'PERSONALIZED AI SAT PREP',
+    title: 'SAT prep that gets smarter after every answer.',
+    intro: 'Mentics turns your real scores, per-skill mastery, and mistake patterns into a focused five-step SAT study path. You always know what to do next—and why it matters.',
+    primary: 'Build my SAT path',
+    signal: [['5', 'focused steps'], ['2', 'SAT sections'], ['1', 'adaptive system']],
+    heroCard: { label: 'YOUR NEXT PATH', title: 'Strengthen transitions', detail: 'Your recent answers show this is the highest-impact skill to work on next.', steps: ['Learn the decision rule', 'Compare strong and weak transitions', 'Complete a focused practice set', 'Review your mistake pattern', 'Prove mastery in a checkpoint'] },
+    methodTitle: 'AI should use evidence, not guesswork.',
+    methodIntro: 'The first path starts with what you tell Mentics. After that, the planner reads what you actually did.',
+    method: [
+      ['01', 'Start with your baseline', 'Add your SAT score, target, test date, schedule, and the skills that feel weakest.'],
+      ['02', 'Learn through focused work', 'Short lessons, original SAT-style questions, explanations, and checkpoints turn a broad goal into finishable sessions.'],
+      ['03', 'Adapt from real performance', 'Measured mastery and your mistake bank shape the next unit, so repeated work gives way to the skills that need it most.']
+    ],
+    featureTitle: 'One study loop, fully connected.',
+    features: [
+      [Brain, 'Adaptive planning', 'Each five-step unit is built around current evidence instead of a fixed calendar.'],
+      [Target, 'Skill-level focus', 'Reading and Writing and Math performance are tracked by the underlying skill, not only a total score.'],
+      [BookOpen, 'Lessons before testing', 'Learn the idea, see it applied, practice it, and then prove that it stuck.'],
+      [LineChart, 'Progress you can explain', 'Scores, accuracy, mastery, completed paths, streaks, and mistakes live in one view.']
+    ],
+    detailTitle: 'What makes Mentics different from a generic AI tutor?',
+    detailCopy: 'A blank chatbot waits for you to know what to ask. Mentics keeps the learning loop moving. The path assigns a useful next lesson or task, the work creates evidence, and the next path uses that evidence. You can still ask the Mentics Guide for help, but the product does not depend on prompts to create structure.',
+    faq: [
+      ['Does Mentics generate a new plan as I improve?', 'Yes. New paths can use completed work, measured skill mastery, logged scores, and mistake patterns so the focus changes with you.'],
+      ['Does the AI replace official SAT material?', 'No. Mentics provides original SAT-style learning and practice. Students should also use official materials and guidance from College Board.'],
+      ['Can I use Mentics before I have a score?', 'Yes. Your first unit can begin from your goals and self-reported weaknesses, then become more precise as answer data accumulates.']
+    ]
+  },
+  'sat-prep': {
+    eyebrow: 'SAT PREP, WITHOUT THE CLUTTER',
+    title: 'Prepare for the SAT with a path you can actually finish.',
+    intro: 'Study SAT Math and Reading and Writing through focused lessons, original SAT-style practice, skill tracking, and a plan that updates when your results change.',
+    primary: 'Start SAT prep',
+    signal: [['RW', 'skill mastery'], ['MATH', 'targeted practice'], ['LIVE', 'timed battles']],
+    heroCard: { label: 'SAT STUDY SESSION', title: 'A complete learning loop', detail: 'Move from strategy to practice without losing the reason behind the work.', steps: ['Learn one tested concept', 'Work through an example', 'Answer a focused set', 'Review every miss', 'Update your mastery'] },
+    methodTitle: 'Train the skill—not just the score.',
+    methodIntro: 'A total score shows where you landed. Mentics helps reveal what caused it.',
+    method: [
+      ['01', 'Set the target', 'Choose SAT, add section scores when you have them, set a target, and tell Mentics when you plan to test.'],
+      ['02', 'Work by skill', 'Build command of algebra, advanced math, grammar, transitions, vocabulary in context, and other SAT-tested skills.'],
+      ['03', 'Practice under pressure', 'Use checkpoints and optional SAT Battle Arena rounds to test accuracy, pacing, and decision-making.']
+    ],
+    featureTitle: 'More than a question bank.',
+    features: [
+      [BookOpen, 'Concept-first lessons', 'Lessons establish the rule or strategy before asking you to perform under time pressure.'],
+      [Zap, 'Original SAT-style practice', 'Fresh practice includes the context, blanks, answer choices, and explanations the question requires.'],
+      [Swords, 'SAT Battle Arena', 'Race through shared five-question sets; question complexity rises with Arena rank.'],
+      [BarChart3, 'Score and mastery tracking', 'Keep section scores, total history, accuracy, streaks, and skill-level progress connected.']
+    ],
+    detailTitle: 'How SAT difficulty scales in Mentics',
+    detailCopy: 'The foundations still use complete SAT-style prompts rather than trivia. Higher difficulty adds denser wording, multi-step reasoning, close distractors, less obvious strategy cues, and tighter pacing. In the Arena, the stronger player’s rank controls a shared set so neither player receives a soft version.',
+    faq: [
+      ['Does Mentics cover both SAT sections?', 'Yes. Mentics supports SAT Math and SAT Reading and Writing planning, lessons, practice, and skill tracking.'],
+      ['Are the questions copied from College Board?', 'No. Mentics questions are original SAT-style practice and are not official College Board questions.'],
+      ['Can I practice against another student?', 'Yes. The SAT Battle Arena offers ranked matchmaking and private bot training across every Arena rank.']
+    ]
+  },
+  'act-prep': {
+    eyebrow: 'PERSONALIZED ACT STUDY PLANNING',
+    title: 'Turn your ACT goal into the next five useful moves.',
+    intro: 'Mentics builds a focused ACT prep path from your current score, target, schedule, and weaknesses—then keeps your study plan and progress together.',
+    primary: 'Build my ACT path',
+    signal: [['4', 'ACT sections'], ['5', 'steps per path'], ['1', 'clear priority']],
+    heroCard: { label: 'ACT PATH SNAPSHOT', title: 'Make the plan specific', detail: 'Your scores and test date help Mentics prioritize the work with the best chance of moving your composite.', steps: ['Review the weakest section', 'Learn a targeted strategy', 'Complete timed practice', 'Analyze missed questions', 'Log the result and replan'] },
+    methodTitle: 'A study plan should fit your actual ACT profile.',
+    methodIntro: 'Mentics keeps section-level context visible so a composite score does not hide the work that matters.',
+    method: [
+      ['01', 'Choose ACT only', 'The onboarding flow stays relevant to the exam you selected instead of mixing SAT and ACT questions.'],
+      ['02', 'Add useful context', 'Record your composite, section scores, target, test date, schedule, and the areas where you lose the most points.'],
+      ['03', 'Run focused cycles', 'Complete one five-step path, log what changed, and generate the next cycle from fresher evidence.']
+    ],
+    featureTitle: 'A calmer way to organize ACT prep.',
+    features: [
+      [Target, 'Goal-based paths', 'Connect every study unit to your target score and available preparation time.'],
+      [CalendarDays, 'Test-date awareness', 'Keep the plan grounded in the date you are actually working toward.'],
+      [BarChart3, 'Section score context', 'Track the numbers behind the composite instead of reducing progress to one total.'],
+      [MessageCircle, 'Guidance in context', 'Ask the Mentics Guide about the path or task you are already working through.']
+    ],
+    detailTitle: 'ACT planning that changes when your situation does',
+    detailCopy: 'A study schedule made once can become irrelevant after a new practice test, a missed week, or a changed test date. Mentics keeps paths short on purpose. Five steps are enough to create direction, and the next cycle can respond to the results instead of dragging an outdated plan forward.',
+    faq: [
+      ['Can I select only ACT during onboarding?', 'Yes. Selecting ACT keeps the test-prep onboarding focused on ACT goals and scores.'],
+      ['Can I update my ACT scores later?', 'Yes. Your score profile can be updated as new results arrive so the dashboard and planning context stay current.'],
+      ['Is Mentics affiliated with ACT, Inc.?', 'No. Mentics is an independent platform and is not affiliated with or endorsed by ACT, Inc.']
+    ]
+  },
+  'college-planning': {
+    eyebrow: 'AI COLLEGE PLANNING',
+    title: 'Learn the strategy. Do the real task. Bring the result back.',
+    intro: 'Mentics turns college planning into short lessons and concrete application work—from building a balanced list to essays, activities, deadlines, and submission.',
+    primary: 'Build my college path',
+    signal: [['LEARN', 'the judgement'], ['DO', 'the real work'], ['REPORT', 'what changed']],
+    heroCard: { label: 'COLLEGE PLANNING LOOP', title: 'From advice to a real deliverable', detail: 'The AI teaches what good work looks like, assigns something useful, and remembers the result.', steps: ['Learn the decision framework', 'Compare weak and strong examples', 'Complete a real application task', 'Report the outcome to Mentics', 'Continue with updated context'] },
+    methodTitle: 'College planning is not a multiple-choice quiz.',
+    methodIntro: 'The work is judgement, writing, research, and follow-through. Mentics is designed around that reality.',
+    method: [
+      ['01', 'Set the stage', 'Add your grade, application stage, goals, deadlines, and colleges you are exploring.'],
+      ['02', 'Learn before doing', 'See the principle and examine stronger and weaker examples before applying it to your own application.'],
+      ['03', 'Complete and report', 'Do the real task, return with what happened, and let Mentics use that context to choose what comes next.']
+    ],
+    featureTitle: 'A planning workspace that remembers the work.',
+    features: [
+      [GraduationCap, 'Stage-aware paths', 'A senior drafting Common App essays should not receive the same plan as a student just beginning a college list.'],
+      [Search, 'College discovery', 'Search for colleges during onboarding instead of maintaining an unstructured text list.'],
+      [PenLine, 'Essay guidance', 'Study structure and examples, then get feedback that protects your voice rather than replacing it.'],
+      [Check, 'Real deliverables', 'Finish tasks that move an application forward, then report the result so the plan can continue intelligently.']
+    ],
+    detailTitle: 'What an adaptive college path looks like',
+    detailCopy: 'A path might teach how to balance a college list, assign research on academic and financial fit, then ask you to record what you found. Later paths can use those reported outcomes. For an application-stage student, the loop can shift to essay openings, activities descriptions, review, and submission readiness.',
+    faq: [
+      ['Will Mentics write my application for me?', 'No. Mentics can teach, organize, and give feedback, but your application must remain accurate and authentically yours.'],
+      ['Does Mentics guarantee admission?', 'No. Admissions decisions are made by colleges and depend on many factors outside the platform.'],
+      ['Is Mentics endorsed by any college or university?', 'No. Mentics is independent and is not affiliated with or endorsed by any college or university.']
+    ]
+  }
+}
+
+const productLinks = [
+  ['/ai-sat-prep', 'AI SAT Prep'], ['/sat-prep', 'SAT Prep'], ['/act-prep', 'ACT Prep'], ['/college-planning', 'College Planning']
+]
+
+function ProductPage({ kind }) {
+  const d = productPages[kind]
+  return <div className="product-story">
+    <header className="product-story-nav">
+      <Brand />
+      <nav aria-label="Product navigation">{productLinks.map(([href, label]) => <a key={href} href={href} aria-current={kind === href.slice(1) ? 'page' : undefined}>{label}</a>)}</nav>
+      <div><a href="/login">Log in</a><a className="button button--small button--dark" href="/signup">Start free <ArrowRight size={15} /></a></div>
+    </header>
+    <main>
+      <section className="product-story-hero">
+        <div className="product-story-copy"><div className="eyebrow"><span /> {d.eyebrow}</div><h1>{d.title}</h1><p>{d.intro}</p><div className="product-story-actions"><a className="button button--primary" href="/signup">{d.primary} <ArrowRight size={18} /></a><a href="#how-it-works">See how it works</a></div><div className="product-story-signals">{d.signal.map(([value, label]) => <span key={label}><b>{value}</b><small>{label}</small></span>)}</div></div>
+        <div className="product-story-card" aria-label={d.heroCard.label}><header><span><Sparkles /> {d.heroCard.label}</span><i>MENTICS</i></header><h2>{d.heroCard.title}</h2><p>{d.heroCard.detail}</p><ol>{d.heroCard.steps.map((step, index) => <li key={step}><b>{String(index + 1).padStart(2, '0')}</b><span>{step}</span>{index < 2 ? <Check /> : <i />}</li>)}</ol></div>
+      </section>
+
+      <section className="product-story-method" id="how-it-works"><header><div className="eyebrow"><span /> HOW IT WORKS</div><h2>{d.methodTitle}</h2><p>{d.methodIntro}</p></header><div>{d.method.map(([number, title, copy]) => <article key={number}><b>{number}</b><h3>{title}</h3><p>{copy}</p></article>)}</div></section>
+
+      <section className="product-story-features"><header><div className="eyebrow eyebrow--light"><span /> INSIDE MENTICS</div><h2>{d.featureTitle}</h2></header><div>{d.features.map(([Icon, title, copy]) => <article key={title}><Icon /><h3>{title}</h3><p>{copy}</p></article>)}</div></section>
+
+      <section className="product-story-detail"><div><div className="eyebrow"><span /> BUILT AROUND REAL PROGRESS</div><h2>{d.detailTitle}</h2><p>{d.detailCopy}</p><a href="/signup">Create your free path <ArrowRight size={16} /></a></div><aside><Brain /><small>THE MENTICS LOOP</small><strong>Context</strong><i /><strong>Focused work</strong><i /><strong>Evidence</strong><i /><strong>Sharper next step</strong></aside></section>
+
+      <section className="product-story-faq"><header><div className="eyebrow"><span /> QUESTIONS</div><h2>Know before you start.</h2></header><div>{d.faq.map(([q, a]) => <details key={q}><summary>{q}<Plus /></summary><p>{a}</p></details>)}</div></section>
+
+      <section className="product-story-related"><small>EXPLORE MENTICS</small><h2>One platform for the whole journey.</h2><div>{productLinks.filter(([href]) => href !== `/${kind}`).map(([href, label]) => <a href={href} key={href}><span>{label}</span><ArrowRight /></a>)}</div></section>
+
+      <section className="product-story-cta"><Brand inverse /><h2>Make the next move obvious.</h2><p>Build a focused path from where you are to where you want to go.</p><a className="button button--light" href="/signup">Get started free <ArrowRight /></a></section>
+    </main>
+    <footer className="product-story-footer"><div><Brand /><p>Personalized test prep and college planning, one focused step at a time.</p></div><nav aria-label="Product links">{productLinks.map(([href, label]) => <a key={href} href={href}>{label}</a>)}</nav><nav aria-label="Legal links"><a href="/terms">Terms</a><a href="/privacy">Privacy</a><a href="mailto:thementicsapp@gmail.com">Contact</a></nav><p className="product-story-disclaimer">Mentics is independent and is not affiliated with or endorsed by College Board, ACT, Inc., or any college or university. SAT is a registered trademark of College Board. ACT is a registered trademark of ACT, Inc.</p><span>© 2026 Mentics. All rights reserved.</span></footer>
+  </div>
+}
+
 function Landing() {
   const loggedIn = useClientOnly(boot.data.isLoggedIn, false)
   useEffect(() => {
@@ -79,7 +232,7 @@ function Landing() {
         <a href="#how-it-works">How it works</a>
         <a href="#platform">Platform</a>
         <a href="#suite">Suite</a>
-        <a href="#faq">Questions</a>
+        <a href="/sat-prep">SAT prep</a>
       </nav>
       <a className="button button--small button--dark" href={loggedIn ? '/dashboard' : '/login'}>
         {loggedIn ? 'Open dashboard' : 'Log in'} <ArrowRight size={15} />
@@ -95,9 +248,9 @@ function Landing() {
           <circle cx="22" cy="355" r="6" /><circle cx="214" cy="205" r="6" /><circle cx="420" cy="72" r="6" /><circle cx="598" cy="204" r="6" />
         </svg>
         <div className="hero-copy">
-          <div className="eyebrow"><span /> Built for high school ambition</div>
+          <div className="eyebrow"><span /> AI SAT, ACT &amp; COLLEGE PLANNING</div>
           <h1>MENTICS</h1>
-          <p className="hero-tagline">Your high school ambition, clarified.<br />Stop guessing. <strong>Start achieving.</strong></p>
+          <p className="hero-tagline">Personalized test prep and college planning that adapts as you improve.<br />Stop guessing. <strong>Start achieving.</strong></p>
           <div className="hero-actions">
             <a className="button button--primary" href={loggedIn ? '/dashboard' : '/signup'}>
               {loggedIn ? 'Continue your path' : 'Build your free path'} <ArrowRight size={18} />
@@ -253,7 +406,7 @@ function Landing() {
 
       <section className="closing"><div><Brand inverse /><h2>Know what to do next.</h2><p>Build a path that makes your ambition feel possible.</p><a className="button button--light" href={loggedIn ? '/dashboard' : '/signup'}>{loggedIn ? 'Open dashboard' : 'Get started free'} <ArrowRight size={18} /></a></div></section>
     </main>
-    <footer><Brand /><span>© 2026 Mentics. All rights reserved.</span><div><a href="/terms">Terms</a><a href="/privacy">Privacy</a><a href="mailto:support@mentics.com">Contact</a></div></footer>
+    <footer><Brand /><span>© 2026 Mentics. All rights reserved.</span><div><a href="/ai-sat-prep">AI SAT Prep</a><a href="/sat-prep">SAT Prep</a><a href="/act-prep">ACT Prep</a><a href="/college-planning">College Planning</a><a href="/terms">Terms</a><a href="/privacy">Privacy</a><a href="mailto:thementicsapp@gmail.com">Contact</a></div></footer>
   </div>
 }
 
@@ -2081,6 +2234,10 @@ function App() {
     case 'account': page = <AccountPage />; break
     case 'privacy': page = <LegalPage type="privacy" />; break
     case 'terms': page = <LegalPage type="terms" />; break
+    case 'ai-sat-prep': page = <ProductPage kind="ai-sat-prep" />; break
+    case 'sat-prep': page = <ProductPage kind="sat-prep" />; break
+    case 'act-prep': page = <ProductPage kind="act-prep" />; break
+    case 'college-planning': page = <ProductPage kind="college-planning" />; break
     case 'article': page = <ArticlePage />; break
     default: page = <Landing />
   }
