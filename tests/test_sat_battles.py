@@ -191,20 +191,32 @@ def test_arena_avatar_loadout_is_validated_and_persisted(tmp_path, monkeypatch):
     save_avatar = inspect.unwrap(app_module.update_sat_battle_avatar)
 
     with app_module.app.test_request_context("/api/sat-battles/avatar", method="POST", json={
-        "body": "sentinel", "palette": "glacier", "skin": "deep", "hair": "wave",
-        "gear": "crown", "emblem": "mind", "aura": "orbit",
+        "frame": "feminine", "body": "sentinel", "skin": "deep", "hair": "braids",
+        "hair_color": "copper", "face": "freckles", "outfit": "champion",
+        "palette": "glacier", "accent": "gold", "bottom": "battle_skirt",
+        "gloves": "gauntlets", "footwear": "armored", "gear": "crown",
+        "back": "cape", "emblem": "mind", "aura": "orbit",
     }):
         saved = save_avatar(player).get_json()["avatar"]
 
     assert saved == {
-        "body": "sentinel", "palette": "glacier", "skin": "deep", "hair": "wave",
-        "gear": "crown", "emblem": "mind", "aura": "orbit",
+        "frame": "feminine", "body": "sentinel", "skin": "deep", "hair": "braids",
+        "hair_color": "copper", "face": "freckles", "outfit": "champion",
+        "palette": "glacier", "accent": "gold", "bottom": "battle_skirt",
+        "gloves": "gauntlets", "footwear": "armored", "gear": "crown",
+        "back": "cape", "emblem": "mind", "aura": "orbit",
     }
     stored = json.loads(database.select_one("users", where={"id": player.data["id"]})["stats"])
     assert stored["arena_avatar"] == saved
 
     sanitized = app_module._normalize_arena_avatar({"body": "javascript", "palette": "", "gear": 42})
     assert sanitized == app_module.ARENA_AVATAR_DEFAULT
+
+    upgraded = app_module._normalize_arena_avatar({"body": "scout", "hair": "wave"})
+    assert upgraded["body"] == "scout"
+    assert upgraded["hair"] == "wave"
+    assert upgraded["frame"] == "masculine"
+    assert upgraded["outfit"] == "combat"
 
 
 def test_battle_payload_carries_both_fighter_loadouts(tmp_path, monkeypatch):

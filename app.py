@@ -4714,17 +4714,28 @@ SAT_BATTLE_RANKS = [
 ]
 
 ARENA_AVATAR_DEFAULT = {
-    'body': 'striker', 'palette': 'nova', 'skin': 'medium', 'hair': 'crop',
-    'gear': 'visor', 'emblem': 'bolt', 'aura': 'pulse',
+    'frame': 'masculine', 'body': 'striker', 'skin': 'medium', 'hair': 'crop',
+    'hair_color': 'onyx', 'face': 'natural', 'outfit': 'combat', 'palette': 'nova',
+    'accent': 'crystal', 'bottom': 'tactical', 'gloves': 'tech', 'footwear': 'boots',
+    'gear': 'visor', 'back': 'none', 'emblem': 'bolt', 'aura': 'pulse',
 }
 ARENA_AVATAR_OPTIONS = {
+    'frame': {'masculine', 'feminine', 'androgynous'},
     'body': {'striker', 'sentinel', 'scout'},
-    'palette': {'nova', 'solar', 'glacier', 'volt'},
-    'skin': {'light', 'medium', 'deep', 'umber'},
-    'hair': {'crop', 'fade', 'wave', 'spike'},
-    'gear': {'visor', 'comms', 'crown', 'none'},
-    'emblem': {'bolt', 'mind', 'target', 'shield'},
-    'aura': {'pulse', 'flare', 'orbit', 'none'},
+    'skin': {'porcelain', 'light', 'warm', 'medium', 'olive', 'deep', 'umber', 'ebony'},
+    'hair': {'crop', 'fade', 'wave', 'spike', 'bob', 'ponytail', 'curls', 'braids', 'long', 'bun'},
+    'hair_color': {'onyx', 'espresso', 'chestnut', 'copper', 'gold', 'silver', 'violet', 'blue'},
+    'face': {'natural', 'freckles', 'liner', 'warpaint'},
+    'outfit': {'combat', 'academy', 'varsity', 'techwear', 'street', 'champion'},
+    'palette': {'nova', 'solar', 'glacier', 'volt', 'rose', 'midnight'},
+    'accent': {'crystal', 'gold', 'rose', 'teal', 'white', 'graphite'},
+    'bottom': {'tactical', 'fitted', 'cargo', 'battle_skirt'},
+    'gloves': {'tech', 'fingerless', 'gauntlets', 'none'},
+    'footwear': {'boots', 'high_tops', 'runners', 'armored'},
+    'gear': {'visor', 'comms', 'crown', 'glasses', 'headband', 'earrings', 'none'},
+    'back': {'none', 'cape', 'half_cape', 'energy_pack', 'banner'},
+    'emblem': {'bolt', 'mind', 'target', 'shield', 'star', 'flame'},
+    'aura': {'pulse', 'flare', 'orbit', 'spark', 'halo', 'none'},
 }
 
 
@@ -4743,13 +4754,13 @@ def _arena_avatar_for_user(user_id, bot_rank=None):
     bot = db.select_one('users', where={'email': SAT_BATTLE_BOT_EMAIL})
     if bot and user_id == bot['id']:
         bot_loadouts = {
-            'bronze': {'body': 'scout', 'palette': 'solar', 'skin': 'light', 'hair': 'fade', 'gear': 'comms', 'emblem': 'target', 'aura': 'none'},
-            'silver': {'body': 'scout', 'palette': 'glacier', 'skin': 'deep', 'hair': 'wave', 'gear': 'visor', 'emblem': 'mind', 'aura': 'pulse'},
-            'gold': {'body': 'striker', 'palette': 'solar', 'skin': 'medium', 'hair': 'spike', 'gear': 'visor', 'emblem': 'shield', 'aura': 'flare'},
-            'platinum': {'body': 'striker', 'palette': 'nova', 'skin': 'umber', 'hair': 'crop', 'gear': 'comms', 'emblem': 'bolt', 'aura': 'orbit'},
-            'diamond': {'body': 'sentinel', 'palette': 'glacier', 'skin': 'deep', 'hair': 'fade', 'gear': 'crown', 'emblem': 'target', 'aura': 'orbit'},
-            'master': {'body': 'sentinel', 'palette': 'volt', 'skin': 'light', 'hair': 'wave', 'gear': 'crown', 'emblem': 'mind', 'aura': 'flare'},
-            'grandmaster': {'body': 'sentinel', 'palette': 'nova', 'skin': 'umber', 'hair': 'spike', 'gear': 'crown', 'emblem': 'shield', 'aura': 'orbit'},
+            'bronze': {'frame': 'androgynous', 'body': 'scout', 'outfit': 'street', 'palette': 'solar', 'skin': 'light', 'hair': 'fade', 'hair_color': 'chestnut', 'gear': 'comms', 'footwear': 'high_tops', 'emblem': 'target', 'aura': 'none'},
+            'silver': {'frame': 'feminine', 'body': 'scout', 'outfit': 'varsity', 'palette': 'glacier', 'skin': 'deep', 'hair': 'ponytail', 'hair_color': 'onyx', 'gear': 'headband', 'bottom': 'fitted', 'emblem': 'mind', 'aura': 'pulse'},
+            'gold': {'frame': 'masculine', 'body': 'striker', 'outfit': 'academy', 'palette': 'solar', 'skin': 'medium', 'hair': 'wave', 'hair_color': 'copper', 'gear': 'glasses', 'emblem': 'shield', 'aura': 'flare'},
+            'platinum': {'frame': 'feminine', 'body': 'striker', 'outfit': 'techwear', 'palette': 'nova', 'skin': 'umber', 'hair': 'braids', 'hair_color': 'onyx', 'gear': 'comms', 'back': 'half_cape', 'emblem': 'bolt', 'aura': 'orbit'},
+            'diamond': {'frame': 'androgynous', 'body': 'sentinel', 'outfit': 'combat', 'palette': 'glacier', 'skin': 'deep', 'hair': 'bob', 'hair_color': 'blue', 'gear': 'visor', 'gloves': 'gauntlets', 'footwear': 'armored', 'emblem': 'target', 'aura': 'halo'},
+            'master': {'frame': 'feminine', 'body': 'sentinel', 'outfit': 'champion', 'palette': 'volt', 'skin': 'porcelain', 'hair': 'long', 'hair_color': 'silver', 'gear': 'crown', 'back': 'cape', 'emblem': 'mind', 'aura': 'spark'},
+            'grandmaster': {'frame': 'masculine', 'body': 'sentinel', 'outfit': 'champion', 'palette': 'midnight', 'accent': 'gold', 'skin': 'ebony', 'hair': 'spike', 'hair_color': 'violet', 'gear': 'crown', 'back': 'banner', 'gloves': 'gauntlets', 'footwear': 'armored', 'emblem': 'shield', 'aura': 'orbit'},
         }
         return _normalize_arena_avatar(bot_loadouts.get(bot_rank, bot_loadouts['gold']))
     row = db.select_one('users', where={'id': user_id}) if user_id else None

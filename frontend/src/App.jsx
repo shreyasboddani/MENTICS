@@ -1647,41 +1647,94 @@ const BATTLE_TRAINING_RANKS = [
   ['grandmaster', 'Grandmaster', 'Hardest SAT-style sets'],
 ]
 
-const ARENA_AVATAR_DEFAULT = { body: 'striker', palette: 'nova', skin: 'medium', hair: 'crop', gear: 'visor', emblem: 'bolt', aura: 'pulse' }
+const ARENA_AVATAR_DEFAULT = {
+  frame: 'masculine', body: 'striker', skin: 'medium', hair: 'crop', hair_color: 'onyx',
+  face: 'natural', outfit: 'combat', palette: 'nova', accent: 'crystal', bottom: 'tactical',
+  gloves: 'tech', footwear: 'boots', gear: 'visor', back: 'none', emblem: 'bolt', aura: 'pulse',
+}
 const ARENA_AVATAR_PALETTES = {
   nova: ['#8b5cf6', '#4f46e5', '#f1eaff'],
   solar: ['#ffb340', '#e95d43', '#fff1c7'],
   glacier: ['#48d8ff', '#3974e8', '#e2fbff'],
   volt: ['#b5f33d', '#31a878', '#efffc6'],
+  rose: ['#ff6fae', '#ad3f83', '#ffe0ef'],
+  midnight: ['#5468ff', '#161c5a', '#b9c4ff'],
 }
 const ARENA_AVATAR_SKINS = {
+  porcelain: ['#ffe7d8', '#d9a184', '#fff7ef'],
   light: ['#ffd7bd', '#d99576', '#fff0df'],
+  warm: ['#efb184', '#b86e4d', '#ffd0aa'],
   medium: ['#dca27c', '#a9674f', '#f0c2a0'],
+  olive: ['#bd865d', '#80523b', '#ddb08a'],
   deep: ['#925c45', '#603629', '#c98968'],
   umber: ['#603f34', '#37241f', '#936752'],
+  ebony: ['#412d28', '#211716', '#735047'],
+}
+const ARENA_AVATAR_HAIR = {
+  onyx: '#151522', espresso: '#3a241e', chestnut: '#713f2b', copper: '#b95732',
+  gold: '#e5b956', silver: '#c8d0df', violet: '#6f4ad8', blue: '#2769bd',
+}
+const ARENA_AVATAR_ACCENTS = {
+  crystal: '#a8edff', gold: '#ffd66d', rose: '#ff9cc8', teal: '#67f0cf', white: '#f8fbff', graphite: '#343a56',
+}
+const ARENA_CUSTOMIZER_SECTIONS = {
+  identity: [
+    ['frame', 'Silhouette', [['masculine', 'Masculine'], ['feminine', 'Feminine'], ['androgynous', 'Androgynous']]],
+    ['body', 'Build', [['striker', 'Striker'], ['sentinel', 'Sentinel'], ['scout', 'Scout']]],
+    ['skin', 'Skin tone', [['porcelain', 'Porcelain'], ['light', 'Light'], ['warm', 'Warm'], ['medium', 'Medium'], ['olive', 'Olive'], ['deep', 'Deep'], ['umber', 'Umber'], ['ebony', 'Ebony']]],
+    ['hair', 'Hair style', [['crop', 'Crop'], ['fade', 'Fade'], ['wave', 'Wave'], ['spike', 'Spike'], ['bob', 'Bob'], ['ponytail', 'Ponytail'], ['curls', 'Curls'], ['braids', 'Braids'], ['long', 'Long'], ['bun', 'Bun']]],
+    ['hair_color', 'Hair color', [['onyx', 'Onyx'], ['espresso', 'Espresso'], ['chestnut', 'Chestnut'], ['copper', 'Copper'], ['gold', 'Gold'], ['silver', 'Silver'], ['violet', 'Violet'], ['blue', 'Blue']]],
+    ['face', 'Face detail', [['natural', 'Natural'], ['freckles', 'Freckles'], ['liner', 'Liner'], ['warpaint', 'War paint']]],
+  ],
+  outfit: [
+    ['outfit', 'Top / armor', [['combat', 'Combat'], ['academy', 'Academy'], ['varsity', 'Varsity'], ['techwear', 'Techwear'], ['street', 'Street'], ['champion', 'Champion']]],
+    ['palette', 'Main color', [['nova', 'Nova'], ['solar', 'Solar'], ['glacier', 'Glacier'], ['volt', 'Volt'], ['rose', 'Rose'], ['midnight', 'Midnight']]],
+    ['accent', 'Trim color', [['crystal', 'Crystal'], ['gold', 'Gold'], ['rose', 'Rose'], ['teal', 'Teal'], ['white', 'White'], ['graphite', 'Graphite']]],
+    ['bottom', 'Bottom', [['tactical', 'Tactical'], ['fitted', 'Fitted'], ['cargo', 'Cargo'], ['battle_skirt', 'Battle skirt']]],
+    ['gloves', 'Gloves', [['tech', 'Tech'], ['fingerless', 'Fingerless'], ['gauntlets', 'Gauntlets'], ['none', 'None']]],
+    ['footwear', 'Footwear', [['boots', 'Combat boots'], ['high_tops', 'High-tops'], ['runners', 'Runners'], ['armored', 'Armored']]],
+  ],
+  gear: [
+    ['gear', 'Face / head gear', [['visor', 'Visor'], ['comms', 'Comms'], ['crown', 'Crown'], ['glasses', 'Glasses'], ['headband', 'Headband'], ['earrings', 'Earrings'], ['none', 'None']]],
+    ['back', 'Back gear', [['none', 'None'], ['cape', 'Cape'], ['half_cape', 'Half cape'], ['energy_pack', 'Energy pack'], ['banner', 'Rank banner']]],
+    ['emblem', 'Chest emblem', [['bolt', 'Bolt'], ['mind', 'Mind'], ['target', 'Target'], ['shield', 'Shield'], ['star', 'Star'], ['flame', 'Flame']]],
+    ['aura', 'Power aura', [['pulse', 'Pulse'], ['flare', 'Flare'], ['orbit', 'Orbit'], ['spark', 'Spark'], ['halo', 'Halo'], ['none', 'None']]],
+  ],
 }
 
 function ArenaFighter({ avatar, label = 'Arena fighter', size = 'full', facing = 'right', state = 'idle' }) {
   const loadout = { ...ARENA_AVATAR_DEFAULT, ...(avatar || {}) }
   const colors = ARENA_AVATAR_PALETTES[loadout.palette] || ARENA_AVATAR_PALETTES.nova
   const skin = ARENA_AVATAR_SKINS[loadout.skin] || ARENA_AVATAR_SKINS.medium
-  const emblem = loadout.emblem === 'mind' ? <Brain /> : loadout.emblem === 'target' ? <Target /> : loadout.emblem === 'shield' ? <ShieldCheck /> : <Zap />
+  const hair = ARENA_AVATAR_HAIR[loadout.hair_color] || ARENA_AVATAR_HAIR.onyx
+  const accent = ARENA_AVATAR_ACCENTS[loadout.accent] || ARENA_AVATAR_ACCENTS.crystal
+  const emblem = loadout.emblem === 'mind' ? <Brain /> : loadout.emblem === 'target' ? <Target /> : loadout.emblem === 'shield' ? <ShieldCheck /> : loadout.emblem === 'star' ? <Sparkles /> : loadout.emblem === 'flame' ? <Flame /> : <Zap />
   return <div
     className={`arena-fighter arena-fighter--${loadout.body} arena-fighter--${size} arena-fighter--${state}`}
     data-facing={facing}
+    data-frame={loadout.frame}
     data-gear={loadout.gear}
     data-hair={loadout.hair}
+    data-face={loadout.face}
+    data-outfit={loadout.outfit}
+    data-bottom={loadout.bottom}
+    data-gloves={loadout.gloves}
+    data-footwear={loadout.footwear}
+    data-back={loadout.back}
     data-aura={loadout.aura}
-    style={{ '--fighter-main': colors[0], '--fighter-deep': colors[1], '--fighter-light': colors[2], '--fighter-skin': skin[0], '--fighter-skin-deep': skin[1], '--fighter-skin-light': skin[2] }}
+    style={{ '--fighter-main': colors[0], '--fighter-deep': colors[1], '--fighter-light': colors[2], '--fighter-skin': skin[0], '--fighter-skin-deep': skin[1], '--fighter-skin-light': skin[2], '--fighter-hair': hair, '--fighter-accent': accent }}
     role="img"
     aria-label={label}
   >
     <i className="arena-fighter-aura" aria-hidden="true" />
     <i className="arena-fighter-shadow" aria-hidden="true" />
     <div className="arena-fighter-rig" aria-hidden="true">
+      <i className="arena-fighter-back"><b /><b /></i>
+      <i className="arena-fighter-hair-back"><b /><b /></i>
       <i className="arena-fighter-crown"><b /><b /><b /></i>
-      <span className="arena-fighter-head"><i className="arena-fighter-hair" /><i className="arena-fighter-face"><b /><b /></i><i className="arena-fighter-nose" /><i className="arena-fighter-mouth" /><i className="arena-fighter-visor" /><i className="arena-fighter-comms" /></span>
-      <span className="arena-fighter-torso"><i className="arena-fighter-shoulder-line" /><i className="arena-fighter-core">{emblem}</i><b /><em className="arena-fighter-belt"><i /><i /><i /></em></span>
+      <span className="arena-fighter-head"><i className="arena-fighter-hair" /><i className="arena-fighter-face"><b /><b /></i><i className="arena-fighter-face-detail" /><i className="arena-fighter-nose" /><i className="arena-fighter-mouth" /><i className="arena-fighter-visor" /><i className="arena-fighter-comms" /><i className="arena-fighter-glasses" /><i className="arena-fighter-headband" /><i className="arena-fighter-earrings" /></span>
+      <span className="arena-fighter-torso"><i className="arena-fighter-outfit"><b /><b /></i><i className="arena-fighter-shoulder-line" /><i className="arena-fighter-core">{emblem}</i><b /><em className="arena-fighter-belt"><i /><i /><i /></em></span>
+      <i className="arena-fighter-bottom"><b /><b /></i>
       <i className="arena-fighter-arm arena-fighter-arm--left"><b /></i>
       <i className="arena-fighter-arm arena-fighter-arm--right"><b /></i>
       <i className="arena-fighter-leg arena-fighter-leg--left"><b /></i>
@@ -1691,23 +1744,20 @@ function ArenaFighter({ avatar, label = 'Arena fighter', size = 'full', facing =
 }
 
 function ArenaCustomizer({ avatar, onChange, onSave, onClose, saving }) {
-  const groups = [
-    ['body', 'Build', [['striker', 'Striker'], ['sentinel', 'Sentinel'], ['scout', 'Scout']]],
-    ['palette', 'Suit color', [['nova', 'Nova'], ['solar', 'Solar'], ['glacier', 'Glacier'], ['volt', 'Volt']]],
-    ['skin', 'Skin tone', [['light', 'Light'], ['medium', 'Medium'], ['deep', 'Deep'], ['umber', 'Umber']]],
-    ['hair', 'Hair', [['crop', 'Crop'], ['fade', 'Fade'], ['wave', 'Wave'], ['spike', 'Spike']]],
-    ['gear', 'Head gear', [['visor', 'Visor'], ['comms', 'Comms'], ['crown', 'Crown'], ['none', 'None']]],
-    ['emblem', 'Chest emblem', [['bolt', 'Bolt'], ['mind', 'Mind'], ['target', 'Target'], ['shield', 'Shield']]],
-    ['aura', 'Power aura', [['pulse', 'Pulse'], ['flare', 'Flare'], ['orbit', 'Orbit'], ['none', 'None']]],
-  ]
+  const [section, setSection] = useState('identity')
+  const groups = ARENA_CUSTOMIZER_SECTIONS[section]
+  const swatchFor = (key, value) => key === 'palette' ? ARENA_AVATAR_PALETTES[value]?.[0] : key === 'skin' ? ARENA_AVATAR_SKINS[value]?.[0] : key === 'hair_color' ? ARENA_AVATAR_HAIR[value] : key === 'accent' ? ARENA_AVATAR_ACCENTS[value] : null
   return <div className="arena-customizer-backdrop" role="presentation" onMouseDown={event => { if (event.target === event.currentTarget) onClose() }}>
     <section className="arena-customizer" role="dialog" aria-modal="true" aria-labelledby="arena-customizer-title">
-      <header><div><small>LOCKER</small><h2 id="arena-customizer-title">Build your fighter</h2><p>Your loadout follows you into every Arena screen.</p></div><button type="button" onClick={onClose} aria-label="Close fighter locker" autoFocus><X /></button></header>
+      <header><div><small>FIGHTER LOCKER</small><h2 id="arena-customizer-title">Make the fighter yours.</h2><p>Every silhouette, hairstyle, and outfit can be mixed freely.</p></div><button type="button" onClick={onClose} aria-label="Close fighter locker" autoFocus><X /></button></header>
       <div className="arena-customizer-body">
-        <div className="arena-customizer-preview"><i className="arena-preview-light" /><ArenaFighter avatar={avatar} label="Your customized Arena fighter" /><strong>LIVE LOADOUT</strong></div>
-        <div className="arena-customizer-options">{groups.map(([key, title, choices]) => <fieldset key={key}><legend>{title}</legend><div>{choices.map(([value, label]) => <button type="button" key={value} className={avatar[key] === value ? 'selected' : ''} onClick={() => onChange({ ...avatar, [key]: value })}>{key === 'palette' && <i style={{ background: ARENA_AVATAR_PALETTES[value]?.[0] }} />}{key === 'skin' && <i style={{ background: ARENA_AVATAR_SKINS[value]?.[0] }} />}<span>{label}</span>{avatar[key] === value && <Check />}</button>)}</div></fieldset>)}</div>
+        <div className="arena-customizer-preview"><i className="arena-preview-light" /><ArenaFighter avatar={avatar} label="Your customized Arena fighter" /><strong>LIVE LOADOUT</strong><span>{avatar.frame} · {avatar.outfit}</span></div>
+        <div className="arena-customizer-editor">
+          <nav className="arena-customizer-tabs" aria-label="Fighter customization categories">{[['identity', 'Body & hair'], ['outfit', 'Outfit'], ['gear', 'Gear & effects']].map(([key, label]) => <button type="button" key={key} className={section === key ? 'selected' : ''} aria-pressed={section === key} onClick={() => setSection(key)}>{label}</button>)}</nav>
+          <div className="arena-customizer-options">{groups.map(([key, title, choices]) => <fieldset key={key}><legend>{title}</legend><div>{choices.map(([value, label]) => { const swatch = swatchFor(key, value); return <button type="button" key={value} className={avatar[key] === value ? 'selected' : ''} aria-pressed={avatar[key] === value} onClick={() => onChange({ ...avatar, [key]: value })}>{swatch && <i style={{ background: swatch }} />}<span>{label}</span>{avatar[key] === value && <Check />}</button> })}</div></fieldset>)}</div>
+        </div>
       </div>
-      <footer><span>Cosmetics never affect question difficulty or rank.</span><button type="button" className="arena-save-loadout" onClick={onSave} disabled={saving}>{saving ? 'SAVING…' : 'EQUIP LOADOUT'} <Check /></button></footer>
+      <footer><span>Cosmetics are visual only. Your rank still controls question difficulty.</span><button type="button" className="arena-save-loadout" onClick={onSave} disabled={saving}>{saving ? 'SAVING…' : 'EQUIP LOADOUT'} <Check /></button></footer>
     </section>
   </div>
 }
@@ -1906,7 +1956,7 @@ function BattleArena() {
   const advanceQuestion = () => setActiveQuestion(index => Math.min(index + 1, Math.max(0, questionCount - 1)))
   return <AppShell name={d.name}><main className={`app-main battle-page ${active ? 'battle-page--in-match' : waiting ? 'battle-page--queue' : complete ? 'battle-page--complete' : ''}`}>
     {idle && <ArenaGameLobby name={d.name} rank={rank} rankProgress={rankProgress} avatar={avatar} openCustomizer={() => setCustomizing(true)} mode={lobbyMode} setMode={setLobbyMode} trainingRank={trainingRank} setTrainingRank={setTrainingRank} selectedTier={selectedTrainingTier} busy={busy} join={join} train={train} />}
-    {idle && customizing && <ArenaCustomizer avatar={avatar} onChange={setAvatar} onSave={saveAvatar} onClose={() => setCustomizing(false)} saving={savingAvatar} />}
+    {idle && customizing && typeof document !== 'undefined' && createPortal(<ArenaCustomizer avatar={avatar} onChange={setAvatar} onSave={saveAvatar} onClose={() => setCustomizing(false)} saving={savingAvatar} />, document.body)}
     {idle && <section className="arena-lobby arena-lobby--game" data-mode={lobbyMode} aria-label="SAT Battle Arena lobby"><header className="arena-lobby-topline"><span><i /> MENTICS SAT ARENA</span><b>SEASON 01</b><span>ONLINE · READY</span></header><div className="arena-lobby-main"><aside className={`arena-lobby-pilot arena-lobby-rank--${rank?.key || 'bronze'}`}><small>YOUR PLAYER</small><span className="arena-pilot-avatar">{String(d.name || 'M').slice(0, 1)}</span><b>{d.name || 'Arena player'}</b><em><i /> READY TO PLAY</em><div className="arena-pilot-rank"><span><Trophy /></span><div><small>{rank?.label || 'Bronze'} RANK</small><b>{rank?.rating || 1000} RP</b></div></div><p>{rank?.nextAt ? `${Math.max(0, rank.nextAt - rank.rating)} RP to ${rank.nextLabel}` : 'You are at the top of the arena.'}</p><i className="arena-rank-progress"><b style={{ width: `${rankProgress}%` }} /></i></aside><section className="arena-lobby-playlist"><header><small>SELECTED PLAYLIST</small><span>{lobbyMode === 'ranked' ? 'RANKED PLAY' : 'PRIVATE SESSION'}</span></header><div className="arena-playlist-title"><i>{lobbyMode === 'ranked' ? <Swords /> : <Brain />}</i><div><h1>{lobbyMode === 'ranked' ? 'Ranked duel' : 'Training room'}</h1><p>{lobbyMode === 'ranked' ? 'Match with a student, put RP on the line, and race through a shared SAT-style set.' : 'Choose the exact question tier you want to train against. Your rating never moves.'}</p></div></div>{lobbyMode === 'training' && <div className="arena-training-ranks" role="radiogroup" aria-label="Choose bot difficulty">{BATTLE_TRAINING_RANKS.map(([key, label, note]) => <button type="button" role="radio" aria-checked={trainingRank === key} className={trainingRank === key ? 'selected' : ''} data-rank={key} key={key} onClick={() => setTrainingRank(key)}><b>{label}</b><small>{note}</small></button>)}</div>}<div className="arena-playlist-action"><div><small>{lobbyMode === 'ranked' ? 'MATCH FORMAT' : 'BOT OPPONENT'}</small><b>{lobbyMode === 'ranked' ? '5 questions · 2 minutes · RP at stake' : `Mentics ${selectedTrainingTier[1]} Bot · ${selectedTrainingTier[2]}`}</b></div><button className="arena-ready-button" onClick={lobbyMode === 'ranked' ? join : train} disabled={busy}>{busy ? (lobbyMode === 'ranked' ? 'SEARCHING…' : 'LOADING…') : (lobbyMode === 'ranked' ? 'READY UP' : `PLAY ${selectedTrainingTier[1].toUpperCase()}`)} <ArrowRight /></button></div></section><aside className="arena-difficulty-board"><header><small>QUESTION DIFFICULTY</small><Target /></header><h2>Rank changes the set.</h2><p>Every tier uses original SAT-style questions. The higher the rank, the denser the reasoning, pacing, and traps become.</p><ol>{BATTLE_TRAINING_RANKS.map(([key, label]) => <li key={key} className={key === (lobbyMode === 'training' ? trainingRank : rank?.key) ? 'current' : ''}><i data-rank={key} /><span>{label}</span>{key === 'grandmaster' && <b>MAX</b>}</li>)}</ol><footer>{lobbyMode === 'ranked' ? 'Ranked matches use the stronger player’s tier so neither player gets a soft set.' : `This drill will use the ${selectedTrainingTier[1]} question tier.`}</footer></aside></div><footer className="arena-lobby-format"><div className="arena-playlist-switch" role="tablist" aria-label="Arena playlists"><button type="button" role="tab" aria-selected={lobbyMode === 'ranked'} className={lobbyMode === 'ranked' ? 'selected' : ''} onClick={() => setLobbyMode('ranked')}><Swords /> Ranked duel <small>RP on the line</small></button><button type="button" role="tab" aria-selected={lobbyMode === 'training'} className={lobbyMode === 'training' ? 'selected' : ''} onClick={() => setLobbyMode('training')}><Brain /> Training room <small>Choose any bot tier</small></button></div><span><i>05</i><b>QUESTIONS</b><small>One shared SAT-style set per round.</small></span><span><i>2:00</i><b>ROUND CLOCK</b><small>Accuracy wins; speed breaks a tie.</small></span></footer></section>}
     {error && <div className="error-banner">{error}<button onClick={() => setError('')}>Dismiss</button></div>}
     {waiting && <section className="battle-stage battle-stage--waiting arena-queue-stage" aria-live="polite"><div className="arena-queue-world"><div className="arena-queue-podium arena-queue-podium--you"><div className="arena-queue-light" /><ArenaFighter avatar={battle.playerAvatar || avatar} label={`${d.name || 'Your'} fighter waiting for a match`} size="medium" /><strong>{d.name || 'YOU'}</strong><span>READY</span></div><div className="arena-queue-core"><span className="battle-search-orbit"><Swords /></span><small>MATCHMAKING</small><h2>Searching the Arena</h2><p>Scanning for a live challenger</p><i><b /></i><em>BOT DROP-IN AT 0:30</em></div><div className="arena-queue-podium arena-queue-podium--rival"><div className="arena-queue-light" /><div className="arena-mystery-fighter">?</div><strong>CHALLENGER</strong><span>SEARCHING</span></div></div><p className="arena-queue-note">Both players receive the same fresh SAT set. If nobody joins within 30 seconds, an Arena bot enters automatically.</p><div className="battle-wait-actions"><button className="text-button" onClick={() => refresh(battle.id)}>Check status <RotateCcw /></button><button className="text-button" onClick={toggleArenaMusic}>{musicEnabled ? <Volume2 /> : <VolumeX />} Music {musicEnabled ? 'on' : 'off'}</button><button className="text-button" disabled={busy} onClick={cancelQueue}>Leave queue</button></div></section>}
