@@ -1,4 +1,5 @@
 import inspect
+from datetime import timedelta
 
 import app as app_module
 from dbhelper import DatabaseHandler
@@ -57,3 +58,24 @@ def test_sat_battle_matches_two_students_and_only_finishes_once(tmp_path, monkey
     assert battle["status"] == "complete"
     assert challenger_stats["battles_played"] == 1
     assert opponent_stats["battles_played"] == 1
+
+
+def test_sat_battle_queues_a_beatable_bot_after_thirty_seconds(tmp_path, monkeypatch):
+    database = DatabaseHandler(str(tmp_path / "bot-battle.db"))
+    monkeypatch.setattr(app_module, "db", database)
+    app_module.init_db()
+    challenger = _user(database, "bot-challenger@example.test", "Bot Challenger")
+    queue = inspect.unwrap(app_module.queue_sat_battle)
+
+    with app_module.app.test_request_context("/api/sat-battles/queue", method="POST", json={}):
+        waiting = queue(challenger).get_json()
+    database.update("sat_battles", {
+        "created_at": (app_module._utc_now() - timedelta(seconds=31)).isoformat(),
+    }, where={"id": waiting["id"]})
+
+    active = app_module._battle_payload(
+        database.select_one("sat_battles", where={"id": waiting["id"]}), challenger.data["id"]
+    )
+    assert active["status"] == "active"
+    assert active["isBotBattle"] is True
+    assert active["opponentName"] == "Mentics Arena Bot"

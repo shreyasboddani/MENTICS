@@ -151,6 +151,14 @@ def init_db():
     db.add_column("users", "name", "TEXT NOT NULL DEFAULT ''")
     db.add_column("users", "onboarding_completed", "BOOLEAN DEFAULT FALSE")
     db.add_column("users", "onboarding_data", "TEXT")
+    if not db.select_one("users", where={"email": "arena-bot@mentics.system"}):
+        db.insert("users", {
+            "email": "arena-bot@mentics.system",
+            "password": generate_password_hash(secrets.token_urlsafe(32)),
+            "stats": "{}",
+            "name": "Mentics Arena Bot",
+            "onboarding_completed": True,
+        })
 
     db.create_table("paths", {
         "id": "INTEGER PRIMARY KEY AUTOINCREMENT",
@@ -4520,6 +4528,8 @@ SAT_BATTLE_QUESTION_POOL = [
 ]
 SAT_BATTLE_QUESTION_COUNT = 5
 SAT_BATTLE_DURATION_SECONDS = 120
+SAT_BATTLE_BOT_WAIT_SECONDS = 30
+SAT_BATTLE_BOT_EMAIL = "arena-bot@mentics.system"
 
 
 def _utc_now():
@@ -4535,6 +4545,19 @@ def _battle_time(value):
 
 def _battle_questions():
     return secrets.SystemRandom().sample(SAT_BATTLE_QUESTION_POOL, SAT_BATTLE_QUESTION_COUNT)
+
+
+def _battle_bot():
+    return db.select_one('users', where={'email': SAT_BATTLE_BOT_EMAIL})
+
+
+def _battle_bot_answers(questions):
+    """A consistent, beatable three-out-of-five Arena Bot round."""
+    answers = []
+    for index, question in enumerate(questions):
+        selected = question['correct_option'] if index in (0, 2, 4) else (question['correct_option'] + 1) % 4
+        answers.append({'question_index': index, 'selected_option': selected})
+    return answers
 
 
 def _battle_answers(value):
@@ -4574,6 +4597,16 @@ def _finish_battle_if_ready(battle):
     timed_out = (now - started).total_seconds() >= SAT_BATTLE_DURATION_SECONDS
     challenger_done = bool(battle.get('challenger_answers'))
     opponent_done = bool(battle.get('opponent_answers'))
+    bot = _battle_bot()
+    is_bot_battle = bool(bot and battle.get('opponent_id') == bot['id'])
+    if is_bot_battle and (challenger_done or timed_out) and not opponent_done:
+        bot_finish = (started + timedelta(seconds=75)).isoformat()
+        db.update('sat_battles', {
+            'opponent_answers': json.dumps(_battle_bot_answers(json.loads(battle['questions']))),
+            'opponent_finished_at': bot_finish,
+        }, where={'id': battle['id']})
+        battle = db.select_one('sat_battles', where={'id': battle['id']})
+        opponent_done = True
     if not (timed_out or (challenger_done and opponent_done)):
         return battle
     questions = json.loads(battle['questions'])
@@ -4594,13 +4627,21 @@ def _finish_battle_if_ready(battle):
         challenger_outcome = 'draw' if winner_id is None else 'win' if winner_id == battle['challenger_id'] else 'loss'
         opponent_outcome = 'draw' if winner_id is None else 'win' if winner_id == battle['opponent_id'] else 'loss'
         _battle_rating(battle['challenger_id'], battle['challenger_name'], challenger_outcome)
-        _battle_rating(battle['opponent_id'], battle['opponent_name'], opponent_outcome)
+        if not is_bot_battle:
+            _battle_rating(battle['opponent_id'], battle['opponent_name'], opponent_outcome)
     return db.select_one('sat_battles', where={'id': battle['id']})
 
 
 def _battle_payload(battle, user_id):
     if battle and battle['status'] == 'waiting':
         created_at = _battle_time(battle.get('created_at'))
+        if created_at and (_utc_now() - created_at).total_seconds() >= SAT_BATTLE_BOT_WAIT_SECONDS:
+            bot = _battle_bot()
+            if bot and db.execute_write(
+                "UPDATE sat_battles SET opponent_id=?, opponent_name=?, status='active', started_at=? WHERE id=? AND status='waiting'",
+                (bot['id'], bot['name'], _utc_now().isoformat(), battle['id'])):
+                battle = db.select_one('sat_battles', where={'id': battle['id']})
+                created_at = None
         if created_at and (_utc_now() - created_at).total_seconds() > 600:
             db.execute_write("UPDATE sat_battles SET status='expired' WHERE id=? AND status='waiting'", (battle['id'],))
             battle = db.select_one('sat_battles', where={'id': battle['id']})
@@ -4614,6 +4655,7 @@ def _battle_payload(battle, user_id):
         'id': battle['id'], 'status': battle['status'], 'opponentName': opponent_name,
         'startedAt': battle.get('started_at'), 'durationSeconds': SAT_BATTLE_DURATION_SECONDS,
         'submitted': bool(own_answers), 'createdAt': battle.get('created_at'),
+        'isBotBattle': bool(_battle_bot() and battle.get('opponent_id') == _battle_bot()['id']),
     }
     if battle['status'] in {'active', 'complete'}:
         questions = json.loads(battle['questions'])
