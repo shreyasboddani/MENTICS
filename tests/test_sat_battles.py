@@ -141,3 +141,41 @@ def test_sat_battle_rank_ladder_covers_bronze_through_grandmaster():
     assert app_module._battle_rank(1400)["label"] == "Diamond"
     assert app_module._battle_rank(1550)["label"] == "Master"
     assert app_module._battle_rank(1750)["label"] == "Grandmaster"
+
+
+def test_sat_battle_questions_are_original_sat_style_and_scale_by_rank():
+    tiers = {
+        "bronze": 1000, "silver": 1050, "gold": 1150, "platinum": 1250,
+        "diamond": 1400, "master": 1550, "grandmaster": 1750,
+    }
+    prompts = {}
+    for tier, rating in tiers.items():
+        questions = app_module._battle_questions(rating)
+        assert len(questions) == app_module.SAT_BATTLE_QUESTION_COUNT
+        assert {question["difficulty"] for question in questions} == {tier}
+        assert all(question["question_text"] and question["skill"] for question in questions)
+        assert all(len(question["options"]) == 4 for question in questions)
+        assert all(0 <= question["correct_option"] < 4 for question in questions)
+        prompts[tier] = {question["question_text"] for question in questions}
+    assert prompts["bronze"].isdisjoint(prompts["grandmaster"])
+
+
+def test_live_match_uses_the_higher_players_question_tier(tmp_path, monkeypatch):
+    database = DatabaseHandler(str(tmp_path / "ranked-match.db"))
+    monkeypatch.setattr(app_module, "db", database)
+    app_module.init_db()
+    bronze = _user(database, "bronze@example.test", "Bronze Player")
+    grandmaster = _user(database, "grandmaster@example.test", "Grandmaster Player")
+    database.insert("sat_battle_stats", {
+        "user_id": grandmaster.data["id"], "user_name": "Grandmaster Player", "rating": 1750,
+        "wins": 0, "losses": 0, "draws": 0, "battles_played": 0,
+    })
+    queue = inspect.unwrap(app_module.queue_sat_battle)
+
+    with app_module.app.test_request_context("/api/sat-battles/queue", method="POST", json={}):
+        queue(bronze)
+    with app_module.app.test_request_context("/api/sat-battles/queue", method="POST", json={}):
+        active = queue(grandmaster).get_json()
+
+    assert active["status"] == "active"
+    assert active["difficulty"] == "grandmaster"

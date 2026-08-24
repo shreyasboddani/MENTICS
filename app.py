@@ -4514,20 +4514,61 @@ def update_reply(user, reply_id):
 
 
 # --- SAT Battle Arena ------------------------------------------------------
-# These original, compact questions keep a battle fast and fair. The server
-# owns the answer key and timestamps; clients receive only the prompt/options.
-SAT_BATTLE_QUESTION_POOL = [
-    {"question_text": "If 3x + 8 = 29, what is x?", "options": ["5", "7", "9", "11"], "correct_option": 1, "skill": "Algebra"},
-    {"question_text": "What is the value of 2a² - 3 when a = 4?", "options": ["13", "29", "32", "61"], "correct_option": 1, "skill": "Algebra"},
-    {"question_text": "A line has slope 3 and passes through (2, 5). What is its y-intercept?", "options": ["-1", "1", "3", "11"], "correct_option": 0, "skill": "Linear equations"},
-    {"question_text": "A rectangle has length 12 and width 5. What is its area?", "options": ["17", "34", "60", "120"], "correct_option": 2, "skill": "Geometry"},
-    {"question_text": "Which expression is equivalent to (x + 4)(x - 4)?", "options": ["x² - 16", "x² + 16", "x² - 8x + 16", "x² + 8x - 16"], "correct_option": 0, "skill": "Algebra"},
-    {"question_text": "The mean of 6, 8, 10, and n is 9. What is n?", "options": ["9", "10", "11", "12"], "correct_option": 3, "skill": "Data analysis"},
-    {"question_text": "If 40% of a number is 28, what is the number?", "options": ["56", "70", "84", "112"], "correct_option": 1, "skill": "Percentages"},
-    {"question_text": "Which transition most logically signals a contrast?", "options": ["For example,", "Therefore,", "However,", "Similarly,"], "correct_option": 2, "skill": "Transitions"},
-    {"question_text": "Which sentence uses a semicolon correctly?", "options": ["The test was hard; because I rushed.", "I reviewed my errors; then I tried again.", "I reviewed my errors; and then tried again.", "Because I reviewed; my errors improved."], "correct_option": 1, "skill": "Conventions"},
-    {"question_text": "A study found that students who slept more reported better focus. Which conclusion is best supported?", "options": ["Sleep always causes better grades.", "The study proves sleep is the only factor in focus.", "More sleep was associated with better reported focus in this study.", "Students should never study at night."], "correct_option": 2, "skill": "Reading and analysis"},
-]
+# Every Arena prompt is original. Each tier keeps the familiar Digital SAT
+# balance of algebra, problem solving/data, and Reading & Writing; the reasoning
+# burden—not just the arithmetic—climbs with the player's Arena rank.
+# The server owns the answer key and clients receive only the prompt and choices.
+SAT_BATTLE_QUESTION_BANK = {
+    "bronze": [
+        {"question_text": "For the linear function f, f(x) = 3x − 7. What is the value of f(5)?", "options": ["6", "8", "10", "15"], "correct_option": 1, "skill": "Algebra"},
+        {"question_text": "A backpack is priced at $80 and is discounted by 15%. What is the sale price, in dollars?", "options": ["12", "65", "68", "92"], "correct_option": 2, "skill": "Percentages"},
+        {"question_text": "What is the slope of the line through (2, −1) and (6, 7)?", "options": ["1", "2", "3", "4"], "correct_option": 1, "skill": "Linear equations"},
+        {"question_text": "Which choice completes the text so that it conforms to the conventions of Standard English?\n\nThe class wanted to finish the review early ___ the teacher assigned one more problem.", "options": ["early, however the teacher", "early; however, the teacher", "early however; the teacher", "early: however the teacher"], "correct_option": 1, "skill": "Sentence boundaries"},
+        {"question_text": "Researchers found charred seeds and cooking vessels at a settlement. Which conclusion is best supported by the finding?", "options": ["The settlement had no trade with other communities.", "People at the settlement likely prepared some food there.", "Every resident at the settlement was a farmer.", "The vessels were used only for storing water."], "correct_option": 1, "skill": "Information and ideas"},
+    ],
+    "silver": [
+        {"question_text": "The system 2x + y = 17 and x − y = 1 has solution (x, y). What is x + y?", "options": ["6", "10", "11", "17"], "correct_option": 2, "skill": "Systems of equations"},
+        {"question_text": "A population is modeled by P(t) = 120(1.25)^t, where t is measured in years. By what percent does the population increase each year?", "options": ["12.5%", "20%", "25%", "125%"], "correct_option": 2, "skill": "Exponential growth"},
+        {"question_text": "What is the greater solution of x² − 9x + 20 = 0?", "options": ["4", "5", "9", "20"], "correct_option": 1, "skill": "Nonlinear equations"},
+        {"question_text": "A museum guide praised an exhibit's ___ labels: each used few words while still identifying the object and its historical role. Which choice completes the text with the most logical and precise word?", "options": ["ambiguous", "economical", "ornamental", "tentative"], "correct_option": 1, "skill": "Words in context"},
+        {"question_text": "Which choice completes the text so that it conforms to the conventions of Standard English?\n\nThe experiment had one goal ___ to determine whether the material could retain heat for six hours.", "options": ["goal, to determine", "goal; to determine", "goal: to determine", "goal to determine"], "correct_option": 2, "skill": "Punctuation"},
+    ],
+    "gold": [
+        {"question_text": "The graph of y = x² − 6x + 5 is a parabola. What is the minimum y-value of the graph?", "options": ["−9", "−4", "0", "5"], "correct_option": 1, "skill": "Quadratic functions"},
+        {"question_text": "A jar contains 18 red beads and 12 blue beads. Blue beads are added until the probability of selecting a red bead is 1/3. How many blue beads are added?", "options": ["6", "12", "18", "24"], "correct_option": 3, "skill": "Probability"},
+        {"question_text": "What is the solution to √(x + 5) = x − 1?", "options": ["−1", "1", "4", "5"], "correct_option": 2, "skill": "Nonlinear equations"},
+        {"question_text": "A writer is comparing two restoration methods. One costs less at the outset, but the other requires fewer repairs over time. Which transition most logically completes the text?\n\nThe first method has a lower initial cost. ___, the second may be less expensive over the life of the building.", "options": ["For example", "However", "Likewise", "Therefore"], "correct_option": 1, "skill": "Transitions"},
+        {"question_text": "Which choice completes the text so that it conforms to the conventions of Standard English?\n\nA collection of antique maps, along with several handwritten journals, ___ displayed in the archive.", "options": ["are", "have been", "is", "were"], "correct_option": 2, "skill": "Subject-verb agreement"},
+    ],
+    "platinum": [
+        {"question_text": "For a constant a, f(x) = a(x − 2)(x + 4). If f(0) = −32, what is f(3)?", "options": ["−28", "7", "28", "56"], "correct_option": 2, "skill": "Nonlinear functions"},
+        {"question_text": "A line of best fit for a data set is y = 1.8x + 12. When x = 10, the observed y-value is 33. What is the residual for this data point?", "options": ["−3", "3", "15", "30"], "correct_option": 1, "skill": "Data analysis"},
+        {"question_text": "The value V, in dollars, of a device t years after purchase is modeled by V = 4,800(0.88)^t. Which statement best interprets 0.88 in the model?", "options": ["The device loses $0.88 in value each year.", "The device retains 88% of its value from one year to the next.", "The device is worth 88% of $4,800 after t years.", "The device loses 88% of its original value each year."], "correct_option": 1, "skill": "Exponential functions"},
+        {"question_text": "Which choice completes the text so that it conforms to the conventions of Standard English?\n\nThe river's flow has changed significantly ___ as a result, several marsh plants now grow farther downstream.", "options": ["significantly as a result,", "significantly, as a result", "significantly; as a result,", "significantly: as a result,"], "correct_option": 2, "skill": "Sentence boundaries"},
+        {"question_text": "A student wants to emphasize a finding from these notes:\n• Biologist Lian Chen studied urban gardens.\n• Gardens with more native plant species had more pollinator visits.\n• Chen recorded visits over twelve weeks.\n\nWhich choice most effectively uses the notes to accomplish this goal?", "options": ["Chen is a biologist who studied urban gardens for twelve weeks.", "In Chen's twelve-week study, gardens with more native plant species received more pollinator visits.", "Pollinators are insects that visit urban gardens containing native plant species.", "Native plants can be found in gardens, and Chen recorded visits to those gardens."], "correct_option": 1, "skill": "Rhetorical synthesis"},
+    ],
+    "diamond": [
+        {"question_text": "The equations x² − 2x − 3 = 0 and x² − 2x − k = 0 have the same solutions. What is the value of k?", "options": ["−3", "0", "2", "3"], "correct_option": 3, "skill": "Equivalent equations"},
+        {"question_text": "What is the positive solution to √(3x + 4) = x − 2?", "options": ["2", "3", "4", "7"], "correct_option": 3, "skill": "Nonlinear equations"},
+        {"question_text": "A researcher replaces the largest value in a data set with a much larger value, leaving all other values unchanged. Which measure is guaranteed to remain unchanged if the data set has an odd number of values?", "options": ["Mean", "Median", "Range", "Standard deviation"], "correct_option": 1, "skill": "Data analysis"},
+        {"question_text": "In the text, the word \"attenuated\" most nearly means \"weakened.\"\n\nBecause the signal had traveled through several thick walls, its strength was attenuated before it reached the receiver.\n\nWhich choice gives the best meaning of \"attenuated\" as used in the text?", "options": ["amplified", "concealed", "reduced", "repeated"], "correct_option": 2, "skill": "Words in context"},
+        {"question_text": "A student wants to contrast two findings from these notes:\n• A 2022 survey found that most commuters preferred shorter travel times.\n• A 2024 survey found that many commuters would accept longer travel times for more reliable service.\n\nWhich choice most effectively uses the notes to accomplish this goal?", "options": ["Commuters participated in surveys in 2022 and 2024.", "Surveys can reveal commuters' opinions about travel time and service.", "Although most 2022 respondents preferred shorter trips, many 2024 respondents prioritized reliable service even if trips took longer.", "Reliable service and short travel times are both important to commuters."], "correct_option": 2, "skill": "Rhetorical synthesis"},
+    ],
+    "master": [
+        {"question_text": "For a positive constant m, the equation x² − (m + 5)x + 5m = 0 has two roots that differ by 7. What is the value of m?", "options": ["2", "5", "7", "12"], "correct_option": 3, "skill": "Quadratic equations"},
+        {"question_text": "A 20-liter solution is 30% acid. How many liters of a 50% acid solution must be added to make a 40% acid solution?", "options": ["10", "15", "20", "25"], "correct_option": 2, "skill": "Ratios and rates"},
+        {"question_text": "For x > 0, f(x) = x + 6/x. Which value of x gives the least possible value of f(x)?", "options": ["√3", "√6", "3", "6"], "correct_option": 1, "skill": "Nonlinear functions"},
+        {"question_text": "Which choice completes the text so that it conforms to the conventions of Standard English?\n\nWalking through the restored theater, ___ impressed the architects most was the acoustics.", "options": ["the acoustics", "what", "which", "there"], "correct_option": 1, "skill": "Conventions"},
+        {"question_text": "Two historians disagree about a diary's reliability. The first notes that the diary was written decades after the events; the second notes that it quotes letters written during the events. Which choice most accurately characterizes their disagreement?", "options": ["They disagree about whether the diary contains any quotations.", "They disagree about whether the diary's date of composition limits its usefulness as evidence.", "They disagree about who wrote the letters quoted in the diary.", "They disagree about whether the events described in the diary occurred."], "correct_option": 1, "skill": "Cross-text connections"},
+    ],
+    "grandmaster": [
+        {"question_text": "The quadratic p(x) = x² + bx + c has no real zeros. The equation p(x) = 9 has exactly one real solution. What is the value of b² − 4c?", "options": ["−36", "−9", "0", "36"], "correct_option": 0, "skill": "Advanced quadratic reasoning"},
+        {"question_text": "For a constant k, the equation x² − 2(k + 1)x + k² − 6k + 1 = 0 has exactly one real solution. What is the value of k?", "options": ["−4", "0", "1", "4"], "correct_option": 1, "skill": "Parameters and quadratics"},
+        {"question_text": "Quantity A is directly proportional to x and inversely proportional to √y. When x = 12 and y = 9, Quantity A equals 16. What is Quantity A when x = 18 and y = 16?", "options": ["12", "18", "24", "32"], "correct_option": 1, "skill": "Advanced ratios"},
+        {"question_text": "Text 1: A critic argues that a novel's fragmented chronology prevents readers from understanding its central conflict.\n\nText 2: Another critic argues that the chronology mirrors the protagonist's incomplete memories and therefore deepens the conflict.\n\nWhich choice best describes the relationship between the texts?", "options": ["Text 2 provides a reason to value the feature Text 1 criticizes.", "Text 2 summarizes the central conflict that Text 1 leaves unexplained.", "Text 2 challenges Text 1's claim that the novel has a fragmented chronology.", "Text 2 agrees with Text 1 that readers cannot understand the novel."], "correct_option": 0, "skill": "Cross-text connections"},
+        {"question_text": "A student wants to make a precise claim from these notes:\n• Physicist Amara Sol studied a coating for solar panels.\n• Panels with the coating reflected 18% less dust-related light loss than uncoated panels.\n• The study lasted eight months in a dry climate.\n\nWhich choice most effectively uses the notes to accomplish this goal?", "options": ["Solar panels are often used in dry climates, where dust can block light.", "In an eight-month study in a dry climate, Sol found that coated panels had 18% less dust-related light loss than uncoated panels.", "Sol, a physicist, studied a coating that could be applied to solar panels for eight months.", "Dust-related light loss is a problem for solar panels, which can be coated."], "correct_option": 1, "skill": "Rhetorical synthesis"},
+    ],
+}
 SAT_BATTLE_QUESTION_COUNT = 5
 SAT_BATTLE_DURATION_SECONDS = 120
 SAT_BATTLE_BOT_WAIT_SECONDS = 30
@@ -4554,10 +4595,6 @@ def _battle_time(value):
     return parsed if parsed.tzinfo else parsed.replace(tzinfo=ZoneInfo("UTC"))
 
 
-def _battle_questions():
-    return secrets.SystemRandom().sample(SAT_BATTLE_QUESTION_POOL, SAT_BATTLE_QUESTION_COUNT)
-
-
 def _battle_rank(rating):
     rating = int(rating or 1000)
     for minimum, label, key in SAT_BATTLE_RANKS:
@@ -4569,6 +4606,32 @@ def _battle_rank(rating):
                 'nextLabel': next_rank[1] if next_rank else None,
             }
     raise AssertionError('Bronze rank must cover every rating')
+
+
+def _battle_difficulty_for_rating(rating):
+    return _battle_rank(rating)['key']
+
+
+def _battle_rating_value(user_id):
+    stats = db.select_one('sat_battle_stats', where={'user_id': user_id})
+    return int(stats['rating']) if stats else 1000
+
+
+def _battle_questions(rating=1000):
+    """Return a five-question original SAT-style set for the supplied rating."""
+    difficulty = _battle_difficulty_for_rating(rating)
+    randomizer = secrets.SystemRandom()
+    questions = []
+    for source in randomizer.sample(SAT_BATTLE_QUESTION_BANK[difficulty], SAT_BATTLE_QUESTION_COUNT):
+        options = list(source['options'])
+        correct_answer = options[source['correct_option']]
+        randomizer.shuffle(options)
+        questions.append({
+            'question_text': source['question_text'], 'options': options,
+            'correct_option': options.index(correct_answer), 'skill': source['skill'],
+            'difficulty': difficulty,
+        })
+    return questions
 
 
 def _battle_bot():
@@ -4709,6 +4772,7 @@ def _battle_payload(battle, user_id):
     result['rank'] = _battle_rank(stats['rating'] if stats else 1000)
     if battle['status'] in {'active', 'complete'}:
         questions = json.loads(battle['questions'])
+        result['difficulty'] = questions[0].get('difficulty', 'bronze') if questions else 'bronze'
         result['questions'] = [{'question_text': q['question_text'], 'options': q['options'], 'skill': q['skill']} for q in questions]
     if battle['status'] == 'complete':
         questions = json.loads(battle['questions'])
@@ -4762,10 +4826,15 @@ def queue_sat_battle(user):
              AND status='waiting' RETURNING *""",
         (user.data['id'], user.get_name(), _utc_now().isoformat(), user.data['id']))
     if paired:
+        # A match is set at the stronger player's tier. That keeps a lower-ranked
+        # challenger from being served a soft set against an advanced opponent.
+        match_rating = max(_battle_rating_value(paired['challenger_id']), _battle_rating_value(user.data['id']))
+        db.update('sat_battles', {'questions': json.dumps(_battle_questions(match_rating))}, where={'id': paired['id']})
+        paired = db.select_one('sat_battles', where={'id': paired['id']})
         return jsonify(_battle_payload(paired, user.data['id']))
     battle_id = db.insert('sat_battles', {
         'status': 'waiting', 'challenger_id': user.data['id'], 'challenger_name': user.get_name(),
-        'questions': json.dumps(_battle_questions()),
+        'questions': json.dumps(_battle_questions(_battle_rating_value(user.data['id']))),
     })
     return jsonify(_battle_payload(db.select_one('sat_battles', where={'id': battle_id}), user.data['id']))
 
@@ -4781,7 +4850,7 @@ def train_with_sat_battle_bot(user):
     battle_id = db.insert('sat_battles', {
         'status': 'active', 'challenger_id': user.data['id'],
         'challenger_name': user.get_name(), 'opponent_id': bot['id'], 'opponent_name': 'Mentics Training Bot',
-        'questions': json.dumps(_battle_questions()), 'started_at': _utc_now().isoformat(),
+        'questions': json.dumps(_battle_questions(_battle_rating_value(user.data['id']))), 'started_at': _utc_now().isoformat(),
     })
     return jsonify(_battle_payload(db.select_one('sat_battles', where={'id': battle_id}), user.data['id']))
 
