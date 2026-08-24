@@ -80,3 +80,17 @@ def test_sat_battle_queues_a_beatable_bot_after_thirty_seconds(tmp_path, monkeyp
     assert active["status"] == "active"
     assert active["isBotBattle"] is True
     assert active["opponentName"] == "Mentics Arena Bot"
+
+
+def test_training_round_starts_immediately_and_does_not_rank(tmp_path, monkeypatch):
+    database = DatabaseHandler(str(tmp_path / "training.db"))
+    monkeypatch.setattr(app_module, "db", database)
+    app_module.init_db()
+    challenger = _user(database, "training@example.test", "Training Student")
+    train = inspect.unwrap(app_module.train_with_sat_battle_bot)
+
+    with app_module.app.test_request_context("/api/sat-battles/train", method="POST", json={}):
+        training = train(challenger).get_json()
+    assert training["status"] == "active"
+    assert training["mode"] == "training"
+    assert training["isBotBattle"] is True

@@ -42,8 +42,9 @@ the `skill_key`, `skill_label`, `subject`, `node_type`, `objective`,
 `xp_reward`, `xp_awarded`, and `unit_title` columns on `paths` — so it needs
 this step.
 
-The SAT Battle Arena adds `sat_battles` and `sat_battle_stats`; deploy it using
-the same one-time migration flag before opening `/battles` in production.
+The SAT Battle Arena adds `sat_battles` and `sat_battle_stats` (and its
+training mode adds the `mode` column to `sat_battles`); deploy it using the same
+one-time migration flag before opening `/battles` in production.
 
 ## Function duration
 

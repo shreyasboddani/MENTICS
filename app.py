@@ -236,6 +236,7 @@ def init_db():
     db.create_table("sat_battles", {
         "id": "INTEGER PRIMARY KEY AUTOINCREMENT",
         "status": "TEXT NOT NULL DEFAULT 'waiting'",
+        "mode": "TEXT NOT NULL DEFAULT 'ranked'",
         "challenger_id": "INTEGER NOT NULL",
         "challenger_name": "TEXT NOT NULL",
         "opponent_id": "INTEGER",
@@ -252,6 +253,7 @@ def init_db():
         "FOREIGN KEY(challenger_id)": "REFERENCES users(id) ON DELETE CASCADE",
         "FOREIGN KEY(opponent_id)": "REFERENCES users(id) ON DELETE CASCADE"
     })
+    db.add_column("sat_battles", "mode", "TEXT NOT NULL DEFAULT 'ranked'")
     db.create_table("sat_battle_stats", {
         "user_id": "INTEGER PRIMARY KEY",
         "user_name": "TEXT NOT NULL",
@@ -4640,7 +4642,7 @@ def _finish_battle_if_ready(battle):
     updated = db.execute_write(
         "UPDATE sat_battles SET status='complete', winner_id=?, completed_at=? WHERE id=? AND status='active'",
         (winner_id, completed_at, battle['id']))
-    if updated:
+    if updated and battle.get('mode', 'ranked') != 'training':
         challenger_outcome = 'draw' if winner_id is None else 'win' if winner_id == battle['challenger_id'] else 'loss'
         opponent_outcome = 'draw' if winner_id is None else 'win' if winner_id == battle['opponent_id'] else 'loss'
         _battle_rating(battle['challenger_id'], battle['challenger_name'], challenger_outcome)
@@ -4673,6 +4675,7 @@ def _battle_payload(battle, user_id):
         'startedAt': battle.get('started_at'), 'durationSeconds': SAT_BATTLE_DURATION_SECONDS,
         'submitted': bool(own_answers), 'createdAt': battle.get('created_at'),
         'isBotBattle': bool(_battle_bot() and battle.get('opponent_id') == _battle_bot()['id']),
+        'mode': battle.get('mode', 'ranked'),
     }
     if battle['status'] in {'active', 'complete'}:
         questions = json.loads(battle['questions'])
@@ -4726,8 +4729,24 @@ def queue_sat_battle(user):
     if paired:
         return jsonify(_battle_payload(paired, user.data['id']))
     battle_id = db.insert('sat_battles', {
-        'status': 'waiting', 'challenger_id': user.data['id'], 'challenger_name': user.get_name(),
+        'status': 'waiting', 'mode': 'ranked', 'challenger_id': user.data['id'], 'challenger_name': user.get_name(),
         'questions': json.dumps(_battle_questions()),
+    })
+    return jsonify(_battle_payload(db.select_one('sat_battles', where={'id': battle_id}), user.data['id']))
+
+
+@app.route('/api/sat-battles/train', methods=['POST'])
+@login_required
+@rate_limit('20/hour', name='sat_battle_training')
+def train_with_sat_battle_bot(user):
+    current = _user_current_battle(user.data['id'])
+    if current:
+        return jsonify({'error': 'Finish or leave your current battle first.'}), 409
+    bot = _battle_bot()
+    battle_id = db.insert('sat_battles', {
+        'status': 'active', 'mode': 'training', 'challenger_id': user.data['id'],
+        'challenger_name': user.get_name(), 'opponent_id': bot['id'], 'opponent_name': bot['name'],
+        'questions': json.dumps(_battle_questions()), 'started_at': _utc_now().isoformat(),
     })
     return jsonify(_battle_payload(db.select_one('sat_battles', where={'id': battle_id}), user.data['id']))
 
