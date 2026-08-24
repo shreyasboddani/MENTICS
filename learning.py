@@ -1372,6 +1372,7 @@ Design one college-application learning unit for a high school student.
 - Grade: {profile['grade']}
 - Stage of the process: {profile['stage']}
 - Intended majors or fields: {profile['majors']}
+- Personal college priorities: {profile['priorities']}
 - Colleges they are considering: {profile['target_colleges']}
 - Academic profile: {profile['academics']}
 - Application progress so far: {profile['progress']}
@@ -1453,6 +1454,7 @@ grade {profile['grade']} who is at the "{profile['stage']}" stage of applying to
 
 # STUDENT CONTEXT
 - Intended majors: {profile['majors']}
+- Personal college priorities: {profile['priorities']}
 - Colleges under consideration: {profile['target_colleges']}
 - Academic profile: {profile['academics']}
 - Progress so far: {profile['progress']}
@@ -1546,6 +1548,7 @@ grade {profile['grade']} at the "{profile['stage']}" stage.
 
 # STUDENT CONTEXT
 - Intended majors: {profile['majors']}
+- Personal college priorities: {profile['priorities']}
 - Colleges under consideration: {profile['target_colleges']}
 
 # QUESTION DESIGN

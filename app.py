@@ -2331,6 +2331,7 @@ def _build_college_profile(user_id, college_context, chat_history):
         "grade": grade,
         "stage": stage,
         "majors": college_context.get("majors") or "undecided",
+        "priorities": college_context.get("priorities") or "not specified",
         "target_colleges": college_context.get("target_colleges") or "none listed yet",
         "academics": ", ".join(academics) or "not provided",
         "progress": ", ".join(progress) or "nothing recorded yet",
@@ -2385,6 +2386,7 @@ def _get_college_planning_ai_chat_response(history, user_stats, stat_history="",
         f"- Grade Level: {college_info.get('grade', 'N/A')}\n"
         f"- Current Planning Stage: '{college_info.get('planning_stage', 'N/A')}'\n"
         f"- Interested Majors: {college_info.get('majors', 'None')}\n"
+        f"- College Priorities: {college_info.get('priorities', 'None')}\n"
         f"- Target Colleges: {college_info.get('target_colleges', 'None')}\n"
         f"- Recently Completed Tasks: {college_info.get('completed_tasks', 'None')}\n"
         f"- Incomplete/Failed Tasks: {college_info.get('incomplete_tasks', 'None')}\n"
@@ -3297,12 +3299,14 @@ def college_path_builder(user):
                 "name": user.get_name(), "error": "Choose a valid grade and planning stage.",
                 "grade": grade, "planning_stage": planning_stage,
                 "majors": request.form.get('interested_majors', '').strip()[:2000],
+                "priorities": request.form.get('college_priorities', '').strip()[:2000],
                 "target_colleges": request.form.get('target_colleges', '').strip()[:2000],
             }, "Build College Path | Mentics", 400)
         college_context = {
             'grade': grade,
             'planning_stage': planning_stage,
             'majors': request.form.get('interested_majors', '').strip()[:2000],
+            'priorities': request.form.get('college_priorities', '').strip()[:2000],
             'target_colleges': request.form.get('target_colleges', '').strip()[:2000]
         }
         stats['college_path'] = college_context
