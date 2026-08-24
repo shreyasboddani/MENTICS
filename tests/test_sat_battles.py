@@ -1,9 +1,18 @@
 import inspect
+import json
 from datetime import timedelta
+
+import pytest
 
 import app as app_module
 from dbhelper import DatabaseHandler
 from userhelper import User
+
+
+@pytest.fixture(autouse=True)
+def _disable_live_arena_ai(monkeypatch):
+    """Arena unit tests must never spend a real Gemini request from .env."""
+    monkeypatch.setattr(app_module, "gemini_api_key", None)
 
 
 def _user(database, email, name):
@@ -193,6 +202,58 @@ def test_sat_battle_questions_are_original_sat_style_and_scale_by_rank():
         assert all(0 <= question["correct_option"] < 4 for question in questions)
         prompts[tier] = {question["question_text"] for question in questions}
     assert prompts["bronze"].isdisjoint(prompts["grandmaster"])
+
+
+def test_sat_battle_round_uses_a_fresh_validated_ai_set_when_configured(tmp_path, monkeypatch):
+    database = DatabaseHandler(str(tmp_path / "ai-arena.db"))
+    monkeypatch.setattr(app_module, "db", database)
+    app_module.init_db()
+    generated = {
+        "questions": [
+            {
+                "domain": "math" if index < 3 else "reading_writing",
+                "question_text": f"A deliberately demanding original Grandmaster Digital SAT question {index} gives enough information to require careful, multi-step reasoning before any answer choice can be selected.",
+                "options": [f"Choice {index}A", f"Choice {index}B", f"Choice {index}C", f"Choice {index}D"],
+                "correct_option": index % 4,
+                "skill": f"Advanced skill {index}",
+                "explanation": "The correct choice follows from the supplied constraints; a tempting wrong choice skips one required condition.",
+            }
+            for index in range(5)
+        ]
+    }
+    calls = []
+
+    def generate(prompt, **kwargs):
+        calls.append((prompt, kwargs))
+        return json.dumps(generated)
+
+    monkeypatch.setattr(app_module, "gemini_api_key", "test-key")
+    monkeypatch.setattr(app_module, "_generate_text", generate)
+    questions = app_module._battle_questions(1750)
+
+    assert len(calls) == 1
+    assert "GRANDMASTER" in calls[0][0]
+    assert "Round nonce:" in calls[0][0]
+    assert {question["difficulty"] for question in questions} == {"grandmaster"}
+    assert all(question["explanation"] for question in questions)
+    assert {question["skill"] for question in questions} == {f"Advanced skill {index}" for index in range(5)}
+
+
+def test_waiting_arena_match_defers_ai_generation_until_it_becomes_a_round(tmp_path, monkeypatch):
+    database = DatabaseHandler(str(tmp_path / "deferred-ai-arena.db"))
+    monkeypatch.setattr(app_module, "db", database)
+    app_module.init_db()
+    challenger = _user(database, "deferred-ai@example.test", "Deferred AI")
+    queue = inspect.unwrap(app_module.queue_sat_battle)
+    monkeypatch.setattr(app_module, "gemini_api_key", "test-key")
+    monkeypatch.setattr(app_module, "_generate_text", lambda *_args, **_kwargs: pytest.fail("AI should not run while a match is merely waiting"))
+
+    with app_module.app.test_request_context("/api/sat-battles/queue", method="POST", json={}):
+        waiting = queue(challenger).get_json()
+
+    stored = database.select_one("sat_battles", where={"id": waiting["id"]})
+    assert waiting["status"] == "waiting"
+    assert json.loads(stored["questions"]) == []
 
 
 def test_training_bots_scale_their_accuracy_with_the_selected_rank():

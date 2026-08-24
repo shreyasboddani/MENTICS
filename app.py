@@ -623,7 +623,7 @@ def _get_gemini_client():
 
 
 def _gemini_config(max_output_tokens, *, system_instruction=None,
-                   json_output=False, thinking_level="minimal"):
+                   json_output=False, json_schema=None, thinking_level="minimal"):
     """Return a conservative generation config tuned for latency and cost."""
     if _get_gemini_client() is None:
         raise RuntimeError("Gemini is not configured.")
@@ -634,11 +634,13 @@ def _gemini_config(max_output_tokens, *, system_instruction=None,
     )
     if json_output:
         config.response_mime_type = "application/json"
+    if json_schema:
+        config.response_json_schema = json_schema
     return config
 
 
 def _generate_text(prompt, *, max_output_tokens=800, json_output=False,
-                   thinking_level="minimal", system_instruction=None):
+                   json_schema=None, thinking_level="minimal", system_instruction=None):
     """Generate validated text through the single configured Gemini model."""
     client = _get_gemini_client()
     if client is None:
@@ -650,6 +652,7 @@ def _generate_text(prompt, *, max_output_tokens=800, json_output=False,
             max_output_tokens,
             system_instruction=system_instruction,
             json_output=json_output,
+            json_schema=json_schema,
             thinking_level=thinking_level,
         ),
     )
@@ -4742,9 +4745,174 @@ def _battle_rating_value(user_id):
     return int(stats['rating']) if stats else 1000
 
 
-def _battle_questions(rating=1000):
-    """Return a five-question original SAT-style set for the supplied rating."""
-    difficulty = _battle_difficulty_for_rating(rating)
+SAT_BATTLE_AI_PROFILES = {
+    'bronze': 'Solid Digital SAT foundation. Use multi-step but accessible algebra/data reasoning and concise Reading & Writing passages. No one-step arithmetic.',
+    'silver': 'Connected Digital SAT skills. Include realistic distractors and at least one question requiring a student to connect two facts or equations.',
+    'gold': 'Upper-middle Digital SAT. Require careful setup, non-obvious distractors, and precise textual reasoning; avoid routine factor-or-substitute questions.',
+    'platinum': 'High Digital SAT. Use dense quantitative relationships, constraints, and nuanced evidence/transition/conventions decisions.',
+    'diamond': 'Very hard Digital SAT. At least two Math questions must require multiple linked constraints or parameter reasoning; Reading & Writing distractors must be genuinely plausible.',
+    'master': 'Elite Digital SAT. Every item should punish a shallow first read. Use nonroutine algebra/data reasoning and subtle logical distinctions, but stay in official Digital SAT scope.',
+    'grandmaster': 'Hardest legitimate Digital SAT-style set. No introductory computation. Include at least two multi-condition Math questions involving parameters, nonlinear functions, or sophisticated data reasoning; and two 100-180-word Reading & Writing stimuli requiring precise evidence, synthesis, or cross-text analysis. Every wrong choice must reflect a specific tempting misconception.',
+}
+
+SAT_BATTLE_AI_RESPONSE_SCHEMA = {
+    'type': 'object',
+    'properties': {
+        'questions': {
+            'type': 'array', 'minItems': SAT_BATTLE_QUESTION_COUNT, 'maxItems': SAT_BATTLE_QUESTION_COUNT,
+            'items': {
+                'type': 'object',
+                'properties': {
+                    'domain': {'type': 'string', 'enum': ['math', 'reading_writing']},
+                    'question_text': {'type': 'string'},
+                    'options': {'type': 'array', 'minItems': 4, 'maxItems': 4, 'items': {'type': 'string'}},
+                    'correct_option': {'type': 'integer', 'minimum': 0, 'maximum': 3},
+                    'skill': {'type': 'string'},
+                    'explanation': {'type': 'string'},
+                },
+                'required': ['domain', 'question_text', 'options', 'correct_option', 'skill', 'explanation'],
+            },
+        },
+    },
+    'required': ['questions'],
+}
+
+
+def _battle_question_fingerprint(question):
+    return re.sub(r'[^a-z0-9]+', '', str(question or '').lower())[:260]
+
+
+_ARENA_OUT_OF_SCOPE_PATTERN = re.compile(
+    r'\b(?:calculus|derivative|integral|limit as|differential|matrix|matrices|linear programming|objective function|eigenvalue|complex number)\b',
+    re.I,
+)
+
+
+def _recent_battle_question_fingerprints():
+    """Avoid repeating a question from recent completed or active rounds."""
+    fingerprints = set()
+    try:
+        rows = db.execute("SELECT questions FROM sat_battles ORDER BY created_at DESC LIMIT 16")
+        for row in rows:
+            try:
+                for question in json.loads(row.get('questions') or '[]'):
+                    fingerprint = _battle_question_fingerprint(question.get('question_text'))
+                    if fingerprint:
+                        fingerprints.add(fingerprint)
+            except (TypeError, ValueError, json.JSONDecodeError):
+                continue
+    except Exception:
+        # Generation should never fail merely because an older deployment has
+        # not created the Arena table yet.
+        pass
+    return fingerprints
+
+
+def _validate_ai_battle_questions(payload, difficulty, recent_fingerprints):
+    items = payload.get('questions') if isinstance(payload, dict) else payload
+    if not isinstance(items, list) or len(items) != SAT_BATTLE_QUESTION_COUNT:
+        return None
+    questions, seen = [], set()
+    minimum_length = 105 if difficulty in {'master', 'grandmaster'} else 75
+    for item in items:
+        if not isinstance(item, dict):
+            return None
+        question_text = str(item.get('question_text') or '').strip()
+        skill = str(item.get('skill') or '').strip()[:80]
+        domain = re.sub(r'[^a-z]+', '_', str(item.get('domain') or '').lower()).strip('_')
+        options = item.get('options')
+        explanation = str(item.get('explanation') or '').strip()
+        try:
+            correct_option = int(item.get('correct_option'))
+        except (TypeError, ValueError):
+            return None
+        fingerprint = _battle_question_fingerprint(question_text)
+        maximum_length = 650 if domain == 'math' else 760
+        if (len(question_text) < minimum_length or len(question_text) > maximum_length
+                or _ARENA_OUT_OF_SCOPE_PATTERN.search(f'{skill} {question_text}')
+                or not skill or domain not in {'math', 'reading_writing'} or len(explanation) < 45
+                or not isinstance(options, list) or len(options) != 4
+                or not 0 <= correct_option < 4 or not fingerprint
+                or fingerprint in seen or fingerprint in recent_fingerprints):
+            return None
+        cleaned_options = [str(option or '').strip()[:500] for option in options]
+        if any(not option for option in cleaned_options) or len({option.lower() for option in cleaned_options}) != 4:
+            return None
+        seen.add(fingerprint)
+        questions.append({
+            'question_text': question_text[:1800], 'options': cleaned_options,
+            'correct_option': correct_option, 'skill': skill,
+            'domain': domain, 'explanation': explanation[:1200], 'difficulty': difficulty,
+        })
+    # An Arena round should not be five variants of the same micro-skill.
+    if len({question['skill'].lower() for question in questions}) < 4:
+        return None
+    if sum(question['domain'] == 'math' for question in questions) != 3:
+        return None
+    return questions
+
+
+def _decode_ai_battle_json(raw):
+    """Decode Gemini JSON even if it adds a code fence or TeX-style slashes."""
+    text = str(raw or '').strip()
+    text = re.sub(r'^```(?:json)?\s*|\s*```$', '', text, flags=re.I)
+    start = text.find('{')
+    if start < 0:
+        raise ValueError('Arena AI response did not contain a JSON object.')
+    # Gemini occasionally emits \( ... \) despite JSON mode. Those are invalid
+    # JSON escapes but are harmless plain-text math once the slash is preserved.
+    candidate = re.sub(r'\\(?!["\\/bfnrtu])', r'\\\\', text[start:])
+    return json.JSONDecoder().raw_decode(candidate)[0]
+
+
+def _generate_ai_battle_questions(difficulty):
+    """Ask Gemini for a fresh, validated Arena round; return None on any fault."""
+    if not gemini_api_key:
+        return None
+    recent_fingerprints = _recent_battle_question_fingerprints()
+    profile = SAT_BATTLE_AI_PROFILES[difficulty]
+    for _attempt in range(2):
+        nonce = secrets.token_urlsafe(12)
+        prompt = f"""
+Write one NEW five-question, original Digital SAT-style battle round for Mentics.
+
+Tier: {difficulty.upper()}
+Tier standard: {profile}
+Round nonce: {nonce}
+
+Return JSON only, exactly in this shape:
+{{"questions":[{{"domain":"math","question_text":"...","options":["...","...","...","..."],"correct_option":0,"skill":"...","explanation":"..."}}]}}
+
+Hard requirements:
+- Exactly 5 questions: 3 Math and 2 Reading & Writing. Use five distinct skills where possible.
+- Each question must be self-contained, answerable, and have exactly one defensible correct answer.
+- Use original wording, data, passages, names, and numbers. Do not reproduce or paraphrase copyrighted College Board questions.
+- Include all required text, tables expressed in plain text if needed, and blanks (____) wherever an answer must complete a sentence.
+- Use plain-text or Unicode math notation only; never use LaTeX commands or backslashes.
+- Strict scope: use only legitimate Digital SAT skills—algebra, advanced math, problem-solving/data, geometry, and Reading & Writing. Never use calculus, derivatives, integrals, limits, matrices, linear programming, objective functions, or college-level theory.
+- Keep Math question_text under 650 characters and Reading & Writing question_text under 760 characters, including any passage or notes.
+- Explanations must briefly show why the correct choice works and identify the trap behind at least one wrong choice.
+- Make the wrong choices plausible; do not use giveaway options, "all of the above," or trick wording.
+- Respect the tier standard above. Grandmaster must be dramatically harder than Bronze while remaining legitimate Digital SAT content.
+"""
+        try:
+            raw = _generate_text(
+                prompt, max_output_tokens=3600, json_output=True,
+                json_schema=SAT_BATTLE_AI_RESPONSE_SCHEMA,
+                thinking_level='low',
+                system_instruction='You are a meticulous Digital SAT assessment designer. Return valid JSON only.',
+            )
+            parsed = _decode_ai_battle_json(raw)
+            questions = _validate_ai_battle_questions(parsed, difficulty, recent_fingerprints)
+            if questions:
+                return questions
+        except Exception as error:  # noqa: BLE001 - a round must remain playable
+            app.logger.warning('Arena AI generation failed for %s: %s', difficulty, error)
+    return None
+
+
+def _fallback_battle_questions(difficulty):
+    """Keep Arena available when Gemini is down, while preserving answer secrecy."""
     randomizer = secrets.SystemRandom()
     questions = []
     for source in randomizer.sample(SAT_BATTLE_QUESTION_BANK[difficulty], SAT_BATTLE_QUESTION_COUNT):
@@ -4754,9 +4922,16 @@ def _battle_questions(rating=1000):
         questions.append({
             'question_text': source['question_text'], 'options': options,
             'correct_option': options.index(correct_answer), 'skill': source['skill'],
+            'explanation': source.get('explanation') or f"The correct answer is {correct_answer}.",
             'difficulty': difficulty,
         })
     return questions
+
+
+def _battle_questions(rating=1000):
+    """Return a new AI-authored SAT round, falling back safely when needed."""
+    difficulty = _battle_difficulty_for_rating(rating)
+    return _generate_ai_battle_questions(difficulty) or _fallback_battle_questions(difficulty)
 
 
 def _battle_bot():
@@ -4888,6 +5063,15 @@ def _battle_payload(battle, user_id):
                 "UPDATE sat_battles SET opponent_id=?, opponent_name=?, status='active', started_at=? WHERE id=? AND status='waiting'",
                 (bot['id'], bot['name'], _utc_now().isoformat(), battle['id'])):
                 battle = db.select_one('sat_battles', where={'id': battle['id']})
+                try:
+                    existing_questions = json.loads(battle.get('questions') or '[]')
+                except (TypeError, ValueError, json.JSONDecodeError):
+                    existing_questions = []
+                if len(existing_questions) != SAT_BATTLE_QUESTION_COUNT:
+                    db.update('sat_battles', {
+                        'questions': json.dumps(_battle_questions(_battle_rating_value(battle['challenger_id'])))
+                    }, where={'id': battle['id']})
+                    battle = db.select_one('sat_battles', where={'id': battle['id']})
                 created_at = None
         if created_at and (_utc_now() - created_at).total_seconds() > 600:
             db.execute_write("UPDATE sat_battles SET status='expired' WHERE id=? AND status='waiting'", (battle['id'],))
@@ -4916,7 +5100,17 @@ def _battle_payload(battle, user_id):
         challenger_score = _battle_score(questions, _battle_answers(battle.get('challenger_answers')))
         opponent_score = _battle_score(questions, _battle_answers(battle.get('opponent_answers')))
         own_score, opponent_score = (challenger_score, opponent_score) if is_challenger else (opponent_score, challenger_score)
-        result.update({'winnerId': battle.get('winner_id'), 'youWon': battle.get('winner_id') == user_id, 'draw': battle.get('winner_id') is None, 'yourScore': own_score, 'opponentScore': opponent_score, 'answerKey': [q['correct_option'] for q in questions]})
+        result.update({
+            'winnerId': battle.get('winner_id'), 'youWon': battle.get('winner_id') == user_id,
+            'draw': battle.get('winner_id') is None, 'yourScore': own_score,
+            'opponentScore': opponent_score, 'answerKey': [q['correct_option'] for q in questions],
+            'questionReview': [{
+                'questionText': question['question_text'],
+                'skill': question['skill'],
+                'correctAnswer': question['options'][question['correct_option']],
+                'explanation': question.get('explanation') or 'Review the correct answer before your next round.',
+            } for question in questions],
+        })
     return result
 
 
@@ -4971,7 +5165,9 @@ def queue_sat_battle(user):
         return jsonify(_battle_payload(paired, user.data['id']))
     battle_id = db.insert('sat_battles', {
         'status': 'waiting', 'challenger_id': user.data['id'], 'challenger_name': user.get_name(),
-        'questions': json.dumps(_battle_questions(_battle_rating_value(user.data['id']))),
+        # Do not spend an AI request until this becomes a real two-player or bot
+        # round. Waiting players never see a question set.
+        'questions': json.dumps([]),
     })
     return jsonify(_battle_payload(db.select_one('sat_battles', where={'id': battle_id}), user.data['id']))
 
