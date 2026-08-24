@@ -364,7 +364,19 @@ def _call(prompt, *, tokens, system, retries=1, expect_key=None, thinking="low")
 
 # --- Question validation --------------------------------------------------
 
-def _valid_question(item, *, needs_prompt):
+_BLANK_REQUIRED_SKILLS = {
+    "words_in_context", "boundaries", "form_structure_sense",
+    "subject_verb_agreement", "pronouns_modifiers", "verb_tense",
+    "act_english_usage",
+}
+
+
+def _skill_requires_blank(skill_key):
+    """Whether an answer choice must visibly replace text in a sentence."""
+    return skill_key in _BLANK_REQUIRED_SKILLS
+
+
+def _valid_question(item, *, needs_prompt, requires_blank=False):
     """Reject anything a student could not actually answer."""
     if not isinstance(item, dict):
         return None
@@ -397,6 +409,11 @@ def _valid_question(item, *, needs_prompt):
         item.get("source_or_prompt") or item.get("passage") or item.get("stimulus"), 3000
     )
     if needs_prompt and len(source) < 40:
+        return None
+    # A word-choice or conventions question is only answerable when the student
+    # can see exactly where the choice goes. Keep the blank in the material we
+    # render (rather than trusting a vague stem such as "Which word fits?").
+    if requires_blank and not re.search(r"_{3,}", f"{source}\n{question}"):
         return None
     return {
         "question_text": question,
@@ -849,12 +866,22 @@ def generate_exercises(node, profile, count, *, cumulative_skills=None):
         coverage = f"Every question tests {skill['skill_label']} specifically."
         skill_field = ""
 
+    blank_rule = ""
+    if _skill_requires_blank(skill["skill_key"]) or any(
+        _skill_requires_blank(key) for key in (cumulative_skills or ())
+    ):
+        blank_rule = (
+            " For every word-choice, grammar, or punctuation item, put exactly one visible "
+            "five-underscore blank (`_____`) in the sentence at the precise place where the "
+            "answer choice belongs. Never describe the missing location without showing the blank."
+        )
+
     if needs_prompt:
         stimulus_rule = (
             "`source_or_prompt` MUST contain the passage, sentence, or data description the question "
             "refers to. Write it yourself, 25-150 words, in the short standalone Digital SAT style. "
             "The student sees only what you put in these fields, so a question that references a text "
-            "you did not include is worthless."
+            f"you did not include is worthless.{blank_rule}"
         )
     else:
         stimulus_rule = (
@@ -923,13 +950,17 @@ Return exactly {count} questions."""
     allowed_keys = set(cumulative_skills or ())
     items = []
     for raw in data.get("questions", []) if isinstance(data, dict) else []:
-        valid = _valid_question(raw, needs_prompt=needs_prompt)
+        tagged = str(raw.get("skill_key") or "").strip()
+        actual_skill_key = tagged if tagged in allowed_keys else skill["skill_key"]
+        valid = _valid_question(
+            raw, needs_prompt=needs_prompt,
+            requires_blank=_skill_requires_blank(actual_skill_key),
+        )
         if not valid:
             continue
         # Mastery is tracked per skill, so a cumulative review must attribute each
         # answer to the skill it actually tested rather than to the node's headline skill.
-        tagged = str(raw.get("skill_key") or "").strip()
-        valid["skill_key"] = tagged if tagged in allowed_keys else skill["skill_key"]
+        valid["skill_key"] = actual_skill_key
         items.append(valid)
     items = _dedupe(items)
     if len(items) < max(2, count // 2):
