@@ -41,6 +41,23 @@ class DatabaseTransaction:
         )
         return cursor.rowcount
 
+    def execute_write(self, query, params=None):
+        """Run a parameterized mutation inside the active transaction."""
+        cursor = self.connection.cursor()
+        cursor.execute(self.database._query(query), params or ())
+        return cursor.rowcount
+
+    def delete(self, table_name, where):
+        table_name = self.database._identifier(table_name)
+        where_keys = [self.database._identifier(key) for key in where]
+        where_clause = " AND ".join(f"{key}=?" for key in where_keys)
+        cursor = self.connection.cursor()
+        cursor.execute(
+            self.database._query(f"DELETE FROM {table_name} WHERE {where_clause}"),  # nosec B608
+            tuple(where.values()),
+        )
+        return cursor.rowcount
+
 
 class DatabaseHandler:
     _identifier_pattern = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")

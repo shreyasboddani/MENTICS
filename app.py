@@ -3166,6 +3166,49 @@ def get_suggestion(user):
     return jsonify({"suggestion": suggestion})
 
 
+def _delete_user_data(user_id):
+    """Remove a student's account and every account-owned record atomically."""
+    with db.transaction() as tx:
+        # A forum post may have replies from other students; removing the whole
+        # thread prevents leaving their text attached to deleted account content.
+        tx.execute_write(
+            "DELETE FROM forum_replies WHERE user_id=? OR post_id IN "
+            "(SELECT id FROM forum_posts WHERE user_id=?)", (user_id, user_id))
+        tx.delete('forum_posts', {'user_id': user_id})
+
+        # Content generated for a path belongs only to that student's account.
+        task_filter = "task_id IN (SELECT id FROM paths WHERE user_id=?)"
+        tx.execute_write(
+            "DELETE FROM lesson_steps WHERE lesson_id IN "
+            f"(SELECT id FROM lessons WHERE {task_filter})", (user_id,))
+        tx.execute_write(f"DELETE FROM lessons WHERE {task_filter}", (user_id,))
+        tx.execute_write(
+            "DELETE FROM quiz_questions WHERE quiz_id IN "
+            f"(SELECT id FROM quizzes WHERE {task_filter})", (user_id,))
+        tx.execute_write(f"DELETE FROM quizzes WHERE {task_filter}", (user_id,))
+        tx.execute_write(
+            "DELETE FROM sprint_questions WHERE sprint_id IN "
+            f"(SELECT id FROM practice_sprints WHERE {task_filter})", (user_id,))
+        tx.execute_write(f"DELETE FROM practice_sprints WHERE {task_filter}", (user_id,))
+        tx.execute_write(f"DELETE FROM strategy_articles WHERE {task_filter}", (user_id,))
+        tx.execute_write(
+            "DELETE FROM subtasks WHERE parent_task_id IN "
+            "(SELECT id FROM paths WHERE user_id=?)", (user_id,))
+
+        for table in (
+            'stat_history', 'chat_conversations', 'activity_log',
+            'gamification_stats', 'sat_battle_stats', 'quiz_results',
+            'sprint_results', 'lesson_progress', 'lesson_answers',
+            'skill_mastery', 'mistake_bank',
+        ):
+            tx.delete(table, {'user_id': user_id})
+        tx.execute_write(
+            "DELETE FROM sat_battles WHERE challenger_id=? OR opponent_id=?",
+            (user_id, user_id))
+        tx.delete('paths', {'user_id': user_id})
+        tx.delete('users', {'id': user_id})
+
+
 @app.route('/account', methods=['GET', 'POST'])
 @login_required
 @rate_limit('20/hour', name='account_update', methods={'POST'})
@@ -3213,6 +3256,16 @@ def account(user):
             hashed_password = generate_password_hash(new_password)
             db.update('users', {'password': hashed_password}, {
                       'id': user.data['id']})
+        elif form_type == 'delete_account':
+            delete_email = request.form.get('delete_email', '').strip().lower()
+            confirmation = request.form.get('delete_confirmation', '').strip()
+            if delete_email != user.data['email'] or confirmation != 'DELETE':
+                return account_error("Type your account email and DELETE to confirm permanent deletion.")
+            if user.data['email'] == SAT_BATTLE_BOT_EMAIL:
+                return account_error("The Mentics Arena Bot account cannot be deleted.", 403)
+            _delete_user_data(user.data['id'])
+            session.clear()
+            return redirect(url_for('home', account_deleted='1'))
         else:
             return account_error("Unknown account update.")
 
