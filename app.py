@@ -4703,12 +4703,16 @@ SAT_BATTLE_RANKS = [
 ]
 
 ARENA_AVATAR_DEFAULT = {
-    'body': 'striker', 'palette': 'nova', 'gear': 'visor', 'aura': 'pulse',
+    'body': 'striker', 'palette': 'nova', 'skin': 'medium', 'hair': 'crop',
+    'gear': 'visor', 'emblem': 'bolt', 'aura': 'pulse',
 }
 ARENA_AVATAR_OPTIONS = {
     'body': {'striker', 'sentinel', 'scout'},
     'palette': {'nova', 'solar', 'glacier', 'volt'},
+    'skin': {'light', 'medium', 'deep', 'umber'},
+    'hair': {'crop', 'fade', 'wave', 'spike'},
     'gear': {'visor', 'comms', 'crown', 'none'},
+    'emblem': {'bolt', 'mind', 'target', 'shield'},
     'aura': {'pulse', 'flare', 'orbit', 'none'},
 }
 
@@ -4728,13 +4732,13 @@ def _arena_avatar_for_user(user_id, bot_rank=None):
     bot = db.select_one('users', where={'email': SAT_BATTLE_BOT_EMAIL})
     if bot and user_id == bot['id']:
         bot_loadouts = {
-            'bronze': {'body': 'scout', 'palette': 'solar', 'gear': 'comms', 'aura': 'none'},
-            'silver': {'body': 'scout', 'palette': 'glacier', 'gear': 'visor', 'aura': 'pulse'},
-            'gold': {'body': 'striker', 'palette': 'solar', 'gear': 'visor', 'aura': 'flare'},
-            'platinum': {'body': 'striker', 'palette': 'nova', 'gear': 'comms', 'aura': 'orbit'},
-            'diamond': {'body': 'sentinel', 'palette': 'glacier', 'gear': 'crown', 'aura': 'orbit'},
-            'master': {'body': 'sentinel', 'palette': 'volt', 'gear': 'crown', 'aura': 'flare'},
-            'grandmaster': {'body': 'sentinel', 'palette': 'nova', 'gear': 'crown', 'aura': 'orbit'},
+            'bronze': {'body': 'scout', 'palette': 'solar', 'skin': 'light', 'hair': 'fade', 'gear': 'comms', 'emblem': 'target', 'aura': 'none'},
+            'silver': {'body': 'scout', 'palette': 'glacier', 'skin': 'deep', 'hair': 'wave', 'gear': 'visor', 'emblem': 'mind', 'aura': 'pulse'},
+            'gold': {'body': 'striker', 'palette': 'solar', 'skin': 'medium', 'hair': 'spike', 'gear': 'visor', 'emblem': 'shield', 'aura': 'flare'},
+            'platinum': {'body': 'striker', 'palette': 'nova', 'skin': 'umber', 'hair': 'crop', 'gear': 'comms', 'emblem': 'bolt', 'aura': 'orbit'},
+            'diamond': {'body': 'sentinel', 'palette': 'glacier', 'skin': 'deep', 'hair': 'fade', 'gear': 'crown', 'emblem': 'target', 'aura': 'orbit'},
+            'master': {'body': 'sentinel', 'palette': 'volt', 'skin': 'light', 'hair': 'wave', 'gear': 'crown', 'emblem': 'mind', 'aura': 'flare'},
+            'grandmaster': {'body': 'sentinel', 'palette': 'nova', 'skin': 'umber', 'hair': 'spike', 'gear': 'crown', 'emblem': 'shield', 'aura': 'orbit'},
         }
         return _normalize_arena_avatar(bot_loadouts.get(bot_rank, bot_loadouts['gold']))
     row = db.select_one('users', where={'id': user_id}) if user_id else None

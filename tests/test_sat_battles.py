@@ -190,11 +190,15 @@ def test_arena_avatar_loadout_is_validated_and_persisted(tmp_path, monkeypatch):
     save_avatar = inspect.unwrap(app_module.update_sat_battle_avatar)
 
     with app_module.app.test_request_context("/api/sat-battles/avatar", method="POST", json={
-        "body": "sentinel", "palette": "glacier", "gear": "crown", "aura": "orbit",
+        "body": "sentinel", "palette": "glacier", "skin": "deep", "hair": "wave",
+        "gear": "crown", "emblem": "mind", "aura": "orbit",
     }):
         saved = save_avatar(player).get_json()["avatar"]
 
-    assert saved == {"body": "sentinel", "palette": "glacier", "gear": "crown", "aura": "orbit"}
+    assert saved == {
+        "body": "sentinel", "palette": "glacier", "skin": "deep", "hair": "wave",
+        "gear": "crown", "emblem": "mind", "aura": "orbit",
+    }
     stored = json.loads(database.select_one("users", where={"id": player.data["id"]})["stats"])
     assert stored["arena_avatar"] == saved
 
