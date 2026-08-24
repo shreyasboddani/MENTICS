@@ -3,12 +3,14 @@
 ## Environment variables
 
 ### Required in production
+
 | Variable | Purpose |
 | --- | --- |
 | `SECRET_KEY` | Session signing. The app refuses to boot in production without it. |
-| `DATABASE_URL` | Postgres connection string. The app refuses to boot in production without it, because local SQLite is not persistent on serverless. |
+| `DATABASE_URL` | Neon Postgres connection string for the SQL-created `mentics_app` runtime role. This role must have `BYPASSRLS = false`; never use `neondb_owner` as the deployed application credential. |
 
 ### Recommended
+
 | Variable | Default | Purpose |
 | --- | --- | --- |
 | `PUBLIC_APP_URL` | `https://mentics.vercel.app` | Canonical origin. Used for `<link rel="canonical">`, `sitemap.xml`, and Open Graph URLs. Set this to your real domain so preview deployments never compete with production in search. |
@@ -17,33 +19,61 @@
 | `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | *(unset)* | Google sign-in. |
 
 ### Operator-only
+
 | Variable | Default | Purpose |
 | --- | --- | --- |
 | `IMPORT_API_TOKEN` | *(unset)* | Enables `POST /api/import_official_questions`. **While unset the endpoint returns 404 and cannot write anything.** Only set it when you are actively importing, and send it as the `X-Import-Token` header. Use a long random value (`python -c "import secrets;print(secrets.token_urlsafe(32))"`). |
-| `INIT_DB_ON_STARTUP` | *(unset)* | Runs `init_db()` at boot. See **Schema migrations** below. |
+| `INIT_DB_ON_STARTUP` | *(unset)* | Local/legacy schema bootstrap only. Leave this unset in Vercel after RLS is enabled. |
+
+## Database security and RLS
+
+All application tables use PostgreSQL Row-Level Security. The Flask request
+layer binds the signed-in user ID to each new database connection, and the
+policies in `migrations/001_enable_rls.sql` enforce tenant ownership again at
+the database boundary.
+
+Neon roles created in the Console, CLI, or API inherit `neon_superuser` and
+therefore bypass RLS. The deployed role must be created with SQL instead:
+
+```sql
+CREATE ROLE mentics_app LOGIN PASSWORD '<generated-secret>'
+  NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NOREPLICATION NOBYPASSRLS;
+```
+
+Create that role while connected as `neondb_owner`, apply the RLS migration as
+`neondb_owner`, and put only the `mentics_app` connection string in Vercel.
+Verify the role before deployment:
+
+```sql
+SELECT rolname, rolcanlogin, rolbypassrls
+FROM pg_roles
+WHERE rolname = 'mentics_app';
+```
+
+`rolcanlogin` must be `true` and `rolbypassrls` must be `false`.
+
+Neon encrypts database storage at rest and `DATABASE_URL` must retain
+`sslmode=require` (and `channel_binding=require` when Neon includes it) for
+transport encryption. Passwords are stored as Werkzeug scrypt hashes, never as
+plaintext.
 
 ## Schema migrations
 
-`init_db()` creates every table and adds every new column, and it is safe to run
-repeatedly. Locally it runs on every start. **In production it runs only when
-`INIT_DB_ON_STARTUP=1`**, so that ordinary cold starts do not issue DDL.
+`init_db()` still bootstraps local SQLite. Production schema changes are now an
+operator action because the RLS runtime role deliberately has no DDL authority.
+For every table or column release:
 
-That means any release which adds a table or column needs one deploy with the
-flag on:
+1. Create a Neon branch from production.
+2. Connect to the branch as `neondb_owner` using a direct, unpooled connection.
+3. Run `flask init-db` with that owner connection in `DATABASE_URL`.
+4. Add or update the table's policy in `migrations/001_enable_rls.sql`, then
+   apply that migration as `neondb_owner`.
+5. Test the app using the branch's non-bypass `mentics_app` connection string.
+6. Repeat the reviewed migration on production, then deploy normally.
 
-1. Set `INIT_DB_ON_STARTUP=1` in the Vercel project's environment variables.
-2. Redeploy and load any page, so one function invocation boots and applies the DDL.
-3. Remove the variable (or set it to `0`) and redeploy.
-
-Skipping this leaves the new tables absent, and the first request that touches
-them fails. The adaptive lesson engine added `lessons`, `lesson_steps`,
-`lesson_progress`, `lesson_answers`, `skill_mastery`, and `mistake_bank`, plus
-the `skill_key`, `skill_label`, `subject`, `node_type`, `objective`,
-`xp_reward`, `xp_awarded`, and `unit_title` columns on `paths` — so it needs
-this step.
-
-The SAT Battle Arena adds `sat_battles` and `sat_battle_stats`; deploy it using
-the same one-time migration flag before opening `/battles` in production.
+Do not set `INIT_DB_ON_STARTUP=1` on the normal Vercel runtime. Do not store an
+owner connection string in Vercel. A newly added table must not ship until its
+RLS policy and the migration regression test have also been updated.
 
 ## Function duration
 
@@ -52,6 +82,7 @@ to fifteen seconds. `vercel.json` sets `maxDuration` to 60s for `app.py`; do not
 lower it below about 30s or path generation will start returning 504s.
 
 ### Rate limits
+
 Counters live in the `rate_limits` table so they hold across serverless
 invocations. Overriding these is rarely necessary.
 
@@ -96,7 +127,7 @@ or renders suspiciously little markup.
 
 `static/og-cover.png` is committed. Regenerate it only when the brand changes:
 
-```
+```text
 pip install Pillow        # build-time only, deliberately not in requirements.txt
 python tools/make_og_image.py
 ```

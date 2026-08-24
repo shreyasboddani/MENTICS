@@ -4,6 +4,14 @@ import datetime
 import re
 import sqlite3
 from contextlib import contextmanager
+from contextvars import ContextVar
+
+
+_RLS_CONTEXT = ContextVar(
+    "mentics_database_rls_context",
+    default={"user_id": None, "auth_email": None, "system": False},
+)
+_UNSET = object()
 
 
 class DatabaseTransaction:
@@ -70,11 +78,61 @@ class DatabaseHandler:
         self.database = database
         self.is_postgres = database.startswith(("postgres://", "postgresql://"))
 
+    def set_rls_context(self, *, user_id=None, auth_email=None, system=False):
+        """Bind trusted application identity to subsequent database connections.
+
+        PostgreSQL policies read these transaction/session settings. ContextVar
+        keeps concurrent Flask requests and worker threads isolated from each
+        other, while SQLite development remains unchanged.
+        """
+        normalized_user_id = None
+        if user_id not in (None, ""):
+            normalized_user_id = int(user_id)
+            if normalized_user_id <= 0:
+                raise ValueError("RLS user id must be positive")
+        normalized_email = str(auth_email or "").strip().lower()[:254] or None
+        return _RLS_CONTEXT.set({
+            "user_id": normalized_user_id,
+            "auth_email": normalized_email,
+            "system": bool(system),
+        })
+
+    def reset_rls_context(self, token):
+        _RLS_CONTEXT.reset(token)
+
+    @contextmanager
+    def rls_scope(self, *, user_id=_UNSET, auth_email=_UNSET, system=_UNSET):
+        """Temporarily add auth or tightly scoped system authority."""
+        current = _RLS_CONTEXT.get()
+        token = self.set_rls_context(
+            user_id=current["user_id"] if user_id is _UNSET else user_id,
+            auth_email=current["auth_email"] if auth_email is _UNSET else auth_email,
+            system=current["system"] if system is _UNSET else system,
+        )
+        try:
+            yield
+        finally:
+            self.reset_rls_context(token)
+
     def _connect(self):
         if self.is_postgres:
             import psycopg
             from psycopg.rows import dict_row
-            return psycopg.connect(self.database, row_factory=dict_row)
+            connection = psycopg.connect(self.database, row_factory=dict_row)
+            context = _RLS_CONTEXT.get()
+            # Custom settings are parameterized and set on every fresh
+            # connection before any tenant query can run.
+            connection.execute(
+                "SELECT set_config('mentics.user_id', %s, false), "
+                "set_config('mentics.auth_email', %s, false), "
+                "set_config('mentics.system', %s, false)",
+                (
+                    str(context["user_id"] or ""),
+                    context["auth_email"] or "",
+                    "on" if context["system"] else "off",
+                ),
+            )
+            return connection
         conn = sqlite3.connect(self.database, timeout=10)
         conn.row_factory = sqlite3.Row
         conn.execute("PRAGMA foreign_keys = ON")

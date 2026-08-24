@@ -57,6 +57,19 @@ GEMINI_CHAT_CHARACTERS = 12000
 PATH_REGENERATION_CONTROL = "MENTICS_REGENERATE_PATH"
 
 
+@app.before_request
+def bind_database_rls_identity():
+    """Make the signed-in account the database tenant for this request."""
+    g.database_rls_token = db.set_rls_context(user_id=session.get('user_id'))
+
+
+@app.teardown_request
+def release_database_rls_identity(_error=None):
+    token = getattr(g, 'database_rls_token', None)
+    if token is not None:
+        db.reset_rls_context(token)
+
+
 @app.after_request
 def add_security_headers(response):
     response.headers.setdefault('X-Content-Type-Options', 'nosniff')
@@ -2770,22 +2783,23 @@ def signup():
             return render_react("signup", {
                 "error": "Enter your name, a valid email, and a password between 8 and 128 characters."
             }, "Create Account | Mentics", 400)
-        if db.select_one("users", where={"email": email}):
-            return render_react("signup", {"error": "Email already exists!"}, "Create Account | Mentics", 409)
         password = generate_password_hash(raw_password)
         try:
-            user_id = db.insert("users", {
-                "email": email, "password": password, "name": name,
-                "stats": json.dumps({
-                    "sat_ebrw": "", "sat_math": "", "act_math": "",
-                    "act_reading": "", "act_science": "", "gpa": "", "milestones": 0,
-                    "legal_acceptance": {"terms_version": "2026-08-23", "privacy_version": "2026-08-23",
-                                         "accepted_at": datetime.now().isoformat(timespec="seconds"), "method": "signup"}
+            with db.rls_scope(auth_email=email):
+                if db.select_one("users", where={"email": email}):
+                    return render_react("signup", {"error": "Email already exists!"}, "Create Account | Mentics", 409)
+                user_id = db.insert("users", {
+                    "email": email, "password": password, "name": name,
+                    "stats": json.dumps({
+                        "sat_ebrw": "", "sat_math": "", "act_math": "",
+                        "act_reading": "", "act_science": "", "gpa": "", "milestones": 0,
+                        "legal_acceptance": {"terms_version": "2026-08-23", "privacy_version": "2026-08-23",
+                                             "accepted_at": datetime.now().isoformat(timespec="seconds"), "method": "signup"}
+                    })
                 })
-            })
-
-            db.insert("gamification_stats", {
-                      "user_id": user_id, "points": 0, "current_streak": 0})
+                with db.rls_scope(user_id=user_id):
+                    db.insert("gamification_stats", {
+                              "user_id": user_id, "points": 0, "current_streak": 0})
 
             session.clear()
             session["user"] = email
@@ -2833,7 +2847,8 @@ def login():
                     retry_after,
                     'This account has had too many failed sign-in attempts. Please wait before trying again.')
 
-        user_record = db.select_one("users", where={"email": email}) if email else None
+        with db.rls_scope(auth_email=email):
+            user_record = db.select_one("users", where={"email": email}) if email else None
         stored_hash = user_record['password'] if user_record else _DUMMY_PASSWORD_HASH
         password_ok = len(password) <= 128 and check_password_hash(stored_hash, password)
         if user_record and password_ok:
@@ -2896,30 +2911,31 @@ def authorize():
             "Sign In | Mentics", 400)
     display_name = str(user_info.get('name') or email.split('@')[0]).strip()[:100]
 
-    user_record = db.select_one("users", where={"email": email})
+    with db.rls_scope(auth_email=email):
+        user_record = db.select_one("users", where={"email": email})
 
-    if user_record:
-        authenticated_email = user_record['email']
-        authenticated_id = user_record['id']
-    else:
-
-        password_hash = generate_password_hash(secrets.token_hex(32))
-        user_id = db.insert("users", {
-            "email": email,
-            "name": display_name,
-            "password": password_hash,
-            "stats": json.dumps({
-                "sat_ebrw": "", "sat_math": "", "act_math": "",
-                "act_reading": "", "act_science": "", "gpa": "", "milestones": 0,
-                "legal_acceptance": {"terms_version": "2026-08-23", "privacy_version": "2026-08-23",
-                                     "accepted_at": datetime.now().isoformat(timespec="seconds"), "method": "google_oauth"}
+        if user_record:
+            authenticated_email = user_record['email']
+            authenticated_id = user_record['id']
+        else:
+            password_hash = generate_password_hash(secrets.token_hex(32))
+            user_id = db.insert("users", {
+                "email": email,
+                "name": display_name,
+                "password": password_hash,
+                "stats": json.dumps({
+                    "sat_ebrw": "", "sat_math": "", "act_math": "",
+                    "act_reading": "", "act_science": "", "gpa": "", "milestones": 0,
+                    "legal_acceptance": {"terms_version": "2026-08-23", "privacy_version": "2026-08-23",
+                                         "accepted_at": datetime.now().isoformat(timespec="seconds"), "method": "google_oauth"}
+                })
             })
-        })
-        db.insert("gamification_stats", {
-                  "user_id": user_id, "points": 0, "current_streak": 0})
+            with db.rls_scope(user_id=user_id):
+                db.insert("gamification_stats", {
+                          "user_id": user_id, "points": 0, "current_streak": 0})
 
-        authenticated_email = email
-        authenticated_id = user_id
+            authenticated_email = email
+            authenticated_id = user_id
 
     session.clear()
     session["user"] = authenticated_email
@@ -4045,18 +4061,19 @@ def import_official_questions():
                 # Ensure options is a list
                 options = q['options'] if isinstance(q['options'], list) else json.loads(q['options'])
                 
-                db.insert("official_questions", {
-                    "test_type": q.get('test_type', 'SAT'),  # SAT or ACT
-                    "subject": q.get('subject', 'Math'),  # Math, Reading/Writing
-                    "topic": q.get('topic', 'General'),
-                    "difficulty": q.get('difficulty', 'medium'),
-                    "question_text": q['question_text'],
-                    "options": json.dumps(options),
-                    "correct_option": int(q['correct_option']),
-                    "explanation": q.get('explanation', ''),
-                    "source_url": q.get('source_url', ''),
-                    "source_or_prompt": q.get('source_or_prompt', ''),
-                })
+                with db.rls_scope(system=True):
+                    db.insert("official_questions", {
+                        "test_type": q.get('test_type', 'SAT'),  # SAT or ACT
+                        "subject": q.get('subject', 'Math'),  # Math, Reading/Writing
+                        "topic": q.get('topic', 'General'),
+                        "difficulty": q.get('difficulty', 'medium'),
+                        "question_text": q['question_text'],
+                        "options": json.dumps(options),
+                        "correct_option": int(q['correct_option']),
+                        "explanation": q.get('explanation', ''),
+                        "source_url": q.get('source_url', ''),
+                        "source_or_prompt": q.get('source_or_prompt', ''),
+                    })
                 imported_count += 1
             except Exception as error:
                 app.logger.warning("Question import rejected row %s: %s", idx, error)
@@ -4471,16 +4488,18 @@ def _get_proactive_ai_suggestions(user):
 @app.route('/leaderboard')
 @login_required
 def leaderboard(user):
-
-    leaderboard_data = db.execute(
-        """
-        SELECT u.name, g.points
-        FROM gamification_stats g
-        JOIN users u ON g.user_id = u.id
-        ORDER BY g.points DESC
-        LIMIT 10
-        """
-    )
+    # Names and totals are intentionally public inside the signed-in community;
+    # the narrow system scope avoids weakening the users-table tenant policy.
+    with db.rls_scope(system=True):
+        leaderboard_data = db.execute(
+            """
+            SELECT u.name, g.points
+            FROM gamification_stats g
+            JOIN users u ON g.user_id = u.id
+            ORDER BY g.points DESC
+            LIMIT 10
+            """
+        )
     return render_react("leaderboard", {
         "name": user.get_name(),
         "leaderboard": [dict(row) for row in leaderboard_data],
@@ -4777,7 +4796,11 @@ def _normalize_arena_avatar(value):
 
 
 def _arena_avatar_for_user(user_id, bot_rank=None):
-    bot = db.select_one('users', where={'email': SAT_BATTLE_BOT_EMAIL})
+    # Only the normalized cosmetic loadout leaves this function. The scoped
+    # read lets opponents render each other without granting general users-table
+    # visibility to the runtime role.
+    with db.rls_scope(system=True):
+        bot = db.select_one('users', where={'email': SAT_BATTLE_BOT_EMAIL})
     if bot and user_id == bot['id']:
         bot_loadouts = {
             'bronze': {'frame': 'androgynous', 'body': 'scout', 'outfit': 'street', 'palette': 'solar', 'skin': 'light', 'hair': 'fade', 'hair_color': 'chestnut', 'gear': 'comms', 'footwear': 'high_tops', 'emblem': 'target', 'aura': 'none'},
@@ -4789,7 +4812,8 @@ def _arena_avatar_for_user(user_id, bot_rank=None):
             'grandmaster': {'frame': 'masculine', 'body': 'sentinel', 'outfit': 'champion', 'palette': 'midnight', 'accent': 'gold', 'skin': 'ebony', 'hair': 'spike', 'hair_color': 'violet', 'gear': 'crown', 'back': 'banner', 'gloves': 'gauntlets', 'footwear': 'armored', 'emblem': 'shield', 'aura': 'orbit'},
         }
         return _normalize_arena_avatar(bot_loadouts.get(bot_rank, bot_loadouts['gold']))
-    row = db.select_one('users', where={'id': user_id}) if user_id else None
+    with db.rls_scope(system=True):
+        row = db.select_one('users', where={'id': user_id}) if user_id else None
     try:
         stats = json.loads((row or {}).get('stats') or '{}')
     except (TypeError, ValueError, json.JSONDecodeError):
@@ -5243,24 +5267,25 @@ def _battle_questions(rating=1000, *, require_ai=False):
 
 
 def _battle_bot():
-    bot = db.select_one('users', where={'email': SAT_BATTLE_BOT_EMAIL})
-    if bot:
-        return bot
-    # The arena can be released after its table migration has already run. Make
-    # the system opponent available on demand so a normal production boot never
-    # depends on a second DDL-enabled deploy just to start a fallback match.
-    try:
-        db.insert('users', {
-            'email': SAT_BATTLE_BOT_EMAIL,
-            'password': generate_password_hash(secrets.token_urlsafe(32)),
-            'stats': '{}',
-            'name': 'Mentics Arena Bot',
-            'onboarding_completed': True,
-        })
-    except Exception:
-        # A concurrent serverless request may have created the same unique user.
-        pass
-    return db.select_one('users', where={'email': SAT_BATTLE_BOT_EMAIL})
+    with db.rls_scope(system=True):
+        bot = db.select_one('users', where={'email': SAT_BATTLE_BOT_EMAIL})
+        if bot:
+            return bot
+        # The arena can be released after its table migration has already run. Make
+        # the system opponent available on demand so a normal production boot never
+        # depends on a second DDL-enabled deploy just to start a fallback match.
+        try:
+            db.insert('users', {
+                'email': SAT_BATTLE_BOT_EMAIL,
+                'password': generate_password_hash(secrets.token_urlsafe(32)),
+                'stats': '{}',
+                'name': 'Mentics Arena Bot',
+                'onboarding_completed': True,
+            })
+        except Exception:
+            # A concurrent serverless request may have created the same unique user.
+            pass
+        return db.select_one('users', where={'email': SAT_BATTLE_BOT_EMAIL})
 
 
 def _battle_bot_answers(questions):
