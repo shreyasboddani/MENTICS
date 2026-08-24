@@ -124,7 +124,7 @@ const productPages = {
     title: 'Turn your ACT goal into the next five useful moves.',
     intro: 'Mentics builds a focused ACT prep path from your current score, target, schedule, and weaknesses—then keeps your study plan and progress together.',
     primary: 'Build my ACT path',
-    signal: [['4', 'ACT sections'], ['5', 'steps per path'], ['1', 'clear priority']],
+    signal: [['3', 'core ACT sections'], ['5', 'steps per path'], ['1', 'clear priority']],
     heroCard: { label: 'ACT PATH SNAPSHOT', title: 'Make the plan specific', detail: 'Your scores and test date help Mentics prioritize the work with the best chance of moving your composite.', steps: ['Review the weakest section', 'Learn a targeted strategy', 'Complete timed practice', 'Analyze missed questions', 'Log the result and replan'] },
     methodTitle: 'A study plan should fit your actual ACT profile.',
     methodIntro: 'Mentics keeps section-level context visible so a composite score does not hide the work that matters.',
