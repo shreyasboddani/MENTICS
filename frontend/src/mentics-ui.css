@@ -1492,6 +1492,25 @@
 .battle-hero-mark i svg { width: 29px; height: 29px; }
 .battle-hero-mark span { margin-top: 10px; font-size: 2.2rem; font-weight: 850; letter-spacing: -.08em; }
 .battle-hero-mark small { color: #cbc4eb; font-size: 10px; font-weight: 800; letter-spacing: .15em; }
+.battle-rank-strip { display: grid; grid-template-columns: 58px minmax(0, 1fr) auto; align-items: center; gap: 17px; margin-top: 18px; padding: 19px 25px; border: 1px solid rgba(255,255,255,.76); border-radius: 20px; background: linear-gradient(145deg, rgba(255,255,255,.84), rgba(245,243,253,.65)); box-shadow: 0 20px 46px -38px rgba(25,18,70,.56), inset 0 1px rgba(255,255,255,.95); }
+.battle-rank-medal { display: grid; place-items: center; width: 58px; height: 58px; border-radius: 18px; color: #fff; background: linear-gradient(135deg, #aa7548, #76472d); box-shadow: inset 0 1px rgba(255,255,255,.34); }
+.battle-rank-medal svg { width: 25px; height: 25px; }
+.battle-rank-strip small { color: #766e8a; font-size: 10px; font-weight: 800; letter-spacing: .12em; }
+.battle-rank-strip h2 { display: flex; align-items: baseline; gap: 8px; margin: 3px 0; color: #251f3b; font-size: 1.15rem; letter-spacing: -.03em; }
+.battle-rank-strip h2 span { color: #6f6684; font-size: 12px; font-weight: 700; letter-spacing: 0; }
+.battle-rank-strip p { margin: 0; color: #797188; font-size: 12px; }
+.battle-rank-strip > div:nth-child(2) > i { display: block; width: min(360px, 100%); height: 5px; margin-top: 9px; overflow: hidden; border-radius: 999px; background: #e9e5f0; }
+.battle-rank-strip > div:nth-child(2) > i b { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, #a46c42, #d6a667); transition: width 220ms cubic-bezier(.23,1,.32,1); }
+.battle-rank-strip dl { display: flex; gap: 20px; margin: 0; }
+.battle-rank-strip dl div { display: grid; gap: 3px; }
+.battle-rank-strip dt { color: #827a91; font-size: 9px; font-weight: 800; letter-spacing: .1em; }
+.battle-rank-strip dd { margin: 0; color: #2c2540; font-size: 17px; font-weight: 800; }
+.battle-rank-strip--silver .battle-rank-medal { background: linear-gradient(135deg, #aeb8c8, #707b90); }.battle-rank-strip--silver > div:nth-child(2) > i b { background: linear-gradient(90deg, #909db0, #c8d1df); }
+.battle-rank-strip--gold .battle-rank-medal { background: linear-gradient(135deg, #e6bb52, #a9771a); }.battle-rank-strip--gold > div:nth-child(2) > i b { background: linear-gradient(90deg, #bb851e, #f4cf68); }
+.battle-rank-strip--platinum .battle-rank-medal { background: linear-gradient(135deg, #66b5b3, #2d797d); }.battle-rank-strip--platinum > div:nth-child(2) > i b { background: linear-gradient(90deg, #3b8589, #8ed8d3); }
+.battle-rank-strip--diamond .battle-rank-medal { background: linear-gradient(135deg, #78b8f2, #3c63b7); }.battle-rank-strip--diamond > div:nth-child(2) > i b { background: linear-gradient(90deg, #4d70c8, #91d3ff); }
+.battle-rank-strip--master .battle-rank-medal { background: linear-gradient(135deg, #c56ee8, #792d9c); }.battle-rank-strip--master > div:nth-child(2) > i b { background: linear-gradient(90deg, #8c3cad, #d589f1); }
+.battle-rank-strip--grandmaster .battle-rank-medal { background: linear-gradient(135deg, #e45e75, #9a263a); }.battle-rank-strip--grandmaster > div:nth-child(2) > i b { background: linear-gradient(90deg, #ae3146, #f28b99); }
 .battle-stage,.battle-result { position: relative; margin-top: 18px; padding: 30px; border: 1px solid rgba(255,255,255,.78); border-radius: 24px; background: linear-gradient(145deg, rgba(255,255,255,.9), rgba(244,242,253,.72)); box-shadow: 0 26px 60px -44px rgba(25,18,70,.65), inset 0 1px rgba(255,255,255,.96); }
 .battle-stage--waiting,.battle-locked { min-height: 286px; display: grid; place-content: center; justify-items: center; gap: 13px; text-align: center; }
 .battle-stage--waiting small,.battle-result > small,.battle-rules > small,.battle-spotlight small { color: var(--mx-violet, #7044d9); font-size: 11px; font-weight: 800; letter-spacing: .14em; }
@@ -1534,6 +1553,8 @@
 .battle-result p { color: #5d5870; font-size: 1rem; }
 .battle-result p b { font-size: 1.65rem; }
 .battle-result p span { padding: 0 6px; color: #958ea8; font-size: 12px; font-weight: 800; }
+.battle-result-rank { display: block; margin: -1px 0 17px; color: #7655ca; font-size: 12px; font-style: normal; font-weight: 800; }
+.battle-result.won .battle-result-rank { color: #e0d2ff; }
 .battle-lower { display: grid; grid-template-columns: 1.2fr .8fr; gap: 18px; margin-top: 18px; }
 .battle-rules,.battle-leaderboard { padding: 28px; border: 1px solid rgba(255,255,255,.75); border-radius: 22px; background: linear-gradient(145deg, rgba(255,255,255,.82), rgba(244,242,252,.62)); box-shadow: 0 22px 52px -42px rgba(25,18,70,.58); }
 .battle-rules h2 { margin: 8px 0 21px; color: var(--mx-ink, #19152d); font-size: 1.7rem; letter-spacing: -.045em; }
@@ -1551,8 +1572,10 @@
 .battle-leaderboard > div:last-child { border: 0; }
 .battle-leaderboard i { color: #bdb5dc; font-size: 11px; font-style: normal; font-weight: 800; }
 .battle-leaderboard > div > span { display: grid; place-items: center; width: 28px; height: 28px; border-radius: 9px; background: rgba(255,255,255,.13); font-size: 12px; font-weight: 800; }
-.battle-leaderboard b { overflow: hidden; font-size: 13px; text-overflow: ellipsis; white-space: nowrap; }
+.battle-leaderboard b { display: grid; overflow: hidden; font-size: 13px; text-overflow: ellipsis; white-space: nowrap; }
 .battle-leaderboard strong { color: #d7c5ff; font-size: 13px; }
+.battle-rank-label { display: block; margin-top: 2px; font-size: 9px; font-weight: 800; letter-spacing: .08em; }
+.battle-rank-label--bronze { color: #d7a57c; }.battle-rank-label--silver { color: #cbd7e9; }.battle-rank-label--gold { color: #f5d474; }.battle-rank-label--platinum { color: #8de4d6; }.battle-rank-label--diamond { color: #9ed7ff; }.battle-rank-label--master { color: #e4a0ff; }.battle-rank-label--grandmaster { color: #ff9cab; }
 .battle-leaderboard > p { color: #d2cbe7; font-size: 13px; line-height: 1.5; }
 .battle-spotlight { display: flex; align-items: center; justify-content: space-between; gap: 25px; margin: 18px 0 8px; padding: 28px 34px; border: 1px solid rgba(117,87,209,.18); border-radius: 22px; background: linear-gradient(135deg, rgba(239,232,255,.85), rgba(232,237,255,.82)); }
 .battle-spotlight h2 { margin: 7px 0; color: #251c4e; font-size: 1.55rem; letter-spacing: -.04em; }
@@ -1563,7 +1586,7 @@
 @media (min-width: 1450px) { .battle-dashboard-card { grid-column: span 4; } }
 @keyframes battle-orbit { to { transform: rotate(360deg); } }
 @media (hover: hover) and (pointer: fine) { .battle-question button:hover { border-color: rgba(116,80,220,.58); transform: translateY(-1px); } }
-@media (max-width: 759px) { .battle-hero { grid-template-columns: 1fr; min-height: 0; padding: 36px 24px 30px; text-align: center; } .battle-hero .eyebrow { justify-content: center; } .battle-hero h1 { margin-inline: auto; font-size: clamp(3.3rem, 15vw, 4.8rem); } .battle-hero p { margin-inline: auto; } .battle-hero-actions { justify-content: center; } .battle-hero-mark { width: 156px; } .battle-hero-mark i { width: 46px; height: 46px; border-radius: 15px; } .battle-hero-mark span { font-size: 1.7rem; } .battle-training { align-items: flex-start; flex-direction: column; padding: 24px; } .battle-training .button { width: 100%; } .battle-stage,.battle-result { padding: 22px 17px; border-radius: 20px; } .battle-question { padding: 17px; } .battle-question > div { grid-template-columns: 1fr; } .battle-question button { min-height: 46px; } .battle-status { align-items: flex-start; } .battle-status > strong { font-size: 1.05rem; } .battle-lower { grid-template-columns: 1fr; } .battle-rules,.battle-leaderboard { padding: 22px; border-radius: 20px; } .battle-spotlight { align-items: flex-start; flex-direction: column; padding: 24px; } .battle-spotlight > div:last-child { width: 100%; } }
+@media (max-width: 759px) { .battle-hero { grid-template-columns: 1fr; min-height: 0; padding: 36px 24px 30px; text-align: center; } .battle-hero .eyebrow { justify-content: center; } .battle-hero h1 { margin-inline: auto; font-size: clamp(3.3rem, 15vw, 4.8rem); } .battle-hero p { margin-inline: auto; } .battle-hero-actions { justify-content: center; } .battle-hero-mark { width: 156px; } .battle-hero-mark i { width: 46px; height: 46px; border-radius: 15px; } .battle-hero-mark span { font-size: 1.7rem; } .battle-rank-strip { grid-template-columns: 52px 1fr; padding: 18px; } .battle-rank-medal { width: 52px; height: 52px; } .battle-rank-strip dl { grid-column: 1 / -1; padding-top: 11px; border-top: 1px solid rgba(77,65,118,.1); } .battle-training { align-items: flex-start; flex-direction: column; padding: 24px; } .battle-training .button { width: 100%; } .battle-stage,.battle-result { padding: 22px 17px; border-radius: 20px; } .battle-question { padding: 17px; } .battle-question > div { grid-template-columns: 1fr; } .battle-question button { min-height: 46px; } .battle-status { align-items: flex-start; } .battle-status > strong { font-size: 1.05rem; } .battle-lower { grid-template-columns: 1fr; } .battle-rules,.battle-leaderboard { padding: 22px; border-radius: 20px; } .battle-spotlight { align-items: flex-start; flex-direction: column; padding: 24px; } .battle-spotlight > div:last-child { width: 100%; } }
 @media (max-width: 759px) { .battle-dashboard-card { grid-column: auto; min-height: 210px; padding: 27px 23px; } .battle-dashboard-card > span { width: 90px; } .battle-dashboard-card > span svg { width: 23px; } .battle-dashboard-card h2 { max-width: 8ch; } .battle-landing { grid-template-columns: 1fr; gap: 40px; padding: 82px 23px; text-align: center; } .battle-landing-copy .eyebrow { justify-content: center; } .battle-landing-copy h2 { margin-inline: auto; font-size: 3.4rem; } .battle-landing-copy p { margin-inline: auto; } .battle-landing-preview { transform: none; } }
 @media (prefers-reduced-motion: reduce) { .battle-search-orbit { animation: none; } .battle-question-progress i,.battle-question button { transition-duration: .01ms; } }
 

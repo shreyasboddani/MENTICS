@@ -94,3 +94,13 @@ def test_training_round_starts_immediately_and_does_not_rank(tmp_path, monkeypat
     assert training["status"] == "active"
     assert training["mode"] == "training"
     assert training["isBotBattle"] is True
+
+
+def test_sat_battle_rank_ladder_covers_bronze_through_grandmaster():
+    assert app_module._battle_rank(1000)["label"] == "Bronze"
+    assert app_module._battle_rank(1050)["label"] == "Silver"
+    assert app_module._battle_rank(1150)["label"] == "Gold"
+    assert app_module._battle_rank(1250)["label"] == "Platinum"
+    assert app_module._battle_rank(1400)["label"] == "Diamond"
+    assert app_module._battle_rank(1550)["label"] == "Master"
+    assert app_module._battle_rank(1750)["label"] == "Grandmaster"

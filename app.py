@@ -4532,6 +4532,15 @@ SAT_BATTLE_QUESTION_COUNT = 5
 SAT_BATTLE_DURATION_SECONDS = 120
 SAT_BATTLE_BOT_WAIT_SECONDS = 30
 SAT_BATTLE_BOT_EMAIL = "arena-bot@mentics.system"
+SAT_BATTLE_RANKS = [
+    (1750, "Grandmaster", "grandmaster"),
+    (1550, "Master", "master"),
+    (1400, "Diamond", "diamond"),
+    (1250, "Platinum", "platinum"),
+    (1150, "Gold", "gold"),
+    (1050, "Silver", "silver"),
+    (0, "Bronze", "bronze"),
+]
 
 
 def _utc_now():
@@ -4547,6 +4556,19 @@ def _battle_time(value):
 
 def _battle_questions():
     return secrets.SystemRandom().sample(SAT_BATTLE_QUESTION_POOL, SAT_BATTLE_QUESTION_COUNT)
+
+
+def _battle_rank(rating):
+    rating = int(rating or 1000)
+    for minimum, label, key in SAT_BATTLE_RANKS:
+        if rating >= minimum:
+            next_rank = next((entry for entry in reversed(SAT_BATTLE_RANKS) if entry[0] > minimum), None)
+            return {
+                'label': label, 'key': key, 'rating': rating, 'minimum': minimum,
+                'nextAt': next_rank[0] if next_rank else None,
+                'nextLabel': next_rank[1] if next_rank else None,
+            }
+    raise AssertionError('Bronze rank must cover every rating')
 
 
 def _battle_bot():
@@ -4677,6 +4699,8 @@ def _battle_payload(battle, user_id):
         'isBotBattle': bool(_battle_bot() and battle.get('opponent_id') == _battle_bot()['id']),
         'mode': battle.get('mode', 'ranked'),
     }
+    stats = db.select_one('sat_battle_stats', where={'user_id': user_id})
+    result['rank'] = _battle_rank(stats['rating'] if stats else 1000)
     if battle['status'] in {'active', 'complete'}:
         questions = json.loads(battle['questions'])
         result['questions'] = [{'question_text': q['question_text'], 'options': q['options'], 'skill': q['skill']} for q in questions]
@@ -4700,10 +4724,15 @@ def _user_current_battle(user_id):
 def battle_arena(user):
     current = _user_current_battle(user.data['id'])
     leaderboard = db.execute("SELECT user_id, user_name, rating, wins, losses, battles_played FROM sat_battle_stats ORDER BY rating DESC, wins DESC LIMIT 10")
+    for row in leaderboard:
+        row['rank'] = _battle_rank(row['rating'])
+    stats = db.select_one('sat_battle_stats', where={'user_id': user.data['id']})
     spotlight = db.execute("SELECT * FROM sat_battles WHERE status='complete' ORDER BY completed_at DESC LIMIT 1")
     return render_react('battles', {
         'name': user.get_name(),
         'currentBattle': _battle_payload(current, user.data['id']) if current else None,
+        'battleRank': _battle_rank(stats['rating'] if stats else 1000),
+        'battleStats': stats or {'wins': 0, 'losses': 0, 'draws': 0, 'battles_played': 0},
         'leaderboard': leaderboard,
         'spotlight': spotlight[0] if spotlight else None,
     }, 'SAT Battles | Mentics')
