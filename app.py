@@ -4601,6 +4601,12 @@ def _battle_bot_answers(questions):
     return answers
 
 
+def _battle_mode(battle):
+    # Training rounds are identified from existing fields as well as the newer
+    # optional column, so deployments with the first Arena schema still work.
+    return 'training' if battle.get('mode') == 'training' or battle.get('opponent_name') == 'Mentics Training Bot' else 'ranked'
+
+
 def _battle_answers(value):
     try:
         answers = json.loads(value or '[]')
@@ -4664,7 +4670,7 @@ def _finish_battle_if_ready(battle):
     updated = db.execute_write(
         "UPDATE sat_battles SET status='complete', winner_id=?, completed_at=? WHERE id=? AND status='active'",
         (winner_id, completed_at, battle['id']))
-    if updated and battle.get('mode', 'ranked') != 'training':
+    if updated and _battle_mode(battle) != 'training':
         challenger_outcome = 'draw' if winner_id is None else 'win' if winner_id == battle['challenger_id'] else 'loss'
         opponent_outcome = 'draw' if winner_id is None else 'win' if winner_id == battle['opponent_id'] else 'loss'
         _battle_rating(battle['challenger_id'], battle['challenger_name'], challenger_outcome)
@@ -4697,7 +4703,7 @@ def _battle_payload(battle, user_id):
         'startedAt': battle.get('started_at'), 'durationSeconds': SAT_BATTLE_DURATION_SECONDS,
         'submitted': bool(own_answers), 'createdAt': battle.get('created_at'),
         'isBotBattle': bool(_battle_bot() and battle.get('opponent_id') == _battle_bot()['id']),
-        'mode': battle.get('mode', 'ranked'),
+        'mode': _battle_mode(battle),
     }
     stats = db.select_one('sat_battle_stats', where={'user_id': user_id})
     result['rank'] = _battle_rank(stats['rating'] if stats else 1000)
@@ -4758,7 +4764,7 @@ def queue_sat_battle(user):
     if paired:
         return jsonify(_battle_payload(paired, user.data['id']))
     battle_id = db.insert('sat_battles', {
-        'status': 'waiting', 'mode': 'ranked', 'challenger_id': user.data['id'], 'challenger_name': user.get_name(),
+        'status': 'waiting', 'challenger_id': user.data['id'], 'challenger_name': user.get_name(),
         'questions': json.dumps(_battle_questions()),
     })
     return jsonify(_battle_payload(db.select_one('sat_battles', where={'id': battle_id}), user.data['id']))
@@ -4773,8 +4779,8 @@ def train_with_sat_battle_bot(user):
         return jsonify({'error': 'Finish or leave your current battle first.'}), 409
     bot = _battle_bot()
     battle_id = db.insert('sat_battles', {
-        'status': 'active', 'mode': 'training', 'challenger_id': user.data['id'],
-        'challenger_name': user.get_name(), 'opponent_id': bot['id'], 'opponent_name': bot['name'],
+        'status': 'active', 'challenger_id': user.data['id'],
+        'challenger_name': user.get_name(), 'opponent_id': bot['id'], 'opponent_name': 'Mentics Training Bot',
         'questions': json.dumps(_battle_questions()), 'started_at': _utc_now().isoformat(),
     })
     return jsonify(_battle_payload(db.select_one('sat_battles', where={'id': battle_id}), user.data['id']))

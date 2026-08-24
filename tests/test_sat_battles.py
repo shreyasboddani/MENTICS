@@ -96,6 +96,43 @@ def test_training_round_starts_immediately_and_does_not_rank(tmp_path, monkeypat
     assert training["isBotBattle"] is True
 
 
+def test_training_round_supports_the_original_arena_table_without_mode(tmp_path, monkeypatch):
+    database = DatabaseHandler(str(tmp_path / "legacy-training.db"))
+    monkeypatch.setattr(app_module, "db", database)
+    app_module.init_db()
+    # The first production Arena release created this table before `mode` was
+    # introduced. Keep training usable while a deployment is awaiting migration.
+    database.execute("ALTER TABLE sat_battles RENAME TO sat_battles_with_mode")
+    database.execute("""
+        CREATE TABLE sat_battles (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            status TEXT NOT NULL,
+            challenger_id INTEGER NOT NULL,
+            challenger_name TEXT NOT NULL,
+            opponent_id INTEGER,
+            opponent_name TEXT,
+            questions TEXT NOT NULL,
+            challenger_answers TEXT,
+            opponent_answers TEXT,
+            challenger_finished_at TEXT,
+            opponent_finished_at TEXT,
+            started_at TEXT,
+            winner_id INTEGER,
+            completed_at TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+    challenger = _user(database, "legacy-training@example.test", "Legacy Student")
+    train = inspect.unwrap(app_module.train_with_sat_battle_bot)
+
+    with app_module.app.test_request_context("/api/sat-battles/train", method="POST", json={}):
+        training = train(challenger).get_json()
+
+    stored = database.select_one("sat_battles", where={"id": training["id"]})
+    assert training["mode"] == "training"
+    assert stored["opponent_name"] == "Mentics Training Bot"
+
+
 def test_sat_battle_rank_ladder_covers_bronze_through_grandmaster():
     assert app_module._battle_rank(1000)["label"] == "Bronze"
     assert app_module._battle_rank(1050)["label"] == "Silver"
