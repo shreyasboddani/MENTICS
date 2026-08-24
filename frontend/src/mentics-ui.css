@@ -1869,3 +1869,10 @@
 /* Four roomy choices preserve the full rank names instead of making the
    training picker look like a compressed settings control. */
 @media (min-width: 760px) { .arena-training-ranks { grid-template-columns: repeat(4, minmax(0, 1fr)); }.arena-training-ranks button { min-height: 52px; } }
+
+/* Original browser-synthesized Arena score; it has a deliberate, always
+   reachable mute instead of an unescapable autoplay soundtrack. */
+.arena-audio-toggle { display: inline-flex; align-items: center; justify-content: center; gap: 6px; flex: none; min-height: 31px; padding: 0 9px; border: 1px solid rgba(191, 171, 255, .3); border-radius: 9px; color: #d8ccff; background: rgba(255,255,255,.055); font: inherit; font-size: 9px; font-weight: 850; letter-spacing: .06em; cursor: pointer; transition: border-color .16s ease, background .16s ease, transform .16s cubic-bezier(.23,1,.32,1); }
+.arena-audio-toggle svg { width: 14px; }.battle-stage--active .arena-audio-toggle { color: #e8e1ff; }.arena-audio-toggle:active { transform: scale(.97); }
+@media (hover: hover) and (pointer: fine) { .arena-audio-toggle:hover { border-color: rgba(215, 199, 255, .6); background: rgba(255,255,255,.12); } }
+@media (max-width: 759px) { .arena-audio-toggle { width: 31px; padding: 0; }.arena-audio-toggle span { display: none; }.battle-wait-actions .text-button { min-height: 38px; } }

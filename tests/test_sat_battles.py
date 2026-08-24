@@ -36,6 +36,16 @@ def test_sat_battle_matches_two_students_and_only_finishes_once(tmp_path, monkey
     assert active["status"] == "active"
     assert len(active["questions"]) == app_module.SAT_BATTLE_QUESTION_COUNT
     assert "correct_option" not in active["questions"][0]
+    assert active["isBotBattle"] is False
+
+    # The waiting player polls the same battle after a second student joins.
+    # Both players must see one live round and an identical shuffled question set.
+    challenger_live = app_module._battle_payload(
+        database.select_one("sat_battles", where={"id": active["id"]}), challenger.data["id"]
+    )
+    assert challenger_live["status"] == "active"
+    assert challenger_live["opponentName"] == "Opponent"
+    assert challenger_live["questions"] == active["questions"]
 
     answers = [{"question_index": index, "selected_option": 0} for index in range(5)]
     with app_module.app.test_request_context(
@@ -178,6 +188,17 @@ def test_sat_battle_questions_are_original_sat_style_and_scale_by_rank():
         assert all(0 <= question["correct_option"] < 4 for question in questions)
         prompts[tier] = {question["question_text"] for question in questions}
     assert prompts["bronze"].isdisjoint(prompts["grandmaster"])
+
+
+def test_training_bots_scale_their_accuracy_with_the_selected_rank():
+    expected_scores = {
+        "bronze": 2, "silver": 2, "gold": 3, "platinum": 3,
+        "diamond": 4, "master": 4, "grandmaster": 5,
+    }
+    for tier, expected_score in expected_scores.items():
+        rating = next(minimum for minimum, _label, key in app_module.SAT_BATTLE_RANKS if key == tier)
+        questions = app_module._battle_questions(rating)
+        assert app_module._battle_score(questions, app_module._battle_bot_answers(questions)) == expected_score
 
 
 def test_live_match_uses_the_higher_players_question_tier(tmp_path, monkeypatch):

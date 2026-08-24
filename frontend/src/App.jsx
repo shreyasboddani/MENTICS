@@ -10,7 +10,7 @@ import {
   GraduationCap, Hand, Headphones, House, LayoutDashboard, LineChart,
   LockKeyhole, LogOut, Mail, Menu, MessageCircle, PenLine, Plus, RotateCcw, SkipForward,
   Search, Send, Settings, ShieldCheck, Sparkles, Swords, Target, Trophy, UserRound,
-  UsersRound, X, Zap
+  UsersRound, Volume2, VolumeX, X, Zap
 } from 'lucide-react'
 import './styles.css'
 import './experience.css'
@@ -1658,10 +1658,77 @@ function BattleArena() {
   const [cinematic, setCinematic] = useState('')
   const [lobbyMode, setLobbyMode] = useState('ranked')
   const [trainingRank, setTrainingRank] = useState(d.battleRank?.key || 'bronze')
+  const [musicEnabled, setMusicEnabled] = useState(true)
   const previousStatus = useRef(d.currentBattle?.status)
   const stageRef = useRef(null)
   const cinematicTimers = useRef([])
+  const arenaAudio = useRef(null)
+  const active = battle?.status === 'active'
+  const waiting = battle?.status === 'waiting'
+  const complete = battle?.status === 'complete'
+  const idle = !battle || battle.status === 'expired'
   const clearCinematic = useCallback(() => { cinematicTimers.current.forEach(window.clearTimeout); cinematicTimers.current = [] }, [])
+  const stopArenaMusic = useCallback(() => {
+    const audio = arenaAudio.current
+    if (!audio) return
+    arenaAudio.current = null
+    window.clearInterval(audio.timer)
+    const now = audio.context.currentTime
+    audio.master.gain.cancelScheduledValues(now)
+    audio.master.gain.setValueAtTime(Math.max(.0001, audio.master.gain.value), now)
+    audio.master.gain.exponentialRampToValueAtTime(.0001, now + .12)
+    window.setTimeout(() => {
+      audio.oscillators.forEach(oscillator => { try { oscillator.stop() } catch (error) { void error } })
+      audio.context.close().catch(() => undefined)
+    }, 150)
+  }, [])
+  const startArenaMusic = useCallback((force = false) => {
+    if ((!musicEnabled && !force) || arenaAudio.current || typeof window === 'undefined') return
+    const AudioContext = window.AudioContext || window.webkitAudioContext
+    if (!AudioContext) return
+    const context = new AudioContext()
+    const master = context.createGain()
+    master.gain.setValueAtTime(.0001, context.currentTime)
+    master.gain.exponentialRampToValueAtTime(.035, context.currentTime + .2)
+    master.connect(context.destination)
+    const oscillators = []
+    const pattern = [0, 7, 12, 7, 3, 10, 7, 14, 0, 7, 15, 12, 3, 10, 7, 2]
+    let step = 0
+    const playBeat = () => {
+      const now = context.currentTime
+      const note = 220 * Math.pow(2, pattern[step % pattern.length] / 12)
+      const lead = context.createOscillator()
+      const leadGain = context.createGain()
+      lead.type = step % 4 === 0 ? 'square' : 'triangle'
+      lead.frequency.setValueAtTime(note, now)
+      leadGain.gain.setValueAtTime(.0001, now)
+      leadGain.gain.exponentialRampToValueAtTime(.19, now + .018)
+      leadGain.gain.exponentialRampToValueAtTime(.0001, now + .22)
+      lead.connect(leadGain).connect(master)
+      lead.start(now); lead.stop(now + .24)
+      oscillators.push(lead)
+      if (step % 4 === 0) {
+        const bass = context.createOscillator()
+        const bassGain = context.createGain()
+        bass.type = 'sine'
+        bass.frequency.setValueAtTime(note / 2, now)
+        bassGain.gain.setValueAtTime(.0001, now)
+        bassGain.gain.exponentialRampToValueAtTime(.28, now + .015)
+        bassGain.gain.exponentialRampToValueAtTime(.0001, now + .27)
+        bass.connect(bassGain).connect(master)
+        bass.start(now); bass.stop(now + .29)
+        oscillators.push(bass)
+      }
+      step += 1
+    }
+    context.resume().catch(() => {})
+    playBeat()
+    arenaAudio.current = { context, master, oscillators, timer: window.setInterval(playBeat, 285) }
+  }, [musicEnabled])
+  const toggleArenaMusic = () => {
+    if (musicEnabled) { stopArenaMusic(); setMusicEnabled(false) }
+    else { setMusicEnabled(true); startArenaMusic(true) }
+  }
   const launchCinematic = useCallback(() => {
     clearCinematic()
     if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
@@ -1690,6 +1757,12 @@ function BattleArena() {
     return () => clearCinematic()
   }, [clearCinematic])
   useEffect(() => {
+    if (!waiting && !active) stopArenaMusic()
+  }, [waiting, active, stopArenaMusic])
+  useEffect(() => {
+    return () => stopArenaMusic()
+  }, [stopArenaMusic])
+  useEffect(() => {
     if (battle?.status !== 'active') return undefined
     const frame = window.requestAnimationFrame(() => stageRef.current?.scrollIntoView({ block: 'start', behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' }))
     return () => window.cancelAnimationFrame(frame)
@@ -1702,15 +1775,11 @@ function BattleArena() {
     return () => window.clearTimeout(timer)
   }, [battle?.id, battle?.status, battle?.youWon])
   const startBattle = nextBattle => { setAnswers({}); setActiveQuestion(0); setBattle(nextBattle); if (nextBattle?.status === 'active') launchCinematic() }
-  const join = async () => { setBusy(true); setError(''); try { startBattle(await api('/api/sat-battles/queue', { method: 'POST' })) } catch (x) { setError(x.message) } finally { setBusy(false) } }
-  const train = async () => { setBusy(true); setError(''); try { startBattle(await api('/api/sat-battles/train', { method: 'POST', body: JSON.stringify({ rank: trainingRank }) })) } catch (x) { setError(x.message) } finally { setBusy(false) } }
-  const cancelQueue = async () => { if (!battle) return; setBusy(true); setError(''); try { await api(`/api/sat-battles/${battle.id}/cancel`, { method: 'POST' }); setBattle(null) } catch (x) { setError(x.message) } finally { setBusy(false) } }
+  const join = async () => { startArenaMusic(); setBusy(true); setError(''); try { startBattle(await api('/api/sat-battles/queue', { method: 'POST' })) } catch (x) { stopArenaMusic(); setError(x.message) } finally { setBusy(false) } }
+  const train = async () => { startArenaMusic(); setBusy(true); setError(''); try { startBattle(await api('/api/sat-battles/train', { method: 'POST', body: JSON.stringify({ rank: trainingRank }) })) } catch (x) { stopArenaMusic(); setError(x.message) } finally { setBusy(false) } }
+  const cancelQueue = async () => { if (!battle) return; setBusy(true); setError(''); try { await api(`/api/sat-battles/${battle.id}/cancel`, { method: 'POST' }); stopArenaMusic(); setBattle(null) } catch (x) { setError(x.message) } finally { setBusy(false) } }
   const select = (questionIndex, selectedOption) => setAnswers(current => ({ ...current, [questionIndex]: selectedOption }))
   const submit = async () => { if (!battle || Object.keys(answers).length !== battle.questions.length) return; setBusy(true); setError(''); try { setBattle(await api(`/api/sat-battles/${battle.id}/submit`, { method: 'POST', body: JSON.stringify({ answers: Object.entries(answers).map(([question_index, selected_option]) => ({ question_index: Number(question_index), selected_option })) }) })) } catch (x) { setError(x.message) } finally { setBusy(false) } }
-  const active = battle?.status === 'active'
-  const waiting = battle?.status === 'waiting'
-  const complete = battle?.status === 'complete'
-  const idle = !battle || battle.status === 'expired'
   const clock = secondsLeft == null ? '2:00' : `${Math.floor(secondsLeft / 60)}:${String(secondsLeft % 60).padStart(2, '0')}`
   const spotlight = d.spotlight
   const rank = battle?.rank || d.battleRank
@@ -1726,10 +1795,10 @@ function BattleArena() {
   return <AppShell name={d.name}><main className={`app-main battle-page ${active ? 'battle-page--in-match' : waiting ? 'battle-page--queue' : complete ? 'battle-page--complete' : ''}`}>
     {idle && <section className="arena-lobby arena-lobby--game" data-mode={lobbyMode} aria-label="SAT Battle Arena lobby"><header className="arena-lobby-topline"><span><i /> MENTICS SAT ARENA</span><b>SEASON 01</b><span>ONLINE · READY</span></header><div className="arena-lobby-main"><aside className={`arena-lobby-pilot arena-lobby-rank--${rank?.key || 'bronze'}`}><small>YOUR PLAYER</small><span className="arena-pilot-avatar">{String(d.name || 'M').slice(0, 1)}</span><b>{d.name || 'Arena player'}</b><em><i /> READY TO PLAY</em><div className="arena-pilot-rank"><span><Trophy /></span><div><small>{rank?.label || 'Bronze'} RANK</small><b>{rank?.rating || 1000} RP</b></div></div><p>{rank?.nextAt ? `${Math.max(0, rank.nextAt - rank.rating)} RP to ${rank.nextLabel}` : 'You are at the top of the arena.'}</p><i className="arena-rank-progress"><b style={{ width: `${rankProgress}%` }} /></i></aside><section className="arena-lobby-playlist"><header><small>SELECTED PLAYLIST</small><span>{lobbyMode === 'ranked' ? 'RANKED PLAY' : 'PRIVATE SESSION'}</span></header><div className="arena-playlist-title"><i>{lobbyMode === 'ranked' ? <Swords /> : <Brain />}</i><div><h1>{lobbyMode === 'ranked' ? 'Ranked duel' : 'Training room'}</h1><p>{lobbyMode === 'ranked' ? 'Match with a student, put RP on the line, and race through a shared SAT-style set.' : 'Choose the exact question tier you want to train against. Your rating never moves.'}</p></div></div>{lobbyMode === 'training' && <div className="arena-training-ranks" role="radiogroup" aria-label="Choose bot difficulty">{BATTLE_TRAINING_RANKS.map(([key, label, note]) => <button type="button" role="radio" aria-checked={trainingRank === key} className={trainingRank === key ? 'selected' : ''} data-rank={key} key={key} onClick={() => setTrainingRank(key)}><b>{label}</b><small>{note}</small></button>)}</div>}<div className="arena-playlist-action"><div><small>{lobbyMode === 'ranked' ? 'MATCH FORMAT' : 'BOT OPPONENT'}</small><b>{lobbyMode === 'ranked' ? '5 questions · 2 minutes · RP at stake' : `Mentics ${selectedTrainingTier[1]} Bot · ${selectedTrainingTier[2]}`}</b></div><button className="arena-ready-button" onClick={lobbyMode === 'ranked' ? join : train} disabled={busy}>{busy ? (lobbyMode === 'ranked' ? 'SEARCHING…' : 'LOADING…') : (lobbyMode === 'ranked' ? 'READY UP' : `PLAY ${selectedTrainingTier[1].toUpperCase()}`)} <ArrowRight /></button></div></section><aside className="arena-difficulty-board"><header><small>QUESTION DIFFICULTY</small><Target /></header><h2>Rank changes the set.</h2><p>Every tier uses original SAT-style questions. The higher the rank, the denser the reasoning, pacing, and traps become.</p><ol>{BATTLE_TRAINING_RANKS.map(([key, label]) => <li key={key} className={key === (lobbyMode === 'training' ? trainingRank : rank?.key) ? 'current' : ''}><i data-rank={key} /><span>{label}</span>{key === 'grandmaster' && <b>MAX</b>}</li>)}</ol><footer>{lobbyMode === 'ranked' ? 'Ranked matches use the stronger player’s tier so neither player gets a soft set.' : `This drill will use the ${selectedTrainingTier[1]} question tier.`}</footer></aside></div><footer className="arena-lobby-format"><div className="arena-playlist-switch" role="tablist" aria-label="Arena playlists"><button type="button" role="tab" aria-selected={lobbyMode === 'ranked'} className={lobbyMode === 'ranked' ? 'selected' : ''} onClick={() => setLobbyMode('ranked')}><Swords /> Ranked duel <small>RP on the line</small></button><button type="button" role="tab" aria-selected={lobbyMode === 'training'} className={lobbyMode === 'training' ? 'selected' : ''} onClick={() => setLobbyMode('training')}><Brain /> Training room <small>Choose any bot tier</small></button></div><span><i>05</i><b>QUESTIONS</b><small>One shared SAT-style set per round.</small></span><span><i>2:00</i><b>ROUND CLOCK</b><small>Accuracy wins; speed breaks a tie.</small></span></footer></section>}
     {error && <div className="error-banner">{error}<button onClick={() => setError('')}>Dismiss</button></div>}
-    {waiting && <section className="battle-stage battle-stage--waiting" aria-live="polite"><span className="battle-search-orbit"><Swords /></span><div><small>MATCHMAKING</small><h2>Finding your challenger</h2><p>Your question set is locked. If nobody joins within 30 seconds, Mentics Arena Bot steps in automatically.</p></div><div className="battle-wait-actions"><button className="text-button" onClick={() => refresh(battle.id)}>Check match status <RotateCcw /></button><button className="text-button" disabled={busy} onClick={cancelQueue}>Leave queue</button></div></section>}
+    {waiting && <section className="battle-stage battle-stage--waiting" aria-live="polite"><span className="battle-search-orbit"><Swords /></span><div><small>MATCHMAKING</small><h2>Finding your challenger</h2><p>Your question set is locked. If another student joins, both players receive the same live round. If nobody joins within 30 seconds, Mentics Arena Bot steps in automatically.</p></div><div className="battle-wait-actions"><button className="text-button" onClick={() => refresh(battle.id)}>Check match status <RotateCcw /></button><button className="text-button" onClick={toggleArenaMusic}>{musicEnabled ? <Volume2 /> : <VolumeX />} Music {musicEnabled ? 'on' : 'off'}</button><button className="text-button" disabled={busy} onClick={cancelQueue}>Leave queue</button></div></section>}
     {active && <section ref={stageRef} className={`battle-stage battle-stage--active ${answers[currentQuestionIndex] != null ? 'is-striking' : ''}`} aria-label="Active SAT battle">
       {cinematic && <div className="arena-cinematic" data-phase={cinematic} role="status" aria-live="assertive"><Starfield warp tone="violet" /><div className="arena-cinematic-fighters" aria-hidden="true"><span className="arena-cinematic-fighter arena-cinematic-fighter--you">{String(d.name || 'Y').slice(0, 1)}</span><i>VS</i><span className="arena-cinematic-fighter arena-cinematic-fighter--rival">{String(battle.opponentName || 'B').slice(0, 1)}</span></div><div className="arena-cinematic-count"><small>{cinematic === 'fight' ? 'MENTICS ARENA' : 'ARENA LINK ESTABLISHED'}</small><strong>{cinematic === 'fight' ? 'FIGHT' : cinematic}</strong><span>{cinematic === 'fight' ? 'MAKE EVERY SECOND COUNT' : 'PREPARE TO THINK FAST'}</span></div>{cinematic !== 'fight' && <button type="button" onClick={() => { clearCinematic(); setCinematic('') }}>Skip intro</button>}</div>}
-      <header className="battle-status"><span><i /><b>{battle.mode === 'training' ? 'PRIVATE BOT DRILL' : `${battleDifficulty} SAT BATTLE`}</b><small>vs {battle.opponentName || 'your challenger'}</small></span><strong className={secondsLeft < 20 ? 'urgent' : ''}><Clock3 /> {clock}</strong></header>
+      <header className="battle-status"><span><i /><b>{battle.mode === 'training' ? 'PRIVATE BOT DRILL' : `${battleDifficulty} SAT BATTLE`}</b><small>vs {battle.opponentName || 'your challenger'}</small></span><button className="arena-audio-toggle" type="button" onClick={toggleArenaMusic} aria-label={musicEnabled ? 'Mute arena music' : 'Play arena music'}>{musicEnabled ? <Volume2 /> : <VolumeX />} <span>Music {musicEnabled ? 'on' : 'off'}</span></button><strong className={secondsLeft < 20 ? 'urgent' : ''}><Clock3 /> {clock}</strong></header>
       {battle.submitted ? <div className="battle-locked"><span className="battle-search-orbit"><Check /></span><h2>Answers locked.</h2><p>{battle.mode === 'training' ? 'Mentics Arena Bot is scoring your round now.' : `Waiting for ${battle.opponentName || 'your challenger'} to finish. The arena will reveal the result automatically.`}</p></div> : <>
         <div className="battle-combat-hud" aria-label={`You versus ${battle.opponentName || 'Arena bot'}`}><article className="battle-combatant battle-combatant--you"><span>{String(d.name || 'Y').slice(0, 1)}</span><div><small>YOU</small><b>{d.name || 'Challenger'}</b><i><em style={{ width: `${Math.max(14, 28 + answeredCount * 14)}%` }} /></i><strong>FOCUS {answeredCount}/{questionCount}</strong></div></article><div className="battle-clash"><i /><b>VS</b><span>{currentQuestion?.skill || 'SAT ARENA'}</span></div><article className="battle-combatant battle-combatant--rival"><div><small>RIVAL</small><b>{battle.opponentName || 'Arena Bot'}</b><i><em /></i><strong>READY TO RACE</strong></div><span>{String(battle.opponentName || 'B').slice(0, 1)}</span></article></div>
         <div className="battle-question-progress" aria-label={`Question ${currentQuestionIndex + 1} of ${questionCount}`}>{battle.questions.map((_, index) => <button type="button" key={index} className={`${answers[index] != null ? 'done' : ''} ${currentQuestionIndex === index ? 'current' : ''}`} onClick={() => setActiveQuestion(index)} aria-label={`Go to question ${index + 1}${answers[index] != null ? ', answered' : ''}`}>{index + 1}</button>)}</div>

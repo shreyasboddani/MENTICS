@@ -4576,6 +4576,10 @@ SAT_BATTLE_QUESTION_COUNT = 5
 SAT_BATTLE_DURATION_SECONDS = 120
 SAT_BATTLE_BOT_WAIT_SECONDS = 30
 SAT_BATTLE_BOT_EMAIL = "arena-bot@mentics.system"
+SAT_BATTLE_BOT_CORRECT_BY_RANK = {
+    'bronze': 2, 'silver': 2, 'gold': 3, 'platinum': 3,
+    'diamond': 4, 'master': 4, 'grandmaster': 5,
+}
 SAT_BATTLE_RANKS = [
     (1750, "Grandmaster", "grandmaster"),
     (1550, "Master", "master"),
@@ -4668,10 +4672,14 @@ def _battle_bot():
 
 
 def _battle_bot_answers(questions):
-    """A consistent, beatable three-out-of-five Arena Bot round."""
+    """Return a rank-scaled bot round that remains beatable on a faster tie."""
+    difficulty = questions[0].get('difficulty', 'bronze') if questions else 'bronze'
+    correct_count = SAT_BATTLE_BOT_CORRECT_BY_RANK.get(difficulty, 3)
+    correct_indices = [0, 2, 4, 1, 3]
+    winning_indices = set(correct_indices[:correct_count])
     answers = []
     for index, question in enumerate(questions):
-        selected = question['correct_option'] if index in (0, 2, 4) else (question['correct_option'] + 1) % 4
+        selected = question['correct_option'] if index in winning_indices else (question['correct_option'] + 1) % 4
         answers.append({'question_index': index, 'selected_option': selected})
     return answers
 
