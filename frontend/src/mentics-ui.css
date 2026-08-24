@@ -1431,6 +1431,95 @@
 @keyframes path-regenerating-orbit { to { transform: rotate(360deg); } }
 @media (prefers-reduced-motion: reduce) { .path-regenerating-orbit { animation: none; } }
 
+/* SAT Battle Arena — a distinct competitive space that still uses the Mentics
+   violet, indigo, and glass vocabulary. */
+.battle-page { max-width: 1280px; }
+.battle-hero { position: relative; display: grid; grid-template-columns: minmax(0, 1fr) 260px; align-items: center; gap: 36px; min-height: 310px; padding: 44px 50px; overflow: hidden; border: 1px solid rgba(255,255,255,.18); border-radius: 28px; color: #fff; background: radial-gradient(circle at 78% 20%, rgba(157,104,255,.5), transparent 22%), radial-gradient(circle at 16% 100%, rgba(76,91,224,.38), transparent 35%), linear-gradient(135deg, #17132f, #2b225d 62%, #24255c); box-shadow: 0 32px 74px -42px rgba(26,17,75,.92), inset 0 1px rgba(255,255,255,.15); }
+.battle-hero:after { content: ''; position: absolute; inset: 0; pointer-events: none; opacity: .24; background-image: linear-gradient(rgba(255,255,255,.15) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.15) 1px, transparent 1px); background-size: 34px 34px; mask-image: linear-gradient(120deg, #000, transparent 70%); }
+.battle-hero > * { position: relative; z-index: 1; }
+.battle-hero .eyebrow { color: #d6c8ff; }
+.battle-hero h1 { max-width: 11ch; margin: 12px 0; color: #fff; font-size: clamp(3.4rem, 6vw, 5.8rem); line-height: .9; letter-spacing: -.07em; }
+.battle-hero h1 em { color: #a98bff; font-style: normal; }
+.battle-hero p { max-width: 530px; margin: 0; color: #d2cce9; font-size: .97rem; line-height: 1.65; }
+.battle-join { margin-top: 25px; }
+.battle-hero-mark { display: grid; place-items: center; align-content: center; width: 220px; aspect-ratio: 1; margin-inline: auto; border: 1px solid rgba(255,255,255,.18); border-radius: 50%; background: radial-gradient(circle at 35% 25%, rgba(255,255,255,.25), transparent 34%), rgba(255,255,255,.08); box-shadow: inset 0 0 0 16px rgba(255,255,255,.035), 0 18px 45px -28px #0d0928; }
+.battle-hero-mark i { display: grid; place-items: center; width: 58px; height: 58px; border-radius: 18px; background: linear-gradient(135deg, #a77aff, #5450dc); box-shadow: 0 14px 24px -14px #100c36, inset 0 1px rgba(255,255,255,.4); }
+.battle-hero-mark i svg { width: 29px; height: 29px; }
+.battle-hero-mark span { margin-top: 10px; font-size: 2.2rem; font-weight: 850; letter-spacing: -.08em; }
+.battle-hero-mark small { color: #cbc4eb; font-size: 10px; font-weight: 800; letter-spacing: .15em; }
+.battle-stage,.battle-result { position: relative; margin-top: 18px; padding: 30px; border: 1px solid rgba(255,255,255,.78); border-radius: 24px; background: linear-gradient(145deg, rgba(255,255,255,.9), rgba(244,242,253,.72)); box-shadow: 0 26px 60px -44px rgba(25,18,70,.65), inset 0 1px rgba(255,255,255,.96); }
+.battle-stage--waiting,.battle-locked { min-height: 286px; display: grid; place-content: center; justify-items: center; gap: 13px; text-align: center; }
+.battle-stage--waiting small,.battle-result > small,.battle-rules > small,.battle-spotlight small { color: var(--mx-violet, #7044d9); font-size: 11px; font-weight: 800; letter-spacing: .14em; }
+.battle-stage--waiting h2,.battle-locked h2 { margin: 0; color: var(--mx-ink, #19152d); font-size: 2rem; letter-spacing: -.045em; }
+.battle-stage--waiting p,.battle-locked p { max-width: 390px; margin: 0; color: var(--mx-muted, #6e7182); line-height: 1.6; }
+.battle-wait-actions { display: flex; align-items: center; justify-content: center; gap: 18px; flex-wrap: wrap; }
+.battle-search-orbit { display: grid; place-items: center; width: 54px; height: 54px; border: 1px solid rgba(113,66,215,.24); border-radius: 50%; color: #fff; background: linear-gradient(135deg, #8c62eb, #5149d4); box-shadow: 0 0 0 9px rgba(126,82,224,.09); animation: battle-orbit 1.2s linear infinite; }
+.battle-search-orbit svg { width: 23px; height: 23px; }
+.battle-status { display: flex; align-items: center; justify-content: space-between; gap: 15px; padding-bottom: 19px; border-bottom: 1px solid rgba(77,65,118,.13); }
+.battle-status > span { display: grid; grid-template-columns: auto 1fr; column-gap: 8px; align-items: center; }
+.battle-status > span i { width: 8px; height: 8px; border-radius: 50%; background: #14a879; box-shadow: 0 0 0 4px rgba(20,168,121,.12); }
+.battle-status b { color: var(--mx-ink, #19152d); font-size: 12px; letter-spacing: .08em; }
+.battle-status small { grid-column: 2; color: var(--mx-muted, #6e7182); font-size: 12px; }
+.battle-status > strong { display: inline-flex; align-items: center; gap: 7px; color: #4d38a9; font-size: 1.25rem; font-variant-numeric: tabular-nums; }
+.battle-status > strong.urgent { color: #ca3e5b; }
+.battle-status svg { width: 17px; }
+.battle-question-progress { display: flex; gap: 7px; margin: 22px 0 18px; }
+.battle-question-progress i { display: grid; place-items: center; width: 28px; height: 28px; border-radius: 50%; color: #837c9a; background: #eeecf4; font-size: 11px; font-style: normal; font-weight: 800; transition: color 160ms ease, background 160ms ease, transform 160ms cubic-bezier(.23,1,.32,1); }
+.battle-question-progress i.done { color: #fff; background: #7950dc; transform: scale(1.06); }
+.battle-questions { display: grid; gap: 14px; }
+.battle-question { padding: 22px; border: 1px solid rgba(93,79,139,.14); border-radius: 18px; background: rgba(255,255,255,.68); }
+.battle-question header { display: flex; justify-content: space-between; gap: 10px; }
+.battle-question header small { color: #7352c9; font-size: 10px; font-weight: 800; letter-spacing: .1em; }
+.battle-question header span { color: #8e889e; font-size: 10px; font-weight: 800; letter-spacing: .08em; }
+.battle-question h2 { margin: 12px 0 16px; color: var(--mx-ink, #19152d); font-size: 1.1rem; line-height: 1.4; }
+.battle-question > div { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.battle-question button { display: flex; align-items: center; min-height: 48px; gap: 9px; padding: 9px 11px; border: 1px solid rgba(91,76,138,.16); border-radius: 11px; color: #393348; background: rgba(255,255,255,.78); font: inherit; font-size: 13px; text-align: left; cursor: pointer; transition: transform 150ms cubic-bezier(.23,1,.32,1), border-color 150ms ease, background 150ms ease, box-shadow 150ms ease; }
+.battle-question button i { display: grid; place-items: center; flex: none; width: 25px; height: 25px; border-radius: 8px; color: #766e88; background: #eeecf4; font-size: 11px; font-style: normal; font-weight: 800; }
+.battle-question button.selected { border-color: #7850dc; color: #34235f; background: #f0eaff; box-shadow: inset 0 0 0 1px #7850dc; }
+.battle-question button.selected i { color: #fff; background: #7850dc; }
+.battle-question button:active { transform: scale(.98); }
+.battle-lock { width: 100%; margin-top: 18px; }
+.battle-locked { min-height: 330px; }
+.battle-result { display: grid; justify-items: center; padding: 50px 25px; text-align: center; }
+.battle-result.won { background: radial-gradient(circle at 50% 0, rgba(169,137,255,.38), transparent 36%), linear-gradient(145deg, #2d2460, #17132e); color: #fff; }
+.battle-result-mark { display: grid; place-items: center; width: 62px; height: 62px; margin-bottom: 16px; border-radius: 20px; color: #fff; background: linear-gradient(135deg, #a97fff, #5a50df); box-shadow: 0 18px 32px -20px #171032; }
+.battle-result-mark svg { width: 28px; height: 28px; }
+.battle-result h2 { margin: 9px 0; font-size: clamp(2rem, 4vw, 3rem); letter-spacing: -.06em; }
+.battle-result.won h2,.battle-result.won p { color: #fff; }
+.battle-result p { color: #5d5870; font-size: 1rem; }
+.battle-result p b { font-size: 1.65rem; }
+.battle-result p span { padding: 0 6px; color: #958ea8; font-size: 12px; font-weight: 800; }
+.battle-lower { display: grid; grid-template-columns: 1.2fr .8fr; gap: 18px; margin-top: 18px; }
+.battle-rules,.battle-leaderboard { padding: 28px; border: 1px solid rgba(255,255,255,.75); border-radius: 22px; background: linear-gradient(145deg, rgba(255,255,255,.82), rgba(244,242,252,.62)); box-shadow: 0 22px 52px -42px rgba(25,18,70,.58); }
+.battle-rules h2 { margin: 8px 0 21px; color: var(--mx-ink, #19152d); font-size: 1.7rem; letter-spacing: -.045em; }
+.battle-rules > div { display: grid; gap: 13px; }
+.battle-rules article { display: grid; grid-template-columns: 36px 1fr; gap: 12px; }
+.battle-rules article > b { color: #7753d5; font-size: 12px; }
+.battle-rules article strong { color: var(--mx-ink, #19152d); font-size: 14px; }
+.battle-rules article p { margin: 4px 0 0; color: var(--mx-muted, #6e7182); font-size: 13px; line-height: 1.5; }
+.battle-leaderboard { background: radial-gradient(circle at 90% 0, rgba(157,119,245,.42), transparent 34%), linear-gradient(155deg, #332a70, #211b45); color: #fff; }
+.battle-leaderboard header { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding-bottom: 15px; border-bottom: 1px solid rgba(255,255,255,.12); }
+.battle-leaderboard header span { display: flex; align-items: center; gap: 7px; font-size: 11px; font-weight: 800; letter-spacing: .08em; }
+.battle-leaderboard header svg { width: 15px; color: #d6bcff; }
+.battle-leaderboard header a { color: #d5c9f7; font-size: 11px; font-weight: 700; }
+.battle-leaderboard > div { display: grid; grid-template-columns: 21px 28px 1fr auto; align-items: center; gap: 9px; padding: 12px 0; border-bottom: 1px solid rgba(255,255,255,.09); }
+.battle-leaderboard > div:last-child { border: 0; }
+.battle-leaderboard i { color: #bdb5dc; font-size: 11px; font-style: normal; font-weight: 800; }
+.battle-leaderboard > div > span { display: grid; place-items: center; width: 28px; height: 28px; border-radius: 9px; background: rgba(255,255,255,.13); font-size: 12px; font-weight: 800; }
+.battle-leaderboard b { overflow: hidden; font-size: 13px; text-overflow: ellipsis; white-space: nowrap; }
+.battle-leaderboard strong { color: #d7c5ff; font-size: 13px; }
+.battle-leaderboard > p { color: #d2cbe7; font-size: 13px; line-height: 1.5; }
+.battle-spotlight { display: flex; align-items: center; justify-content: space-between; gap: 25px; margin: 18px 0 8px; padding: 28px 34px; border: 1px solid rgba(117,87,209,.18); border-radius: 22px; background: linear-gradient(135deg, rgba(239,232,255,.85), rgba(232,237,255,.82)); }
+.battle-spotlight h2 { margin: 7px 0; color: #251c4e; font-size: 1.55rem; letter-spacing: -.04em; }
+.battle-spotlight p { margin: 0; color: #67617e; font-size: 13px; }
+.battle-spotlight > div:last-child { display: grid; gap: 5px; min-width: 145px; padding: 15px 18px; border-radius: 14px; color: #fff; background: linear-gradient(135deg, #7b54db, #4d52d1); }
+.battle-spotlight > div:last-child strong { font-size: 11px; letter-spacing: .08em; }
+.battle-spotlight > div:last-child span { color: #e5dfff; font-size: 11px; }
+@keyframes battle-orbit { to { transform: rotate(360deg); } }
+@media (hover: hover) and (pointer: fine) { .battle-question button:hover { border-color: rgba(116,80,220,.58); transform: translateY(-1px); } }
+@media (max-width: 759px) { .battle-hero { grid-template-columns: 1fr; min-height: 0; padding: 36px 24px 30px; text-align: center; } .battle-hero .eyebrow { justify-content: center; } .battle-hero h1 { margin-inline: auto; font-size: clamp(3.3rem, 15vw, 4.8rem); } .battle-hero p { margin-inline: auto; } .battle-hero-mark { width: 156px; } .battle-hero-mark i { width: 46px; height: 46px; border-radius: 15px; } .battle-hero-mark span { font-size: 1.7rem; } .battle-stage,.battle-result { padding: 22px 17px; border-radius: 20px; } .battle-question { padding: 17px; } .battle-question > div { grid-template-columns: 1fr; } .battle-question button { min-height: 46px; } .battle-status { align-items: flex-start; } .battle-status > strong { font-size: 1.05rem; } .battle-lower { grid-template-columns: 1fr; } .battle-rules,.battle-leaderboard { padding: 22px; border-radius: 20px; } .battle-spotlight { align-items: flex-start; flex-direction: column; padding: 24px; } .battle-spotlight > div:last-child { width: 100%; } }
+@media (prefers-reduced-motion: reduce) { .battle-search-orbit { animation: none; } .battle-question-progress i,.battle-question button { transition-duration: .01ms; } }
+
 @media (max-width: 759px) {
   /* Prevent iOS Safari from dropping the label on primary actions when the
      glass rules are composed together (for example, New discussion). */

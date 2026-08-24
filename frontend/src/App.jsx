@@ -8,7 +8,7 @@ import {
   Check, Clock3, Flame,
   GraduationCap, Hand, Headphones, House, LayoutDashboard, LineChart,
   LockKeyhole, LogOut, Mail, Menu, MessageCircle, PenLine, Plus, RotateCcw, SkipForward,
-  Search, Send, Settings, ShieldCheck, Sparkles, Target, Trophy, UserRound,
+  Search, Send, Settings, ShieldCheck, Sparkles, Swords, Target, Trophy, UserRound,
   UsersRound, X, Zap
 } from 'lucide-react'
 import './styles.css'
@@ -257,6 +257,7 @@ const navItems = [
   ['/dashboard/college-path-view', GraduationCap, 'College path'],
   ['/dashboard/stats', BarChart3, 'Stats'],
   ['/dashboard/tracker', LineChart, 'Tracker'],
+  ['/battles', Swords, 'SAT Battles'],
   ['/forum', MessageCircle, 'Community'],
   ['/leaderboard', Trophy, 'Leaderboard'],
   ['/account', Settings, 'Settings']
@@ -1573,6 +1574,46 @@ function EditStats() { const d = boot.data; const values = { gpa: d.gpa, sat_ebr
 function Field({ name, label, textarea = false, value, ...props }) { return <label>{label}{textarea ? <textarea name={name} rows="4" defaultValue={value || ''} {...props} /> : <input name={name} defaultValue={value || ''} {...props} />}</label> }
 function BuilderPage({ kind }) { const d = boot.data; const test = kind === 'test'; const [focus, setFocus] = useState(d.test_focus || ''); return <AppShell name={d.name}><main className="app-main form-page"><PageIntro kicker={test ? 'TEST PREPARATION' : 'COLLEGE PLANNING'} title={test ? 'Design your next five steps.' : 'Build a college plan that fits.'} copy={test ? 'Tell Mentics what the score alone cannot show.' : 'Turn a wide-open process into focused, personal action.'} /><form method="POST" className="settings-form builder-form">{test ? <><fieldset><legend>Which test are you preparing for?</legend><div className="choice-grid choice-grid--three">{[['sat', 'SAT only'], ['act', 'ACT only'], ['both', 'SAT + ACT']].map(([value, label]) => <label className={focus === value ? 'selected' : ''} key={value}><input type="radio" name="test_focus" value={value} required checked={focus === value} onChange={() => setFocus(value)} /><BookOpen /><b>{label}</b></label>)}</div></fieldset><div className="form-field-grid"><Field name="desired_sat" label="Desired SAT" type="number" min="400" max="1600" step="10" value={d.desired_sat} /><Field name="desired_act" label="Desired ACT" type="number" min="1" max="36" value={d.desired_act} /><Field name="current_sat_ebrw" label="Current SAT reading & writing" type="number" min="200" max="800" value={d.current_sat_ebrw} /><Field name="current_sat_math" label="Current SAT math" type="number" min="200" max="800" value={d.current_sat_math} /><Field name="current_act_composite" label="Current ACT composite" type="number" min="1" max="36" value={d.current_act_composite} /><Field name="current_act_math" label="Current ACT math" type="number" min="1" max="36" value={d.current_act_math} /><Field name="current_act_reading" label="Current ACT reading" type="number" min="1" max="36" value={d.current_act_reading} /><Field name="current_act_science" label="Current ACT science" type="number" min="1" max="36" value={d.current_act_science} /><Field name="hours_per_week" label="Hours available each week" type="number" min="1" max="40" value={d.hours_per_week} /></div><Field name="strengths" label="Your strengths" textarea value={d.strengths} /><Field name="weaknesses" label="Where you need the most help" textarea required value={d.weaknesses} /><Field name="test_date" label="Test date" type="date" value={d.test_date} /></> : <><div className="form-field-grid"><label>Current grade<select name="current_grade" required defaultValue={d.grade || ''}><option value="">Choose grade</option>{['9', '10', '11', '12'].map(v => <option value={v} key={v}>{v}th grade</option>)}</select></label><label>Planning stage<select name="planning_stage" required defaultValue={d.planning_stage || ''}><option value="">Choose stage</option><option value="exploring">Exploring options</option><option value="researching">Researching colleges</option><option value="applying">Ready to apply</option></select></label></div><Field name="interested_majors" label="Interested majors" textarea value={d.majors} /><Field name="target_colleges" label="Target colleges" textarea value={d.target_colleges} /></>}<div className="form-actions"><a className="button button--quiet" href="/dashboard">Cancel</a><button className="button button--primary" type="submit">Build my five-step path <ArrowRight /></button></div></form></main></AppShell> }
 
+function BattleArena() {
+  const d = boot.data
+  const [battle, setBattle] = useState(d.currentBattle)
+  const [answers, setAnswers] = useState({})
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState('')
+  const [secondsLeft, setSecondsLeft] = useState(null)
+  const refresh = async id => { try { setBattle(await api(`/api/sat-battles/${id}`)) } catch (x) { setError(x.message) } }
+  useEffect(() => {
+    if (!battle?.id || !['waiting', 'active'].includes(battle.status)) return undefined
+    const poll = window.setInterval(() => refresh(battle.id), 1800)
+    return () => window.clearInterval(poll)
+  }, [battle?.id, battle?.status])
+  useEffect(() => {
+    if (battle?.status !== 'active' || !battle.startedAt) return undefined
+    const tick = () => setSecondsLeft(Math.max(0, battle.durationSeconds - Math.floor((Date.now() - Date.parse(battle.startedAt)) / 1000)))
+    tick(); const timer = window.setInterval(tick, 250)
+    return () => window.clearInterval(timer)
+  }, [battle?.status, battle?.startedAt, battle?.durationSeconds])
+  const join = async () => { setBusy(true); setError(''); try { setBattle(await api('/api/sat-battles/queue', { method: 'POST' })) } catch (x) { setError(x.message) } finally { setBusy(false) } }
+  const cancelQueue = async () => { if (!battle) return; setBusy(true); setError(''); try { await api(`/api/sat-battles/${battle.id}/cancel`, { method: 'POST' }); setBattle(null) } catch (x) { setError(x.message) } finally { setBusy(false) } }
+  const select = (questionIndex, selectedOption) => setAnswers(current => ({ ...current, [questionIndex]: selectedOption }))
+  const submit = async () => { if (!battle || Object.keys(answers).length !== battle.questions.length) return; setBusy(true); setError(''); try { setBattle(await api(`/api/sat-battles/${battle.id}/submit`, { method: 'POST', body: JSON.stringify({ answers: Object.entries(answers).map(([question_index, selected_option]) => ({ question_index: Number(question_index), selected_option })) }) })) } catch (x) { setError(x.message) } finally { setBusy(false) } }
+  const active = battle?.status === 'active'
+  const waiting = battle?.status === 'waiting'
+  const complete = battle?.status === 'complete'
+  const idle = !battle || battle.status === 'expired'
+  const clock = secondsLeft == null ? '2:00' : `${Math.floor(secondsLeft / 60)}:${String(secondsLeft % 60).padStart(2, '0')}`
+  const spotlight = d.spotlight
+  return <AppShell name={d.name}><main className="app-main battle-page">
+    <section className="battle-hero"><div><div className="eyebrow"><span /> LIVE SAT ARENA</div><h1>Fast thinking.<br /><em>Real pressure.</em></h1><p>Race a matched student through five original SAT-style questions. Accuracy wins; speed breaks a tie.</p>{idle && <button className="button button--primary battle-join" onClick={join} disabled={busy}><Swords /> {busy ? 'Finding a challenger…' : 'Enter the arena'} <ArrowRight /></button>}</div><div className="battle-hero-mark"><i><Swords /></i><span>1:1</span><small>HEAD-TO-HEAD</small></div></section>
+    {error && <div className="error-banner">{error}<button onClick={() => setError('')}>Dismiss</button></div>}
+    {waiting && <section className="battle-stage battle-stage--waiting" aria-live="polite"><span className="battle-search-orbit"><Swords /></span><div><small>MATCHMAKING</small><h2>Finding your challenger</h2><p>Your question set is locked. This starts automatically when another student joins.</p></div><div className="battle-wait-actions"><button className="text-button" onClick={() => refresh(battle.id)}>Check match status <RotateCcw /></button><button className="text-button" disabled={busy} onClick={cancelQueue}>Leave queue</button></div></section>}
+    {active && <section className="battle-stage" aria-label="Active SAT battle"><header className="battle-status"><span><i /><b>LIVE BATTLE</b><small>vs {battle.opponentName || 'your challenger'}</small></span><strong className={secondsLeft < 20 ? 'urgent' : ''}><Clock3 /> {clock}</strong></header>{battle.submitted ? <div className="battle-locked"><span className="battle-search-orbit"><Check /></span><h2>Answers locked.</h2><p>Waiting for {battle.opponentName || 'your challenger'} to finish. The arena will reveal the result automatically.</p></div> : <><div className="battle-question-progress">{battle.questions.map((_, index) => <i key={index} className={answers[index] != null ? 'done' : ''}>{index + 1}</i>)}</div><div className="battle-questions">{battle.questions.map((question, index) => <article className="battle-question" key={index}><header><small>QUESTION {index + 1} · {question.skill}</small><span>{answers[index] != null ? 'ANSWERED' : 'UNANSWERED'}</span></header><h2>{question.question_text}</h2><div>{question.options.map((option, optionIndex) => <button key={optionIndex} className={answers[index] === optionIndex ? 'selected' : ''} onClick={() => select(index, optionIndex)}><i>{String.fromCharCode(65 + optionIndex)}</i><span>{option}</span></button>)}</div></article>)}</div><button className="button button--primary battle-lock" disabled={busy || Object.keys(answers).length !== battle.questions.length} onClick={submit}>{busy ? 'Locking answers…' : `Lock in ${Object.keys(answers).length}/${battle.questions.length} answers`} <ArrowRight /></button></>}</section>}
+    {complete && <section className={`battle-result ${battle.youWon ? 'won' : battle.draw ? 'draw' : 'lost'}`}><div className="battle-result-mark">{battle.youWon ? <Trophy /> : battle.draw ? <Target /> : <Swords />}</div><small>{battle.youWon ? 'VICTORY' : battle.draw ? 'DRAW' : 'BATTLE COMPLETE'}</small><h2>{battle.youWon ? 'You won the race.' : battle.draw ? 'A dead-even finish.' : 'A strong round. Run it back.'}</h2><p><b>{battle.yourScore}</b> correct <span>vs</span> <b>{battle.opponentScore}</b> correct</p><button className="button button--primary" onClick={() => { setBattle(null); setAnswers({}) }}>Find another battle <Swords /></button></section>}
+    <section className="battle-lower"><div className="battle-rules"><small>HOW IT WORKS</small><h2>One clean round. No fluff.</h2><div><article><b>01</b><span><strong>Match</strong><p>We pair you with one student and serve the same question set.</p></span></article><article><b>02</b><span><strong>Race</strong><p>Answer all five in two minutes. Your clock starts together.</p></span></article><article><b>03</b><span><strong>Climb</strong><p>Accuracy takes it. Faster completion breaks a tied score.</p></span></article></div></div><aside className="battle-leaderboard"><header><span><Trophy /> BATTLE LEADERBOARD</span><a href="#battle-rankings">View rankings</a></header>{d.leaderboard?.length ? d.leaderboard.slice(0, 5).map((row, index) => <div key={row.user_id}><i>{index + 1}</i><span>{String(row.user_name || 'M').slice(0, 1)}</span><b>{row.user_name}</b><strong>{row.rating}</strong></div>) : <p>The first completed battle earns a place here.</p>}</aside></section>
+    <section className="battle-spotlight" id="battle-rankings"><div><small>ARENA SPOTLIGHT</small><h2>{spotlight ? `${spotlight.challenger_name} vs ${spotlight.opponent_name}` : 'The next great battle starts with you.'}</h2><p>{spotlight ? 'The latest completed head-to-head round in the Mentics arena.' : 'Enter the arena to set the first battle on the board.'}</p></div><div>{spotlight ? <><strong>{spotlight.winner_id ? 'WINNER DECIDED' : 'DRAW'}</strong><span>Latest completed battle</span></> : <><strong>OPEN</strong><span>Matchmaking is ready</span></>}</div></section>
+  </main></AppShell>
+}
+
 function ForumPage() {
   const d = boot.data
   const [creating, setCreating] = useState(false)
@@ -1657,6 +1698,7 @@ function App() {
   switch (boot.page) {
     case 'dashboard': page = <Dashboard />; break
     case 'path': page = <PathPage />; break
+    case 'battles': page = <BattleArena />; break
     case 'login': page = <AuthPage mode="login" />; break
     case 'signup': page = <AuthPage mode="signup" />; break
     case 'onboarding': page = <Onboarding />; break

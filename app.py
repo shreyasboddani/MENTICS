@@ -225,6 +225,35 @@ def init_db():
         "FOREIGN KEY(post_id)": "REFERENCES forum_posts(id) ON DELETE CASCADE",
         "FOREIGN KEY(user_id)": "REFERENCES users(id) ON DELETE CASCADE"
     })
+    db.create_table("sat_battles", {
+        "id": "INTEGER PRIMARY KEY AUTOINCREMENT",
+        "status": "TEXT NOT NULL DEFAULT 'waiting'",
+        "challenger_id": "INTEGER NOT NULL",
+        "challenger_name": "TEXT NOT NULL",
+        "opponent_id": "INTEGER",
+        "opponent_name": "TEXT",
+        "questions": "TEXT NOT NULL",
+        "challenger_answers": "TEXT",
+        "opponent_answers": "TEXT",
+        "started_at": "TIMESTAMP",
+        "challenger_finished_at": "TIMESTAMP",
+        "opponent_finished_at": "TIMESTAMP",
+        "completed_at": "TIMESTAMP",
+        "winner_id": "INTEGER",
+        "created_at": "TIMESTAMP DEFAULT CURRENT_TIMESTAMP",
+        "FOREIGN KEY(challenger_id)": "REFERENCES users(id) ON DELETE CASCADE",
+        "FOREIGN KEY(opponent_id)": "REFERENCES users(id) ON DELETE CASCADE"
+    })
+    db.create_table("sat_battle_stats", {
+        "user_id": "INTEGER PRIMARY KEY",
+        "user_name": "TEXT NOT NULL",
+        "rating": "INTEGER NOT NULL DEFAULT 1000",
+        "wins": "INTEGER NOT NULL DEFAULT 0",
+        "losses": "INTEGER NOT NULL DEFAULT 0",
+        "draws": "INTEGER NOT NULL DEFAULT 0",
+        "battles_played": "INTEGER NOT NULL DEFAULT 0",
+        "FOREIGN KEY(user_id)": "REFERENCES users(id) ON DELETE CASCADE"
+    })
     db.create_table("quizzes", {
         "id": "INTEGER PRIMARY KEY AUTOINCREMENT",
         "task_id": "INTEGER NOT NULL",
@@ -433,6 +462,9 @@ def init_db():
         'idx_quiz_results_user': 'quiz_results (user_id)',
         'idx_sprint_results_user': 'sprint_results (user_id)',
         'idx_forum_replies_post': 'forum_replies (post_id, created_at)',
+        'idx_sat_battles_status': 'sat_battles (status, created_at)',
+        'idx_sat_battles_challenger': 'sat_battles (challenger_id, status)',
+        'idx_sat_battles_opponent': 'sat_battles (opponent_id, status)',
         'idx_lesson_steps_lesson': 'lesson_steps (lesson_id, step_order)',
         'idx_skill_mastery_user': 'skill_mastery (user_id)',
         'idx_mistake_bank_user': 'mistake_bank (user_id, resolved, created_at DESC)',
@@ -4469,6 +4501,229 @@ def update_reply(user, reply_id):
         return jsonify({'success': False, 'error': 'Reply content is required'}), 400
     db.update('forum_replies', {'content': content}, where={'id': reply_id})
     return jsonify({'success': True})
+
+
+# --- SAT Battle Arena ------------------------------------------------------
+# These original, compact questions keep a battle fast and fair. The server
+# owns the answer key and timestamps; clients receive only the prompt/options.
+SAT_BATTLE_QUESTION_POOL = [
+    {"question_text": "If 3x + 8 = 29, what is x?", "options": ["5", "7", "9", "11"], "correct_option": 1, "skill": "Algebra"},
+    {"question_text": "What is the value of 2a² - 3 when a = 4?", "options": ["13", "29", "32", "61"], "correct_option": 1, "skill": "Algebra"},
+    {"question_text": "A line has slope 3 and passes through (2, 5). What is its y-intercept?", "options": ["-1", "1", "3", "11"], "correct_option": 0, "skill": "Linear equations"},
+    {"question_text": "A rectangle has length 12 and width 5. What is its area?", "options": ["17", "34", "60", "120"], "correct_option": 2, "skill": "Geometry"},
+    {"question_text": "Which expression is equivalent to (x + 4)(x - 4)?", "options": ["x² - 16", "x² + 16", "x² - 8x + 16", "x² + 8x - 16"], "correct_option": 0, "skill": "Algebra"},
+    {"question_text": "The mean of 6, 8, 10, and n is 9. What is n?", "options": ["9", "10", "11", "12"], "correct_option": 3, "skill": "Data analysis"},
+    {"question_text": "If 40% of a number is 28, what is the number?", "options": ["56", "70", "84", "112"], "correct_option": 1, "skill": "Percentages"},
+    {"question_text": "Which transition most logically signals a contrast?", "options": ["For example,", "Therefore,", "However,", "Similarly,"], "correct_option": 2, "skill": "Transitions"},
+    {"question_text": "Which sentence uses a semicolon correctly?", "options": ["The test was hard; because I rushed.", "I reviewed my errors; then I tried again.", "I reviewed my errors; and then tried again.", "Because I reviewed; my errors improved."], "correct_option": 1, "skill": "Conventions"},
+    {"question_text": "A study found that students who slept more reported better focus. Which conclusion is best supported?", "options": ["Sleep always causes better grades.", "The study proves sleep is the only factor in focus.", "More sleep was associated with better reported focus in this study.", "Students should never study at night."], "correct_option": 2, "skill": "Reading and analysis"},
+]
+SAT_BATTLE_QUESTION_COUNT = 5
+SAT_BATTLE_DURATION_SECONDS = 120
+
+
+def _utc_now():
+    return datetime.now(ZoneInfo("UTC"))
+
+
+def _battle_time(value):
+    if not value:
+        return None
+    parsed = datetime.fromisoformat(str(value).replace('Z', '+00:00'))
+    return parsed if parsed.tzinfo else parsed.replace(tzinfo=ZoneInfo("UTC"))
+
+
+def _battle_questions():
+    return secrets.SystemRandom().sample(SAT_BATTLE_QUESTION_POOL, SAT_BATTLE_QUESTION_COUNT)
+
+
+def _battle_answers(value):
+    try:
+        answers = json.loads(value or '[]')
+    except (TypeError, ValueError):
+        answers = []
+    return answers if isinstance(answers, list) else []
+
+
+def _battle_score(questions, answers):
+    selected = {item.get('question_index'): item.get('selected_option') for item in answers if isinstance(item, dict)}
+    return sum(1 for index, question in enumerate(questions) if selected.get(index) == question['correct_option'])
+
+
+def _battle_rating(user_id, user_name, outcome):
+    stats = db.select_one('sat_battle_stats', where={'user_id': user_id})
+    if not stats:
+        stats = {'user_id': user_id, 'user_name': user_name, 'rating': 1000, 'wins': 0, 'losses': 0, 'draws': 0, 'battles_played': 0}
+        db.insert('sat_battle_stats', stats)
+    delta = {'win': 24, 'loss': -14, 'draw': 4}[outcome]
+    db.update('sat_battle_stats', {
+        'user_name': user_name,
+        'rating': max(800, int(stats['rating']) + delta),
+        'wins': int(stats['wins']) + (outcome == 'win'),
+        'losses': int(stats['losses']) + (outcome == 'loss'),
+        'draws': int(stats['draws']) + (outcome == 'draw'),
+        'battles_played': int(stats['battles_played']) + 1,
+    }, where={'user_id': user_id})
+
+
+def _finish_battle_if_ready(battle):
+    if not battle or battle['status'] != 'active':
+        return battle
+    now = _utc_now()
+    started = _battle_time(battle.get('started_at')) or now
+    timed_out = (now - started).total_seconds() >= SAT_BATTLE_DURATION_SECONDS
+    challenger_done = bool(battle.get('challenger_answers'))
+    opponent_done = bool(battle.get('opponent_answers'))
+    if not (timed_out or (challenger_done and opponent_done)):
+        return battle
+    questions = json.loads(battle['questions'])
+    challenger_score = _battle_score(questions, _battle_answers(battle.get('challenger_answers')))
+    opponent_score = _battle_score(questions, _battle_answers(battle.get('opponent_answers')))
+    challenger_time = _battle_time(battle.get('challenger_finished_at')) or now
+    opponent_time = _battle_time(battle.get('opponent_finished_at')) or now
+    winner_id = None
+    if challenger_score > opponent_score or (challenger_score == opponent_score and challenger_score and challenger_time < opponent_time):
+        winner_id = battle['challenger_id']
+    elif opponent_score > challenger_score or (challenger_score == opponent_score and opponent_score and opponent_time < challenger_time):
+        winner_id = battle['opponent_id']
+    completed_at = now.isoformat()
+    updated = db.execute_write(
+        "UPDATE sat_battles SET status='complete', winner_id=?, completed_at=? WHERE id=? AND status='active'",
+        (winner_id, completed_at, battle['id']))
+    if updated:
+        challenger_outcome = 'draw' if winner_id is None else 'win' if winner_id == battle['challenger_id'] else 'loss'
+        opponent_outcome = 'draw' if winner_id is None else 'win' if winner_id == battle['opponent_id'] else 'loss'
+        _battle_rating(battle['challenger_id'], battle['challenger_name'], challenger_outcome)
+        _battle_rating(battle['opponent_id'], battle['opponent_name'], opponent_outcome)
+    return db.select_one('sat_battles', where={'id': battle['id']})
+
+
+def _battle_payload(battle, user_id):
+    if battle and battle['status'] == 'waiting':
+        created_at = _battle_time(battle.get('created_at'))
+        if created_at and (_utc_now() - created_at).total_seconds() > 600:
+            db.execute_write("UPDATE sat_battles SET status='expired' WHERE id=? AND status='waiting'", (battle['id'],))
+            battle = db.select_one('sat_battles', where={'id': battle['id']})
+    battle = _finish_battle_if_ready(battle)
+    if not battle or user_id not in (battle['challenger_id'], battle.get('opponent_id')):
+        return None
+    is_challenger = battle['challenger_id'] == user_id
+    opponent_name = battle.get('opponent_name') if is_challenger else battle['challenger_name']
+    own_answers = _battle_answers(battle.get('challenger_answers') if is_challenger else battle.get('opponent_answers'))
+    result = {
+        'id': battle['id'], 'status': battle['status'], 'opponentName': opponent_name,
+        'startedAt': battle.get('started_at'), 'durationSeconds': SAT_BATTLE_DURATION_SECONDS,
+        'submitted': bool(own_answers), 'createdAt': battle.get('created_at'),
+    }
+    if battle['status'] in {'active', 'complete'}:
+        questions = json.loads(battle['questions'])
+        result['questions'] = [{'question_text': q['question_text'], 'options': q['options'], 'skill': q['skill']} for q in questions]
+    if battle['status'] == 'complete':
+        questions = json.loads(battle['questions'])
+        challenger_score = _battle_score(questions, _battle_answers(battle.get('challenger_answers')))
+        opponent_score = _battle_score(questions, _battle_answers(battle.get('opponent_answers')))
+        own_score, opponent_score = (challenger_score, opponent_score) if is_challenger else (opponent_score, challenger_score)
+        result.update({'winnerId': battle.get('winner_id'), 'youWon': battle.get('winner_id') == user_id, 'draw': battle.get('winner_id') is None, 'yourScore': own_score, 'opponentScore': opponent_score, 'answerKey': [q['correct_option'] for q in questions]})
+    return result
+
+
+def _user_current_battle(user_id):
+    return db.execute_for_one(
+        "SELECT * FROM sat_battles WHERE (challenger_id=? OR opponent_id=?) AND status IN ('waiting', 'active') ORDER BY created_at DESC LIMIT 1",
+        (user_id, user_id))
+
+
+@app.route('/battles')
+@login_required
+def battle_arena(user):
+    current = _user_current_battle(user.data['id'])
+    leaderboard = db.execute("SELECT user_id, user_name, rating, wins, losses, battles_played FROM sat_battle_stats ORDER BY rating DESC, wins DESC LIMIT 10")
+    spotlight = db.execute("SELECT * FROM sat_battles WHERE status='complete' ORDER BY completed_at DESC LIMIT 1")
+    return render_react('battles', {
+        'name': user.get_name(),
+        'currentBattle': _battle_payload(current, user.data['id']) if current else None,
+        'leaderboard': leaderboard,
+        'spotlight': spotlight[0] if spotlight else None,
+    }, 'SAT Battles | Mentics')
+
+
+@app.route('/api/sat-battles/queue', methods=['POST'])
+@login_required
+@rate_limit('12/hour', name='sat_battle_queue', message='Take a moment before searching for another battle.')
+def queue_sat_battle(user):
+    current = _user_current_battle(user.data['id'])
+    if current:
+        return jsonify(_battle_payload(current, user.data['id']))
+    now = _utc_now()
+    for waiting_battle in db.execute("SELECT id, created_at FROM sat_battles WHERE status='waiting'"):
+        created_at = _battle_time(waiting_battle.get('created_at'))
+        if created_at and (now - created_at).total_seconds() > 600:
+            db.update('sat_battles', {'status': 'expired'}, where={'id': waiting_battle['id']})
+    paired = db.execute_returning_one(
+        """UPDATE sat_battles SET opponent_id=?, opponent_name=?, status='active', started_at=?
+           WHERE id=(SELECT id FROM sat_battles WHERE status='waiting' AND challenger_id != ? ORDER BY created_at ASC LIMIT 1)
+             AND status='waiting' RETURNING *""",
+        (user.data['id'], user.get_name(), _utc_now().isoformat(), user.data['id']))
+    if paired:
+        return jsonify(_battle_payload(paired, user.data['id']))
+    battle_id = db.insert('sat_battles', {
+        'status': 'waiting', 'challenger_id': user.data['id'], 'challenger_name': user.get_name(),
+        'questions': json.dumps(_battle_questions()),
+    })
+    return jsonify(_battle_payload(db.select_one('sat_battles', where={'id': battle_id}), user.data['id']))
+
+
+@app.route('/api/sat-battles/<int:battle_id>')
+@login_required
+def get_sat_battle(user, battle_id):
+    battle = db.select_one('sat_battles', where={'id': battle_id})
+    payload = _battle_payload(battle, user.data['id'])
+    if not payload:
+        return jsonify({'error': 'Battle not found'}), 404
+    return jsonify(payload)
+
+
+@app.route('/api/sat-battles/<int:battle_id>/cancel', methods=['POST'])
+@login_required
+def cancel_sat_battle(user, battle_id):
+    cancelled = db.execute_write(
+        "UPDATE sat_battles SET status='expired' WHERE id=? AND challenger_id=? AND status='waiting'",
+        (battle_id, user.data['id']))
+    if not cancelled:
+        return jsonify({'error': 'This match can no longer be cancelled'}), 409
+    return jsonify({'success': True})
+
+
+@app.route('/api/sat-battles/<int:battle_id>/submit', methods=['POST'])
+@login_required
+@rate_limit('20/hour', name='sat_battle_submit')
+def submit_sat_battle(user, battle_id):
+    battle = db.select_one('sat_battles', where={'id': battle_id})
+    if not battle or user.data['id'] not in (battle['challenger_id'], battle.get('opponent_id')):
+        return jsonify({'error': 'Battle not found'}), 404
+    battle = _finish_battle_if_ready(battle)
+    if battle['status'] != 'active':
+        return jsonify({'error': 'This battle has already ended'}), 409
+    is_challenger = user.data['id'] == battle['challenger_id']
+    answer_column = 'challenger_answers' if is_challenger else 'opponent_answers'
+    finished_column = 'challenger_finished_at' if is_challenger else 'opponent_finished_at'
+    if battle.get(answer_column):
+        return jsonify({'error': 'Your answers are already locked'}), 409
+    answers = (request.get_json(silent=True) or {}).get('answers')
+    if not isinstance(answers, list) or len(answers) != SAT_BATTLE_QUESTION_COUNT:
+        return jsonify({'error': 'Answer every question before locking your battle.'}), 400
+    cleaned, seen = [], set()
+    for answer in answers:
+        try:
+            question_index = int(answer.get('question_index'))
+            selected_option = int(answer.get('selected_option'))
+        except (AttributeError, TypeError, ValueError):
+            return jsonify({'error': 'One of your answers is invalid.'}), 400
+        if question_index in seen or not 0 <= question_index < SAT_BATTLE_QUESTION_COUNT or not 0 <= selected_option < 4:
+            return jsonify({'error': 'One of your answers is invalid.'}), 400
+        seen.add(question_index); cleaned.append({'question_index': question_index, 'selected_option': selected_option})
+    db.update('sat_battles', {answer_column: json.dumps(cleaned), finished_column: _utc_now().isoformat()}, where={'id': battle_id})
+    return jsonify(_battle_payload(db.select_one('sat_battles', where={'id': battle_id}), user.data['id']))
 
 
 @app.cli.command("init-db")

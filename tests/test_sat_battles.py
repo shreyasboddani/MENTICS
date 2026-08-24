@@ -1,0 +1,59 @@
+import inspect
+
+import app as app_module
+from dbhelper import DatabaseHandler
+from userhelper import User
+
+
+def _user(database, email, name):
+    database.insert("users", {
+        "email": email,
+        "password": "not-used",
+        "stats": "{}",
+        "name": name,
+        "onboarding_completed": True,
+    })
+    return User(database, email)
+
+
+def test_sat_battle_matches_two_students_and_only_finishes_once(tmp_path, monkeypatch):
+    database = DatabaseHandler(str(tmp_path / "battles.db"))
+    monkeypatch.setattr(app_module, "db", database)
+    app_module.init_db()
+    challenger = _user(database, "challenger@example.test", "Challenger")
+    opponent = _user(database, "opponent@example.test", "Opponent")
+    queue = inspect.unwrap(app_module.queue_sat_battle)
+    submit = inspect.unwrap(app_module.submit_sat_battle)
+
+    with app_module.app.test_request_context("/api/sat-battles/queue", method="POST", json={}):
+        waiting = queue(challenger).get_json()
+    assert waiting["status"] == "waiting"
+    assert "questions" not in waiting
+
+    with app_module.app.test_request_context("/api/sat-battles/queue", method="POST", json={}):
+        active = queue(opponent).get_json()
+    assert active["status"] == "active"
+    assert len(active["questions"]) == app_module.SAT_BATTLE_QUESTION_COUNT
+    assert "correct_option" not in active["questions"][0]
+
+    answers = [{"question_index": index, "selected_option": 0} for index in range(5)]
+    with app_module.app.test_request_context(
+        f"/api/sat-battles/{active['id']}/submit", method="POST", json={"answers": answers}
+    ):
+        first = submit(challenger, active["id"]).get_json()
+    assert first["status"] == "active"
+    assert first["submitted"] is True
+
+    with app_module.app.test_request_context(
+        f"/api/sat-battles/{active['id']}/submit", method="POST", json={"answers": answers}
+    ):
+        result = submit(opponent, active["id"]).get_json()
+    assert result["status"] == "complete"
+    assert len(result["answerKey"]) == 5
+
+    battle = database.select_one("sat_battles", where={"id": active["id"]})
+    challenger_stats = database.select_one("sat_battle_stats", where={"user_id": challenger.data["id"]})
+    opponent_stats = database.select_one("sat_battle_stats", where={"user_id": opponent.data["id"]})
+    assert battle["status"] == "complete"
+    assert challenger_stats["battles_played"] == 1
+    assert opponent_stats["battles_played"] == 1
