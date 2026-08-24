@@ -446,8 +446,8 @@ button,a { -webkit-tap-highlight-color: transparent; }
   .progress-tile { grid-column: span 2; }
   .activity-module { grid-column: span 8; }
   .vital-module { grid-column: span 4; }
-  .insight-module,.updates-module { grid-column: span 6; }
-  .trophies-module { grid-column: span 12; }
+  .insight-module { grid-column: span 8; }
+  .updates-module,.trophies-module { grid-column: span 6; }
 }
 
 /* Five-step journey and mentor panel. */
