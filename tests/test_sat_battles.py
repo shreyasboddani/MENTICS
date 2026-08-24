@@ -1,5 +1,6 @@
 import inspect
 import json
+import re
 from datetime import timedelta
 
 import pytest
@@ -251,35 +252,62 @@ def test_sat_battle_round_uses_a_fresh_validated_ai_set_when_configured(tmp_path
     database = DatabaseHandler(str(tmp_path / "ai-arena.db"))
     monkeypatch.setattr(app_module, "db", database)
     app_module.init_db()
-    generated = {
-        "questions": [
-            {
-                "domain": "math" if index < 3 else "reading_writing",
-                "question_text": f"A deliberately demanding original Grandmaster Digital SAT question {index} gives enough information to require careful, multi-step reasoning before any answer choice can be selected.",
-                "options": [f"Choice {index}A", f"Choice {index}B", f"Choice {index}C", f"Choice {index}D"],
-                "correct_option": index % 4,
-                "skill": f"Advanced skill {index}",
-                "explanation": "The correct choice follows from the supplied constraints; a tempting wrong choice skips one required condition.",
-            }
-            for index in range(5)
-        ]
-    }
+    generated = {"questions": []}
+    for index in range(3):
+        generated["questions"].append({
+            "domain": "math",
+            "question_text": (
+                f"For a positive constant parameter k{index}, a nonlinear system has two roots that satisfy "
+                "a stated ratio and an additional area constraint. The greater root is three times the lesser "
+                "root, while the related similar figure has twice its area. Which value satisfies every condition?"
+            ),
+            "options": [f"Choice {index}A", f"Choice {index}B", f"Choice {index}C", f"Choice {index}D"],
+            "correct_option": index % 4,
+            "skill": f"Advanced math skill {index}",
+            "explanation": "The correct choice follows from every supplied constraint; a tempting wrong choice skips the root-ratio condition.",
+        })
+    for index in range(3, 5):
+        generated["questions"].append({
+            "domain": "reading_writing",
+            "question_text": (
+                f"Text {index}: Researchers compared two explanations for an unexpected result. "
+                + " ".join(["idea"] * 105)
+                + " Which choice is most precisely supported by the relationship between the claims?"
+            ),
+            "options": [f"Choice {index}A", f"Choice {index}B", f"Choice {index}C", f"Choice {index}D"],
+            "correct_option": index % 4,
+            "skill": f"Advanced reading skill {index}",
+            "explanation": "The correct choice matches the scope of both claims; a tempting wrong choice reverses the direction of support.",
+        })
     calls = []
 
     def generate(prompt, **kwargs):
         calls.append((prompt, kwargs))
-        return json.dumps(generated)
+        slot_match = re.search(r"Slot: (\d) of 5", prompt)
+        skill_match = re.search(r'Advanced (?:math|reading) skill (\d)', prompt)
+        slot = int(slot_match.group(1)) - 1 if slot_match else int(skill_match.group(1))
+        return json.dumps({"question": generated["questions"][slot]})
 
     monkeypatch.setattr(app_module, "gemini_api_key", "test-key")
+    monkeypatch.setattr(app_module, "_get_gemini_client", lambda: object())
     monkeypatch.setattr(app_module, "_generate_text", generate)
     questions = app_module._battle_questions(1750)
 
-    assert len(calls) == 1
-    assert "GRANDMASTER" in calls[0][0]
-    assert "Round nonce:" in calls[0][0]
+    assert len(calls) == 10
+    assert all("GRANDMASTER" in call[0] for call in calls)
+    creation_calls = [call for call in calls if "Slot:" in call[0]]
+    review_calls = [call for call in calls if "Independently audit" in call[0]]
+    assert {int(re.search(r"Slot: (\d) of 5", call[0]).group(1)) for call in creation_calls} == {1, 2, 3, 4, 5}
+    assert all(call[1]["model"] == app_module.GEMINI_ARENA_MODEL for call in calls)
+    assert all(call[1]["thinking_level"] == "medium" for call in creation_calls)
+    assert all(call[1]["thinking_level"] == "medium" for call in review_calls)
     assert {question["difficulty"] for question in questions} == {"grandmaster"}
+    assert {question["source"] for question in questions} == {"gemini"}
     assert all(question["explanation"] for question in questions)
-    assert {question["skill"] for question in questions} == {f"Advanced skill {index}" for index in range(5)}
+    assert {question["skill"] for question in questions} == {
+        "Advanced math skill 0", "Advanced math skill 1", "Advanced math skill 2",
+        "Advanced reading skill 3", "Advanced reading skill 4",
+    }
 
 
 def test_waiting_arena_match_defers_ai_generation_until_it_becomes_a_round(tmp_path, monkeypatch):
@@ -297,6 +325,23 @@ def test_waiting_arena_match_defers_ai_generation_until_it_becomes_a_round(tmp_p
     stored = database.select_one("sat_battles", where={"id": waiting["id"]})
     assert waiting["status"] == "waiting"
     assert json.loads(stored["questions"]) == []
+
+
+def test_configured_training_never_silently_reuses_the_fallback_bank(tmp_path, monkeypatch):
+    database = DatabaseHandler(str(tmp_path / "strict-ai-training.db"))
+    monkeypatch.setattr(app_module, "db", database)
+    app_module.init_db()
+    challenger = _user(database, "strict-ai@example.test", "Strict AI")
+    train = inspect.unwrap(app_module.train_with_sat_battle_bot)
+    monkeypatch.setattr(app_module, "gemini_api_key", "test-key")
+    monkeypatch.setattr(app_module, "_generate_ai_battle_questions", lambda _difficulty: None)
+
+    with app_module.app.test_request_context("/api/sat-battles/train", method="POST", json={"rank": "grandmaster"}):
+        response, status = train(challenger)
+
+    assert status == 503
+    assert "Gemini" in response.get_json()["error"]
+    assert database.execute("SELECT * FROM sat_battles") == []
 
 
 def test_training_bots_scale_their_accuracy_with_the_selected_rank():
