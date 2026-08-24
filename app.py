@@ -2941,6 +2941,35 @@ def set_timezone():
 # --- Dashboard & Path Routes ---
 
 
+def _academic_score_snapshot(stats):
+    """Return the one canonical set of scores shown across the product."""
+    def as_int(value):
+        try:
+            return int(value)
+        except (TypeError, ValueError):
+            return None
+
+    test_path = stats.get('test_path') or {}
+    sat_ebrw = as_int(stats.get('sat_ebrw') or test_path.get('current_sat_ebrw'))
+    sat_math = as_int(stats.get('sat_math') or test_path.get('current_sat_math'))
+    saved_sat_total = as_int(stats.get('sat_total'))
+    sat_total = sat_ebrw + sat_math if sat_ebrw is not None and sat_math is not None else saved_sat_total
+
+    act_math = as_int(stats.get('act_math') or test_path.get('current_act_math'))
+    act_reading = as_int(stats.get('act_reading') or test_path.get('current_act_reading'))
+    act_science = as_int(stats.get('act_science') or test_path.get('current_act_science'))
+    saved_act_composite = as_int(stats.get('act_composite') or test_path.get('current_act_composite'))
+    act_sections = [value for value in (act_math, act_reading, act_science) if value is not None]
+    act_average = saved_act_composite or (round(sum(act_sections) / len(act_sections)) if act_sections else None)
+
+    return {
+        'gpa': stats.get('gpa') or None,
+        'satEbrw': sat_ebrw, 'satMath': sat_math, 'satTotal': sat_total,
+        'actMath': act_math, 'actReading': act_reading, 'actScience': act_science,
+        'actComposite': saved_act_composite, 'actAverage': act_average,
+    }
+
+
 @app.route("/dashboard")
 @login_required
 def dashboard(user):
@@ -2983,26 +3012,7 @@ def dashboard(user):
     total_college_planning_completed = sum(
         1 for t in all_tasks if t['is_completed'] and t['category'] == 'College Planning')
 
-    # --- Key Stat Calculations ---
-    sat_ebrw = stats.get("sat_ebrw")
-    sat_math = stats.get("sat_math")
-    sat_total = None
-    if sat_ebrw and sat_math:
-        try:
-            sat_total = int(sat_ebrw) + int(sat_math)
-        except (ValueError, TypeError):
-            sat_total = None
-
-    act_scores = []
-    if stats.get("act_math"):
-        act_scores.append(int(stats.get("act_math")))
-    if stats.get("act_reading"):
-        act_scores.append(int(stats.get("act_reading")))
-    if stats.get("act_science"):
-        act_scores.append(int(stats.get("act_science")))
-
-    act_average = round(sum(act_scores) / len(act_scores)
-                        ) if act_scores else None
+    academic_scores = _academic_score_snapshot(stats)
 
     # --- Recent Activity Fetch ---
     recent_activities_raw = db.select(
@@ -3129,9 +3139,9 @@ def dashboard(user):
         "name": name,
         "testPrepCompleted": test_prep_completed_current,
         "collegePlanningCompleted": college_planning_completed_current,
-        "gpa": stats.get("gpa") or "—",
-        "satTotal": sat_total or "—",
-        "actAverage": act_average or "—",
+        "gpa": academic_scores['gpa'] or "—",
+        "satTotal": academic_scores['satTotal'] or "—",
+        "actAverage": academic_scores['actAverage'] or "—",
         "recentActivities": recent_activities,
         "activityData": activity_data,
         "testDateInfo": test_date_info,
@@ -3378,25 +3388,15 @@ def stats(user):
     stats = user.get_stats()
     user_id = user.data['id']
 
+    test_path = stats.get("test_path") or {}
+    academic_scores = _academic_score_snapshot(stats)
+
     def as_int(value):
         try:
             return int(value)
         except (TypeError, ValueError):
             return None
 
-    test_path = stats.get("test_path") or {}
-    # Scores may be entered on the profile or while building a test path.
-    # The profile should show one coherent snapshot, not make students re-enter them.
-    sat_ebrw = as_int(stats.get("sat_ebrw") or test_path.get("current_sat_ebrw"))
-    sat_math = as_int(stats.get("sat_math") or test_path.get("current_sat_math"))
-    sat_total = sat_ebrw + sat_math if sat_ebrw and sat_math else as_int(stats.get("sat_total"))
-    act_math = as_int(stats.get("act_math") or test_path.get("current_act_math"))
-    act_reading = as_int(stats.get("act_reading") or test_path.get("current_act_reading"))
-    act_science = as_int(stats.get("act_science") or test_path.get("current_act_science"))
-    act_sections = [act_math, act_reading, act_science]
-    act_composite = as_int(stats.get("act_composite") or test_path.get("current_act_composite"))
-    act_average = act_composite or (round(sum(v for v in act_sections if v) / len([v for v in act_sections if v]))
-                                    if any(act_sections) else None)
     goal_sat = as_int(test_path.get("desired_sat"))
     goal_act = as_int(test_path.get("desired_act"))
 
@@ -3424,10 +3424,10 @@ def stats(user):
 
     return render_react("stats", {
         "name": user.get_name(),
-        "gpa": stats.get("gpa", ""),
-        "satEbrw": sat_ebrw, "satMath": sat_math, "satTotal": sat_total,
-        "actMath": act_math, "actReading": act_reading,
-        "actScience": act_science, "actAverage": act_average, "actComposite": act_composite,
+        "gpa": academic_scores['gpa'] or "",
+        "satEbrw": academic_scores['satEbrw'], "satMath": academic_scores['satMath'], "satTotal": academic_scores['satTotal'],
+        "actMath": academic_scores['actMath'], "actReading": academic_scores['actReading'],
+        "actScience": academic_scores['actScience'], "actAverage": academic_scores['actAverage'], "actComposite": academic_scores['actComposite'],
         "goalSat": goal_sat, "goalAct": goal_act,
         "testDate": test_path.get("test_date"),
         "points": game.get("points") or 0,
@@ -4116,13 +4116,12 @@ def api_update_stats(user):
             "user_id": user.data['id'], "stat_name": stat_name, "stat_value": stat_value
         })
 
-        if stat_name not in ["sat_total", "act_composite"]:
-            stats = user.get_stats()
-            stats[stat_name] = stat_value
-            user.set_stats(stats)
+        stats = user.get_stats()
+        stats[stat_name] = stat_value
+        user.set_stats(stats)
 
-            log_activity(user.data['id'], 'stat_updated', {
-                         'stat_name': stat_name.upper(), 'stat_value': stat_value})
+        log_activity(user.data['id'], 'stat_updated', {
+                     'stat_name': stat_name.upper(), 'stat_value': stat_value})
 
         return jsonify({"success": True, "message": "Stats updated successfully"})
     except Exception as e:

@@ -27,8 +27,11 @@ class User:
 
     def set_stats(self, stats):
         if self.data:
-            self.db.update("users", {"stats": json.dumps(
-                stats)}, where={"email": self.email})
+            serialized_stats = json.dumps(stats)
+            self.db.update("users", {"stats": serialized_stats}, where={"email": self.email})
+            # Keep the request-scoped user object coherent for consecutive
+            # updates, rather than allowing a later save to overwrite a score.
+            self.data["stats"] = serialized_stats
 
     @staticmethod
     def from_session(db, session):
