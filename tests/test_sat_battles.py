@@ -180,6 +180,11 @@ def test_sat_battle_questions_are_original_sat_style_and_scale_by_rank():
     }
     prompts = {}
     for tier, rating in tiers.items():
+        bank = app_module.SAT_BATTLE_QUESTION_BANK[tier]
+        assert len(bank) >= app_module.SAT_BATTLE_QUESTION_COUNT
+        assert min(len(question["question_text"]) for question in bank) >= 75
+        assert sum(len(question["question_text"]) for question in bank) / len(bank) >= 140
+        assert len({question["skill"] for question in bank}) >= 4
         questions = app_module._battle_questions(rating)
         assert len(questions) == app_module.SAT_BATTLE_QUESTION_COUNT
         assert {question["difficulty"] for question in questions} == {tier}

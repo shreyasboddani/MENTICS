@@ -1882,3 +1882,124 @@
 .account-danger-zone { display: grid; gap: 16px; margin-top: 18px; padding: 24px; border: 1px solid rgba(188, 70, 84, .28); border-radius: 18px; background: linear-gradient(145deg, rgba(255, 248, 249, .94), rgba(255, 239, 242, .72)); box-shadow: inset 0 1px rgba(255,255,255,.9); }
 .account-danger-zone header { display: flex; align-items: center; gap: 11px; }.account-danger-zone header > svg { width: 37px; height: 37px; padding: 9px; border-radius: 12px; color: #b63f51; background: rgba(191, 61, 78, .11); }.account-danger-zone header small { color: #ad4756; font-size: 9px; font-weight: 850; letter-spacing: .14em; }.account-danger-zone h2 { margin: 3px 0 0; color: #4b2029; font-size: 1.05rem; }.account-danger-zone > p { max-width: 760px; margin: 0; color: #72555c; font-size: 12px; line-height: 1.6; }.account-danger-zone form { display: grid; grid-template-columns: minmax(180px, 1fr) minmax(160px, .8fr) auto; align-items: end; gap: 12px; }.account-danger-zone label { display: grid; gap: 7px; color: #653942; font-size: 10px; font-weight: 800; }.account-danger-zone input { min-height: 42px; border: 1px solid rgba(156, 87, 98, .26); border-radius: 10px; color: #43252c; background: rgba(255,255,255,.78); font: inherit; padding: 0 11px; }.account-danger-zone input:focus { outline: 0; border-color: #bd5664; box-shadow: 0 0 0 4px rgba(189, 86, 100, .12); }.account-delete-button { min-height: 42px; border: 1px solid #a63547; border-radius: 10px; color: #fff; background: linear-gradient(135deg, #c34d5e, #963045); box-shadow: 0 13px 24px -17px rgba(146, 40, 56, .85), inset 0 1px rgba(255,255,255,.26); font: inherit; font-size: 11px; font-weight: 850; cursor: pointer; }.account-delete-button:active { transform: scale(.985); }
 @media (max-width: 759px) { .account-danger-zone { padding: 19px 16px; }.account-danger-zone form { grid-template-columns: 1fr; }.account-delete-button { width: 100%; min-height: 46px; } }
+
+/* Arena lobby refinement: one decision at a time. The lobby uses the visual
+   language of a polished game menu—strong selected state, compact player
+   identity, and a single Ready Up action—without turning the whole page into
+   a dark sci-fi dashboard. */
+.battle-page { max-width: 1180px; }
+.arena-lobby--game {
+  overflow: hidden;
+  border: 1px solid #d9dcef;
+  border-radius: 24px;
+  color: #20213d;
+  background:
+    radial-gradient(circle at 86% 0%, rgba(137, 111, 241, .17), transparent 30%),
+    linear-gradient(145deg, #fbfcff, #f2f4fb 76%);
+  box-shadow: 0 26px 60px -44px rgba(35, 31, 85, .48), inset 0 1px rgba(255,255,255,.92);
+}
+.arena-lobby--game::before { display: none; }
+.arena-lobby--game::after { height: 4px; opacity: 1; background: linear-gradient(90deg, #6556cf 0 30%, #7fa9e8 55%, #d7d8ed 82%); }
+.arena-lobby--game .arena-lobby-topline {
+  min-height: 46px;
+  padding: 0 25px;
+  border-bottom-color: #e3e5f0;
+  color: #636983;
+  background: rgba(255,255,255,.56);
+}
+.arena-lobby--game .arena-lobby-topline > span:first-child { color: #3d3f69; }
+.arena-lobby--game .arena-lobby-topline > span:first-child i { background: #42b68b; box-shadow: 0 0 0 4px rgba(66,182,139,.12); }
+.arena-lobby--game .arena-lobby-topline b { color: #7564cf; }
+.arena-lobby--game .arena-lobby-main {
+  grid-template-columns: 205px minmax(0, 1fr) 225px;
+  gap: 14px;
+  min-height: 318px;
+  padding: 20px;
+}
+.arena-lobby-pilot {
+  padding: 18px 16px;
+  border-color: #e1e3ee;
+  border-radius: 16px;
+  color: #24253e;
+  background: rgba(255,255,255,.75);
+  box-shadow: 0 14px 28px -26px rgba(28,25,72,.38), inset 0 1px #fff;
+}
+.arena-lobby-pilot > small,.arena-lobby-playlist > header small,.arena-difficulty-board header small,.arena-playlist-action small { color: #7768c7; }
+.arena-pilot-avatar { width: 70px; height: 70px; margin: 15px 0 9px; border-color: rgba(104,87,204,.55); border-radius: 22px; background: linear-gradient(145deg, #806ce0, #556ac4); box-shadow: 0 0 0 6px rgba(108,88,209,.08), 0 16px 25px -20px rgba(65,51,152,.72), inset 0 1px rgba(255,255,255,.44); font-size: 28px; }
+.arena-lobby-pilot > b,.arena-pilot-rank b { color: #252641; }
+.arena-lobby-pilot > em { color: #388e71; }
+.arena-lobby-pilot > em i { background: #42b68b; box-shadow: 0 0 9px rgba(66,182,139,.68); }
+.arena-pilot-rank { padding-top: 14px; border-top-color: #e7e8f0; }
+.arena-pilot-rank > span { color: #fff; background: linear-gradient(135deg, #b68750, #8b613b); }
+.arena-pilot-rank small,.arena-lobby-pilot > p { color: #747991; }
+.arena-rank-progress { background: #e7e8f1; }
+.arena-lobby-playlist {
+  padding: 22px 25px 18px;
+  border-color: #e0e2ee;
+  border-radius: 16px;
+  background: rgba(255,255,255,.82);
+  box-shadow: 0 16px 30px -27px rgba(28,25,72,.35), inset 0 1px #fff;
+}
+.arena-lobby-playlist > header > span { border-color: #e1ddf4; color: #6d60b3; background: #f4f2ff; }
+.arena-playlist-title { grid-template-columns: 48px minmax(0, 1fr); gap: 13px; margin-top: 21px; }
+.arena-playlist-title > i { width: 48px; height: 48px; border: 0; border-radius: 14px; background: linear-gradient(135deg, #7962df, #566dce); box-shadow: 0 13px 22px -17px rgba(89,66,196,.78), inset 0 1px rgba(255,255,255,.4); }
+.arena-lobby--game[data-mode="training"] .arena-playlist-title > i { background: linear-gradient(135deg, #3f8baa, #5867cc); }
+.arena-playlist-title svg { width: 22px; }
+.arena-playlist-title h1 { margin: -1px 0 4px; color: #252641; font-size: clamp(1.65rem, 3vw, 2.25rem); }
+.arena-playlist-title p { color: #62677d; font-size: 12px; line-height: 1.55; }
+.arena-playlist-action { margin-top: 18px; padding-top: 15px; border-top-color: #ececf3; }
+.arena-playlist-action b { color: #3f4358; }
+.arena-ready-button { min-height: 46px; padding: 0 18px; border: 0; border-radius: 12px; background: linear-gradient(135deg, #684ed3, #3c62c4); box-shadow: 0 16px 27px -18px rgba(67,52,173,.78), inset 0 1px rgba(255,255,255,.32); }
+.arena-difficulty-board {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 20px 17px;
+  border-color: #e1e3ee;
+  border-radius: 16px;
+  color: #252641;
+  background: rgba(255,255,255,.67);
+  box-shadow: inset 0 1px #fff;
+}
+.arena-difficulty-board header svg { color: #7462ca; }
+.arena-difficulty-board h2 { margin: 17px 0 7px; color: #2c2d4b; font-size: 17px; }
+.arena-difficulty-board > p { color: #64697f; font-size: 10px; }
+.arena-difficulty-board ol { display: none; }
+.arena-difficulty-board footer { margin-top: 14px; padding-top: 12px; border-top-color: #e8e9f1; color: #565d78; font-size: 10px; }
+.arena-training-ranks { gap: 7px; margin-top: 18px; }
+.arena-training-ranks button { border-color: #e2e3ed; color: #596078; background: #f8f9fc; }
+.arena-training-ranks button b { color: #343650; }.arena-training-ranks button small { color: #7b8195; }
+.arena-training-ranks button.selected { border-color: #8d7ae1; color: #342b73; background: #f0edff; box-shadow: 0 0 0 2px rgba(120,94,213,.11), inset 0 1px #fff; }
+.arena-lobby--game .arena-lobby-format { grid-template-columns: minmax(330px, 1.25fr) minmax(140px, .45fr) minmax(140px, .45fr); min-height: 76px; border-top-color: #e3e5ef; }
+.arena-playlist-switch { padding: 10px 14px; border-right-color: #e5e6ee; }
+.arena-playlist-switch button { color: #656a7f; border-color: #e7e8f0; background: #fafbfe; }
+.arena-playlist-switch button.selected { border-color: #d6d0f1; color: #433a8f; background: #f1effd; box-shadow: inset 0 1px #fff; }
+.arena-lobby--game .arena-lobby-format > span { min-height: 76px; border-right-color: #e5e6ee; }
+.arena-lobby--game .arena-lobby-format > span i { color: #5d57af; background: #f0effa; }.arena-lobby-format b { color: #3e4056; }.arena-lobby-format small { color: #777c90; }
+@media (hover: hover) and (pointer: fine) {
+  .arena-training-ranks button:hover { border-color: #bdb3eb; background: #f4f2ff; transform: translateY(-1px); }
+  .arena-ready-button:hover { filter: brightness(1.06); transform: translateY(-1px); }
+  .arena-playlist-switch button:hover:not(.selected) { color: #41455d; background: #f3f4f9; }
+}
+@media (max-width: 1050px) {
+  .arena-lobby--game .arena-lobby-main { grid-template-columns: 190px minmax(0, 1fr); }
+  .arena-difficulty-board { grid-column: 1 / -1; display: grid; grid-template-columns: 170px minmax(0, 1fr); gap: 14px; align-items: center; }
+  .arena-difficulty-board h2 { margin: 0; }.arena-difficulty-board > p { margin: 0; }.arena-difficulty-board footer { grid-column: 2; margin: -8px 0 0; padding-top: 0; border-top: 0; }
+}
+@media (max-width: 759px) {
+  .arena-lobby--game { border-radius: 18px; }.arena-lobby--game .arena-lobby-topline { padding: 0 15px; }.arena-lobby--game .arena-lobby-topline > span:last-child { display: none; }
+  .arena-lobby--game .arena-lobby-main { grid-template-columns: 1fr; padding: 14px; }.arena-lobby-pilot { grid-template-columns: 52px 1fr auto; }
+  .arena-lobby-playlist { padding: 18px 15px 15px; }.arena-difficulty-board { display: block; padding: 17px 15px; }.arena-difficulty-board h2 { margin-top: 14px; }.arena-difficulty-board footer { margin-top: 12px; padding-top: 11px; border-top: 1px solid #e8e9f1; }
+  .arena-lobby--game .arena-lobby-format { grid-template-columns: 1fr; }.arena-playlist-switch { border-right: 0; border-bottom-color: #e5e6ee; }.arena-lobby--game .arena-lobby-format > span { border-right: 0; border-bottom-color: #e5e6ee; }
+}
+
+/* Supporting Arena information stays visibly secondary to the chosen mode. */
+.arena-lobby ~ .battle-lower .battle-rules,
+.arena-lobby ~ .battle-lower .battle-leaderboard,
+.arena-lobby ~ .battle-spotlight { border-color: #dfe2ef; color: #292b48; background: rgba(255,255,255,.78); box-shadow: 0 18px 38px -33px rgba(32,29,78,.35), inset 0 1px #fff; }
+.arena-lobby ~ .battle-lower .battle-rules h2,.arena-lobby ~ .battle-lower .battle-rules article strong,.arena-lobby ~ .battle-spotlight h2 { color: #292b48; }
+.arena-lobby ~ .battle-lower .battle-rules > small,.arena-lobby ~ .battle-lower .battle-rules article > b,.arena-lobby ~ .battle-spotlight small { color: #7663c9; }
+.arena-lobby ~ .battle-lower .battle-rules article p,.arena-lobby ~ .battle-spotlight p { color: #687087; }
+.arena-lobby ~ .battle-lower .battle-leaderboard { background: linear-gradient(145deg, #fbfcff, #f2f3fa); }
+.arena-lobby ~ .battle-lower .battle-leaderboard header { border-bottom-color: #e4e6ef; color: #424462; }
+.arena-lobby ~ .battle-lower .battle-leaderboard > p { color: #70758a; }
