@@ -30,6 +30,23 @@
   backdrop-filter: none !important;
 }
 
+/* Keep the brand motion on entry, but do not make Chrome repaint large
+   blurred layers and SVG filters for the lifetime of the page. */
+.landing .product-frame {
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
+  animation: mx-product-in .9s .12s var(--mx-ease) both !important;
+}
+.landing .product-frame::after,
+.landing .journey-route-progress,
+.landing .demo-route-live,
+.landing .hero-route,
+.landing .story-progress {
+  animation: none !important;
+}
+.landing .hero-glow { filter: blur(40px); }
+.dashboard-page .path-radar i { animation: none !important; }
+
 /* Continuous animation is fine on a couple of focal elements; confine the
    repainting to those rather than the whole route. */
 @media (prefers-reduced-motion: reduce) {

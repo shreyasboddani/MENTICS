@@ -4576,7 +4576,10 @@ function Starfield({ warp = false, tone = "violet" }) {
 		const observer = new IntersectionObserver(([entry]) => {
 			active = entry.isIntersecting && !document.hidden;
 			if (active && !frame && !reduced) frame = requestAnimationFrame(draw);
-			if (!active) cancelAnimationFrame(frame);
+			if (!active) {
+				cancelAnimationFrame(frame);
+				frame = void 0;
+			}
 		}, { threshold: 0 });
 		observer.observe(canvas);
 		return () => {
