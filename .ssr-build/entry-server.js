@@ -4,7 +4,6 @@ import { createPortal } from "react-dom";
 import DOMPurify from "dompurify";
 import { marked } from "marked";
 import { Toaster, toast } from "sonner";
-import confetti from "canvas-confetti";
 import { AlertTriangle, ArrowLeft, ArrowRight, Award, BarChart3, BookOpen, Brain, Calculator, CalendarDays, Check, Clock3, Dices, Flame, GraduationCap, GripHorizontal, Hand, Headphones, House, LayoutDashboard, LineChart, LockKeyhole, LogOut, Mail, Menu, MessageCircle, PenLine, Plus, RotateCcw, Search, Send, Settings, ShieldCheck, SkipForward, Sparkles, Swords, Target, Trophy, UserRound, UsersRound, Volume2, VolumeX, X, Zap } from "lucide-react";
 import { Fragment, jsx, jsxs } from "react/jsx-runtime";
 //#region frontend/src/boot.js
@@ -4500,6 +4499,7 @@ function Starfield({ warp = false, tone = "violet" }) {
 		let width = 0;
 		let height = 0;
 		let points = [];
+		let active = !document.hidden;
 		const color = tone === "indigo" ? [
 			79,
 			70,
@@ -4530,6 +4530,10 @@ function Starfield({ warp = false, tone = "violet" }) {
 			});
 		};
 		const draw = () => {
+			if (!active) {
+				frame = void 0;
+				return;
+			}
 			ctx.clearRect(0, 0, width, height);
 			if (warp) {
 				const cx = width / 2, cy = height / 2;
@@ -4561,12 +4565,25 @@ function Starfield({ warp = false, tone = "violet" }) {
 			});
 			if (!reduced) frame = requestAnimationFrame(draw);
 		};
+		const setActive = () => {
+			active = !document.hidden;
+			if (active && !frame && !reduced) frame = requestAnimationFrame(draw);
+		};
 		resize();
 		draw();
 		window.addEventListener("resize", resize);
+		document.addEventListener("visibilitychange", setActive);
+		const observer = new IntersectionObserver(([entry]) => {
+			active = entry.isIntersecting && !document.hidden;
+			if (active && !frame && !reduced) frame = requestAnimationFrame(draw);
+			if (!active) cancelAnimationFrame(frame);
+		}, { threshold: 0 });
+		observer.observe(canvas);
 		return () => {
 			cancelAnimationFrame(frame);
+			observer.disconnect();
 			window.removeEventListener("resize", resize);
+			document.removeEventListener("visibilitychange", setActive);
 		};
 	}, [warp, tone]);
 	return /* @__PURE__ */ jsx("canvas", {
@@ -9544,7 +9561,7 @@ function BattleArena() {
 	}, [battle?.id, battle?.status]);
 	useEffect(() => {
 		if (battle?.status !== "complete" || !battle.youWon || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return void 0;
-		const burst = () => confetti({
+		const burst = () => import("canvas-confetti").then(({ default: confetti }) => confetti({
 			particleCount: 56,
 			spread: 66,
 			startVelocity: 29,
@@ -9555,7 +9572,7 @@ function BattleArena() {
 				"#e2d6ff",
 				"#ffd267"
 			]
-		});
+		}));
 		burst();
 		const timer = window.setTimeout(burst, 240);
 		return () => window.clearTimeout(timer);
