@@ -11,6 +11,7 @@ from ratelimit import rate_limit
 from functools import wraps
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import json
+import time
 import hmac
 import mimetypes
 import os
@@ -70,6 +71,13 @@ def release_database_rls_identity(_error=None):
         db.reset_rls_context(token)
 
 
+# The Digital SAT ships a Desmos calculator inside the test, so an Arena Math
+# item should offer one too. It is embedded as a frame on this exact origin:
+# that keeps a third-party script out of the page while still giving students
+# the real calculator rather than a toy reimplementation of one.
+DESMOS_EMBED_ORIGIN = 'https://www.desmos.com'
+
+
 @app.after_request
 def add_security_headers(response):
     response.headers.setdefault('X-Content-Type-Options', 'nosniff')
@@ -87,6 +95,7 @@ def add_security_headers(response):
         "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
         "font-src 'self' https://fonts.gstatic.com data:; "
         "img-src 'self' data:; connect-src 'self'; "
+        f"frame-src {DESMOS_EMBED_ORIGIN}; "
         "object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self'"
     )
     if is_production and request.path.startswith('/static/'):
@@ -271,6 +280,10 @@ def init_db():
         "FOREIGN KEY(opponent_id)": "REFERENCES users(id) ON DELETE CASCADE"
     })
     db.add_column("sat_battles", "mode", "TEXT NOT NULL DEFAULT 'ranked'")
+    # Elo is path dependent: once a rating moves, the swing that produced it
+    # cannot be recomputed. It is stored with the round that caused it.
+    db.add_column("sat_battles", "challenger_rating_delta", "INTEGER")
+    db.add_column("sat_battles", "opponent_rating_delta", "INTEGER")
     db.create_table("sat_battle_stats", {
         "user_id": "INTEGER PRIMARY KEY",
         "user_name": "TEXT NOT NULL",
@@ -281,6 +294,8 @@ def init_db():
         "battles_played": "INTEGER NOT NULL DEFAULT 0",
         "FOREIGN KEY(user_id)": "REFERENCES users(id) ON DELETE CASCADE"
     })
+    db.add_column("sat_battle_stats", "win_streak", "INTEGER NOT NULL DEFAULT 0")
+    db.add_column("sat_battle_stats", "best_win_streak", "INTEGER NOT NULL DEFAULT 0")
     db.create_table("quizzes", {
         "id": "INTEGER PRIMARY KEY AUTOINCREMENT",
         "task_id": "INTEGER NOT NULL",
@@ -781,6 +796,49 @@ def _award_xp(user_id, amount):
     return total
 
 
+def _user_today():
+    """The student's calendar day, not the server's.
+
+    A streak is a promise about the student's days. date.today() is the server's
+    day, which on a UTC host rolls over mid-evening in the Americas: an 8pm
+    session counted as tomorrow, so an evening learner could bank two days at
+    once and then appear to have skipped one.
+    """
+    try:
+        return datetime.now(ZoneInfo(session.get('timezone') or 'UTC')).date()
+    except (ZoneInfoNotFoundError, RuntimeError, ValueError, TypeError):
+        return datetime.now(ZoneInfo('UTC')).date()
+
+
+def _streak_last_day(row):
+    """The last day this student completed something, if it was recorded."""
+    raw = (row or {}).get('last_completed_date')
+    if not raw:
+        return None
+    try:
+        return date.fromisoformat(str(raw)[:10])
+    except (TypeError, ValueError):
+        return None
+
+
+def _live_streak(row, today=None):
+    """The streak the student actually has right now.
+
+    The stored counter is only ever written when a step is completed, so nothing
+    reset it when they stopped. A student who last studied a month ago kept
+    seeing that old number on their dashboard -- the one thing a streak must
+    never get wrong. Today still counts as alive, because the day is not over.
+    """
+    streak = int((row or {}).get('current_streak') or 0)
+    if streak <= 0:
+        return 0
+    last = _streak_last_day(row)
+    if last is None:
+        return 0
+    today = today or _user_today()
+    return streak if last in (today, today - timedelta(days=1)) else 0
+
+
 def _advance_completion_streak(user_id):
     """Advance a student's streak once for a newly completed path step."""
     row = db.select_one("gamification_stats", where={"user_id": user_id})
@@ -790,21 +848,13 @@ def _advance_completion_streak(user_id):
         })
         row = db.select_one("gamification_stats", where={"user_id": user_id})
 
-    today = date.today()
-    yesterday = today - timedelta(days=1)
-    last_completed = None
-    if row.get("last_completed_date"):
-        try:
-            last_completed = date.fromisoformat(row["last_completed_date"])
-        except (TypeError, ValueError):
-            app.logger.warning(
-                "Resetting invalid completion date for user %s", user_id,
-            )
-
-    streak = row.get("current_streak") or 0
+    today = _user_today()
+    last_completed = _streak_last_day(row)
+    streak = int(row.get("current_streak") or 0)
     if last_completed == today:
-        next_streak = streak
-    elif last_completed == yesterday:
+        # Already counted today; a second step must not inflate the streak.
+        next_streak = max(streak, 1)
+    elif last_completed == today - timedelta(days=1):
         next_streak = streak + 1
     else:
         next_streak = 1
@@ -3052,7 +3102,7 @@ def dashboard(user):
 
     game_stats = {
         "points": gamification_stats['points'],
-        "streak": gamification_stats['current_streak']
+        "streak": _live_streak(gamification_stats),
     }
 
     # --- Progress Calculations ---
@@ -3544,7 +3594,7 @@ def stats(user):
         "goalSat": goal_sat, "goalAct": goal_act,
         "testDate": test_path.get("test_date"),
         "points": game.get("points") or 0,
-        "streak": game.get("current_streak") or 0,
+        "streak": _live_streak(game),
         "practice": _practice_totals(user_id),
         "subjects": subjects,
         "weakest": [{
@@ -4466,11 +4516,11 @@ def _get_proactive_ai_suggestions(user):
         f"- SAT Math: {stats.get('sat_math', 'N/A')}\n"
         f"- SAT EBRW: {stats.get('sat_ebrw', 'N/A')}\n"
         f"- ACT Composite: {stats.get('act_average', 'N/A')}\n"
-        f"- Day Streak: {gamification_stats.get('current_streak', 0)}\n"
+        f"- Day Streak: {_live_streak(gamification_stats)}\n"
         f"- Last 5 Completed Tasks: {', '.join(completed_tasks) if completed_tasks else 'None'}\n"
         f"- Stat History:\n{stat_history}\n\n"
         f"Based on this data, provide one concise and encouraging insight. **Do not suggest a new task.** Instead, focus on motivation, strategy, and well-being. Here are some examples of the tone and style you should adopt:\n"
-        f"- (If streak is high): 'A {gamification_stats.get('current_streak', 0)}-day streak is amazing! That consistency is what builds success. Keep up the great momentum.'\n"
+        f"- (If streak is high): 'A {_live_streak(gamification_stats)}-day streak is amazing! That consistency is what builds success. Keep up the great momentum.'\n"
         f"- (If a score dipped): 'I noticed your last SAT Math score was a little lower. That's a normal part of the process! It's a great opportunity to review your notes and see what you can learn from it.'\n"
         f"- (If anxieties were about time management): 'Remember when you said you were worried about time management? You've been consistently completing tasks. That shows real progress in building good habits.'\n"
         f"- (If no recent activity): 'Just checking in! Remember that even small steps forward are still steps. You've got this.'\n\n"
@@ -4690,57 +4740,61 @@ SAT_BATTLE_QUESTION_BANK = {
 # conditions, plausible distractors, and reading burden as players climb.
 SAT_BATTLE_QUESTION_BANK.update({
     "bronze": [
-        {"question_text": "A community garden charges a one-time membership fee of $18 and $6 for each weekly delivery. The total cost, in dollars, for w deliveries is modeled by c(w)=18+6w. What does c(7) represent?", "options": ["The membership fee after 7 weeks", "The total cost of membership and 7 deliveries", "The cost of 7 memberships", "The cost of 18 deliveries"], "correct_option": 1, "skill": "Linear models"},
-        {"question_text": "At a school store, 3 notebooks and 2 pens cost $11. One notebook and 3 pens cost $8. How much does one notebook cost, in dollars?", "options": ["1", "2", "3", "4"], "correct_option": 2, "skill": "Systems of equations"},
-        {"question_text": "Which choice completes the text so that it conforms to the conventions of Standard English?\n\nThe volunteers sorted the donated books by genre ___ after that, they labeled each box for delivery.", "options": ["genre, after", "genre; after", "genre: after", "genre after"], "correct_option": 1, "skill": "Sentence boundaries"},
-        {"question_text": "The historian's account is ___: it identifies the source of each claim and distinguishes established facts from speculation. Which choice completes the text with the most logical and precise word?", "options": ["meticulous", "casual", "temporary", "ornamental"], "correct_option": 0, "skill": "Words in context"},
-        {"question_text": "A survey of 240 students found that 150 preferred beginning school at 8:30 a.m. or later. Based on the survey, which percentage of the students preferred a start time of 8:30 a.m. or later?", "options": ["37.5%", "50%", "60%", "62.5%"], "correct_option": 3, "skill": "Percentages and data"},
+        {"question_text": "A community garden charges a one-time membership fee of $18 and $6 for each weekly delivery. The total cost, in dollars, for w deliveries is modeled by c(w)=18+6w. What does c(7) represent?", "options": ["The membership fee after 7 weeks", "The total cost of membership and 7 deliveries", "The cost of 7 memberships", "The cost of 18 deliveries"], "correct_option": 1, "domain": "math", "skill": "Linear models"},
+        {"question_text": "At a school store, 3 notebooks and 2 pens cost $11. One notebook and 3 pens cost $8. How much does one notebook cost, in dollars?", "options": ["1", "2", "3", "4"], "correct_option": 2, "domain": "math", "skill": "Systems of equations"},
+        {"question_text": "Which choice completes the text so that it conforms to the conventions of Standard English?\n\nThe volunteers sorted the donated books by genre ___ after that, they labeled each box for delivery.", "options": ["genre, after", "genre; after", "genre: after", "genre after"], "correct_option": 1, "domain": "reading_writing", "skill": "Sentence boundaries"},
+        {"question_text": "The historian's account is ___: it identifies the source of each claim and distinguishes established facts from speculation. Which choice completes the text with the most logical and precise word?", "options": ["meticulous", "casual", "temporary", "ornamental"], "correct_option": 0, "domain": "reading_writing", "skill": "Words in context"},
+        {"question_text": "A survey of 240 students found that 150 preferred beginning school at 8:30 a.m. or later. Based on the survey, which percentage of the students preferred a start time of 8:30 a.m. or later?", "options": ["37.5%", "50%", "60%", "62.5%"], "correct_option": 3, "domain": "math", "skill": "Percentages and data"},
     ],
     "silver": [
-        {"question_text": "For what value of k does the system y=3x+k and y=-x+12 have the solution (2, 6)?", "options": ["0", "2", "4", "6"], "correct_option": 0, "skill": "Systems of equations"},
-        {"question_text": "A bacteria culture has 400 cells at noon and increases by 18% each hour. Which expression gives the number of cells h hours after noon?", "options": ["400(0.18)^h", "400(1.18)^h", "418h", "400+18h"], "correct_option": 1, "skill": "Exponential models"},
-        {"question_text": "Which choice completes the text so that it conforms to the conventions of Standard English?\n\nThe fossil was unusual for its size; the team therefore photographed it from several angles ___ before moving it.", "options": ["angles, before", "angles; before", "angles: before", "angles before"], "correct_option": 0, "skill": "Punctuation"},
-        {"question_text": "In a review, a critic calls a documentary 'restrained,' noting that it lets interviews and archival footage make its argument without dramatic narration. As used in the text, 'restrained' most nearly means", "options": ["carefully controlled", "poorly funded", "briefly recorded", "widely promoted"], "correct_option": 0, "skill": "Words in context"},
-        {"question_text": "Text: Biologist Imani Patel measured leaf temperatures on two nearby hillsides. Trees on the shaded hillside had lower leaf temperatures at noon than trees on the exposed hillside.\n\nWhich conclusion is best supported by the text?", "options": ["All tree species grow better in shade.", "Shade may affect leaf temperature under the conditions Patel studied.", "The exposed hillside receives no rainfall.", "Patel measured leaf temperature only at night."], "correct_option": 1, "skill": "Information and ideas"},
+        {"question_text": "For what value of k does the system y=3x+k and y=-x+12 have the solution (2, 6)?", "options": ["0", "2", "4", "6"], "correct_option": 0, "domain": "math", "skill": "Systems of equations"},
+        {"question_text": "A bacteria culture has 400 cells at noon and increases by 18% each hour. Which expression gives the number of cells h hours after noon?", "options": ["400(0.18)^h", "400(1.18)^h", "418h", "400+18h"], "correct_option": 1, "domain": "math", "skill": "Exponential models"},
+        {"question_text": "Which choice completes the text so that it conforms to the conventions of Standard English?\n\nThe fossil was unusual for its size; the team therefore photographed it from several angles ___ before moving it.", "options": ["angles, before", "angles; before", "angles: before", "angles before"], "correct_option": 0, "domain": "reading_writing", "skill": "Punctuation"},
+        {"question_text": "In a review, a critic calls a documentary 'restrained,' noting that it lets interviews and archival footage make its argument without dramatic narration. As used in the text, 'restrained' most nearly means", "options": ["carefully controlled", "poorly funded", "briefly recorded", "widely promoted"], "correct_option": 0, "domain": "reading_writing", "skill": "Words in context"},
+        {"question_text": "Text: Biologist Imani Patel measured leaf temperatures on two nearby hillsides. Trees on the shaded hillside had lower leaf temperatures at noon than trees on the exposed hillside.\n\nWhich conclusion is best supported by the text?", "options": ["All tree species grow better in shade.", "Shade may affect leaf temperature under the conditions Patel studied.", "The exposed hillside receives no rainfall.", "Patel measured leaf temperature only at night."], "correct_option": 1, "domain": "reading_writing", "skill": "Information and ideas"},
     ],
     "gold": [
-        {"question_text": "The equation x²-10x+c=0 has two integer solutions that differ by 4. What is the value of c?", "options": ["9", "16", "21", "24"], "correct_option": 2, "skill": "Quadratic equations"},
-        {"question_text": "A tank is filled at a constant rate. After 8 minutes it contains 46 liters, and after 14 minutes it contains 79 liters. If L is the number of liters in the tank t minutes after filling began, what is the value of L(0)?", "options": ["-2", "0", "2", "13"], "correct_option": 2, "skill": "Linear functions"},
-        {"question_text": "Which choice most logically completes the text?\n\nA city installed shaded bus shelters at several stops. Ridership did not immediately change. ___, surveys conducted that summer showed that riders at the shaded stops reported waiting more comfortably.", "options": ["Nevertheless", "For instance", "Similarly", "Consequently"], "correct_option": 0, "skill": "Transitions"},
-        {"question_text": "Which choice completes the text so that it conforms to the conventions of Standard English?\n\nThe sculptures, which were carved from local stone, ___ displayed in the museum's central gallery.", "options": ["is", "was", "are", "has been"], "correct_option": 2, "skill": "Subject-verb agreement"},
-        {"question_text": "A study reports that a plant grown with a certain soil additive produced 14% more fruit than the same plant grown without the additive. Which choice most accurately states the finding?", "options": ["The additive caused every plant to produce fruit.", "Plants grown with the additive produced more fruit in the study.", "The additive is necessary for all fruit production.", "The plant produced 14 more pieces of fruit."], "correct_option": 1, "skill": "Rhetorical synthesis"},
+        {"question_text": "The equation x²-10x+c=0 has two integer solutions that differ by 4. What is the value of c?", "options": ["9", "16", "21", "24"], "correct_option": 2, "domain": "math", "skill": "Quadratic equations"},
+        {"question_text": "A tank is filled at a constant rate. After 8 minutes it contains 46 liters, and after 14 minutes it contains 79 liters. If L is the number of liters in the tank t minutes after filling began, what is the value of L(0)?", "options": ["-2", "0", "2", "13"], "correct_option": 2, "domain": "math", "skill": "Linear functions"},
+        {"question_text": "Which choice most logically completes the text?\n\nA city installed shaded bus shelters at several stops. Ridership did not immediately change. ___, surveys conducted that summer showed that riders at the shaded stops reported waiting more comfortably.", "options": ["Nevertheless", "For instance", "Similarly", "Consequently"], "correct_option": 0, "domain": "reading_writing", "skill": "Transitions"},
+        {"question_text": "Which choice completes the text so that it conforms to the conventions of Standard English?\n\nThe sculptures, which were carved from local stone, ___ displayed in the museum's central gallery.", "options": ["is", "was", "are", "has been"], "correct_option": 2, "domain": "reading_writing", "skill": "Subject-verb agreement"},
+        {"question_text": "A study reports that a plant grown with a certain soil additive produced 14% more fruit than the same plant grown without the additive. Which choice most accurately states the finding?", "options": ["The additive caused every plant to produce fruit.", "Plants grown with the additive produced more fruit in the study.", "The additive is necessary for all fruit production.", "The plant produced 14 more pieces of fruit."], "correct_option": 1, "domain": "reading_writing", "skill": "Rhetorical synthesis"},
     ],
     "platinum": [
-        {"question_text": "For a positive constant a, the graph of y=a(x-3)²-12 passes through (1, 4). What is the value of a?", "options": ["2", "3", "4", "8"], "correct_option": 2, "skill": "Quadratic functions"},
-        {"question_text": "The function f is defined by f(x)=2x²-3. For which value of x is f(x+1)-f(x)=10?", "options": ["1", "2", "3", "4"], "correct_option": 1, "skill": "Function notation"},
-        {"question_text": "A report notes that a wetland restoration increased the number of observed bird species over three years. It does not compare the restored wetland with an unrestored wetland. Which claim is best supported?", "options": ["Restoration caused the increase in bird species.", "The restored wetland had more bird species after three years than at the start of the project.", "Unrestored wetlands lose bird species over three years.", "Every restored wetland will gain bird species."], "correct_option": 1, "skill": "Claims and evidence"},
-        {"question_text": "Which choice completes the text so that it conforms to the conventions of Standard English?\n\nThe panel reached one conclusion ___ the proposed route would disrupt a nesting area.", "options": ["conclusion, the proposed", "conclusion; the proposed", "conclusion: the proposed", "conclusion the proposed"], "correct_option": 2, "skill": "Punctuation"},
-        {"question_text": "A student wants to emphasize a contrast in these notes:\n• In 2018, a library lent 9,400 print books.\n• In 2018, it lent 2,100 e-books.\n• In 2024, it lent 7,800 print books.\n• In 2024, it lent 8,600 e-books.\n\nWhich choice most effectively uses the notes?", "options": ["The library lends both print books and e-books.", "From 2018 to 2024, the library's print lending fell while its e-book lending rose sharply.", "The library lent 19,800 items in 2018 and 2024 combined.", "E-books became available at the library after 2018."], "correct_option": 1, "skill": "Rhetorical synthesis"},
+        {"question_text": "For a positive constant a, the graph of y=a(x-3)²-12 passes through (1, 4). What is the value of a?", "options": ["2", "3", "4", "8"], "correct_option": 2, "domain": "math", "skill": "Quadratic functions"},
+        {"question_text": "The function f is defined by f(x)=2x²-3. For which value of x is f(x+1)-f(x)=10?", "options": ["1", "2", "3", "4"], "correct_option": 1, "domain": "math", "skill": "Function notation"},
+        {"question_text": "A report notes that a wetland restoration increased the number of observed bird species over three years. It does not compare the restored wetland with an unrestored wetland. Which claim is best supported?", "options": ["Restoration caused the increase in bird species.", "The restored wetland had more bird species after three years than at the start of the project.", "Unrestored wetlands lose bird species over three years.", "Every restored wetland will gain bird species."], "correct_option": 1, "domain": "reading_writing", "skill": "Claims and evidence"},
+        {"question_text": "Which choice completes the text so that it conforms to the conventions of Standard English?\n\nThe panel reached one conclusion ___ the proposed route would disrupt a nesting area.", "options": ["conclusion, the proposed", "conclusion; the proposed", "conclusion: the proposed", "conclusion the proposed"], "correct_option": 2, "domain": "reading_writing", "skill": "Punctuation"},
+        {"question_text": "A student wants to emphasize a contrast in these notes:\n• In 2018, a library lent 9,400 print books.\n• In 2018, it lent 2,100 e-books.\n• In 2024, it lent 7,800 print books.\n• In 2024, it lent 8,600 e-books.\n\nWhich choice most effectively uses the notes?", "options": ["The library lends both print books and e-books.", "From 2018 to 2024, the library's print lending fell while its e-book lending rose sharply.", "The library lent 19,800 items in 2018 and 2024 combined.", "E-books became available at the library after 2018."], "correct_option": 1, "domain": "reading_writing", "skill": "Rhetorical synthesis"},
     ],
     "diamond": [
-        {"question_text": "The system ax+2y=14 and 3x-y=1 has the solution (2, 5). What is the value of a?", "options": ["1", "2", "3", "4"], "correct_option": 1, "skill": "Parameters and systems"},
-        {"question_text": "A circle has center (4, -2) and passes through (7, 2). Which equation represents the circle?", "options": ["(x-4)²+(y+2)²=13", "(x+4)²+(y-2)²=25", "(x-4)²+(y+2)²=25", "(x+4)²+(y-2)²=13"], "correct_option": 2, "skill": "Circles"},
-        {"question_text": "Text 1: A scholar argues that a poem's repeated images of doors represent confinement.\n\nText 2: Another scholar argues that the doors represent choices the speaker is unwilling to make.\n\nThe scholars most likely disagree about", "options": ["whether the poem contains images of doors", "what the repeated door imagery symbolizes", "who wrote the poem", "whether the speaker makes any choices"], "correct_option": 1, "skill": "Cross-text connections"},
-        {"question_text": "Which choice completes the text so that it conforms to the conventions of Standard English?\n\nUnlike the original survey, which focused on adults, the revised survey ___ questions for teenagers and caregivers.", "options": ["include", "including", "includes", "to include"], "correct_option": 2, "skill": "Conventions"},
-        {"question_text": "A researcher reports a correlation between students' sleep duration and their quiz scores. Which statement is justified by this result alone?", "options": ["More sleep causes higher quiz scores.", "Students with longer sleep duration tended to have different quiz scores.", "Quiz scores determine sleep duration.", "Every student who slept longer earned a higher score."], "correct_option": 1, "skill": "Data reasoning"},
+        {"question_text": "The system ax+2y=14 and 3x-y=1 has the solution (2, 5). What is the value of a?", "options": ["1", "2", "3", "4"], "correct_option": 1, "domain": "math", "skill": "Parameters and systems"},
+        {"question_text": "A circle has center (4, -2) and passes through (7, 2). Which equation represents the circle?", "options": ["(x-4)²+(y+2)²=13", "(x+4)²+(y-2)²=25", "(x-4)²+(y+2)²=25", "(x+4)²+(y-2)²=13"], "correct_option": 2, "domain": "math", "skill": "Circles"},
+        {"question_text": "Text 1: A scholar argues that a poem's repeated images of doors represent confinement.\n\nText 2: Another scholar argues that the doors represent choices the speaker is unwilling to make.\n\nThe scholars most likely disagree about", "options": ["whether the poem contains images of doors", "what the repeated door imagery symbolizes", "who wrote the poem", "whether the speaker makes any choices"], "correct_option": 1, "domain": "reading_writing", "skill": "Cross-text connections"},
+        {"question_text": "Which choice completes the text so that it conforms to the conventions of Standard English?\n\nUnlike the original survey, which focused on adults, the revised survey ___ questions for teenagers and caregivers.", "options": ["include", "including", "includes", "to include"], "correct_option": 2, "domain": "reading_writing", "skill": "Conventions"},
+        {"question_text": "A researcher reports a correlation between students' sleep duration and their quiz scores. Which statement is justified by this result alone?", "options": ["More sleep causes higher quiz scores.", "Students with longer sleep duration tended to have different quiz scores.", "Quiz scores determine sleep duration.", "Every student who slept longer earned a higher score."], "correct_option": 1, "domain": "reading_writing", "skill": "Data reasoning"},
     ],
     "master": [
-        {"question_text": "For a positive constant p, the equation x²-2px+p²-25=0 has two roots. One root is twice the other. What is the value of p?", "options": ["5", "10", "15", "25"], "correct_option": 2, "skill": "Advanced quadratic reasoning"},
-        {"question_text": "A function g is defined by g(x)=f(x-4)+3. Compared with the graph of y=f(x), the graph of y=g(x) is translated", "options": ["4 units left and 3 units down", "4 units left and 3 units up", "4 units right and 3 units down", "4 units right and 3 units up"], "correct_option": 3, "skill": "Function transformations"},
-        {"question_text": "A historian writes that a city's rapid population growth 'coincided with' an expansion of its rail network. Which revision preserves the historian's level of certainty?", "options": ["The rail network expansion caused the city's rapid population growth.", "The city's population growth and rail network expansion occurred during the same period.", "The city expanded its rail network because its population growth had ended.", "The rail network expansion prevented further population growth."], "correct_option": 1, "skill": "Precision"},
-        {"question_text": "Which choice completes the text so that it conforms to the conventions of Standard English?\n\nThe memo's recommendation was clear ___ revise the schedule before publishing it, and notify the staff of the change.", "options": ["clear, revise", "clear; revise", "clear: revise", "clear revise"], "correct_option": 2, "skill": "Punctuation"},
-        {"question_text": "In the passage, the author describes a scientist's explanation as 'provisional' because new measurements may require it to change. As used in the passage, 'provisional' most nearly means", "options": ["subject to revision", "officially approved", "difficult to measure", "based on tradition"], "correct_option": 0, "skill": "Words in context"},
+        {"question_text": "For a positive constant p, the equation x²-2px+p²-25=0 has two roots. One root is twice the other. What is the value of p?", "options": ["5", "10", "15", "25"], "correct_option": 2, "domain": "math", "skill": "Advanced quadratic reasoning"},
+        {"question_text": "A function g is defined by g(x)=f(x-4)+3. Compared with the graph of y=f(x), the graph of y=g(x) is translated", "options": ["4 units left and 3 units down", "4 units left and 3 units up", "4 units right and 3 units down", "4 units right and 3 units up"], "correct_option": 3, "domain": "math", "skill": "Function transformations"},
+        {"question_text": "A historian writes that a city's rapid population growth 'coincided with' an expansion of its rail network. Which revision preserves the historian's level of certainty?", "options": ["The rail network expansion caused the city's rapid population growth.", "The city's population growth and rail network expansion occurred during the same period.", "The city expanded its rail network because its population growth had ended.", "The rail network expansion prevented further population growth."], "correct_option": 1, "domain": "reading_writing", "skill": "Precision"},
+        {"question_text": "Which choice completes the text so that it conforms to the conventions of Standard English?\n\nThe memo's recommendation was clear ___ revise the schedule before publishing it, and notify the staff of the change.", "options": ["clear, revise", "clear; revise", "clear: revise", "clear revise"], "correct_option": 2, "domain": "reading_writing", "skill": "Punctuation"},
+        {"question_text": "In the passage, the author describes a scientist's explanation as 'provisional' because new measurements may require it to change. As used in the passage, 'provisional' most nearly means", "options": ["subject to revision", "officially approved", "difficult to measure", "based on tradition"], "correct_option": 0, "domain": "reading_writing", "skill": "Words in context"},
     ],
     "grandmaster": [
-        {"question_text": "For a positive constant p, the equation x²-2px+p²-16=0 has two positive roots. The greater root is three times the lesser root. What is the value of p?", "options": ["4", "6", "8", "12"], "correct_option": 2, "skill": "Parameters and quadratics"},
-        {"question_text": "For all real x, f(x)=ax²+bx+6. The graph of y=f(x) has a vertex at (2, -2) and passes through (0, 6). What is the value of b?", "options": ["-8", "-4", "4", "8"], "correct_option": 0, "skill": "Quadratic functions"},
-        {"question_text": "A report states that, after accounting for rainfall and temperature, a model predicted crop yield more accurately when soil nitrogen was included. Which conclusion is best supported?", "options": ["Soil nitrogen is the only factor affecting crop yield.", "Including soil nitrogen improved this model's predictive accuracy under the reported analysis.", "Higher soil nitrogen always increases crop yield.", "Rainfall and temperature have no relationship to crop yield."], "correct_option": 1, "skill": "Data analysis"},
-        {"question_text": "Text 1: An essay argues that a novel's shifting point of view distances readers from its narrator.\n\nText 2: A review contends that the same shifts reveal the narrator's blind spots, inviting readers to judge the narrator's account more critically.\n\nWhich choice best describes the relationship between the texts?", "options": ["Text 2 rejects the claim that the novel shifts point of view.", "Text 2 offers a reason the technique Text 1 criticizes may serve a purpose.", "Text 2 summarizes the narrator's account that Text 1 omits.", "Text 2 agrees that readers cannot judge the narrator's account."], "correct_option": 1, "skill": "Cross-text connections"},
-        {"question_text": "A student wants to make a precise claim from these notes:\n• A 14-month study followed 86 coastal marsh plots.\n• Plots planted with two native grass species retained more sediment than unplanted plots.\n• The study did not compare individual grass species.\n\nWhich choice most effectively uses the notes?", "options": ["Native grasses always retain sediment in coastal marshes.", "In a 14-month study of 86 marsh plots, plots planted with two native grass species retained more sediment than unplanted plots.", "Each native grass species retained more sediment than every unplanted plot.", "Coastal marsh plots can retain sediment for fourteen months."], "correct_option": 1, "skill": "Rhetorical synthesis"},
+        {"question_text": "For a positive constant p, the equation x²-2px+p²-16=0 has two positive roots. The greater root is three times the lesser root. What is the value of p?", "options": ["4", "6", "8", "12"], "correct_option": 2, "domain": "math", "skill": "Parameters and quadratics"},
+        {"question_text": "For all real x, f(x)=ax²+bx+6. The graph of y=f(x) has a vertex at (2, -2) and passes through (0, 6). What is the value of b?", "options": ["-8", "-4", "4", "8"], "correct_option": 0, "domain": "math", "skill": "Quadratic functions"},
+        {"question_text": "A report states that, after accounting for rainfall and temperature, a model predicted crop yield more accurately when soil nitrogen was included. Which conclusion is best supported?", "options": ["Soil nitrogen is the only factor affecting crop yield.", "Including soil nitrogen improved this model's predictive accuracy under the reported analysis.", "Higher soil nitrogen always increases crop yield.", "Rainfall and temperature have no relationship to crop yield."], "correct_option": 1, "domain": "reading_writing", "skill": "Data analysis"},
+        {"question_text": "Text 1: An essay argues that a novel's shifting point of view distances readers from its narrator.\n\nText 2: A review contends that the same shifts reveal the narrator's blind spots, inviting readers to judge the narrator's account more critically.\n\nWhich choice best describes the relationship between the texts?", "options": ["Text 2 rejects the claim that the novel shifts point of view.", "Text 2 offers a reason the technique Text 1 criticizes may serve a purpose.", "Text 2 summarizes the narrator's account that Text 1 omits.", "Text 2 agrees that readers cannot judge the narrator's account."], "correct_option": 1, "domain": "reading_writing", "skill": "Cross-text connections"},
+        {"question_text": "A student wants to make a precise claim from these notes:\n• A 14-month study followed 86 coastal marsh plots.\n• Plots planted with two native grass species retained more sediment than unplanted plots.\n• The study did not compare individual grass species.\n\nWhich choice most effectively uses the notes?", "options": ["Native grasses always retain sediment in coastal marshes.", "In a 14-month study of 86 marsh plots, plots planted with two native grass species retained more sediment than unplanted plots.", "Each native grass species retained more sediment than every unplanted plot.", "Coastal marsh plots can retain sediment for fourteen months."], "correct_option": 1, "domain": "reading_writing", "skill": "Rhetorical synthesis"},
     ],
 })
 
 SAT_BATTLE_QUESTION_COUNT = 5
+SAT_BATTLE_BASE_RATING = 1000
+SAT_BATTLE_RATING_FLOOR = 800
+# Rounds before a rating is treated as settled and stops moving in big steps.
+SAT_BATTLE_PLACEMENT_ROUNDS = 10
 SAT_BATTLE_DURATION_SECONDS = 120
 SAT_BATTLE_BOT_WAIT_SECONDS = 30
 SAT_BATTLE_BOT_EMAIL = "arena-bot@mentics.system"
@@ -4758,29 +4812,63 @@ SAT_BATTLE_RANKS = [
     (0, "Bronze", "bronze"),
 ]
 
+# The cosmetic loadout mirrors frontend/src/arena-fighter.jsx exactly: that file
+# draws these values, this allow-list is what may be stored and shown to an
+# opponent. Adding a value in one place without the other silently falls back
+# to the default, so the two lists move together.
 ARENA_AVATAR_DEFAULT = {
-    'frame': 'masculine', 'body': 'striker', 'skin': 'medium', 'hair': 'crop',
-    'hair_color': 'onyx', 'face': 'natural', 'outfit': 'combat', 'palette': 'nova',
-    'accent': 'crystal', 'bottom': 'tactical', 'gloves': 'tech', 'footwear': 'boots',
-    'gear': 'visor', 'back': 'none', 'emblem': 'bolt', 'aura': 'pulse',
+    'frame': 'masculine',
+    'body': 'striker',
+    'height': 'average',
+    'skin': 'medium',
+    'pose': 'ready',
+    'eyes': 'brown',
+    'brows': 'soft',
+    'expression': 'calm',
+    'face': 'natural',
+    'facial_hair': 'none',
+    'hair': 'crop',
+    'hair_color': 'onyx',
+    'outfit': 'combat',
+    'palette': 'nova',
+    'accent': 'crystal',
+    'marking': 'none',
+    'bottom': 'tactical',
+    'gloves': 'tech',
+    'footwear': 'boots',
+    'shoulder': 'none',
+    'waist': 'none',
+    'gear': 'visor',
+    'back': 'none',
+    'emblem': 'bolt',
+    'aura': 'pulse',
 }
 ARENA_AVATAR_OPTIONS = {
-    'frame': {'masculine', 'feminine', 'androgynous'},
-    'body': {'striker', 'sentinel', 'scout'},
-    'skin': {'porcelain', 'light', 'warm', 'medium', 'olive', 'deep', 'umber', 'ebony'},
-    'hair': {'crop', 'fade', 'wave', 'spike', 'bob', 'ponytail', 'curls', 'braids', 'long', 'bun'},
-    'hair_color': {'onyx', 'espresso', 'chestnut', 'copper', 'gold', 'silver', 'violet', 'blue'},
-    'face': {'natural', 'freckles', 'liner', 'warpaint'},
-    'outfit': {'combat', 'academy', 'varsity', 'techwear', 'street', 'champion'},
-    'palette': {'nova', 'solar', 'glacier', 'volt', 'rose', 'midnight'},
-    'accent': {'crystal', 'gold', 'rose', 'teal', 'white', 'graphite'},
-    'bottom': {'tactical', 'fitted', 'cargo', 'battle_skirt'},
-    'gloves': {'tech', 'fingerless', 'gauntlets', 'none'},
-    'footwear': {'boots', 'high_tops', 'runners', 'armored'},
-    'gear': {'visor', 'comms', 'crown', 'glasses', 'headband', 'earrings', 'none'},
-    'back': {'none', 'cape', 'half_cape', 'energy_pack', 'banner'},
-    'emblem': {'bolt', 'mind', 'target', 'shield', 'star', 'flame'},
-    'aura': {'pulse', 'flare', 'orbit', 'spark', 'halo', 'none'},
+    'frame': {'masculine', 'feminine', 'androgynous', 'athletic'},
+    'body': {'striker', 'sentinel', 'scout', 'titan', 'lithe', 'compact'},
+    'height': {'short', 'average', 'tall'},
+    'skin': {'porcelain', 'light', 'sand', 'warm', 'amber', 'medium', 'olive', 'bronze', 'deep', 'mocha', 'umber', 'ebony'},
+    'pose': {'ready', 'guard', 'confident', 'relaxed'},
+    'eyes': {'brown', 'hazel', 'green', 'blue', 'amber', 'violet', 'grey', 'crimson', 'gold', 'teal', 'silver', 'rose'},
+    'brows': {'soft', 'bold', 'arched', 'sharp'},
+    'expression': {'calm', 'focused', 'fierce', 'grin'},
+    'face': {'natural', 'freckles', 'liner', 'warpaint', 'blush', 'scar', 'cyber', 'tattoo'},
+    'facial_hair': {'none', 'stubble', 'mustache', 'goatee', 'full'},
+    'hair': {'crop', 'fade', 'buzz', 'wave', 'spike', 'mohawk', 'undercut', 'pixie', 'bob', 'ponytail', 'twin_tails', 'curls', 'afro', 'locs', 'braids', 'long', 'flow', 'bun'},
+    'hair_color': {'onyx', 'espresso', 'chestnut', 'copper', 'gold', 'silver', 'white', 'violet', 'blue', 'teal', 'emerald', 'crimson', 'pink', 'sunset', 'ash', 'sage', 'ember', 'ice', 'plum', 'honey'},
+    'outfit': {'combat', 'academy', 'varsity', 'techwear', 'street', 'champion', 'hoodie', 'jersey', 'flight', 'scholar'},
+    'palette': {'nova', 'solar', 'glacier', 'volt', 'rose', 'midnight', 'ember', 'forest', 'mono', 'tide', 'crimson', 'jade', 'royal', 'dune', 'orchid', 'steel'},
+    'accent': {'crystal', 'gold', 'rose', 'teal', 'white', 'graphite', 'violet', 'lime', 'copper', 'obsidian', 'ice', 'ember', 'jade', 'blush', 'chrome', 'bronze'},
+    'marking': {'none', 'stripes', 'circuit', 'chevron', 'stars', 'scales'},
+    'bottom': {'tactical', 'fitted', 'cargo', 'battle_skirt', 'shorts', 'pleated', 'joggers'},
+    'gloves': {'tech', 'fingerless', 'gauntlets', 'wraps', 'claws', 'none'},
+    'footwear': {'boots', 'high_tops', 'runners', 'armored', 'low_tops', 'greaves', 'barefoot'},
+    'shoulder': {'none', 'pauldrons', 'epaulettes', 'spikes', 'sash'},
+    'waist': {'none', 'pouch', 'wrap', 'chain', 'holsters'},
+    'gear': {'visor', 'comms', 'crown', 'glasses', 'shades', 'headband', 'earrings', 'mask', 'cap', 'helmet', 'none'},
+    'back': {'none', 'cape', 'half_cape', 'energy_pack', 'banner', 'wings', 'quiver', 'jetpack'},
+    'emblem': {'bolt', 'mind', 'target', 'shield', 'star', 'flame', 'crown', 'atom', 'book', 'wave'},
+    'aura': {'pulse', 'flare', 'orbit', 'spark', 'halo', 'embers', 'frost', 'storm', 'none'},
 }
 
 
@@ -4803,13 +4891,13 @@ def _arena_avatar_for_user(user_id, bot_rank=None):
         bot = db.select_one('users', where={'email': SAT_BATTLE_BOT_EMAIL})
     if bot and user_id == bot['id']:
         bot_loadouts = {
-            'bronze': {'frame': 'androgynous', 'body': 'scout', 'outfit': 'street', 'palette': 'solar', 'skin': 'light', 'hair': 'fade', 'hair_color': 'chestnut', 'gear': 'comms', 'footwear': 'high_tops', 'emblem': 'target', 'aura': 'none'},
-            'silver': {'frame': 'feminine', 'body': 'scout', 'outfit': 'varsity', 'palette': 'glacier', 'skin': 'deep', 'hair': 'ponytail', 'hair_color': 'onyx', 'gear': 'headband', 'bottom': 'fitted', 'emblem': 'mind', 'aura': 'pulse'},
-            'gold': {'frame': 'masculine', 'body': 'striker', 'outfit': 'academy', 'palette': 'solar', 'skin': 'medium', 'hair': 'wave', 'hair_color': 'copper', 'gear': 'glasses', 'emblem': 'shield', 'aura': 'flare'},
-            'platinum': {'frame': 'feminine', 'body': 'striker', 'outfit': 'techwear', 'palette': 'nova', 'skin': 'umber', 'hair': 'braids', 'hair_color': 'onyx', 'gear': 'comms', 'back': 'half_cape', 'emblem': 'bolt', 'aura': 'orbit'},
-            'diamond': {'frame': 'androgynous', 'body': 'sentinel', 'outfit': 'combat', 'palette': 'glacier', 'skin': 'deep', 'hair': 'bob', 'hair_color': 'blue', 'gear': 'visor', 'gloves': 'gauntlets', 'footwear': 'armored', 'emblem': 'target', 'aura': 'halo'},
-            'master': {'frame': 'feminine', 'body': 'sentinel', 'outfit': 'champion', 'palette': 'volt', 'skin': 'porcelain', 'hair': 'long', 'hair_color': 'silver', 'gear': 'crown', 'back': 'cape', 'emblem': 'mind', 'aura': 'spark'},
-            'grandmaster': {'frame': 'masculine', 'body': 'sentinel', 'outfit': 'champion', 'palette': 'midnight', 'accent': 'gold', 'skin': 'ebony', 'hair': 'spike', 'hair_color': 'violet', 'gear': 'crown', 'back': 'banner', 'gloves': 'gauntlets', 'footwear': 'armored', 'emblem': 'shield', 'aura': 'orbit'},
+            'bronze': {'frame': 'androgynous', 'body': 'scout', 'height': 'short', 'outfit': 'street', 'palette': 'solar', 'accent': 'copper', 'skin': 'light', 'eyes': 'hazel', 'expression': 'calm', 'hair': 'fade', 'hair_color': 'chestnut', 'gear': 'comms', 'bottom': 'joggers', 'footwear': 'high_tops', 'gloves': 'fingerless', 'emblem': 'target', 'aura': 'none'},
+            'silver': {'frame': 'feminine', 'body': 'scout', 'height': 'average', 'outfit': 'varsity', 'palette': 'glacier', 'accent': 'white', 'skin': 'deep', 'eyes': 'brown', 'brows': 'arched', 'hair': 'ponytail', 'hair_color': 'onyx', 'gear': 'headband', 'bottom': 'fitted', 'footwear': 'runners', 'emblem': 'mind', 'aura': 'pulse'},
+            'gold': {'frame': 'masculine', 'body': 'striker', 'height': 'average', 'outfit': 'academy', 'palette': 'solar', 'accent': 'gold', 'skin': 'medium', 'eyes': 'amber', 'expression': 'focused', 'facial_hair': 'stubble', 'hair': 'wave', 'hair_color': 'copper', 'gear': 'glasses', 'emblem': 'shield', 'aura': 'flare'},
+            'platinum': {'frame': 'feminine', 'body': 'striker', 'height': 'tall', 'outfit': 'techwear', 'palette': 'nova', 'accent': 'violet', 'skin': 'umber', 'eyes': 'violet', 'face': 'cyber', 'hair': 'braids', 'hair_color': 'onyx', 'gear': 'comms', 'back': 'half_cape', 'bottom': 'cargo', 'emblem': 'bolt', 'aura': 'orbit'},
+            'diamond': {'frame': 'androgynous', 'body': 'sentinel', 'height': 'average', 'outfit': 'flight', 'palette': 'glacier', 'accent': 'crystal', 'skin': 'deep', 'eyes': 'blue', 'brows': 'sharp', 'expression': 'focused', 'hair': 'undercut', 'hair_color': 'blue', 'gear': 'visor', 'gloves': 'gauntlets', 'footwear': 'armored', 'back': 'jetpack', 'emblem': 'target', 'aura': 'halo'},
+            'master': {'frame': 'athletic', 'body': 'sentinel', 'height': 'tall', 'outfit': 'champion', 'palette': 'volt', 'accent': 'lime', 'skin': 'porcelain', 'eyes': 'green', 'brows': 'arched', 'expression': 'fierce', 'face': 'warpaint', 'hair': 'flow', 'hair_color': 'silver', 'gear': 'crown', 'back': 'cape', 'bottom': 'battle_skirt', 'footwear': 'greaves', 'emblem': 'crown', 'aura': 'spark'},
+            'grandmaster': {'frame': 'athletic', 'body': 'titan', 'height': 'tall', 'outfit': 'champion', 'palette': 'midnight', 'accent': 'gold', 'skin': 'ebony', 'eyes': 'crimson', 'brows': 'bold', 'expression': 'fierce', 'face': 'scar', 'facial_hair': 'goatee', 'hair': 'locs', 'hair_color': 'violet', 'gear': 'helmet', 'back': 'wings', 'gloves': 'claws', 'bottom': 'tactical', 'footwear': 'armored', 'emblem': 'shield', 'aura': 'storm'},
         }
         return _normalize_arena_avatar(bot_loadouts.get(bot_rank, bot_loadouts['gold']))
     with db.rls_scope(system=True):
@@ -4858,6 +4946,19 @@ def _battle_difficulty_for_rating(rating):
     return _battle_rank(rating)['key']
 
 
+def _battle_tier_rating(difficulty):
+    """The rating an Arena bot plays at, so its tier decides what a win is worth.
+
+    Bronze's ladder threshold is 0 because it is the floor every unrated player
+    starts above, but a bot rated 0 would make beating it worth nothing and
+    losing to it catastrophic, so the bot never rates below a new player.
+    """
+    threshold = next(
+        (minimum for minimum, _label, key in SAT_BATTLE_RANKS if key == difficulty),
+        SAT_BATTLE_BASE_RATING)
+    return max(threshold, SAT_BATTLE_BASE_RATING)
+
+
 def _battle_rating_value(user_id):
     stats = db.select_one('sat_battle_stats', where={'user_id': user_id})
     return int(stats['rating']) if stats else 1000
@@ -4865,9 +4966,11 @@ def _battle_rating_value(user_id):
 
 SAT_BATTLE_AI_PROFILES = {
     'bronze': (
-        'Authentic lower-difficulty Digital SAT, never elementary-school work. Math takes two deliberate steps '
-        'using linear models, percentages, ratios, or basic data; Reading & Writing uses a 45-80 word stimulus '
-        'and close but distinguishable choices. No bare arithmetic or direct vocabulary-definition recall.'
+        'The easy end of a real Digital SAT: ordinary, straightforward questions, never elementary-school '
+        'arithmetic. Math is one clear setup plus one step - a linear model, a percentage, a unit rate, or '
+        'reading a plain data statement. Reading & Writing uses one short paragraph and choices that separate '
+        'plainly once the sentence is read. A prepared student should finish an item in 30-45 seconds. No '
+        'parameters, no multi-constraint systems, no paired passages, and no vocabulary-definition recall.'
     ),
     'silver': (
         'Authentic medium-low Digital SAT. Math connects two equations, representations, or conditions; Reading '
@@ -4897,7 +5000,9 @@ SAT_BATTLE_AI_PROFILES = {
         'or sophisticated two-way-table/statistical reasoning; no item may collapse to direct substitution or one routine '
         'formula. Both Reading & Writing items use 130-180 word dense stimuli (one must be paired-text, notes-plus-data, '
         'or claim/evidence synthesis) and four choices separated only by exact scope, quantifier, causality, or inferential '
-        'support. All wrong answers must encode a specific expert-level trap. A top scorer should still find the set difficult.'
+        'support. All wrong answers must encode a specific expert-level trap. A 1500+ scorer should expect to '
+        'miss one of these under the clock. The difficulty must come from genuinely linked reasoning: an item '
+        'that is unanswerable, ambiguous, missing a needed fact, or a trick is a defect, not a hard question.'
     ),
 }
 
@@ -4974,7 +5079,208 @@ def _recent_battle_question_fingerprints():
     return _recent_battle_question_material()[0]
 
 
+# --- Arena item contract ---------------------------------------------------
+# A round is assembled one slot at a time. Every slot owns its contract, so one
+# weak item is the only thing regenerated instead of costing the student the
+# other four questions they were already going to be served.
+
+SAT_BATTLE_SLOT_ATTEMPTS = 3
+# Vercel gives the function 60s. Stop starting new Gemini waves well before the
+# gateway hangs up so a slow tier fails with a real message instead of a 504.
+SAT_BATTLE_GENERATION_BUDGET_SECONDS = 44
+SAT_BATTLE_AI_MAX_OUTPUT_TOKENS = 12000
+
+_ARENA_COMPLEXITY_PATTERN = re.compile(
+    r'\b(?:constant|parameter|coefficient|for all|roots?|zeros?|vertex|discriminant|satisf(?:y|ies)|'
+    r'system|in terms of|ratio|rate|proportion|table|median|mean|standard deviation|margin of error|'
+    r'distribution|frequency|area|volume|perimeter|angle|radius|diameter|similar|congruent|circle|'
+    r'coordinate|midpoint|chord|arc|perpendicular|parallel|probability|conditional|sample)\b', re.I)
+
+# Difficulty is a contract, not a hope.
+#
+# Asking a model for a "harder" question reliably produces longer wording, not
+# deeper reasoning, so each tier declares bands an item must land inside and the
+# bands are separated enough that a Bronze item cannot pass as Grandmaster or
+# the reverse. Missing a band is retryable: the slot is regenerated, and only
+# after repeated attempts is a valid-but-off-band item accepted rather than
+# failing the student's round.
+#
+#   math    - stem length in characters, floor and ceiling
+#   words   - Reading & Writing stimulus length in words, floor and ceiling
+#   layers  - how many linked conditions/quantities the Math stem may chain
+#   advanced- may use parameter families, discriminants, "for all real x"
+#   paired  - may use paired Text 1 / Text 2 or notes-synthesis stimuli
+SAT_BATTLE_TIER_CONTRACT = {
+    'bronze': {'math': (90, 340), 'words': (35, 95), 'layers': (0, 3), 'advanced': False, 'paired': False},
+    'silver': {'math': (105, 430), 'words': (45, 110), 'layers': (1, 4), 'advanced': False, 'paired': False},
+    'gold': {'math': (120, 540), 'words': (60, 125), 'layers': (1, 5), 'advanced': True, 'paired': False},
+    'platinum': {'math': (135, 680), 'words': (70, 140), 'layers': (2, 7), 'advanced': True, 'paired': True},
+    'diamond': {'math': (150, 850), 'words': (85, 155), 'layers': (2, 9), 'advanced': True, 'paired': True},
+    'master': {'math': (165, 1050), 'words': (100, 175), 'layers': (3, 11), 'advanced': True, 'paired': True},
+    'grandmaster': {'math': (180, 1200), 'words': (110, 210), 'layers': (3, 14), 'advanced': True, 'paired': True},
+}
+
+# Structures that mark an item as genuinely upper-tier. Below the tier that
+# allows them they are a sign the writer drifted past its brief, which is the
+# specific way a Bronze round used to end up carrying Diamond questions.
+_ARENA_ADVANCED_MATH = re.compile(
+    r'\b(?:discriminant|for all real|parameter famil(?:y|ies)|all possible values|'
+    r'in terms of|nonlinear system|two-way table|conditional probability)\b', re.I)
+_ARENA_PAIRED_STIMULUS = re.compile(
+    r'\bText [12]\b|\bpaired[- ]text|\buses the notes\b|\bfrom these notes\b', re.I)
+
+# Each Grandmaster Math slot has to actually be the thing its blueprint asked
+# for. The pattern is broad on purpose: it should catch an item that quietly
+# became a one-step exercise, not an item that solved the brief with different
+# vocabulary than the first draft of this check happened to imagine.
+_ARENA_GRANDMASTER_SLOTS = {
+    0: (
+        re.compile(r'\b(?:constants?|parameters?|coefficients?|for all|roots?|zeros?|vertex|'
+                   r'discriminant|exactly one (?:real )?solution|no real solutions?|in terms of|'
+                   r'value of [a-z]\b)\b', re.I),
+        'parameter or function structure',
+        'Name at least one literal constant (k, m, p, ...) and tie it to root, zero, vertex, or '
+        'discriminant structure, so the stem literally reads as a parameter problem.',
+    ),
+    1: (
+        re.compile(r'\b(?:ratios?|rates?|proportions?|percent|probabilit(?:y|ies)|conditional|table|'
+                   r'two-way|sample|survey|median|means?|averages?|standard deviation|margin of error|'
+                   r'distribution|frequency|total number|how many)\b', re.I),
+        'reconstructed data, statistics, or probability reasoning',
+        'The stem must visibly be a data/statistics/probability item: use the words ratio, rate, '
+        'probability, conditional, table, sample, median, mean, or frequency somewhere in the setup.',
+    ),
+    2: (
+        re.compile(r'\b(?:constants?|parameters?|unknown|all possible|value of [a-z]\b|in terms of|'
+                   r'radius|diameter|area|volume|angle|similar|congruent|coordinates?|midpoint|arc|'
+                   r'chord|diagonal|perimeter|circumference)\b', re.I),
+        'a constrained geometry or measurement parameter',
+        'The stem must name the geometry it constrains (radius, area, volume, angle, similar figures, '
+        'coordinates, chord, arc, ...) and leave one quantity unknown until two conditions are combined.',
+    ),
+}
+# The tangent line plus perpendicular radius is a single-theorem setup that
+# reads hard and solves in one step, so it stays banned from the geometry slot.
+_ARENA_BANNED_TANGENT = re.compile(
+    r'\bpoint of tangency\b|\btangent\b[^.]{0,80}\b(?:perpendicular|radius)\b|'
+    r'\b(?:perpendicular|radius)\b[^.]{0,80}\btangent\b', re.I)
+
+
+def _clean_battle_question(item, difficulty, seen, recent_fingerprints, *, index=0):
+    """Return (question, rejection_reason) for a single Arena item.
+
+    This is the contract every Arena question must meet at every tier. It is
+    never relaxed: a malformed, duplicated, out-of-scope, or unanswerable item
+    is discarded no matter how many attempts are left.
+    """
+    label = f'question {index + 1}'
+    if not isinstance(item, dict):
+        return None, f'{label} is not an object'
+    minimum_lengths = SAT_BATTLE_MINIMUM_TEXT[difficulty]
+    question_text = str(item.get('question_text') or '').strip()
+    skill = str(item.get('skill') or '').strip()[:80]
+    domain = re.sub(r'[^a-z]+', '_', str(item.get('domain') or '').lower()).strip('_')
+    options = item.get('options')
+    explanation = str(item.get('explanation') or '').strip()
+    try:
+        correct_option = int(item.get('correct_option'))
+    except (TypeError, ValueError):
+        return None, f'{label} has an invalid answer key'
+    fingerprint = _battle_question_fingerprint(question_text)
+    maximum_length = 1200 if domain == 'math' else 1400
+    minimum_length = minimum_lengths.get(domain, 100)
+    needs_blank = domain == 'reading_writing' and bool(
+        re.search(r'\b(?:completes?|completion|conventions?|transition)\b', f'{skill} {question_text}', re.I)
+    )
+    checks = [
+        (len(question_text) < minimum_length, f'text shorter than {minimum_length} characters'),
+        (len(question_text) > maximum_length, f'text longer than {maximum_length} characters'),
+        (bool(_ARENA_OUT_OF_SCOPE_PATTERN.search(f'{skill} {question_text}')), 'out-of-scope content'),
+        (not skill, 'missing skill'),
+        (domain not in {'math', 'reading_writing'}, 'invalid domain'),
+        (len(explanation) < 45, 'explanation too short'),
+        (not isinstance(options, list) or len(options) != 4, 'invalid options'),
+        (not 0 <= correct_option < 4, 'answer key out of range'),
+        (not fingerprint, 'empty fingerprint'),
+        (fingerprint in seen, 'duplicate within the set'),
+        (fingerprint in recent_fingerprints, 'recent question repeated'),
+        (needs_blank and '____' not in question_text, 'completion item is missing a blank'),
+    ]
+    failure = next((reason for failed, reason in checks if failed), None)
+    if failure:
+        return None, f'{label}: {failure}'
+    cleaned_options = [str(option or '').strip()[:500] for option in options]
+    if any(not option for option in cleaned_options) or len({option.lower() for option in cleaned_options}) != 4:
+        return None, f'{label}: empty or duplicate options'
+    return {
+        'question_text': question_text[:1800], 'options': cleaned_options,
+        'correct_option': correct_option, 'skill': skill,
+        'domain': domain, 'explanation': explanation[:1200], 'difficulty': difficulty,
+    }, None
+
+
+def _battle_tier_contract_failure(question, slot, difficulty):
+    """Return why a usable item is the wrong *hardness* for its tier.
+
+    This is deliberately separate from the item contract in
+    _clean_battle_question, which decides whether an item works at all. A
+    flawless two-step algebra question is a good Bronze item and a broken
+    promise at Grandmaster, and only this check can tell those apart.
+    """
+    spec = SAT_BATTLE_TIER_CONTRACT[difficulty]
+    text = question['question_text']
+    label = f'slot {slot + 1} ({difficulty})'
+
+    if question['domain'] == 'reading_writing':
+        words = len(re.findall(r"\b[\w'-]+\b", text))
+        floor, ceiling = spec['words']
+        if words < floor:
+            return f'{label}: stimulus runs {words} words, under the {floor}-word floor'
+        if words > ceiling:
+            return f'{label}: stimulus runs {words} words, over the {ceiling}-word ceiling'
+        if not spec['paired'] and _ARENA_PAIRED_STIMULUS.search(text):
+            return f'{label}: paired-text or notes synthesis is above this tier'
+        return None
+
+    floor, ceiling = spec['math']
+    if len(text) < floor:
+        return f'{label}: Math stem is {len(text)} characters, under the {floor} floor'
+    if len(text) > ceiling:
+        return f'{label}: Math stem is {len(text)} characters, over the {ceiling} ceiling'
+    layers = len(_ARENA_COMPLEXITY_PATTERN.findall(text))
+    fewest, most = spec['layers']
+    if layers < fewest:
+        return f'{label}: Math item chains {layers} conditions, under the {fewest} this tier needs'
+    if layers > most:
+        return f'{label}: Math item chains {layers} conditions, over the {most} this tier allows'
+    if not spec['advanced'] and _ARENA_ADVANCED_MATH.search(text):
+        return f'{label}: uses upper-tier structure a student at this rank should not meet'
+    if difficulty != 'grandmaster':
+        return None
+
+    # Grandmaster additionally holds each Math slot to its specific blueprint,
+    # because at the top of the ladder "hard enough" is not the same as "the
+    # kind of hard the round promised".
+    pattern, requirement, _hint = _ARENA_GRANDMASTER_SLOTS[slot]
+    if not pattern.search(text):
+        return f'{label}: Math item lacks {requirement}'
+    if slot == 2 and _ARENA_BANNED_TANGENT.search(text):
+        return f'{label}: used the banned one-route tangent setup'
+    return None
+
+
+def _battle_round_failure(questions, difficulty):
+    """Return why an assembled round is not a real mixed SAT set."""
+    # An Arena round should not be five variants of the same micro-skill.
+    if len({question['skill'].lower() for question in questions}) < 4:
+        return 'fewer than four distinct skills'
+    if sum(question['domain'] == 'math' for question in questions) != 3:
+        return 'round does not contain exactly three Math questions'
+    return None
+
+
 def _validate_ai_battle_questions(payload, difficulty, recent_fingerprints):
+    """Gate a complete five-item round against the item and tier contracts."""
     def reject(reason):
         app.logger.warning('Arena %s validation rejected a set: %s', difficulty, reason)
         return None
@@ -4983,80 +5289,19 @@ def _validate_ai_battle_questions(payload, difficulty, recent_fingerprints):
     if not isinstance(items, list) or len(items) != SAT_BATTLE_QUESTION_COUNT:
         return reject('question count or payload shape')
     questions, seen = [], set()
-    minimum_lengths = SAT_BATTLE_MINIMUM_TEXT[difficulty]
     for index, item in enumerate(items):
-        if not isinstance(item, dict):
-            return reject(f'question {index + 1} is not an object')
-        question_text = str(item.get('question_text') or '').strip()
-        skill = str(item.get('skill') or '').strip()[:80]
-        domain = re.sub(r'[^a-z]+', '_', str(item.get('domain') or '').lower()).strip('_')
-        options = item.get('options')
-        explanation = str(item.get('explanation') or '').strip()
-        try:
-            correct_option = int(item.get('correct_option'))
-        except (TypeError, ValueError):
-            return reject(f'question {index + 1} has an invalid answer key')
-        fingerprint = _battle_question_fingerprint(question_text)
-        maximum_length = 1200 if domain == 'math' else 1400
-        minimum_length = minimum_lengths.get(domain, 100)
-        needs_blank = domain == 'reading_writing' and bool(
-            re.search(r'\b(?:completes?|completion|conventions?|transition)\b', f'{skill} {question_text}', re.I)
-        )
-        checks = [
-            (len(question_text) < minimum_length, f'text shorter than {minimum_length} characters'),
-            (len(question_text) > maximum_length, f'text longer than {maximum_length} characters'),
-            (bool(_ARENA_OUT_OF_SCOPE_PATTERN.search(f'{skill} {question_text}')), 'out-of-scope content'),
-            (not skill, 'missing skill'),
-            (domain not in {'math', 'reading_writing'}, 'invalid domain'),
-            (len(explanation) < 45, 'explanation too short'),
-            (not isinstance(options, list) or len(options) != 4, 'invalid options'),
-            (not 0 <= correct_option < 4, 'answer key out of range'),
-            (not fingerprint, 'empty fingerprint'),
-            (fingerprint in seen, 'duplicate within the set'),
-            (fingerprint in recent_fingerprints, 'recent question repeated'),
-            (needs_blank and '____' not in question_text, 'completion item is missing a blank'),
-        ]
-        failure = next((reason for failed, reason in checks if failed), None)
+        question, failure = _clean_battle_question(item, difficulty, seen, recent_fingerprints, index=index)
         if failure:
-            return reject(f'question {index + 1}: {failure}')
-        cleaned_options = [str(option or '').strip()[:500] for option in options]
-        if any(not option for option in cleaned_options) or len({option.lower() for option in cleaned_options}) != 4:
-            return reject(f'question {index + 1}: empty or duplicate options')
-        seen.add(fingerprint)
-        questions.append({
-            'question_text': question_text[:1800], 'options': cleaned_options,
-            'correct_option': correct_option, 'skill': skill,
-            'domain': domain, 'explanation': explanation[:1200], 'difficulty': difficulty,
-        })
-    # An Arena round should not be five variants of the same micro-skill.
-    if len({question['skill'].lower() for question in questions}) < 4:
-        return reject('fewer than four distinct skills')
-    if sum(question['domain'] == 'math' for question in questions) != 3:
-        return reject('round does not contain exactly three Math questions')
-    if difficulty == 'grandmaster':
-        math_items = [question for question in questions if question['domain'] == 'math']
-        reading_items = [question for question in questions if question['domain'] == 'reading_writing']
-        complexity_pattern = re.compile(
-            r'\b(?:constant|parameter|for all|roots?|zeros?|vertex|satisf(?:y|ies)|system|ratio|'
-            r'table|standard deviation|margin of error|area|volume|similar|circle|coordinate|perpendicular|'
-            r'tangent|probability|conditional)\b', re.I)
-        genuinely_layered = sum(
-            len(question['question_text']) >= 180
-            and len(complexity_pattern.findall(question['question_text'])) >= 2
-            for question in math_items
-        )
-        if genuinely_layered < 2:
-            return reject('fewer than two genuinely layered Math items')
-        if not re.search(r'\b(?:constant|parameter|for all|roots?|zeros?|vertex|discriminant)\b', math_items[0]['question_text'], re.I):
-            return reject('first Grandmaster Math item lacks parameter/function structure')
-        if not re.search(r'\b(?:ratio|unknown|missing|conditional|probability|table)\b', math_items[1]['question_text'], re.I):
-            return reject('second Grandmaster Math item lacks reconstructed data reasoning')
-        if not re.search(r'\b(?:constant|parameter|unknown|all possible|value of [a-z])\b', math_items[2]['question_text'], re.I):
-            return reject('third Grandmaster Math item lacks an inferred geometry parameter')
-        if re.search(r'\b(?:tangent|point of tangency|perpendicular to the tangent)\b', math_items[2]['question_text'], re.I):
-            return reject('third Grandmaster Math item used the banned one-route tangent setup')
-        if any(len(re.findall(r"\b[\w'-]+\b", question['question_text'])) < 110 for question in reading_items):
-            return reject('Reading & Writing stimulus below 110 words')
+            return reject(failure)
+        seen.add(_battle_question_fingerprint(question['question_text']))
+        questions.append(question)
+    round_failure = _battle_round_failure(questions, difficulty)
+    if round_failure:
+        return reject(round_failure)
+    for slot, question in enumerate(questions):
+        tier_failure = _battle_tier_contract_failure(question, slot, difficulty)
+        if tier_failure:
+            return reject(tier_failure)
     return questions
 
 
@@ -5073,14 +5318,43 @@ def _decode_ai_battle_json(raw):
     return json.JSONDecoder().raw_decode(candidate)[0]
 
 
+def _generate_arena_text(prompt, *, thinking_level, system_instruction):
+    """Call Gemini for one Arena item, surviving a thinking-budget overrun.
+
+    Grandmaster prompts are the longest in the product, and a long private
+    reasoning pass can consume the whole output budget and return nothing.
+    Retrying that specific failure once with a shorter thinking level is the
+    difference between a playable round and a 503.
+    """
+    try:
+        return _generate_text(
+            prompt, max_output_tokens=SAT_BATTLE_AI_MAX_OUTPUT_TOKENS, json_output=True,
+            json_schema=SAT_BATTLE_AI_SINGLE_SCHEMA, thinking_level=thinking_level,
+            system_instruction=system_instruction, model=GEMINI_ARENA_MODEL,
+        )
+    except ValueError:
+        # An empty or truncated body is the one failure a cheaper retry fixes.
+        return _generate_text(
+            prompt, max_output_tokens=SAT_BATTLE_AI_MAX_OUTPUT_TOKENS, json_output=True,
+            json_schema=SAT_BATTLE_AI_SINGLE_SCHEMA, thinking_level='low',
+            system_instruction=system_instruction, model=GEMINI_ARENA_MODEL,
+        )
+
+
 def _generate_ai_battle_questions(difficulty):
-    """Build five focused Flash-Lite items in parallel, then validate the round."""
+    """Build five Arena items in parallel, regenerating only the slots that fail.
+
+    Every slot runs its own draft-then-audit pipeline on its own thread, so the
+    round costs one draft plus one audit of wall time rather than two full
+    waves, and a slot that misses its contract is retried by itself.
+    """
     if not gemini_api_key:
         return None
     recent_fingerprints, recent_stems = _recent_battle_question_material()
     profile = SAT_BATTLE_AI_PROFILES[difficulty]
     thinking_level = SAT_BATTLE_THINKING_BY_RANK[difficulty]
     recent_context = '\n'.join(f'- {stem}' for stem in recent_stems[:12]) or '- No previous Arena questions.'
+    audited = difficulty in {'diamond', 'master', 'grandmaster'}
     slot_blueprints = [
         ('math', 'algebra and function structure appropriate to the tier'),
         ('math', 'problem-solving, data analysis, ratios, probability, or statistics appropriate to the tier'),
@@ -5105,23 +5379,48 @@ def _generate_ai_battle_questions(difficulty):
         'relationship; distractors subtly alter causality, scope, certainty, or comparison direction.',
     ]
 
+    def slot_contract_hint(slot):
+        """State, in words, exactly what the tier gate is going to measure.
+
+        The gate and the brief have to describe the same item. When they drift
+        apart the writer produces good questions that get rejected over wording
+        the check happened to want, and every rejection costs the student time.
+        """
+        contract = SAT_BATTLE_TIER_CONTRACT[difficulty]
+        if slot_blueprints[slot][0] == 'reading_writing':
+            low, high = contract['words']
+            lines = [f'Hard requirement: the stimulus must run {low}-{high} words before the question sentence.']
+            if not contract['paired']:
+                lines.append('Do not use paired Text 1 / Text 2 passages or notes-and-bullets synthesis at this tier.')
+        else:
+            low, high = contract['math']
+            fewest, most = contract['layers']
+            lines = [
+                f'Hard requirement: keep the Math stem between {low} and {high} characters, and chain '
+                f'{fewest}-{most} explicit conditions or named quantities. Fewer reads as a lower tier; '
+                f'more reads as a higher one, and both are rejected.'
+            ]
+            if not contract['advanced']:
+                lines.append('Do not use discriminants, parameter families, "for all real x", two-way tables, '
+                             'or conditional probability at this tier.')
+            if difficulty == 'grandmaster':
+                lines.append(_ARENA_GRANDMASTER_SLOTS[slot][2])
+        return '\n' + '\n'.join(lines)
+
     # Complete lazy client setup once before the worker threads use it.
     _get_gemini_client()
-    attempts = 1 if difficulty in {'diamond', 'master', 'grandmaster'} else 2
-    for _attempt in range(attempts):
-        nonce = secrets.token_urlsafe(12)
 
-        def generate_slot(slot):
-            domain, focus = slot_blueprints[slot]
-            exact_focus = grandmaster_blueprints[slot] if difficulty == 'grandmaster' else focus
-            prompt = f"""
+    def generate_slot(slot, nonce):
+        domain, focus = slot_blueprints[slot]
+        exact_focus = grandmaster_blueprints[slot] if difficulty == 'grandmaster' else focus
+        prompt = f"""
 Write ONE new, original Digital SAT-style question for a Mentics Arena round.
 
 Tier: {difficulty.upper()}
 Tier contract: {profile}
 Slot: {slot + 1} of 5
 Required domain: {domain}
-Required focus: {exact_focus}
+Required focus: {exact_focus}{slot_contract_hint(slot)}
 Uniqueness nonce: {nonce}-{slot}
 
 Recent stems that must not be reused, lightly reworded, or recreated with new numbers:
@@ -5139,33 +5438,30 @@ Requirements:
 - Sentence-completion, transition, punctuation, and vocabulary-completion items must visibly contain ____.
 - Reject and rewrite the draft if a student at this tier could solve it in one routine step or by keyword matching.
 """
-            raw = _generate_text(
-                prompt, max_output_tokens=8000, json_output=True,
-                json_schema=SAT_BATTLE_AI_SINGLE_SCHEMA,
-                thinking_level=thinking_level,
-                system_instruction=(
-                    'You are a rigorous Digital SAT assessment writer. Create one fully solvable, '
-                    'original item at the exact requested tier and return structured JSON only.'
-                ),
-                model=GEMINI_ARENA_MODEL,
-            )
-            parsed = _decode_ai_battle_json(raw)
-            question = parsed.get('question') if isinstance(parsed, dict) else None
-            if not isinstance(question, dict):
-                raise ValueError(f'Arena slot {slot + 1} did not contain a question.')
-            question['domain'] = domain
-            return slot, question
+        raw = _generate_arena_text(
+            prompt, thinking_level=thinking_level,
+            system_instruction=(
+                'You are a rigorous Digital SAT assessment writer. Create one fully solvable, '
+                'original item at the exact requested tier and return structured JSON only.'
+            ),
+        )
+        parsed = _decode_ai_battle_json(raw)
+        question = parsed.get('question') if isinstance(parsed, dict) else None
+        if not isinstance(question, dict):
+            raise ValueError(f'Arena slot {slot + 1} did not contain a question.')
+        question['domain'] = domain
+        return question
 
-        def review_slot(slot, question):
-            domain, focus = slot_blueprints[slot]
-            exact_focus = grandmaster_blueprints[slot] if difficulty == 'grandmaster' else focus
-            prompt = f"""
+    def review_slot(slot, question):
+        domain, focus = slot_blueprints[slot]
+        exact_focus = grandmaster_blueprints[slot] if difficulty == 'grandmaster' else focus
+        prompt = f"""
 Independently audit and finalize this ONE original Digital SAT-style question.
 
 Tier: {difficulty.upper()}
 Tier contract: {profile}
 Required domain: {domain}
-Required focus: {exact_focus}
+Required focus: {exact_focus}{slot_contract_hint(slot)}
 
 First solve the question yourself without trusting a single line of its current answer key or explanation. Write the
 equations and recompute every intermediate value privately. Then return a corrected question in exactly the same JSON
@@ -5188,48 +5484,102 @@ Return JSON only as {{"question":{{...}}}}.
 DRAFT:
 {json.dumps({'question': question}, ensure_ascii=False)}
 """
-            raw = _generate_text(
-                prompt, max_output_tokens=8000, json_output=True,
-                json_schema=SAT_BATTLE_AI_SINGLE_SCHEMA,
-                thinking_level=thinking_level,
-                system_instruction=(
-                    'You are an adversarial Digital SAT item editor. Independently solve, correct, '
-                    'and harden one item, then return structured JSON only.'
-                ),
-                model=GEMINI_ARENA_MODEL,
-            )
-            parsed = _decode_ai_battle_json(raw)
-            reviewed = parsed.get('question') if isinstance(parsed, dict) else None
-            if not isinstance(reviewed, dict):
-                raise ValueError(f'Arena review {slot + 1} did not contain a question.')
-            reviewed['domain'] = domain
-            return slot, reviewed
+        raw = _generate_arena_text(
+            prompt, thinking_level=thinking_level,
+            system_instruction=(
+                'You are an adversarial Digital SAT item editor. Independently solve, correct, '
+                'and harden one item, then return structured JSON only.'
+            ),
+        )
+        parsed = _decode_ai_battle_json(raw)
+        reviewed = parsed.get('question') if isinstance(parsed, dict) else None
+        if not isinstance(reviewed, dict):
+            raise ValueError(f'Arena review {slot + 1} did not contain a question.')
+        reviewed['domain'] = domain
+        return reviewed
 
-        candidates = [None] * SAT_BATTLE_QUESTION_COUNT
+    def build_slot(slot, nonce):
+        """Draft then audit one slot, keeping the draft if the audit misfires."""
+        draft = generate_slot(slot, nonce)
+        if not audited:
+            return [draft]
         try:
-            with ThreadPoolExecutor(max_workers=SAT_BATTLE_QUESTION_COUNT) as executor:
-                futures = [executor.submit(generate_slot, slot) for slot in range(SAT_BATTLE_QUESTION_COUNT)]
-                for future in as_completed(futures):
-                    slot, question = future.result()
-                    candidates[slot] = question
-            if difficulty in {'diamond', 'master', 'grandmaster'}:
-                reviewed = [None] * SAT_BATTLE_QUESTION_COUNT
-                with ThreadPoolExecutor(max_workers=SAT_BATTLE_QUESTION_COUNT) as executor:
-                    futures = [executor.submit(review_slot, slot, candidates[slot]) for slot in range(SAT_BATTLE_QUESTION_COUNT)]
-                    for future in as_completed(futures):
-                        slot, question = future.result()
-                        reviewed[slot] = question
-                candidates = reviewed
-            questions = _validate_ai_battle_questions({'questions': candidates}, difficulty, recent_fingerprints)
-            if questions:
-                for question in questions:
-                    question['source'] = 'gemini'
-                    question['generation_id'] = nonce
-                return questions
-            app.logger.warning('Arena AI generated a set that failed %s validation.', difficulty)
-        except Exception as error:  # noqa: BLE001 - a round must remain playable
-            app.logger.warning('Arena AI generation failed for %s: %s', difficulty, error)
-    return None
+            return [review_slot(slot, draft), draft]
+        except Exception as error:  # noqa: BLE001 - a good draft outranks a failed audit
+            app.logger.warning('Arena %s slot %s audit failed: %s', difficulty, slot + 1, error)
+            return [draft]
+
+    accepted = [None] * SAT_BATTLE_QUESTION_COUNT
+    # A slot that satisfies the non-negotiable item contract but misses its
+    # tier-specific phrasing is kept aside. It is only used if repeated attempts
+    # cannot do better, because a slightly off-brief Grandmaster item still
+    # beats telling the student the Arena is unavailable.
+    best_effort = [None] * SAT_BATTLE_QUESTION_COUNT
+    seen, used_skills = set(), set()
+    deadline = time.monotonic() + SAT_BATTLE_GENERATION_BUDGET_SECONDS
+    pending = list(range(SAT_BATTLE_QUESTION_COUNT))
+
+    for _attempt in range(SAT_BATTLE_SLOT_ATTEMPTS):
+        if not pending or time.monotonic() >= deadline:
+            break
+        nonce = secrets.token_urlsafe(12)
+        drafts = {}
+        with ThreadPoolExecutor(max_workers=len(pending)) as executor:
+            futures = {executor.submit(build_slot, slot, nonce): slot for slot in pending}
+            for future in as_completed(futures):
+                slot = futures[future]
+                try:
+                    drafts[slot] = future.result()
+                except Exception as error:  # noqa: BLE001 - one slot must not end the round
+                    app.logger.warning('Arena %s slot %s failed: %s', difficulty, slot + 1, error)
+        # Validation runs here rather than inside the workers so duplicate and
+        # skill detection see one consistent view of the round being built.
+        still_pending = []
+        for slot in pending:
+            chosen, spare = None, None
+            for candidate in drafts.get(slot) or ():
+                question, failure = _clean_battle_question(
+                    candidate, difficulty, seen, recent_fingerprints, index=slot)
+                if failure:
+                    app.logger.warning('Arena %s rejected a candidate: %s', difficulty, failure)
+                    continue
+                if question['skill'].lower() in used_skills:
+                    app.logger.warning(
+                        'Arena %s slot %s repeated the skill %r', difficulty, slot + 1, question['skill'])
+                    spare = spare or question
+                    continue
+                tier_failure = _battle_tier_contract_failure(question, slot, difficulty)
+                if tier_failure:
+                    app.logger.warning('Arena %s missed its contract: %s', difficulty, tier_failure)
+                    spare = spare or question
+                    continue
+                chosen = question
+                break
+            if chosen:
+                accepted[slot] = chosen
+                seen.add(_battle_question_fingerprint(chosen['question_text']))
+                used_skills.add(chosen['skill'].lower())
+            else:
+                best_effort[slot] = best_effort[slot] or spare
+                still_pending.append(slot)
+        pending = still_pending
+
+    for slot in pending:
+        if best_effort[slot]:
+            app.logger.warning('Arena %s slot %s settled for a best-effort item.', difficulty, slot + 1)
+            accepted[slot] = best_effort[slot]
+    if any(question is None for question in accepted):
+        app.logger.warning('Arena %s could not fill every slot within its budget.', difficulty)
+        return None
+    round_failure = _battle_round_failure(accepted, difficulty)
+    if round_failure:
+        app.logger.warning('Arena %s assembled an invalid round: %s', difficulty, round_failure)
+        return None
+    generation_id = secrets.token_urlsafe(12)
+    for question in accepted:
+        question['source'] = 'gemini'
+        question['generation_id'] = generation_id
+    return accepted
 
 
 def _fallback_battle_questions(difficulty):
@@ -5243,6 +5593,7 @@ def _fallback_battle_questions(difficulty):
         questions.append({
             'question_text': source['question_text'], 'options': options,
             'correct_option': options.index(correct_answer), 'skill': source['skill'],
+            'domain': source.get('domain', 'reading_writing'),
             'explanation': source.get('explanation') or f"The correct answer is {correct_answer}.",
             'difficulty': difficulty, 'source': 'fallback',
         })
@@ -5328,20 +5679,67 @@ def _battle_score(questions, answers):
     return sum(1 for index, question in enumerate(questions) if selected.get(index) == question['correct_option'])
 
 
-def _battle_rating(user_id, user_name, outcome):
+def _battle_stats_row(user_id, user_name):
+    """Return a player's ladder row, creating it on their first ranked round."""
     stats = db.select_one('sat_battle_stats', where={'user_id': user_id})
-    if not stats:
-        stats = {'user_id': user_id, 'user_name': user_name, 'rating': 1000, 'wins': 0, 'losses': 0, 'draws': 0, 'battles_played': 0}
-        db.insert('sat_battle_stats', stats)
-    delta = {'win': 24, 'loss': -14, 'draw': 4}[outcome]
+    if stats:
+        return stats
+    db.insert('sat_battle_stats', {
+        'user_id': user_id, 'user_name': user_name, 'rating': SAT_BATTLE_BASE_RATING,
+        'wins': 0, 'losses': 0, 'draws': 0, 'battles_played': 0,
+    })
+    return db.select_one('sat_battle_stats', where={'user_id': user_id})
+
+
+def _elo_k_factor(battles_played, rating):
+    """How far one round is allowed to move a rating.
+
+    Placement rounds move fast so a student lands near their real tier within a
+    few battles instead of grinding thirty. A settled high rating moves slowly,
+    which is what stops one lucky round from minting a Grandmaster.
+    """
+    if battles_played < SAT_BATTLE_PLACEMENT_ROUNDS:
+        return 48
+    return 20 if rating >= 1550 else 32
+
+
+def _elo_delta(rating, opponent_rating, outcome, battles_played):
+    """Standard Elo: the swing scales with how surprising the result was.
+
+    The flat +24/-14 this replaces meant beating a Bronze bot paid exactly what
+    beating a Grandmaster did, so the ladder could be farmed at the bottom.
+    """
+    score = {'win': 1.0, 'draw': 0.5, 'loss': 0.0}[outcome]
+    expected = 1 / (1 + 10 ** ((opponent_rating - rating) / 400))
+    delta = round(_elo_k_factor(battles_played, rating) * (score - expected))
+    # However lopsided the matchup, a win never costs rating and a loss never
+    # pays: rounding alone would otherwise produce a 0 on a heavy favourite.
+    if outcome == 'win':
+        return max(delta, 1)
+    if outcome == 'loss':
+        return min(delta, -1)
+    return delta
+
+
+def _battle_rating(user_id, user_name, outcome, opponent_rating):
+    """Apply one Elo result and return the swing it produced."""
+    stats = _battle_stats_row(user_id, user_name)
+    rating = int(stats['rating'])
+    delta = _elo_delta(rating, opponent_rating, outcome, int(stats['battles_played']))
+    # A win streak is a run of wins, so anything that is not a win ends it --
+    # a draw included, or the flame would survive rounds nobody won.
+    win_streak = int(stats.get('win_streak') or 0) + 1 if outcome == 'win' else 0
     db.update('sat_battle_stats', {
         'user_name': user_name,
-        'rating': max(800, int(stats['rating']) + delta),
+        'rating': max(SAT_BATTLE_RATING_FLOOR, rating + delta),
         'wins': int(stats['wins']) + (outcome == 'win'),
         'losses': int(stats['losses']) + (outcome == 'loss'),
         'draws': int(stats['draws']) + (outcome == 'draw'),
         'battles_played': int(stats['battles_played']) + 1,
+        'win_streak': win_streak,
+        'best_win_streak': max(int(stats.get('best_win_streak') or 0), win_streak),
     }, where={'user_id': user_id})
+    return delta
 
 
 def _finish_battle_if_ready(battle):
@@ -5381,9 +5779,25 @@ def _finish_battle_if_ready(battle):
     if updated and _battle_mode(battle) != 'training':
         challenger_outcome = 'draw' if winner_id is None else 'win' if winner_id == battle['challenger_id'] else 'loss'
         opponent_outcome = 'draw' if winner_id is None else 'win' if winner_id == battle['opponent_id'] else 'loss'
-        _battle_rating(battle['challenger_id'], battle['challenger_name'], challenger_outcome)
+        # Both sides are scored against the ratings they held going in. Updating
+        # one first and then reading it back would pay the second player for a
+        # swing that had not happened when the round was played.
+        difficulty = questions[0].get('difficulty', 'bronze') if questions else 'bronze'
+        challenger_rating = _battle_rating_value(battle['challenger_id'])
+        opponent_rating = (
+            _battle_tier_rating(difficulty) if is_bot_battle
+            else _battle_rating_value(battle['opponent_id'])
+        )
+        challenger_delta = _battle_rating(
+            battle['challenger_id'], battle['challenger_name'], challenger_outcome, opponent_rating)
+        opponent_delta = None
         if not is_bot_battle:
-            _battle_rating(battle['opponent_id'], battle['opponent_name'], opponent_outcome)
+            opponent_delta = _battle_rating(
+                battle['opponent_id'], battle['opponent_name'], opponent_outcome, challenger_rating)
+        db.update('sat_battles', {
+            'challenger_rating_delta': challenger_delta,
+            'opponent_rating_delta': opponent_delta,
+        }, where={'id': battle['id']})
     return db.select_one('sat_battles', where={'id': battle['id']})
 
 
@@ -5434,21 +5848,32 @@ def _battle_payload(battle, user_id):
     }
     stats = db.select_one('sat_battle_stats', where={'user_id': user_id})
     result['rank'] = _battle_rank(stats['rating'] if stats else 1000)
+    result['winStreak'] = int((stats or {}).get('win_streak') or 0)
+    result['bestWinStreak'] = int((stats or {}).get('best_win_streak') or 0)
     if battle['status'] in {'active', 'complete'}:
         result['difficulty'] = battle_difficulty
         result['questionSource'] = (
             'gemini' if battle_questions and all(q.get('source') == 'gemini' for q in battle_questions)
             else 'fallback'
         )
-        result['questions'] = [{'question_text': q['question_text'], 'options': q['options'], 'skill': q['skill']} for q in battle_questions]
+        result['questions'] = [{
+            'question_text': q['question_text'], 'options': q['options'], 'skill': q['skill'],
+            'domain': q.get('domain', 'reading_writing'),
+        } for q in battle_questions]
     if battle['status'] == 'complete':
         questions = json.loads(battle['questions'])
         challenger_score = _battle_score(questions, _battle_answers(battle.get('challenger_answers')))
         opponent_score = _battle_score(questions, _battle_answers(battle.get('opponent_answers')))
         own_score, opponent_score = (challenger_score, opponent_score) if is_challenger else (opponent_score, challenger_score)
+        rating_delta = battle.get('challenger_rating_delta' if is_challenger else 'opponent_rating_delta')
         result.update({
             'winnerId': battle.get('winner_id'), 'youWon': battle.get('winner_id') == user_id,
             'draw': battle.get('winner_id') is None, 'yourScore': own_score,
+            # What the round was actually worth, plus the rank the student held
+            # going in, so a promotion can be shown as the event it is instead of
+            # a number they are left to compare against memory.
+            'ratingDelta': rating_delta,
+            'previousRank': _battle_rank(result['rank']['rating'] - rating_delta) if rating_delta is not None else None,
             'opponentScore': opponent_score, 'answerKey': [q['correct_option'] for q in questions],
             'questionReview': [{
                 'questionText': question['question_text'],
@@ -5481,6 +5906,8 @@ def battle_arena(user):
         'arenaAvatar': _arena_avatar_for_user(user.data['id']),
         'battleRank': _battle_rank(stats['rating'] if stats else 1000),
         'battleStats': stats or {'wins': 0, 'losses': 0, 'draws': 0, 'battles_played': 0},
+        'winStreak': int((stats or {}).get('win_streak') or 0),
+        'bestWinStreak': int((stats or {}).get('best_win_streak') or 0),
         'leaderboard': leaderboard,
         'spotlight': spotlight[0] if spotlight else None,
     }, 'SAT Battles | Mentics')
@@ -5488,7 +5915,10 @@ def battle_arena(user):
 
 @app.route('/api/sat-battles/avatar', methods=['POST'])
 @login_required
-@rate_limit('30/hour', name='sat_battle_avatar')
+# Twenty-five slots and a randomiser: thirty saves an hour is a limit a
+# student hits while genuinely playing with the locker, and the save then
+# fails on a fighter they can already see.
+@rate_limit('120/hour', name='sat_battle_avatar')
 def update_sat_battle_avatar(user):
     payload = request.get_json(silent=True) or {}
     avatar = _normalize_arena_avatar(payload)

@@ -23,6 +23,8 @@ import './lesson-player.css'
 import './mentics-ui.css'  // last: owns chat guide, task modal, and map performance
 
 import { boot } from './boot'
+import { ArenaCustomizer, ArenaFighter, normalizeArenaAvatar } from './arena-fighter'
+import { ArenaCalculator, ArenaCalculatorToggle } from './arena-calculator'
 
 // The CSRF token is per-session, so it cannot be baked into prerendered HTML.
 // Rendering empty on the server and filling in after mount keeps the server and
@@ -1800,122 +1802,92 @@ const BATTLE_TRAINING_RANKS = [
   ['grandmaster', 'Grandmaster', 'Hardest SAT-style sets'],
 ]
 
-const ARENA_AVATAR_DEFAULT = {
-  frame: 'masculine', body: 'striker', skin: 'medium', hair: 'crop', hair_color: 'onyx',
-  face: 'natural', outfit: 'combat', palette: 'nova', accent: 'crystal', bottom: 'tactical',
-  gloves: 'tech', footwear: 'boots', gear: 'visor', back: 'none', emblem: 'bolt', aura: 'pulse',
-}
-const ARENA_AVATAR_PALETTES = {
-  nova: ['#8b5cf6', '#4f46e5', '#f1eaff'],
-  solar: ['#ffb340', '#e95d43', '#fff1c7'],
-  glacier: ['#48d8ff', '#3974e8', '#e2fbff'],
-  volt: ['#b5f33d', '#31a878', '#efffc6'],
-  rose: ['#ff6fae', '#ad3f83', '#ffe0ef'],
-  midnight: ['#5468ff', '#161c5a', '#b9c4ff'],
-}
-const ARENA_AVATAR_SKINS = {
-  porcelain: ['#ffe7d8', '#d9a184', '#fff7ef'],
-  light: ['#ffd7bd', '#d99576', '#fff0df'],
-  warm: ['#efb184', '#b86e4d', '#ffd0aa'],
-  medium: ['#dca27c', '#a9674f', '#f0c2a0'],
-  olive: ['#bd865d', '#80523b', '#ddb08a'],
-  deep: ['#925c45', '#603629', '#c98968'],
-  umber: ['#603f34', '#37241f', '#936752'],
-  ebony: ['#412d28', '#211716', '#735047'],
-}
-const ARENA_AVATAR_HAIR = {
-  onyx: '#151522', espresso: '#3a241e', chestnut: '#713f2b', copper: '#b95732',
-  gold: '#e5b956', silver: '#c8d0df', violet: '#6f4ad8', blue: '#2769bd',
-}
-const ARENA_AVATAR_ACCENTS = {
-  crystal: '#a8edff', gold: '#ffd66d', rose: '#ff9cc8', teal: '#67f0cf', white: '#f8fbff', graphite: '#343a56',
-}
-const ARENA_CUSTOMIZER_SECTIONS = {
-  identity: [
-    ['frame', 'Silhouette', [['masculine', 'Masculine'], ['feminine', 'Feminine'], ['androgynous', 'Androgynous']]],
-    ['body', 'Build', [['striker', 'Striker'], ['sentinel', 'Sentinel'], ['scout', 'Scout']]],
-    ['skin', 'Skin tone', [['porcelain', 'Porcelain'], ['light', 'Light'], ['warm', 'Warm'], ['medium', 'Medium'], ['olive', 'Olive'], ['deep', 'Deep'], ['umber', 'Umber'], ['ebony', 'Ebony']]],
-    ['hair', 'Hair style', [['crop', 'Crop'], ['fade', 'Fade'], ['wave', 'Wave'], ['spike', 'Spike'], ['bob', 'Bob'], ['ponytail', 'Ponytail'], ['curls', 'Curls'], ['braids', 'Braids'], ['long', 'Long'], ['bun', 'Bun']]],
-    ['hair_color', 'Hair color', [['onyx', 'Onyx'], ['espresso', 'Espresso'], ['chestnut', 'Chestnut'], ['copper', 'Copper'], ['gold', 'Gold'], ['silver', 'Silver'], ['violet', 'Violet'], ['blue', 'Blue']]],
-    ['face', 'Face detail', [['natural', 'Natural'], ['freckles', 'Freckles'], ['liner', 'Liner'], ['warpaint', 'War paint']]],
-  ],
-  outfit: [
-    ['outfit', 'Top / armor', [['combat', 'Combat'], ['academy', 'Academy'], ['varsity', 'Varsity'], ['techwear', 'Techwear'], ['street', 'Street'], ['champion', 'Champion']]],
-    ['palette', 'Main color', [['nova', 'Nova'], ['solar', 'Solar'], ['glacier', 'Glacier'], ['volt', 'Volt'], ['rose', 'Rose'], ['midnight', 'Midnight']]],
-    ['accent', 'Trim color', [['crystal', 'Crystal'], ['gold', 'Gold'], ['rose', 'Rose'], ['teal', 'Teal'], ['white', 'White'], ['graphite', 'Graphite']]],
-    ['bottom', 'Bottom', [['tactical', 'Tactical'], ['fitted', 'Fitted'], ['cargo', 'Cargo'], ['battle_skirt', 'Battle skirt']]],
-    ['gloves', 'Gloves', [['tech', 'Tech'], ['fingerless', 'Fingerless'], ['gauntlets', 'Gauntlets'], ['none', 'None']]],
-    ['footwear', 'Footwear', [['boots', 'Combat boots'], ['high_tops', 'High-tops'], ['runners', 'Runners'], ['armored', 'Armored']]],
-  ],
-  gear: [
-    ['gear', 'Face / head gear', [['visor', 'Visor'], ['comms', 'Comms'], ['crown', 'Crown'], ['glasses', 'Glasses'], ['headband', 'Headband'], ['earrings', 'Earrings'], ['none', 'None']]],
-    ['back', 'Back gear', [['none', 'None'], ['cape', 'Cape'], ['half_cape', 'Half cape'], ['energy_pack', 'Energy pack'], ['banner', 'Rank banner']]],
-    ['emblem', 'Chest emblem', [['bolt', 'Bolt'], ['mind', 'Mind'], ['target', 'Target'], ['shield', 'Shield'], ['star', 'Star'], ['flame', 'Flame']]],
-    ['aura', 'Power aura', [['pulse', 'Pulse'], ['flare', 'Flare'], ['orbit', 'Orbit'], ['spark', 'Spark'], ['halo', 'Halo'], ['none', 'None']]],
-  ],
+// Win-streak tiers follow how a real flame actually gets hotter -- deep red,
+// orange, gold, white, blue, violet -- so the colour itself tells you the run
+// is climbing without needing the number read to you.
+const WIN_STREAK_TIERS = [
+  { at: 1, key: 'ember', label: 'Ember', hot: '#ffb27a', cool: '#e0361f' },
+  { at: 3, key: 'blaze', label: 'Blaze', hot: '#ffd08a', cool: '#ff6b1f' },
+  { at: 5, key: 'solar', label: 'Solar', hot: '#fff0a8', cool: '#ffa722' },
+  { at: 8, key: 'whitehot', label: 'White hot', hot: '#ffffff', cool: '#ffeeb0' },
+  { at: 12, key: 'azure', label: 'Azure', hot: '#dff4ff', cool: '#2f8fff' },
+  { at: 20, key: 'void', label: 'Void', hot: '#f0dcff', cool: '#8b3dff' },
+]
+
+export function winStreakTier(streak) {
+  let tier = null
+  for (const candidate of WIN_STREAK_TIERS) if (streak >= candidate.at) tier = candidate
+  return tier
 }
 
-function ArenaFighter({ avatar, label = 'Arena fighter', size = 'full', facing = 'right', state = 'idle' }) {
-  const loadout = { ...ARENA_AVATAR_DEFAULT, ...(avatar || {}) }
-  const colors = ARENA_AVATAR_PALETTES[loadout.palette] || ARENA_AVATAR_PALETTES.nova
-  const skin = ARENA_AVATAR_SKINS[loadout.skin] || ARENA_AVATAR_SKINS.medium
-  const hair = ARENA_AVATAR_HAIR[loadout.hair_color] || ARENA_AVATAR_HAIR.onyx
-  const accent = ARENA_AVATAR_ACCENTS[loadout.accent] || ARENA_AVATAR_ACCENTS.crystal
-  const emblem = loadout.emblem === 'mind' ? <Brain /> : loadout.emblem === 'target' ? <Target /> : loadout.emblem === 'shield' ? <ShieldCheck /> : loadout.emblem === 'star' ? <Sparkles /> : loadout.emblem === 'flame' ? <Flame /> : <Zap />
-  return <div
-    className={`arena-fighter arena-fighter--${loadout.body} arena-fighter--${size} arena-fighter--${state}`}
-    data-facing={facing}
-    data-frame={loadout.frame}
-    data-gear={loadout.gear}
-    data-hair={loadout.hair}
-    data-face={loadout.face}
-    data-outfit={loadout.outfit}
-    data-bottom={loadout.bottom}
-    data-gloves={loadout.gloves}
-    data-footwear={loadout.footwear}
-    data-back={loadout.back}
-    data-aura={loadout.aura}
-    style={{ '--fighter-main': colors[0], '--fighter-deep': colors[1], '--fighter-light': colors[2], '--fighter-skin': skin[0], '--fighter-skin-deep': skin[1], '--fighter-skin-light': skin[2], '--fighter-hair': hair, '--fighter-accent': accent }}
-    role="img"
-    aria-label={label}
-  >
-    <i className="arena-fighter-aura" aria-hidden="true" />
-    <i className="arena-fighter-shadow" aria-hidden="true" />
-    <div className="arena-fighter-rig" aria-hidden="true">
-      <i className="arena-fighter-back"><b /><b /></i>
-      <i className="arena-fighter-hair-back"><b /><b /></i>
-      <i className="arena-fighter-crown"><b /><b /><b /></i>
-      <span className="arena-fighter-head"><i className="arena-fighter-hair" /><i className="arena-fighter-face"><b /><b /></i><i className="arena-fighter-face-detail" /><i className="arena-fighter-nose" /><i className="arena-fighter-mouth" /><i className="arena-fighter-visor" /><i className="arena-fighter-comms" /><i className="arena-fighter-glasses" /><i className="arena-fighter-headband" /><i className="arena-fighter-earrings" /></span>
-      <span className="arena-fighter-torso"><i className="arena-fighter-outfit"><b /><b /></i><i className="arena-fighter-shoulder-line" /><i className="arena-fighter-core">{emblem}</i><b /><em className="arena-fighter-belt"><i /><i /><i /></em></span>
-      <i className="arena-fighter-bottom"><b /><b /></i>
-      <i className="arena-fighter-arm arena-fighter-arm--left"><b /></i>
-      <i className="arena-fighter-arm arena-fighter-arm--right"><b /></i>
-      <i className="arena-fighter-leg arena-fighter-leg--left"><b /></i>
-      <i className="arena-fighter-leg arena-fighter-leg--right"><b /></i>
+function WinStreakFlame({ streak = 0, best = 0, compact = false }) {
+  const tier = winStreakTier(streak)
+  if (!tier) {
+    if (compact) return null
+    return <div className="win-streak win-streak--cold">
+      <Flame aria-hidden="true" />
+      <span><b>No win streak</b><small>{best > 0 ? `Best run ${best}` : 'Win a ranked round to light it'}</small></span>
+    </div>
+  }
+  const id = `flame-${tier.key}`
+  return <div className={`win-streak win-streak--${tier.key}`} data-tier={tier.key}
+    title={`${streak} win streak - ${tier.label}`}>
+    <svg viewBox="0 0 24 30" aria-hidden="true" className="win-streak-flame">
+      <defs>
+        <linearGradient id={id} x1="0" y1="1" x2="0" y2="0">
+          <stop offset="0%" stopColor={tier.cool} />
+          <stop offset="55%" stopColor={tier.cool} />
+          <stop offset="100%" stopColor={tier.hot} />
+        </linearGradient>
+      </defs>
+      <path d="M12 1c4.2 5.1 6.4 8.6 6.4 11.7 0 2.3-1 3.9-2.6 4.6 1-3.1-.6-6-4-8.6-.9 2.8-2.6 4.4-4.6 6.4-2 2-2.7 4.4-1.6 6.9C3.2 20.6 2 18 2 15.1 2 9.6 6.6 6.2 12 1Z"
+        fill={`url(#${id})`} />
+      <path d="M12 29c-3.6 0-6.4-2.3-6.4-5.6 0-2.6 1.7-4.4 3.5-6.3 1.5-1.6 2.8-3 3.3-5 2.9 2.3 4.2 4.7 3.5 7.2 1.2-.5 2-1.6 2.2-3.1 1.5 1.9 2.3 3.8 2.3 5.6 0 3.6-3 7.2-8.4 7.2Z"
+        fill={`url(#${id})`} opacity=".92" />
+    </svg>
+    <span><b>{streak} win{streak === 1 ? '' : 's'}</b><small>{tier.label}{best > streak ? ` · best ${best}` : ''}</small></span>
+  </div>
+}
+
+function BattleRatingResult({ rank, previousRank, delta }) {
+  if (delta == null || !rank) return null
+  const promoted = previousRank && previousRank.key !== rank.key
+  const climbed = delta > 0
+  const span = rank.nextAt ? rank.nextAt - rank.minimum : 0
+  const progress = span > 0 ? Math.min(100, Math.max(0, ((rank.rating - rank.minimum) / span) * 100)) : 100
+  return <div className={`battle-rating-result ${climbed ? 'is-up' : 'is-down'}`}>
+    <div className="battle-rating-swing">
+      <b>{climbed ? '+' : '−'}{Math.abs(delta)}</b>
+      <small>RP</small>
+    </div>
+    <div className="battle-rating-standing">
+      {promoted && <em className={climbed ? 'promoted' : 'demoted'}>
+        {climbed ? 'RANKED UP' : 'RANKED DOWN'} · {previousRank.label} → {rank.label}
+      </em>}
+      <strong className={`battle-result-rank--${rank.key}`}>{rank.label} · {rank.rating} RP</strong>
+      <i className="battle-rating-track"><b style={{ width: `${progress}%` }} /></i>
+      <span>{rank.nextAt
+        ? `${Math.max(0, rank.nextAt - rank.rating)} RP to ${rank.nextLabel}`
+        : 'Top of the ladder.'}</span>
     </div>
   </div>
 }
 
-function ArenaCustomizer({ avatar, onChange, onSave, onClose, saving }) {
-  const [section, setSection] = useState('identity')
-  const groups = ARENA_CUSTOMIZER_SECTIONS[section]
-  const swatchFor = (key, value) => key === 'palette' ? ARENA_AVATAR_PALETTES[value]?.[0] : key === 'skin' ? ARENA_AVATAR_SKINS[value]?.[0] : key === 'hair_color' ? ARENA_AVATAR_HAIR[value] : key === 'accent' ? ARENA_AVATAR_ACCENTS[value] : null
-  return <div className="arena-customizer-backdrop" role="presentation" onMouseDown={event => { if (event.target === event.currentTarget) onClose() }}>
-    <section className="arena-customizer" role="dialog" aria-modal="true" aria-labelledby="arena-customizer-title">
-      <header><div><small>FIGHTER LOCKER</small><h2 id="arena-customizer-title">Make the fighter yours.</h2><p>Every silhouette, hairstyle, and outfit can be mixed freely.</p></div><button type="button" onClick={onClose} aria-label="Close fighter locker" autoFocus><X /></button></header>
-      <div className="arena-customizer-body">
-        <div className="arena-customizer-preview"><i className="arena-preview-light" /><ArenaFighter avatar={avatar} label="Your customized Arena fighter" /><strong>LIVE LOADOUT</strong><span>{avatar.frame} · {avatar.outfit}</span></div>
-        <div className="arena-customizer-editor">
-          <nav className="arena-customizer-tabs" aria-label="Fighter customization categories">{[['identity', 'Body & hair'], ['outfit', 'Outfit'], ['gear', 'Gear & effects']].map(([key, label]) => <button type="button" key={key} className={section === key ? 'selected' : ''} aria-pressed={section === key} onClick={() => setSection(key)}>{label}</button>)}</nav>
-          <div className="arena-customizer-options">{groups.map(([key, title, choices]) => <fieldset key={key}><legend>{title}</legend><div>{choices.map(([value, label]) => { const swatch = swatchFor(key, value); return <button type="button" key={value} className={avatar[key] === value ? 'selected' : ''} aria-pressed={avatar[key] === value} onClick={() => onChange({ ...avatar, [key]: value })}>{swatch && <i style={{ background: swatch }} />}<span>{label}</span>{avatar[key] === value && <Check />}</button> })}</div></fieldset>)}</div>
-        </div>
-      </div>
-      <footer><span>Cosmetics are visual only. Your rank still controls question difficulty.</span><button type="button" className="arena-save-loadout" onClick={onSave} disabled={saving}>{saving ? 'SAVING…' : 'EQUIP LOADOUT'} <Check /></button></footer>
-    </section>
-  </div>
+function BattleClock({ startedAt, durationSeconds }) {
+  const [secondsLeft, setSecondsLeft] = useState(null)
+  useEffect(() => {
+    if (!startedAt) return undefined
+    const tick = () => setSecondsLeft(Math.max(0, durationSeconds - Math.floor((Date.now() - Date.parse(startedAt)) / 1000)))
+    tick()
+    // One tick per second is all an mm:ss readout can show.
+    const timer = window.setInterval(tick, 1000)
+    return () => window.clearInterval(timer)
+  }, [startedAt, durationSeconds])
+  const clock = secondsLeft == null ? '2:00' : `${Math.floor(secondsLeft / 60)}:${String(secondsLeft % 60).padStart(2, '0')}`
+  return <strong className={secondsLeft != null && secondsLeft < 20 ? 'urgent' : ''}><Clock3 /> {clock}</strong>
 }
 
-function ArenaGameLobby({ name, rank, rankProgress, avatar, openCustomizer, mode, setMode, trainingRank, setTrainingRank, selectedTier, busy, join, train }) {
+function ArenaGameLobby({ name, rank, rankProgress, avatar, openCustomizer, mode, setMode, trainingRank, setTrainingRank, selectedTier, busy, join, train, winStreak, bestWinStreak }) {
   const ranked = mode === 'ranked'
   return <section className="arena-game-shell" data-mode={mode} aria-label="SAT Battle Arena game lobby">
     <div className="arena-game-sky" aria-hidden="true"><i /><i /><i /><i /></div>
@@ -1926,6 +1898,7 @@ function ArenaGameLobby({ name, rank, rankProgress, avatar, openCustomizer, mode
         <button type="button" className={ranked ? 'selected' : ''} onClick={() => setMode('ranked')}><i><Swords /></i><span><b>Ranked duel</b><small>Climb the ladder</small></span></button>
         <button type="button" className={!ranked ? 'selected' : ''} onClick={() => setMode('training')}><i><Brain /></i><span><b>Training room</b><small>Choose any tier</small></span></button>
         <div className="arena-season-card"><Trophy /><span><small>CURRENT RANK</small><b>{rank?.label || 'Bronze'}</b><em>{rank?.rating || 1000} RP</em></span><i><b style={{ width: `${rankProgress}%` }} /></i></div>
+        <WinStreakFlame streak={winStreak} best={bestWinStreak} />
       </nav>
       <section className="arena-player-stage">
         <div className="arena-stage-rig" aria-hidden="true"><i /><i /><i /></div>
@@ -1956,12 +1929,19 @@ function BattleArena() {
   const [answers, setAnswers] = useState({})
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
-  const [secondsLeft, setSecondsLeft] = useState(null)
   const [activeQuestion, setActiveQuestion] = useState(0)
+  const [calculatorOpen, setCalculatorOpen] = useState(false)
+  const winStreak = battle?.winStreak ?? d.winStreak ?? 0
+  const bestWinStreak = battle?.bestWinStreak ?? d.bestWinStreak ?? 0
   const [cinematic, setCinematic] = useState('')
   const [lobbyMode, setLobbyMode] = useState('ranked')
   const [trainingRank, setTrainingRank] = useState(d.battleRank?.key || 'bronze')
-  const [avatar, setAvatar] = useState({ ...ARENA_AVATAR_DEFAULT, ...(d.arenaAvatar || d.currentBattle?.playerAvatar || {}) })
+  const [avatar, setAvatar] = useState(() => normalizeArenaAvatar(d.arenaAvatar || d.currentBattle?.playerAvatar))
+  // The last loadout the server confirmed. Picking a slot updates the fighter
+  // everywhere immediately, so without this a save that fails -- or a locker
+  // closed without equipping -- leaves the lobby showing a fighter that only
+  // exists on this screen, and it silently reverts on the next page load.
+  const savedAvatar = useRef(avatar)
   const [customizing, setCustomizing] = useState(false)
   const [savingAvatar, setSavingAvatar] = useState(false)
   const [musicEnabled, setMusicEnabled] = useState(true)
@@ -1985,6 +1965,7 @@ function BattleArena() {
     audio.master.gain.exponentialRampToValueAtTime(.0001, now + .12)
     window.setTimeout(() => {
       audio.oscillators.forEach(oscillator => { try { oscillator.stop() } catch (error) { void error } })
+      audio.oscillators.clear()
       audio.context.close().catch(() => undefined)
     }, 150)
   }, [])
@@ -1997,7 +1978,8 @@ function BattleArena() {
     master.gain.setValueAtTime(.0001, context.currentTime)
     master.gain.exponentialRampToValueAtTime(.035, context.currentTime + .2)
     master.connect(context.destination)
-    const oscillators = []
+    // Held only until each note ends; see the onended cleanup below.
+    const oscillators = new Set()
     const pattern = [0, 7, 12, 7, 3, 10, 7, 14, 0, 7, 15, 12, 3, 10, 7, 2]
     let step = 0
     const playBeat = () => {
@@ -2012,7 +1994,8 @@ function BattleArena() {
       leadGain.gain.exponentialRampToValueAtTime(.0001, now + .22)
       lead.connect(leadGain).connect(master)
       lead.start(now); lead.stop(now + .24)
-      oscillators.push(lead)
+      oscillators.add(lead)
+      lead.onended = () => { lead.disconnect(); leadGain.disconnect(); oscillators.delete(lead) }
       if (step % 4 === 0) {
         const bass = context.createOscillator()
         const bassGain = context.createGain()
@@ -2023,7 +2006,8 @@ function BattleArena() {
         bassGain.gain.exponentialRampToValueAtTime(.0001, now + .27)
         bass.connect(bassGain).connect(master)
         bass.start(now); bass.stop(now + .29)
-        oscillators.push(bass)
+        oscillators.add(bass)
+        bass.onended = () => { bass.disconnect(); bassGain.disconnect(); oscillators.delete(bass) }
       }
       step += 1
     }
@@ -2044,15 +2028,16 @@ function BattleArena() {
   const refresh = async id => { try { setBattle(await api(`/api/sat-battles/${id}`)) } catch (x) { setError(x.message) } }
   useEffect(() => {
     if (!battle?.id || !['waiting', 'active'].includes(battle.status)) return undefined
-    const poll = window.setInterval(() => refresh(battle.id), 1800)
-    return () => window.clearInterval(poll)
+    const poll = window.setInterval(() => {
+      if (!document.hidden) refresh(battle.id)
+    }, 1800)
+    const onVisible = () => { if (!document.hidden) refresh(battle.id) }
+    document.addEventListener('visibilitychange', onVisible)
+    return () => {
+      window.clearInterval(poll)
+      document.removeEventListener('visibilitychange', onVisible)
+    }
   }, [battle?.id, battle?.status])
-  useEffect(() => {
-    if (battle?.status !== 'active' || !battle.startedAt) return undefined
-    const tick = () => setSecondsLeft(Math.max(0, battle.durationSeconds - Math.floor((Date.now() - Date.parse(battle.startedAt)) / 1000)))
-    tick(); const timer = window.setInterval(tick, 250)
-    return () => window.clearInterval(timer)
-  }, [battle?.status, battle?.startedAt, battle?.durationSeconds])
   useEffect(() => {
     const previous = previousStatus.current
     previousStatus.current = battle?.status
@@ -2092,10 +2077,25 @@ function BattleArena() {
   const join = async () => { startArenaMusic(); setBusy(true); setError(''); try { startBattle(await api('/api/sat-battles/queue', { method: 'POST' })) } catch (x) { stopArenaMusic(); setError(x.message) } finally { setBusy(false) } }
   const train = async () => { startArenaMusic(); setBusy(true); setError(''); try { startBattle(await api('/api/sat-battles/train', { method: 'POST', body: JSON.stringify({ rank: trainingRank }) })) } catch (x) { stopArenaMusic(); setError(x.message) } finally { setBusy(false) } }
   const cancelQueue = async () => { if (!battle) return; setBusy(true); setError(''); try { await api(`/api/sat-battles/${battle.id}/cancel`, { method: 'POST' }); stopArenaMusic(); setBattle(null) } catch (x) { setError(x.message) } finally { setBusy(false) } }
-  const saveAvatar = async () => { setSavingAvatar(true); setError(''); try { const saved = await api('/api/sat-battles/avatar', { method: 'POST', body: JSON.stringify(avatar) }); setAvatar(saved.avatar); setCustomizing(false); toast.success('Fighter loadout equipped') } catch (x) { setError(x.message) } finally { setSavingAvatar(false) } }
+  const saveAvatar = async () => {
+    setSavingAvatar(true); setError('')
+    try {
+      const saved = await api('/api/sat-battles/avatar', { method: 'POST', body: JSON.stringify(avatar) })
+      setAvatar(saved.avatar)
+      savedAvatar.current = saved.avatar
+      // boot.data is what a remount initialises from; keep it in step with the server.
+      boot.data.arenaAvatar = saved.avatar
+      setCustomizing(false)
+      toast.success('Fighter loadout equipped')
+    } catch (x) {
+      setAvatar(savedAvatar.current)
+      setError(x.message)
+      toast.error(x.message)
+    } finally { setSavingAvatar(false) }
+  }
+  const closeCustomizer = () => { setAvatar(savedAvatar.current); setCustomizing(false) }
   const select = (questionIndex, selectedOption) => setAnswers(current => ({ ...current, [questionIndex]: selectedOption }))
   const submit = async () => { if (!battle || Object.keys(answers).length !== battle.questions.length) return; setBusy(true); setError(''); try { setBattle(await api(`/api/sat-battles/${battle.id}/submit`, { method: 'POST', body: JSON.stringify({ answers: Object.entries(answers).map(([question_index, selected_option]) => ({ question_index: Number(question_index), selected_option })) }) })) } catch (x) { setError(x.message) } finally { setBusy(false) } }
-  const clock = secondsLeft == null ? '2:00' : `${Math.floor(secondsLeft / 60)}:${String(secondsLeft % 60).padStart(2, '0')}`
   const spotlight = d.spotlight
   const rank = battle?.rank || d.battleRank
   const battleDifficulty = String(battle?.difficulty || rank?.label || 'Bronze').toUpperCase()
@@ -2108,24 +2108,30 @@ function BattleArena() {
   const selectedTrainingTier = BATTLE_TRAINING_RANKS.find(([key]) => key === trainingRank) || BATTLE_TRAINING_RANKS[0]
   const advanceQuestion = () => setActiveQuestion(index => Math.min(index + 1, Math.max(0, questionCount - 1)))
   return <AppShell name={d.name}><main className={`app-main battle-page ${active ? 'battle-page--in-match' : waiting ? 'battle-page--queue' : complete ? 'battle-page--complete' : ''}`}>
-    {idle && <ArenaGameLobby name={d.name} rank={rank} rankProgress={rankProgress} avatar={avatar} openCustomizer={() => setCustomizing(true)} mode={lobbyMode} setMode={setLobbyMode} trainingRank={trainingRank} setTrainingRank={setTrainingRank} selectedTier={selectedTrainingTier} busy={busy} join={join} train={train} />}
-    {idle && customizing && typeof document !== 'undefined' && createPortal(<ArenaCustomizer avatar={avatar} onChange={setAvatar} onSave={saveAvatar} onClose={() => setCustomizing(false)} saving={savingAvatar} />, document.body)}
+    {idle && <ArenaGameLobby name={d.name} rank={rank} rankProgress={rankProgress} avatar={avatar} openCustomizer={() => setCustomizing(true)} mode={lobbyMode} setMode={setLobbyMode} trainingRank={trainingRank} setTrainingRank={setTrainingRank} selectedTier={selectedTrainingTier} busy={busy} join={join} train={train} winStreak={winStreak} bestWinStreak={bestWinStreak} />}
+    {idle && customizing && typeof document !== 'undefined' && createPortal(<ArenaCustomizer avatar={avatar} onChange={setAvatar} onSave={saveAvatar} onClose={closeCustomizer} saving={savingAvatar} />, document.body)}
     {idle && <section className="arena-lobby arena-lobby--game" data-mode={lobbyMode} aria-label="SAT Battle Arena lobby"><header className="arena-lobby-topline"><span><i /> MENTICS SAT ARENA</span><b>SEASON 01</b><span>ONLINE · READY</span></header><div className="arena-lobby-main"><aside className={`arena-lobby-pilot arena-lobby-rank--${rank?.key || 'bronze'}`}><small>YOUR PLAYER</small><span className="arena-pilot-avatar">{String(d.name || 'M').slice(0, 1)}</span><b>{d.name || 'Arena player'}</b><em><i /> READY TO PLAY</em><div className="arena-pilot-rank"><span><Trophy /></span><div><small>{rank?.label || 'Bronze'} RANK</small><b>{rank?.rating || 1000} RP</b></div></div><p>{rank?.nextAt ? `${Math.max(0, rank.nextAt - rank.rating)} RP to ${rank.nextLabel}` : 'You are at the top of the arena.'}</p><i className="arena-rank-progress"><b style={{ width: `${rankProgress}%` }} /></i></aside><section className="arena-lobby-playlist"><header><small>SELECTED PLAYLIST</small><span>{lobbyMode === 'ranked' ? 'RANKED PLAY' : 'PRIVATE SESSION'}</span></header><div className="arena-playlist-title"><i>{lobbyMode === 'ranked' ? <Swords /> : <Brain />}</i><div><h1>{lobbyMode === 'ranked' ? 'Ranked duel' : 'Training room'}</h1><p>{lobbyMode === 'ranked' ? 'Match with a student, put RP on the line, and race through a shared SAT-style set.' : 'Choose the exact question tier you want to train against. Your rating never moves.'}</p></div></div>{lobbyMode === 'training' && <div className="arena-training-ranks" role="radiogroup" aria-label="Choose bot difficulty">{BATTLE_TRAINING_RANKS.map(([key, label, note]) => <button type="button" role="radio" aria-checked={trainingRank === key} className={trainingRank === key ? 'selected' : ''} data-rank={key} key={key} onClick={() => setTrainingRank(key)}><b>{label}</b><small>{note}</small></button>)}</div>}<div className="arena-playlist-action"><div><small>{lobbyMode === 'ranked' ? 'MATCH FORMAT' : 'BOT OPPONENT'}</small><b>{lobbyMode === 'ranked' ? '5 questions · 2 minutes · RP at stake' : `Mentics ${selectedTrainingTier[1]} Bot · ${selectedTrainingTier[2]}`}</b></div><button className="arena-ready-button" onClick={lobbyMode === 'ranked' ? join : train} disabled={busy}>{busy ? (lobbyMode === 'ranked' ? 'SEARCHING…' : 'LOADING…') : (lobbyMode === 'ranked' ? 'READY UP' : `PLAY ${selectedTrainingTier[1].toUpperCase()}`)} <ArrowRight /></button></div></section><aside className="arena-difficulty-board"><header><small>QUESTION DIFFICULTY</small><Target /></header><h2>Rank changes the set.</h2><p>Every tier uses original SAT-style questions. The higher the rank, the denser the reasoning, pacing, and traps become.</p><ol>{BATTLE_TRAINING_RANKS.map(([key, label]) => <li key={key} className={key === (lobbyMode === 'training' ? trainingRank : rank?.key) ? 'current' : ''}><i data-rank={key} /><span>{label}</span>{key === 'grandmaster' && <b>MAX</b>}</li>)}</ol><footer>{lobbyMode === 'ranked' ? 'Ranked matches use the stronger player’s tier so neither player gets a soft set.' : `This drill will use the ${selectedTrainingTier[1]} question tier.`}</footer></aside></div><footer className="arena-lobby-format"><div className="arena-playlist-switch" role="tablist" aria-label="Arena playlists"><button type="button" role="tab" aria-selected={lobbyMode === 'ranked'} className={lobbyMode === 'ranked' ? 'selected' : ''} onClick={() => setLobbyMode('ranked')}><Swords /> Ranked duel <small>RP on the line</small></button><button type="button" role="tab" aria-selected={lobbyMode === 'training'} className={lobbyMode === 'training' ? 'selected' : ''} onClick={() => setLobbyMode('training')}><Brain /> Training room <small>Choose any bot tier</small></button></div><span><i>05</i><b>QUESTIONS</b><small>One shared SAT-style set per round.</small></span><span><i>2:00</i><b>ROUND CLOCK</b><small>Accuracy wins; speed breaks a tie.</small></span></footer></section>}
     {error && <div className="error-banner">{error}<button onClick={() => setError('')}>Dismiss</button></div>}
     {waiting && <section className="battle-stage battle-stage--waiting arena-queue-stage" aria-live="polite"><div className="arena-queue-world"><div className="arena-queue-podium arena-queue-podium--you"><div className="arena-queue-light" /><ArenaFighter avatar={battle.playerAvatar || avatar} label={`${d.name || 'Your'} fighter waiting for a match`} size="medium" /><strong>{d.name || 'YOU'}</strong><span>READY</span></div><div className="arena-queue-core"><span className="battle-search-orbit"><Swords /></span><small>MATCHMAKING</small><h2>Searching the Arena</h2><p>Scanning for a live challenger</p><i><b /></i><em>BOT DROP-IN AT 0:30</em></div><div className="arena-queue-podium arena-queue-podium--rival"><div className="arena-queue-light" /><div className="arena-mystery-fighter">?</div><strong>CHALLENGER</strong><span>SEARCHING</span></div></div><p className="arena-queue-note">Both players receive the same fresh SAT set. If nobody joins within 30 seconds, an Arena bot enters automatically.</p><div className="battle-wait-actions"><button className="text-button" onClick={() => refresh(battle.id)}>Check status <RotateCcw /></button><button className="text-button" onClick={toggleArenaMusic}>{musicEnabled ? <Volume2 /> : <VolumeX />} Music {musicEnabled ? 'on' : 'off'}</button><button className="text-button" disabled={busy} onClick={cancelQueue}>Leave queue</button></div></section>}
     {active && <section ref={stageRef} className={`battle-stage battle-stage--active ${answers[currentQuestionIndex] != null ? 'is-striking' : ''}`} aria-label="Active SAT battle">
       {cinematic && <div className="arena-cinematic" data-phase={cinematic} role="status" aria-live="assertive"><Starfield warp tone="violet" /><div className="arena-cinematic-fighters" aria-hidden="true"><div className="arena-cinematic-fighter arena-cinematic-fighter--you"><ArenaFighter avatar={battle.playerAvatar || avatar} size="medium" state="combat" /><b>{d.name || 'YOU'}</b></div><i>VS</i><div className="arena-cinematic-fighter arena-cinematic-fighter--rival"><ArenaFighter avatar={battle.opponentAvatar} size="medium" facing="left" state="combat" /><b>{battle.opponentName || 'RIVAL'}</b></div></div><div className="arena-cinematic-count"><small>{cinematic === 'fight' ? 'MENTICS ARENA' : 'ARENA LINK ESTABLISHED'}</small><strong>{cinematic === 'fight' ? 'FIGHT' : cinematic}</strong><span>{cinematic === 'fight' ? 'MAKE EVERY SECOND COUNT' : 'PREPARE TO THINK FAST'}</span></div>{cinematic !== 'fight' && <button type="button" onClick={() => { clearCinematic(); setCinematic('') }}>Skip intro</button>}</div>}
-      <header className="battle-status"><span><i /><b>{battle.mode === 'training' ? 'PRIVATE BOT DRILL' : `${battleDifficulty} SAT BATTLE`}</b><small>vs {battle.opponentName || 'your challenger'}{battle.questionSource === 'gemini' ? ' · GEMINI LIVE SET' : ''}</small></span><button className="arena-audio-toggle" type="button" onClick={toggleArenaMusic} aria-label={musicEnabled ? 'Mute arena music' : 'Play arena music'}>{musicEnabled ? <Volume2 /> : <VolumeX />} <span>Music {musicEnabled ? 'on' : 'off'}</span></button><strong className={secondsLeft < 20 ? 'urgent' : ''}><Clock3 /> {clock}</strong></header>
+      <header className="battle-status"><span><i /><b>{battle.mode === 'training' ? 'PRIVATE BOT DRILL' : `${battleDifficulty} SAT BATTLE`}</b><small>vs {battle.opponentName || 'your challenger'}{battle.questionSource === 'gemini' ? ' · GEMINI LIVE SET' : ''}</small></span><button className="arena-audio-toggle" type="button" onClick={toggleArenaMusic} aria-label={musicEnabled ? 'Mute arena music' : 'Play arena music'}>{musicEnabled ? <Volume2 /> : <VolumeX />} <span>Music {musicEnabled ? 'on' : 'off'}</span></button><BattleClock startedAt={battle.startedAt} durationSeconds={battle.durationSeconds} /></header>
       {battle.submitted ? <div className="battle-locked"><span className="battle-search-orbit"><Check /></span><h2>Answers locked.</h2><p>{battle.mode === 'training' ? 'Mentics Arena Bot is scoring your round now.' : `Waiting for ${battle.opponentName || 'your challenger'} to finish. The arena will reveal the result automatically.`}</p></div> : <>
         <div className="battle-combat-hud" aria-label={`You versus ${battle.opponentName || 'Arena bot'}`}><article className="battle-combatant battle-combatant--you"><ArenaFighter avatar={battle.playerAvatar || avatar} label="Your fighter" size="portrait" state="combat" /><div className="battle-combatant-stats"><small>YOU</small><b>{d.name || 'Challenger'}</b><i><em style={{ width: `${Math.max(14, 28 + answeredCount * 14)}%` }} /></i><strong>FOCUS {answeredCount}/{questionCount}</strong></div></article><div className="battle-clash"><i /><b>VS</b><span>{currentQuestion?.skill || 'SAT ARENA'}</span></div><article className="battle-combatant battle-combatant--rival"><div className="battle-combatant-stats"><small>RIVAL</small><b>{battle.opponentName || 'Arena Bot'}</b><i><em /></i><strong>READY TO RACE</strong></div><ArenaFighter avatar={battle.opponentAvatar} label={`${battle.opponentName || 'Rival'} fighter`} size="portrait" facing="left" state="combat" /></article></div>
         <div className="battle-question-progress" aria-label={`Question ${currentQuestionIndex + 1} of ${questionCount}`}>{battle.questions.map((_, index) => <button type="button" key={index} className={`${answers[index] != null ? 'done' : ''} ${currentQuestionIndex === index ? 'current' : ''}`} onClick={() => setActiveQuestion(index)} aria-label={`Go to question ${index + 1}${answers[index] != null ? ', answered' : ''}`}>{index + 1}</button>)}</div>
         <div className="battle-round-heading"><span>ROUND {currentQuestionIndex + 1} OF {questionCount}</span><b>{answeredCount}/{questionCount} LOCKED IN</b></div>
-        {currentQuestion && <div className="battle-questions"><article className="battle-question battle-question--focus" key={currentQuestionIndex}><header><small>QUESTION {currentQuestionIndex + 1} · {currentQuestion.skill}</small><span>{answers[currentQuestionIndex] != null ? 'ANSWERED' : 'UNANSWERED'}</span></header><h2>{currentQuestion.question_text}</h2><div>{currentQuestion.options.map((option, optionIndex) => <button key={optionIndex} className={answers[currentQuestionIndex] === optionIndex ? 'selected' : ''} onClick={() => select(currentQuestionIndex, optionIndex)}><i>{String.fromCharCode(65 + optionIndex)}</i><span>{option}</span></button>)}</div></article></div>}
+        {currentQuestion && <div className="battle-questions"><article className="battle-question battle-question--focus" key={currentQuestionIndex}><header><small>QUESTION {currentQuestionIndex + 1} · {currentQuestion.skill}</small>{currentQuestion.domain === 'math' && <ArenaCalculatorToggle open={calculatorOpen} onToggle={() => setCalculatorOpen(value => !value)} />}<span>{answers[currentQuestionIndex] != null ? 'ANSWERED' : 'UNANSWERED'}</span></header><h2>{currentQuestion.question_text}</h2><div>{currentQuestion.options.map((option, optionIndex) => <button key={optionIndex} className={answers[currentQuestionIndex] === optionIndex ? 'selected' : ''} onClick={() => select(currentQuestionIndex, optionIndex)}><i>{String.fromCharCode(65 + optionIndex)}</i><span>{option}</span></button>)}</div></article></div>}
         <div className="battle-round-actions"><p>{answers[currentQuestionIndex] != null ? 'Answer saved. Keep moving.' : 'Choose your best answer to lock this round in.'}</p>{currentQuestionIndex < questionCount - 1 ? <button type="button" className="button button--quiet" onClick={advanceQuestion}>{answers[currentQuestionIndex] != null ? 'Next question' : 'Skip for now'} <ArrowRight /></button> : <button type="button" className="button button--quiet" onClick={() => { const unanswered = battle.questions.findIndex((_, index) => answers[index] == null); if (unanswered >= 0) setActiveQuestion(unanswered); else submit() }}>{remainingCount ? `Answer ${remainingCount} remaining` : 'Review complete'} <ArrowRight /></button>}</div>
         <button className="button button--primary battle-lock" disabled={busy || answeredCount !== questionCount} onClick={submit}>{busy ? 'Locking answers…' : `Lock in ${answeredCount}/${questionCount} answers`} <ArrowRight /></button>
+        <ArenaCalculator open={calculatorOpen} onClose={() => setCalculatorOpen(false)} />
       </>}
     </section>}
-    {complete && <section className={`battle-result battle-result--fighters ${battle.youWon ? 'won' : battle.draw ? 'draw' : 'lost'}`}>{(battle.youWon || battle.draw) && <div className="arena-confetti" aria-hidden="true">{Array.from({ length: 12 }, (_, index) => <i key={index} style={{ '--arena-index': index }} />)}</div>}<div className="battle-result-mark">{battle.youWon ? <Trophy /> : battle.draw ? <Target /> : <Swords />}</div><small>{battle.mode === 'training' ? 'BOT DRILL COMPLETE' : battle.youWon ? 'VICTORY' : battle.draw ? 'DRAW' : 'BATTLE COMPLETE'}</small><h2>{battle.mode === 'training' ? 'A sharper round in the bank.' : battle.youWon ? 'You won the race.' : battle.draw ? 'A dead-even finish.' : 'A strong round. Run it back.'}</h2><div className="arena-result-versus"><article className={battle.youWon ? 'winner' : ''}><ArenaFighter avatar={battle.playerAvatar || avatar} label="Your fighter" size="medium" state={battle.youWon ? 'victory' : 'idle'} /><b>{d.name || 'YOU'}</b><strong>{battle.yourScore}</strong><span>CORRECT</span></article><i>VS</i><article className={!battle.youWon && !battle.draw ? 'winner' : ''}><ArenaFighter avatar={battle.opponentAvatar} label={`${battle.opponentName || 'Rival'} fighter`} size="medium" facing="left" state={!battle.youWon && !battle.draw ? 'victory' : 'idle'} /><b>{battle.opponentName || 'RIVAL'}</b><strong>{battle.opponentScore}</strong><span>CORRECT</span></article></div>{battle.mode === 'training' ? <em className="battle-training-note">This private drill did not affect your rating.</em> : <em className={`battle-result-rank battle-result-rank--${battle.rank?.key}`}>{battle.rank?.label} · {battle.rank?.rating} RP</em>}<button className="button button--primary" onClick={() => { setBattle(null); setAnswers({}); setActiveQuestion(0) }}>{battle.mode === 'training' ? 'Train again' : 'Find another battle'} <Swords /></button></section>}
+    {complete && <section className={`battle-result battle-result--fighters ${battle.youWon ? 'won' : battle.draw ? 'draw' : 'lost'}`}>{(battle.youWon || battle.draw) && <div className="arena-confetti" aria-hidden="true">{Array.from({ length: 12 }, (_, index) => <i key={index} style={{ '--arena-index': index }} />)}</div>}<div className="battle-result-mark">{battle.youWon ? <Trophy /> : battle.draw ? <Target /> : <Swords />}</div><small>{battle.mode === 'training' ? 'BOT DRILL COMPLETE' : battle.youWon ? 'VICTORY' : battle.draw ? 'DRAW' : 'BATTLE COMPLETE'}</small><h2>{battle.mode === 'training' ? 'A sharper round in the bank.' : battle.youWon ? 'You won the race.' : battle.draw ? 'A dead-even finish.' : 'A strong round. Run it back.'}</h2><div className="arena-result-versus"><article className={battle.youWon ? 'winner' : ''}><ArenaFighter avatar={battle.playerAvatar || avatar} label="Your fighter" size="medium" state={battle.youWon ? 'victory' : 'idle'} /><b>{d.name || 'YOU'}</b><strong>{battle.yourScore}</strong><span>CORRECT</span></article><i>VS</i><article className={!battle.youWon && !battle.draw ? 'winner' : ''}><ArenaFighter avatar={battle.opponentAvatar} label={`${battle.opponentName || 'Rival'} fighter`} size="medium" facing="left" state={!battle.youWon && !battle.draw ? 'victory' : 'idle'} /><b>{battle.opponentName || 'RIVAL'}</b><strong>{battle.opponentScore}</strong><span>CORRECT</span></article></div>{battle.mode === 'training'
+      ? <em className="battle-training-note">This private drill did not affect your rating.</em>
+      : battle.ratingDelta != null
+        ? <><BattleRatingResult rank={battle.rank} previousRank={battle.previousRank} delta={battle.ratingDelta} />
+          <WinStreakFlame streak={battle.winStreak || 0} best={battle.bestWinStreak || 0} /></>
+        : <em className={`battle-result-rank battle-result-rank--${battle.rank?.key}`}>{battle.rank?.label} · {battle.rank?.rating} RP</em>}<button className="button button--primary" onClick={() => { setBattle(null); setAnswers({}); setActiveQuestion(0) }}>{battle.mode === 'training' ? 'Train again' : 'Find another battle'} <Swords /></button></section>}
     <section className="battle-lower"><div className="battle-rules"><small>HOW IT WORKS</small><h2>One clean round. No fluff.</h2><div><article><b>01</b><span><strong>Match</strong><p>We pair you with one student and serve the same question set.</p></span></article><article><b>02</b><span><strong>Race</strong><p>Answer all five in two minutes. Your clock starts together.</p></span></article><article><b>03</b><span><strong>Climb</strong><p>Accuracy takes it. Faster completion breaks a tied score.</p></span></article></div></div><aside className="battle-leaderboard"><header><span><Trophy /> BATTLE LEADERBOARD</span><a href="#battle-rankings">View rankings</a></header>{d.leaderboard?.length ? d.leaderboard.slice(0, 5).map((row, index) => <div key={row.user_id}><i>{index + 1}</i><span>{String(row.user_name || 'M').slice(0, 1)}</span><b>{row.user_name}<small className={`battle-rank-label battle-rank-label--${row.rank.key}`}>{row.rank.label}</small></b><strong>{row.rating}</strong></div>) : <p>The first completed battle earns a place here.</p>}</aside></section>
     <section className="battle-spotlight" id="battle-rankings"><div><small>ARENA SPOTLIGHT</small><h2>{spotlight ? `${spotlight.challenger_name} vs ${spotlight.opponent_name}` : 'The next great battle starts with you.'}</h2><p>{spotlight ? 'The latest completed head-to-head round in the Mentics arena.' : 'Enter the arena to set the first battle on the board.'}</p></div><div>{spotlight ? <><strong>{spotlight.winner_id ? 'WINNER DECIDED' : 'DRAW'}</strong><span>Latest completed battle</span></> : <><strong>OPEN</strong><span>Matchmaking is ready</span></>}</div></section>
   </main></AppShell>
