@@ -12,6 +12,7 @@ _RLS_CONTEXT = ContextVar(
     default={"user_id": None, "auth_email": None, "system": False},
 )
 _UNSET = object()
+_REQUEST_CONNECTION = ContextVar("mentics_request_connection", default=None)
 
 
 class DatabaseTransaction:
@@ -101,6 +102,26 @@ class DatabaseHandler:
         _RLS_CONTEXT.reset(token)
 
     @contextmanager
+    def request_scope(self):
+        """Reuse one PostgreSQL connection across all queries in a request.
+
+        Vercel can execute several database queries while rendering one page.
+        Opening a fresh Neon connection for every query adds avoidable network
+        and compute-wakeup latency, especially for users far from the region.
+        The connection remains request-local and is always closed at teardown.
+        """
+        if _REQUEST_CONNECTION.get() is not None:
+            yield
+            return
+        connection = self._connect()
+        token = _REQUEST_CONNECTION.set(connection)
+        try:
+            yield
+        finally:
+            _REQUEST_CONNECTION.reset(token)
+            connection.close()
+
+    @contextmanager
     def rls_scope(self, *, user_id=_UNSET, auth_email=_UNSET, system=_UNSET):
         """Temporarily add auth or tightly scoped system authority."""
         current = _RLS_CONTEXT.get()
@@ -115,6 +136,9 @@ class DatabaseHandler:
             self.reset_rls_context(token)
 
     def _connect(self):
+        existing = _REQUEST_CONNECTION.get()
+        if existing is not None:
+            return existing
         if self.is_postgres:
             import psycopg
             from psycopg.rows import dict_row
@@ -142,6 +166,7 @@ class DatabaseHandler:
     def transaction(self):
         """Commit all writes together, rolling every write back on failure."""
         conn = self._connect()
+        owns_connection = _REQUEST_CONNECTION.get() is None
         try:
             yield DatabaseTransaction(self, conn)
             conn.commit()
@@ -149,7 +174,8 @@ class DatabaseHandler:
             conn.rollback()
             raise
         finally:
-            conn.close()
+            if owns_connection:
+                conn.close()
 
     def _query(self, query):
         if not self.is_postgres:
@@ -192,6 +218,7 @@ class DatabaseHandler:
 
     def execute(self, query, params=None):
         conn = self._connect()
+        owns_connection = _REQUEST_CONNECTION.get() is None
         try:
             cursor = conn.cursor()
             cursor.execute(self._query(query), params or ())
@@ -200,11 +227,13 @@ class DatabaseHandler:
             conn.commit()
             return result
         finally:
-            conn.close()
+            if owns_connection:
+                conn.close()
 
     def execute_write(self, query, params=None):
         """Execute a parameterized mutation and return the affected row count."""
         conn = self._connect()
+        owns_connection = _REQUEST_CONNECTION.get() is None
         try:
             cursor = conn.cursor()
             cursor.execute(self._query(query), params or ())
@@ -212,7 +241,8 @@ class DatabaseHandler:
             conn.commit()
             return affected
         finally:
-            conn.close()
+            if owns_connection:
+                conn.close()
 
     def create_table(self, table_name, columns):
         table_name = self._identifier(table_name)
@@ -241,6 +271,7 @@ class DatabaseHandler:
         placeholders = ", ".join(["?"] * len(data))
         query = f"INSERT INTO {table_name} ({columns}) VALUES ({placeholders})"  # nosec B608
         conn = self._connect()
+        owns_connection = _REQUEST_CONNECTION.get() is None
         try:
             cursor = conn.cursor()
             if self.is_postgres and table_name != "gamification_stats":
@@ -254,7 +285,8 @@ class DatabaseHandler:
             conn.commit()
             return result
         finally:
-            conn.close()
+            if owns_connection:
+                conn.close()
 
     def update(self, table_name, data, where):
         table_name = self._identifier(table_name)
@@ -301,6 +333,7 @@ class DatabaseHandler:
     def execute_returning_one(self, query, params=None):
         """Run a mutation that RETURNS a row and commit it, e.g. an atomic upsert."""
         conn = self._connect()
+        owns_connection = _REQUEST_CONNECTION.get() is None
         try:
             cursor = conn.cursor()
             cursor.execute(self._query(query), params or ())
@@ -309,16 +342,19 @@ class DatabaseHandler:
             conn.commit()
             return result
         finally:
-            conn.close()
+            if owns_connection:
+                conn.close()
 
     def execute_for_one(self, query, params=None):
         conn = self._connect()
+        owns_connection = _REQUEST_CONNECTION.get() is None
         try:
             cursor = conn.cursor()
             cursor.execute(self._query(query), params or ())
             return self._row(cursor.fetchone())
         finally:
-            conn.close()
+            if owns_connection:
+                conn.close()
 
     def select_one(self, table_name, columns="*", where=None, order_by=None):
         table_name = self._identifier(table_name)

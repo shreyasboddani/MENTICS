@@ -61,11 +61,18 @@ PATH_REGENERATION_CONTROL = "MENTICS_REGENERATE_PATH"
 @app.before_request
 def bind_database_rls_identity():
     """Make the signed-in account the database tenant for this request."""
+    if request.path.startswith('/static/'):
+        return
     g.database_rls_token = db.set_rls_context(user_id=session.get('user_id'))
+    g.database_request_scope = db.request_scope()
+    g.database_request_scope.__enter__()
 
 
 @app.teardown_request
 def release_database_rls_identity(_error=None):
+    scope = getattr(g, 'database_request_scope', None)
+    if scope is not None:
+        scope.__exit__(None, None, None)
     token = getattr(g, 'database_rls_token', None)
     if token is not None:
         db.reset_rls_context(token)
