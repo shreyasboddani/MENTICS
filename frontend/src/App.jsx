@@ -22,6 +22,7 @@ import './lesson-player.css'
 import './mentics-ui.css'  // last: owns chat guide, task modal, and map performance
 import './exam-landing.css'
 
+import { HomeHero } from './home-hero'
 import { boot } from './boot'
 import { ArenaCustomizer, ArenaFighter, normalizeArenaAvatar } from './arena-fighter'
 import { ArenaCalculator, ArenaCalculatorToggle } from './arena-calculator'
@@ -277,7 +278,7 @@ function Landing() {
     nodes.forEach(node => observer.observe(node))
     return () => observer.disconnect()
   }, [])
-  return <div className="landing">
+  return <div className="landing home-landing">
     <div className="story-progress" aria-hidden="true" />
     <Starfield />
     <header className="public-nav">
@@ -294,52 +295,7 @@ function Landing() {
     </header>
 
     <main>
-      <section className="hero">
-        <div className="hero-glow hero-glow--one" />
-        <div className="hero-glow hero-glow--two" />
-        <svg className="hero-route" viewBox="0 0 620 420" aria-hidden="true">
-          <path d="M22 355 C115 355 103 205 214 205 S318 72 420 72 S497 204 598 204" />
-          <circle cx="22" cy="355" r="6" /><circle cx="214" cy="205" r="6" /><circle cx="420" cy="72" r="6" /><circle cx="598" cy="204" r="6" />
-        </svg>
-        <div className="hero-copy">
-          <div className="eyebrow"><span /> AI SAT, ACT &amp; COLLEGE PLANNING</div>
-          <h1>MENTICS</h1>
-          <p className="hero-tagline">Personalized test prep and college planning that adapts as you improve.<br />Stop guessing. <strong>Start achieving.</strong></p>
-          <div className="hero-actions">
-            <a className="button button--primary" href={loggedIn ? '/dashboard' : '/signup'}>
-              {loggedIn ? 'Continue your path' : 'Build your free path'} <ArrowRight size={18} />
-            </a>
-            <a className="button button--quiet" href="#how-it-works">See how it works</a>
-          </div>
-          <div className="hero-signal" aria-label="How Mentics keeps you moving">
-            <span><b>01</b> Find the signal</span>
-            <i />
-            <span><b>02</b> Do the work</span>
-            <i />
-            <span><b>03</b> Adapt the path</span>
-          </div>
-        </div>
-
-        <div className="product-frame" aria-label="Mentics product preview">
-          <div className="frame-float frame-float--signal" aria-hidden="true"><Sparkles /> Path recalibrated</div>
-          <div className="frame-float frame-float--focus" aria-hidden="true"><Target /> One clear move</div>
-          <div className="frame-top"><span /><span /><span /><div>mentics.vercel.app</div></div>
-          <div className="preview-shell">
-            <aside className="preview-rail"><Brand /><div className="preview-nav active"><House size={16} /> Home</div><div className="preview-nav"><Target size={16} /> My path</div><div className="preview-nav"><BarChart3 size={16} /> Progress</div></aside>
-            <div className="preview-main">
-              <div className="preview-heading"><div><small>MONDAY, AUGUST 14</small><h3>Good morning, Alex.</h3><p>One clear step at a time.</p></div><div className="streak-pill"><Flame size={15} /> 6 day focus</div></div>
-              <div className="preview-grid">
-                <div className="preview-plan">
-                  <div className="card-kicker">TODAY'S PATH</div>
-                  {[['01', 'Review linear functions', '20 min'], ['02', 'Complete a focused sprint', '15 min'], ['03', 'Log missed questions', '10 min']].map((item, i) => <div className={`preview-task ${i === 0 ? 'current' : ''}`} key={item[0]}><b>{item[0]}</b><span>{item[1]}</span><small>{item[2]}</small></div>)}
-                </div>
-                <div className="preview-score"><div className="card-kicker">SAT PROGRESS</div><strong>1420</strong><span>+60 this month</span><div className="mini-chart"><i /><i /><i /><i /><i /><i /></div></div>
-              </div>
-            </div>
-          </div>
-        </div>
-        <div className="hero-scroll-cue" aria-hidden="true"><span>Follow the path</span><i /></div>
-      </section>
+      <HomeHero loggedIn={loggedIn} />
 
       <section className="trust-strip"><span>A path that adapts</span><span>Focused daily action</span><span>Progress you can see</span><span>Guidance when you need it</span></section>
 

@@ -4,7 +4,7 @@ import { createPortal } from "react-dom";
 import DOMPurify from "dompurify";
 import { marked } from "marked";
 import { Toaster, toast } from "sonner";
-import { AlertTriangle, ArrowLeft, ArrowRight, Award, BarChart3, BookOpen, Brain, Calculator, CalendarDays, Check, Clock3, Dices, Flame, GraduationCap, GripHorizontal, Hand, Headphones, House, LayoutDashboard, LineChart, LockKeyhole, LogOut, Mail, Menu, MessageCircle, PenLine, Plus, RotateCcw, Search, Send, Settings, ShieldCheck, SkipForward, Sparkles, Swords, Target, Trophy, UserRound, UsersRound, Volume2, VolumeX, X, Zap } from "lucide-react";
+import { AlertTriangle, ArrowLeft, ArrowRight, Award, BarChart3, BookOpen, Brain, Calculator, CalendarDays, Check, Clock3, Dices, Flag, Flame, GraduationCap, GripHorizontal, Hand, Headphones, House, LayoutDashboard, LineChart, LockKeyhole, LogOut, Mail, Menu, MessageCircle, PenLine, Plus, RotateCcw, Search, Send, Settings, ShieldCheck, SkipForward, Sparkles, Swords, Target, Trophy, UserRound, UsersRound, Volume2, VolumeX, X, Zap } from "lucide-react";
 import { Fragment, jsx, jsxs } from "react/jsx-runtime";
 //#region frontend/src/boot.js
 var initial = typeof window !== "undefined" && window.__MENTICS__ ? window.__MENTICS__ : {
@@ -18,6 +18,725 @@ var boot = {
 function setBoot(next) {
 	boot.page = next && next.page || "landing";
 	boot.data = next && next.data || {};
+}
+//#endregion
+//#region frontend/src/home-hero.jsx
+var previews = {
+	SAT: {
+		title: "Make the next point count.",
+		focus: "Master linear equations",
+		subject: "Math · Focused practice",
+		steps: [
+			"Find your starting point",
+			"Learn the strategy",
+			"Practice with purpose",
+			"Understand every miss",
+			"Build your next path"
+		],
+		icon: Target
+	},
+	ACT: {
+		title: "Find your strongest approach.",
+		focus: "Sharpen your reading strategy",
+		subject: "Reading · Targeted strategy",
+		steps: [
+			"Set your ACT target",
+			"Find your section focus",
+			"Practice with purpose",
+			"Review your approach",
+			"Plan your next session"
+		],
+		icon: BookOpen
+	},
+	College: {
+		title: "Make your next chapter yours.",
+		focus: "Build a balanced college list",
+		subject: "College planning · Find your fit",
+		steps: [
+			"Define what matters to you",
+			"Learn what makes a good fit",
+			"Research your shortlist",
+			"Bring your findings back",
+			"Choose your next move"
+		],
+		icon: GraduationCap
+	}
+};
+var CAMERA = [
+	{
+		p: 0,
+		rx: 48,
+		ry: 0,
+		rz: -27,
+		dz: 0,
+		ox: 50,
+		oy: 50,
+		tx: 0,
+		ty: 0,
+		sc: 1
+	},
+	{
+		p: .3,
+		rx: 41,
+		ry: 7,
+		rz: -21,
+		dz: 45,
+		ox: 36,
+		oy: 55,
+		tx: -24,
+		ty: -14,
+		sc: 1.03
+	},
+	{
+		p: .64,
+		rx: 35,
+		ry: 12,
+		rz: -15,
+		dz: 85,
+		ox: 63,
+		oy: 60,
+		tx: -14,
+		ty: -24,
+		sc: 1.05
+	},
+	{
+		p: 1,
+		rx: 30,
+		ry: 9,
+		rz: -8,
+		dz: 112,
+		ox: 71,
+		oy: 66,
+		tx: 4,
+		ty: -12,
+		sc: 1.04
+	}
+];
+var CAMERA_VARS = [
+	[
+		"--cam-x",
+		"rx",
+		"deg"
+	],
+	[
+		"--cam-y",
+		"ry",
+		"deg"
+	],
+	[
+		"--cam-z",
+		"rz",
+		"deg"
+	],
+	[
+		"--cam-dolly",
+		"dz",
+		"px"
+	],
+	[
+		"--cam-origin-x",
+		"ox",
+		"%"
+	],
+	[
+		"--cam-origin-y",
+		"oy",
+		"%"
+	]
+];
+var PANELS = [
+	{
+		enter: [0, 0],
+		exit: [.11, .23]
+	},
+	{
+		enter: [.19, .31],
+		exit: [.53, .63]
+	},
+	{
+		enter: [.61, .73],
+		exit: [2, 3]
+	}
+];
+var STEP_STOPS = [
+	[.17, 2],
+	[.33, 0],
+	[.49, 1],
+	[.65, 2],
+	[.81, 3],
+	[2, 4]
+];
+var clamp = (value) => value < 0 ? 0 : value > 1 ? 1 : value;
+var smooth = (value) => value * value * (3 - 2 * value);
+var cameraAt = (progress) => {
+	let index = 1;
+	while (index < CAMERA.length - 1 && progress > CAMERA[index].p) index += 1;
+	const from = CAMERA[index - 1], to = CAMERA[index];
+	const eased = smooth(clamp((progress - from.p) / (to.p - from.p)));
+	const frame = {};
+	for (const key in to) frame[key] = from[key] + (to[key] - from[key]) * eased;
+	return frame;
+};
+function HomeHero({ loggedIn }) {
+	const [track, setTrack] = useState("SAT");
+	const [activeStep, setActiveStep] = useState(2);
+	const sceneRef = useRef(null);
+	const heroRef = useRef(null);
+	const storyRef = useRef(null);
+	const visualRef = useRef(null);
+	const progressRef = useRef(null);
+	const panelsRef = useRef([]);
+	const [chapter, setChapter] = useState(0);
+	useEffect(() => {
+		const story = storyRef.current;
+		const hero = heroRef.current;
+		const sculpture = sceneRef.current;
+		const visual = visualRef.current;
+		const enabled = window.matchMedia("(prefers-reduced-motion: no-preference) and (min-height: 650px)");
+		const route = sculpture.querySelector(".path-route-active");
+		const parallax = [
+			[
+				".home-hero-grid",
+				0,
+				-70
+			],
+			[
+				".home-hero-halo",
+				54,
+				-46
+			],
+			[
+				".home-hero-orbit--outer",
+				-34,
+				26
+			],
+			[
+				".hero-left-art",
+				-46,
+				-20
+			]
+		].map(([selector, x, y]) => [
+			hero.querySelector(selector),
+			x,
+			y
+		]);
+		const prompt = hero.querySelector(".hero-scroll-prompt");
+		let frame = 0, range = 1, mobile = false;
+		let lastChapter = -1, lastStep = -1;
+		const measure = () => {
+			range = Math.max(1, story.offsetHeight - hero.offsetHeight);
+			mobile = window.innerWidth <= 900;
+		};
+		const render = () => {
+			frame = 0;
+			if (!enabled.matches) {
+				panelsRef.current.forEach((panel) => {
+					panel.style.opacity = "";
+					panel.style.transform = "";
+				});
+				CAMERA_VARS.forEach(([name]) => sculpture.style.removeProperty(name));
+				parallax.forEach(([node]) => {
+					if (node) node.style.translate = "";
+				});
+				if (prompt) prompt.style.opacity = "";
+				visual.style.transform = "";
+				story.dataset.scroll = "static";
+				setChapter(-1);
+				return;
+			}
+			story.dataset.scroll = "active";
+			const progress = clamp(-story.getBoundingClientRect().top / range);
+			const current = progress < .17 ? 0 : progress < .58 ? 1 : 2;
+			if (current !== lastChapter) {
+				lastChapter = current;
+				setChapter(current);
+			}
+			const step = STEP_STOPS.find(([edge]) => progress < edge)[1];
+			if (step !== lastStep) {
+				lastStep = step;
+				setActiveStep(step);
+			}
+			panelsRef.current.forEach((panel, index) => {
+				if (!panel) return;
+				const { enter, exit } = PANELS[index];
+				const arriving = enter[1] > enter[0] ? clamp((progress - enter[0]) / (enter[1] - enter[0])) : 1;
+				const leaving = clamp((progress - exit[0]) / (exit[1] - exit[0]));
+				panel.style.opacity = smooth(arriving) * (1 - smooth(leaving));
+				panel.style.transform = `translate3d(0, ${(1 - arriving) * 46 - leaving * 54}px, 0) scale(${1 - (1 - arriving) * .045 - leaving * .035})`;
+			});
+			const camera = cameraAt(progress);
+			const damp = mobile ? .55 : 1;
+			const shot = (key) => CAMERA[0][key] + (camera[key] - CAMERA[0][key]) * damp;
+			CAMERA_VARS.forEach(([name, key, unit]) => sculpture.style.setProperty(name, `${shot(key).toFixed(2)}${unit}`));
+			visual.style.transform = `translate3d(${mobile ? 0 : shot("tx").toFixed(2)}px, ${shot("ty").toFixed(2)}px, 0) scale(${shot("sc").toFixed(4)})`;
+			parallax.forEach(([node, x, y]) => {
+				if (node) node.style.translate = `${(mobile ? 0 : x) * progress}px ${y * progress}px`;
+			});
+			if (prompt) prompt.style.opacity = String(1 - clamp(progress / .07));
+			progressRef.current.style.transform = `scaleX(${progress})`;
+			route.style.strokeDashoffset = String(100 - clamp((progress - .05) / .8) * 100);
+		};
+		const schedule = () => {
+			if (!frame) frame = requestAnimationFrame(render);
+		};
+		const remeasure = () => {
+			measure();
+			schedule();
+		};
+		window.addEventListener("scroll", schedule, { passive: true });
+		window.addEventListener("resize", remeasure);
+		enabled.addEventListener("change", remeasure);
+		measure();
+		render();
+		return () => {
+			cancelAnimationFrame(frame);
+			window.removeEventListener("scroll", schedule);
+			window.removeEventListener("resize", remeasure);
+			enabled.removeEventListener("change", remeasure);
+		};
+	}, []);
+	const goToChapter = (index) => {
+		const story = storyRef.current;
+		const range = story.offsetHeight - heroRef.current.offsetHeight;
+		const top = window.scrollY + story.getBoundingClientRect().top + range * [
+			0,
+			.4,
+			.8
+		][index];
+		window.scrollTo({
+			top,
+			behavior: "smooth"
+		});
+	};
+	useEffect(() => {
+		const hero = heroRef.current;
+		let visible = true;
+		const update = () => {
+			hero.dataset.motion = visible && !document.hidden ? "running" : "paused";
+		};
+		const observer = new IntersectionObserver(([entry]) => {
+			visible = entry.isIntersecting;
+			update();
+		});
+		observer.observe(hero);
+		document.addEventListener("visibilitychange", update);
+		update();
+		return () => {
+			observer.disconnect();
+			document.removeEventListener("visibilitychange", update);
+		};
+	}, []);
+	useEffect(() => {
+		const scene = sceneRef.current;
+		const motion = window.matchMedia("(prefers-reduced-motion: no-preference) and (pointer: fine) and (min-width: 901px)");
+		let frame = 0;
+		let x = 0, y = 0, vx = 0, vy = 0, targetX = 0, targetY = 0, last = 0;
+		const tick = (now) => {
+			const dt = Math.min((now - (last || now - 16)) / 1e3, .032);
+			last = now;
+			vx += ((targetX - x) * 100 - vx * 18) * dt;
+			vy += ((targetY - y) * 100 - vy * 18) * dt;
+			x += vx * dt;
+			y += vy * dt;
+			scene.style.rotate = `${-y} ${x} 0 ${Math.hypot(x, y)}deg`;
+			if (Math.abs(targetX - x) + Math.abs(targetY - y) + Math.abs(vx) + Math.abs(vy) > .01) frame = requestAnimationFrame(tick);
+			else {
+				frame = 0;
+				last = 0;
+			}
+		};
+		const start = () => {
+			if (!frame) frame = requestAnimationFrame(tick);
+		};
+		const move = (event) => {
+			if (!motion.matches || event.pointerType === "touch") return;
+			const box = scene.parentElement.getBoundingClientRect();
+			targetX = ((event.clientX - box.left) / box.width - .5) * 10;
+			targetY = ((event.clientY - box.top) / box.height - .5) * 8;
+			start();
+		};
+		const reset = () => {
+			targetX = 0;
+			targetY = 0;
+			start();
+		};
+		const preferenceChanged = () => {
+			cancelAnimationFrame(frame);
+			frame = 0;
+			x = y = vx = vy = targetX = targetY = last = 0;
+			scene.style.rotate = "";
+		};
+		const parent = scene.parentElement;
+		parent.addEventListener("pointermove", move);
+		parent.addEventListener("pointerleave", reset);
+		motion.addEventListener("change", preferenceChanged);
+		return () => {
+			cancelAnimationFrame(frame);
+			parent.removeEventListener("pointermove", move);
+			parent.removeEventListener("pointerleave", reset);
+			motion.removeEventListener("change", preferenceChanged);
+		};
+	}, []);
+	const preview = previews[track];
+	const Icon = preview.icon;
+	return /* @__PURE__ */ jsx("div", {
+		className: "hero-scroll-story",
+		ref: storyRef,
+		children: /* @__PURE__ */ jsxs("section", {
+			className: "home-hero",
+			ref: heroRef,
+			"aria-labelledby": "home-hero-title",
+			children: [
+				/* @__PURE__ */ jsxs("div", {
+					className: "home-hero-atmosphere",
+					"aria-hidden": "true",
+					children: [
+						/* @__PURE__ */ jsx("div", { className: "home-hero-grid" }),
+						/* @__PURE__ */ jsx("div", { className: "home-hero-halo" }),
+						/* @__PURE__ */ jsx("div", { className: "home-hero-orbit home-hero-orbit--outer" }),
+						/* @__PURE__ */ jsx("div", { className: "home-hero-orbit home-hero-orbit--inner" }),
+						/* @__PURE__ */ jsx("span", { className: "home-hero-star home-hero-star--one" }),
+						/* @__PURE__ */ jsx("span", { className: "home-hero-star home-hero-star--two" }),
+						/* @__PURE__ */ jsx("span", { className: "home-hero-star home-hero-star--three" })
+					]
+				}),
+				/* @__PURE__ */ jsxs("div", {
+					className: "hero-story-copy-stack",
+					children: [
+						/* @__PURE__ */ jsxs("div", {
+							className: "hero-left-art",
+							"aria-hidden": "true",
+							children: [
+								/* @__PURE__ */ jsx("div", { className: "hero-left-disc" }),
+								/* @__PURE__ */ jsx("div", { className: "hero-left-arc" }),
+								/* @__PURE__ */ jsx("span", {
+									className: "hero-coordinate hero-coordinate--one",
+									children: "YOUR GOAL"
+								}),
+								/* @__PURE__ */ jsx("span", {
+									className: "hero-coordinate hero-coordinate--two",
+									children: "YOUR PACE"
+								}),
+								/* @__PURE__ */ jsxs("svg", {
+									viewBox: "0 0 550 400",
+									children: [
+										/* @__PURE__ */ jsx("path", { d: "M-40 330 C70 330 25 110 130 110 S245 300 345 225 S430 25 570 65" }),
+										/* @__PURE__ */ jsx("circle", {
+											cx: "130",
+											cy: "110",
+											r: "5"
+										}),
+										/* @__PURE__ */ jsx("circle", {
+											cx: "345",
+											cy: "225",
+											r: "5"
+										})
+									]
+								})
+							]
+						}),
+						/* @__PURE__ */ jsxs("div", {
+							className: "home-hero-copy hero-story-panel",
+							ref: (node) => {
+								panelsRef.current[0] = node;
+							},
+							"aria-hidden": chapter !== 0 && chapter !== -1,
+							inert: chapter !== 0 && chapter !== -1,
+							children: [
+								/* @__PURE__ */ jsxs("div", {
+									className: "home-hero-eyebrow",
+									children: [/* @__PURE__ */ jsx("span", {}), " SMALL STEPS. BIG POSSIBILITIES."]
+								}),
+								/* @__PURE__ */ jsxs("h1", {
+									id: "home-hero-title",
+									"aria-label": "MENTICS",
+									children: ["MENTICS", /* @__PURE__ */ jsx("span", {
+										className: "wordmark-sweep",
+										"aria-hidden": "true",
+										children: "MENTICS"
+									})]
+								}),
+								/* @__PURE__ */ jsxs("p", { children: [
+									"From your next test to your next chapter.",
+									/* @__PURE__ */ jsx("br", { className: "home-hero-break" }),
+									" Personalized SAT, ACT, and college planning that turns ",
+									/* @__PURE__ */ jsx("strong", { children: "“where do I start?”" }),
+									" into ",
+									/* @__PURE__ */ jsx("strong", { children: "“I’ve got this.”" })
+								] }),
+								/* @__PURE__ */ jsxs("div", {
+									className: "home-hero-actions",
+									children: [/* @__PURE__ */ jsxs("a", {
+										className: "button home-hero-primary",
+										href: loggedIn ? "/dashboard" : "/signup",
+										children: [
+											loggedIn ? "Continue your path" : "Find my starting point",
+											" ",
+											/* @__PURE__ */ jsx(ArrowRight, { size: 18 })
+										]
+									}), /* @__PURE__ */ jsxs("a", {
+										className: "home-hero-secondary",
+										href: "#how-it-works",
+										children: ["See how it works ", /* @__PURE__ */ jsx(ArrowRight, { size: 16 })]
+									})]
+								}),
+								/* @__PURE__ */ jsxs("div", {
+									className: "home-hero-assurance",
+									children: [/* @__PURE__ */ jsxs("span", { children: [/* @__PURE__ */ jsx(Check, { size: 14 }), " Free to get started"] }), /* @__PURE__ */ jsxs("span", { children: [/* @__PURE__ */ jsx(Check, { size: 14 }), " Built around you"] })]
+								})
+							]
+						}),
+						/* @__PURE__ */ jsxs("div", {
+							className: "hero-story-panel hero-story-panel--chapter",
+							ref: (node) => {
+								panelsRef.current[1] = node;
+							},
+							"aria-hidden": chapter !== 1 && chapter !== -1,
+							inert: chapter !== 1 && chapter !== -1,
+							children: [
+								/* @__PURE__ */ jsxs("div", {
+									className: "home-hero-eyebrow",
+									children: [/* @__PURE__ */ jsx("span", {}), " 01 / FIND YOUR SIGNAL"]
+								}),
+								/* @__PURE__ */ jsxs("h2", { children: [
+									"It starts",
+									/* @__PURE__ */ jsx("br", {}),
+									"with ",
+									/* @__PURE__ */ jsx("em", { children: "you." })
+								] }),
+								/* @__PURE__ */ jsx("p", { children: "Your goals. Your starting point. The things that feel hard right now. Mentics turns that context into a direction." }),
+								/* @__PURE__ */ jsxs("div", {
+									className: "story-context",
+									children: [
+										/* @__PURE__ */ jsxs("span", { children: [/* @__PURE__ */ jsx(Target, { size: 16 }), " Your target"] }),
+										/* @__PURE__ */ jsxs("span", { children: [/* @__PURE__ */ jsx(BookOpen, { size: 16 }), " Your strengths"] }),
+										/* @__PURE__ */ jsxs("span", { children: [/* @__PURE__ */ jsx(Sparkles, { size: 16 }), " Your next opportunity"] })
+									]
+								})
+							]
+						}),
+						/* @__PURE__ */ jsxs("div", {
+							className: "hero-story-panel hero-story-panel--chapter",
+							ref: (node) => {
+								panelsRef.current[2] = node;
+							},
+							"aria-hidden": chapter !== 2 && chapter !== -1,
+							inert: chapter !== 2 && chapter !== -1,
+							children: [
+								/* @__PURE__ */ jsxs("div", {
+									className: "home-hero-eyebrow",
+									children: [/* @__PURE__ */ jsx("span", {}), " 02 / TURN CLARITY INTO ACTION"]
+								}),
+								/* @__PURE__ */ jsxs("h2", { children: [
+									"One move.",
+									/* @__PURE__ */ jsx("br", {}),
+									/* @__PURE__ */ jsx("em", { children: "Real momentum." })
+								] }),
+								/* @__PURE__ */ jsx("p", { children: "Five focused steps. One clear place to begin. Learn, practice, and bring back the result. Your next path gets smarter with you." }),
+								/* @__PURE__ */ jsxs("a", {
+									className: "button home-hero-primary",
+									href: loggedIn ? "/dashboard" : "/signup",
+									children: [
+										loggedIn ? "Continue your path" : "Build my free path",
+										" ",
+										/* @__PURE__ */ jsx(ArrowRight, { size: 18 })
+									]
+								}),
+								/* @__PURE__ */ jsxs("a", {
+									className: "story-continue",
+									href: "#how-it-works",
+									children: ["Keep going. See the method. ", /* @__PURE__ */ jsx(ArrowRight, { size: 16 })]
+								})
+							]
+						})
+					]
+				}),
+				/* @__PURE__ */ jsx("div", {
+					className: "hero-story-visual",
+					ref: visualRef,
+					children: /* @__PURE__ */ jsxs("div", {
+						className: "home-hero-demo",
+						children: [
+							/* @__PURE__ */ jsx("div", {
+								className: "home-hero-track",
+								role: "group",
+								"aria-label": "Choose a sample study path",
+								children: Object.keys(previews).map((name) => /* @__PURE__ */ jsx("button", {
+									type: "button",
+									"aria-pressed": track === name,
+									"aria-controls": "home-path-preview",
+									onClick: () => {
+										setTrack(name);
+										setActiveStep(2);
+									},
+									children: name
+								}, name))
+							}),
+							/* @__PURE__ */ jsxs("div", {
+								className: "home-hero-stage",
+								children: [/* @__PURE__ */ jsxs("div", {
+									className: "path-scene",
+									id: "home-path-preview",
+									"aria-live": "polite",
+									"aria-atomic": "true",
+									children: [
+										/* @__PURE__ */ jsxs("div", {
+											className: "path-scene-heading",
+											children: [/* @__PURE__ */ jsxs("span", { children: [
+												/* @__PURE__ */ jsx(Sparkles, { size: 14 }),
+												" ",
+												track,
+												" · SAMPLE PATH"
+											] }), /* @__PURE__ */ jsx("h2", { children: preview.title })]
+										}),
+										/* @__PURE__ */ jsxs("div", {
+											className: "path-sculpture",
+											ref: sceneRef,
+											children: [
+												/* @__PURE__ */ jsx("div", {
+													className: "path-plinth path-plinth--bottom",
+													"aria-hidden": "true"
+												}),
+												/* @__PURE__ */ jsx("div", {
+													className: "path-plinth path-plinth--middle",
+													"aria-hidden": "true"
+												}),
+												/* @__PURE__ */ jsxs("div", {
+													className: "path-plane",
+													children: [
+														/* @__PURE__ */ jsx("div", {
+															className: "path-plane-grid",
+															"aria-hidden": "true"
+														}),
+														/* @__PURE__ */ jsxs("svg", {
+															className: "path-sculpture-route",
+															viewBox: "0 0 500 440",
+															"aria-hidden": "true",
+															children: [
+																/* @__PURE__ */ jsx("path", {
+																	className: "path-route-shadow",
+																	d: "M100 88 C100 15 350 25 350 119 S225 132 225 220 S375 230 375 317 S125 410 125 361"
+																}),
+																/* @__PURE__ */ jsx("path", {
+																	className: "path-route-base",
+																	d: "M100 88 C100 15 350 25 350 119 S225 132 225 220 S375 230 375 317 S125 410 125 361"
+																}),
+																/* @__PURE__ */ jsx("path", {
+																	className: "path-route-active",
+																	pathLength: "100",
+																	strokeDasharray: "100",
+																	d: "M100 88 C100 15 350 25 350 119 S225 132 225 220 S375 230 375 317 S125 410 125 361"
+																})
+															]
+														}),
+														/* @__PURE__ */ jsx("ol", {
+															className: "path-milestones",
+															children: preview.steps.map((step, index) => /* @__PURE__ */ jsxs("li", {
+																className: `path-milestone path-milestone--${index} ${index === activeStep ? "is-active" : ""}`,
+																children: [
+																	/* @__PURE__ */ jsx("span", {
+																		className: "path-pedestal",
+																		"aria-hidden": "true"
+																	}),
+																	/* @__PURE__ */ jsx("button", {
+																		type: "button",
+																		className: "path-token",
+																		"aria-pressed": activeStep === index,
+																		"aria-label": `Explore step ${index + 1}: ${step}`,
+																		onClick: () => setActiveStep(index),
+																		children: index < 2 ? /* @__PURE__ */ jsx(Check, {}) : index === 2 ? /* @__PURE__ */ jsx(Icon, {}) : index === 4 ? /* @__PURE__ */ jsx(Flag, {}) : /* @__PURE__ */ jsx(LockKeyhole, {})
+																	}),
+																	/* @__PURE__ */ jsxs("span", {
+																		className: "path-milestone-label",
+																		children: [/* @__PURE__ */ jsxs("small", { children: [
+																			"0",
+																			index + 1,
+																			index === activeStep ? " / EXPLORING" : ""
+																		] }), step]
+																	})
+																]
+															}, index))
+														}),
+														/* @__PURE__ */ jsx("span", {
+															className: "path-plane-signature",
+															"aria-hidden": "true",
+															children: "MENTICS / YOUR NEXT CHAPTER"
+														})
+													]
+												})
+											]
+										}),
+										/* @__PURE__ */ jsxs("div", {
+											className: "path-orbit-badge",
+											"aria-hidden": "true",
+											children: [/* @__PURE__ */ jsx(Sparkles, { size: 18 }), /* @__PURE__ */ jsxs("span", { children: ["Made for your", /* @__PURE__ */ jsx("strong", { children: "next breakthrough." })] })]
+										})
+									]
+								}), /* @__PURE__ */ jsxs("div", {
+									className: "home-focus-card",
+									children: [
+										/* @__PURE__ */ jsx("span", {
+											className: "home-focus-icon",
+											children: /* @__PURE__ */ jsx(Icon, { size: 21 })
+										}),
+										/* @__PURE__ */ jsxs("div", { children: [
+											/* @__PURE__ */ jsxs("small", { children: [
+												"STEP ",
+												String(activeStep + 1).padStart(2, "0"),
+												" / YOUR NEXT MOVE"
+											] }),
+											/* @__PURE__ */ jsx("strong", { children: activeStep === 2 ? preview.focus : preview.steps[activeStep] }),
+											/* @__PURE__ */ jsx("span", { children: preview.subject })
+										] }),
+										/* @__PURE__ */ jsx("button", {
+											type: "button",
+											className: "home-focus-spark",
+											"aria-label": "Explore the next sample step",
+											onClick: () => setActiveStep((step) => (step + 1) % 5),
+											children: /* @__PURE__ */ jsx(ArrowRight, { size: 18 })
+										})
+									]
+								})]
+							}),
+							/* @__PURE__ */ jsxs("p", {
+								className: "home-hero-caption",
+								children: [/* @__PURE__ */ jsx("span", {}), " Pick a milestone. See where it takes you."]
+							})
+						]
+					})
+				}),
+				/* @__PURE__ */ jsxs("nav", {
+					className: "hero-story-nav",
+					"aria-label": "Hero story chapters",
+					children: [
+						/* @__PURE__ */ jsx("div", {
+							className: "hero-story-nav-track",
+							children: /* @__PURE__ */ jsx("i", { ref: progressRef })
+						}),
+						[
+							"Your ambition",
+							"Your signal",
+							"Your next move"
+						].map((label, index) => /* @__PURE__ */ jsxs("button", {
+							type: "button",
+							"aria-current": chapter === index ? "step" : void 0,
+							onClick: () => goToChapter(index),
+							children: [/* @__PURE__ */ jsxs("span", { children: ["0", index + 1] }), label]
+						}, label)),
+						/* @__PURE__ */ jsxs("a", {
+							href: "#how-it-works",
+							children: ["Skip to the method ", /* @__PURE__ */ jsx(ArrowRight, { size: 14 })]
+						})
+					]
+				}),
+				/* @__PURE__ */ jsxs("div", {
+					className: "hero-scroll-prompt",
+					"aria-hidden": "true",
+					children: [/* @__PURE__ */ jsx("span", {}), " SCROLL TO FIND YOUR PATH"]
+				})
+			]
+		})
+	});
 }
 //#endregion
 //#region frontend/src/arena-fighter.jsx
@@ -4024,7 +4743,7 @@ function Landing() {
 		return () => observer.disconnect();
 	}, []);
 	return /* @__PURE__ */ jsxs("div", {
-		className: "landing",
+		className: "landing home-landing",
 		children: [
 			/* @__PURE__ */ jsx("div", {
 				className: "story-progress",
@@ -4068,204 +4787,7 @@ function Landing() {
 				]
 			}),
 			/* @__PURE__ */ jsxs("main", { children: [
-				/* @__PURE__ */ jsxs("section", {
-					className: "hero",
-					children: [
-						/* @__PURE__ */ jsx("div", { className: "hero-glow hero-glow--one" }),
-						/* @__PURE__ */ jsx("div", { className: "hero-glow hero-glow--two" }),
-						/* @__PURE__ */ jsxs("svg", {
-							className: "hero-route",
-							viewBox: "0 0 620 420",
-							"aria-hidden": "true",
-							children: [
-								/* @__PURE__ */ jsx("path", { d: "M22 355 C115 355 103 205 214 205 S318 72 420 72 S497 204 598 204" }),
-								/* @__PURE__ */ jsx("circle", {
-									cx: "22",
-									cy: "355",
-									r: "6"
-								}),
-								/* @__PURE__ */ jsx("circle", {
-									cx: "214",
-									cy: "205",
-									r: "6"
-								}),
-								/* @__PURE__ */ jsx("circle", {
-									cx: "420",
-									cy: "72",
-									r: "6"
-								}),
-								/* @__PURE__ */ jsx("circle", {
-									cx: "598",
-									cy: "204",
-									r: "6"
-								})
-							]
-						}),
-						/* @__PURE__ */ jsxs("div", {
-							className: "hero-copy",
-							children: [
-								/* @__PURE__ */ jsxs("div", {
-									className: "eyebrow",
-									children: [/* @__PURE__ */ jsx("span", {}), " AI SAT, ACT & COLLEGE PLANNING"]
-								}),
-								/* @__PURE__ */ jsx("h1", { children: "MENTICS" }),
-								/* @__PURE__ */ jsxs("p", {
-									className: "hero-tagline",
-									children: [
-										"Personalized test prep and college planning that adapts as you improve.",
-										/* @__PURE__ */ jsx("br", {}),
-										"Stop guessing. ",
-										/* @__PURE__ */ jsx("strong", { children: "Start achieving." })
-									]
-								}),
-								/* @__PURE__ */ jsxs("div", {
-									className: "hero-actions",
-									children: [/* @__PURE__ */ jsxs("a", {
-										className: "button button--primary",
-										href: loggedIn ? "/dashboard" : "/signup",
-										children: [
-											loggedIn ? "Continue your path" : "Build your free path",
-											" ",
-											/* @__PURE__ */ jsx(ArrowRight, { size: 18 })
-										]
-									}), /* @__PURE__ */ jsx("a", {
-										className: "button button--quiet",
-										href: "#how-it-works",
-										children: "See how it works"
-									})]
-								}),
-								/* @__PURE__ */ jsxs("div", {
-									className: "hero-signal",
-									"aria-label": "How Mentics keeps you moving",
-									children: [
-										/* @__PURE__ */ jsxs("span", { children: [/* @__PURE__ */ jsx("b", { children: "01" }), " Find the signal"] }),
-										/* @__PURE__ */ jsx("i", {}),
-										/* @__PURE__ */ jsxs("span", { children: [/* @__PURE__ */ jsx("b", { children: "02" }), " Do the work"] }),
-										/* @__PURE__ */ jsx("i", {}),
-										/* @__PURE__ */ jsxs("span", { children: [/* @__PURE__ */ jsx("b", { children: "03" }), " Adapt the path"] })
-									]
-								})
-							]
-						}),
-						/* @__PURE__ */ jsxs("div", {
-							className: "product-frame",
-							"aria-label": "Mentics product preview",
-							children: [
-								/* @__PURE__ */ jsxs("div", {
-									className: "frame-float frame-float--signal",
-									"aria-hidden": "true",
-									children: [/* @__PURE__ */ jsx(Sparkles, {}), " Path recalibrated"]
-								}),
-								/* @__PURE__ */ jsxs("div", {
-									className: "frame-float frame-float--focus",
-									"aria-hidden": "true",
-									children: [/* @__PURE__ */ jsx(Target, {}), " One clear move"]
-								}),
-								/* @__PURE__ */ jsxs("div", {
-									className: "frame-top",
-									children: [
-										/* @__PURE__ */ jsx("span", {}),
-										/* @__PURE__ */ jsx("span", {}),
-										/* @__PURE__ */ jsx("span", {}),
-										/* @__PURE__ */ jsx("div", { children: "mentics.vercel.app" })
-									]
-								}),
-								/* @__PURE__ */ jsxs("div", {
-									className: "preview-shell",
-									children: [/* @__PURE__ */ jsxs("aside", {
-										className: "preview-rail",
-										children: [
-											/* @__PURE__ */ jsx(Brand, {}),
-											/* @__PURE__ */ jsxs("div", {
-												className: "preview-nav active",
-												children: [/* @__PURE__ */ jsx(House, { size: 16 }), " Home"]
-											}),
-											/* @__PURE__ */ jsxs("div", {
-												className: "preview-nav",
-												children: [/* @__PURE__ */ jsx(Target, { size: 16 }), " My path"]
-											}),
-											/* @__PURE__ */ jsxs("div", {
-												className: "preview-nav",
-												children: [/* @__PURE__ */ jsx(BarChart3, { size: 16 }), " Progress"]
-											})
-										]
-									}), /* @__PURE__ */ jsxs("div", {
-										className: "preview-main",
-										children: [/* @__PURE__ */ jsxs("div", {
-											className: "preview-heading",
-											children: [/* @__PURE__ */ jsxs("div", { children: [
-												/* @__PURE__ */ jsx("small", { children: "MONDAY, AUGUST 14" }),
-												/* @__PURE__ */ jsx("h3", { children: "Good morning, Alex." }),
-												/* @__PURE__ */ jsx("p", { children: "One clear step at a time." })
-											] }), /* @__PURE__ */ jsxs("div", {
-												className: "streak-pill",
-												children: [/* @__PURE__ */ jsx(Flame, { size: 15 }), " 6 day focus"]
-											})]
-										}), /* @__PURE__ */ jsxs("div", {
-											className: "preview-grid",
-											children: [/* @__PURE__ */ jsxs("div", {
-												className: "preview-plan",
-												children: [/* @__PURE__ */ jsx("div", {
-													className: "card-kicker",
-													children: "TODAY'S PATH"
-												}), [
-													[
-														"01",
-														"Review linear functions",
-														"20 min"
-													],
-													[
-														"02",
-														"Complete a focused sprint",
-														"15 min"
-													],
-													[
-														"03",
-														"Log missed questions",
-														"10 min"
-													]
-												].map((item, i) => /* @__PURE__ */ jsxs("div", {
-													className: `preview-task ${i === 0 ? "current" : ""}`,
-													children: [
-														/* @__PURE__ */ jsx("b", { children: item[0] }),
-														/* @__PURE__ */ jsx("span", { children: item[1] }),
-														/* @__PURE__ */ jsx("small", { children: item[2] })
-													]
-												}, item[0]))]
-											}), /* @__PURE__ */ jsxs("div", {
-												className: "preview-score",
-												children: [
-													/* @__PURE__ */ jsx("div", {
-														className: "card-kicker",
-														children: "SAT PROGRESS"
-													}),
-													/* @__PURE__ */ jsx("strong", { children: "1420" }),
-													/* @__PURE__ */ jsx("span", { children: "+60 this month" }),
-													/* @__PURE__ */ jsxs("div", {
-														className: "mini-chart",
-														children: [
-															/* @__PURE__ */ jsx("i", {}),
-															/* @__PURE__ */ jsx("i", {}),
-															/* @__PURE__ */ jsx("i", {}),
-															/* @__PURE__ */ jsx("i", {}),
-															/* @__PURE__ */ jsx("i", {}),
-															/* @__PURE__ */ jsx("i", {})
-														]
-													})
-												]
-											})]
-										})]
-									})]
-								})
-							]
-						}),
-						/* @__PURE__ */ jsxs("div", {
-							className: "hero-scroll-cue",
-							"aria-hidden": "true",
-							children: [/* @__PURE__ */ jsx("span", { children: "Follow the path" }), /* @__PURE__ */ jsx("i", {})]
-						})
-					]
-				}),
+				/* @__PURE__ */ jsx(HomeHero, { loggedIn }),
 				/* @__PURE__ */ jsxs("section", {
 					className: "trust-strip",
 					children: [
