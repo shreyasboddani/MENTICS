@@ -3432,6 +3432,7 @@ var productLinks = [
 	["/college-planning", "College Planning"]
 ];
 function ProductPage({ kind }) {
+	if (kind !== "college-planning") return /* @__PURE__ */ jsx(ExamLanding, { kind });
 	const d = productPages[kind];
 	return /* @__PURE__ */ jsxs("div", {
 		className: "product-story",
@@ -3632,6 +3633,372 @@ function ProductPage({ kind }) {
 					/* @__PURE__ */ jsx("span", { children: "© 2026 Mentics. All rights reserved." })
 				]
 			})
+		]
+	});
+}
+function ExamLanding({ kind }) {
+	const d = productPages[kind];
+	const exam = kind === "act-prep" ? "ACT" : "SAT";
+	const loggedIn = useClientOnly(boot.data.isLoggedIn, false);
+	const destination = loggedIn ? "/dashboard" : "/signup";
+	const methodIcons = [
+		Target,
+		BookOpen,
+		BarChart3
+	];
+	return /* @__PURE__ */ jsxs("div", {
+		className: "landing exam-landing",
+		children: [
+			/* @__PURE__ */ jsx("div", {
+				className: "story-progress",
+				"aria-hidden": "true"
+			}),
+			/* @__PURE__ */ jsx(Starfield, {}),
+			/* @__PURE__ */ jsxs("header", {
+				className: "public-nav",
+				children: [
+					/* @__PURE__ */ jsx(Brand, {}),
+					/* @__PURE__ */ jsxs("nav", {
+						"aria-label": "Main navigation",
+						children: [
+							/* @__PURE__ */ jsx("a", {
+								href: "#how-it-works",
+								children: "How it works"
+							}),
+							/* @__PURE__ */ jsx("a", {
+								href: "/sat-prep",
+								"aria-current": exam === "SAT" ? "page" : void 0,
+								children: "SAT prep"
+							}),
+							/* @__PURE__ */ jsx("a", {
+								href: "/act-prep",
+								"aria-current": exam === "ACT" ? "page" : void 0,
+								children: "ACT prep"
+							}),
+							/* @__PURE__ */ jsx("a", {
+								href: "/college-planning",
+								children: "College planning"
+							})
+						]
+					}),
+					/* @__PURE__ */ jsxs("a", {
+						className: "button button--small button--dark",
+						href: loggedIn ? "/dashboard" : "/login",
+						children: [
+							loggedIn ? "Open dashboard" : "Log in",
+							" ",
+							/* @__PURE__ */ jsx(ArrowRight, { size: 15 })
+						]
+					})
+				]
+			}),
+			/* @__PURE__ */ jsxs("main", { children: [
+				/* @__PURE__ */ jsxs("section", {
+					className: "hero exam-hero",
+					children: [
+						/* @__PURE__ */ jsx("div", { className: "hero-glow hero-glow--one" }),
+						/* @__PURE__ */ jsx("div", { className: "hero-glow hero-glow--two" }),
+						/* @__PURE__ */ jsxs("svg", {
+							className: "hero-route",
+							viewBox: "0 0 620 420",
+							"aria-hidden": "true",
+							children: [
+								/* @__PURE__ */ jsx("path", { d: "M22 355 C115 355 103 205 214 205 S318 72 420 72 S497 204 598 204" }),
+								/* @__PURE__ */ jsx("circle", {
+									cx: "22",
+									cy: "355",
+									r: "6"
+								}),
+								/* @__PURE__ */ jsx("circle", {
+									cx: "214",
+									cy: "205",
+									r: "6"
+								}),
+								/* @__PURE__ */ jsx("circle", {
+									cx: "420",
+									cy: "72",
+									r: "6"
+								}),
+								/* @__PURE__ */ jsx("circle", {
+									cx: "598",
+									cy: "204",
+									r: "6"
+								})
+							]
+						}),
+						/* @__PURE__ */ jsxs("div", {
+							className: "hero-copy",
+							children: [
+								/* @__PURE__ */ jsxs("div", {
+									className: "eyebrow",
+									children: [
+										/* @__PURE__ */ jsx("span", {}),
+										" ",
+										d.eyebrow
+									]
+								}),
+								/* @__PURE__ */ jsxs("h1", { children: [kind === "ai-sat-prep" ? "AI SAT" : exam, " PREP"] }),
+								/* @__PURE__ */ jsx("p", {
+									className: "exam-promise",
+									children: exam === "ACT" ? "Your goal. Five clear next steps." : "A clear path to your next best."
+								}),
+								/* @__PURE__ */ jsx("p", {
+									className: "hero-tagline",
+									children: d.intro
+								}),
+								/* @__PURE__ */ jsxs("div", {
+									className: "hero-actions",
+									children: [/* @__PURE__ */ jsxs("a", {
+										className: "button button--primary",
+										href: destination,
+										children: [
+											loggedIn ? "Continue your path" : d.primary,
+											" ",
+											/* @__PURE__ */ jsx(ArrowRight, { size: 18 })
+										]
+									}), /* @__PURE__ */ jsx("a", {
+										className: "button button--quiet",
+										href: "#how-it-works",
+										children: "See how it works"
+									})]
+								}),
+								/* @__PURE__ */ jsxs("div", {
+									className: "hero-signal",
+									children: [
+										/* @__PURE__ */ jsxs("span", { children: [/* @__PURE__ */ jsx("b", { children: "01" }), " Find your focus"] }),
+										/* @__PURE__ */ jsx("i", {}),
+										/* @__PURE__ */ jsxs("span", { children: [/* @__PURE__ */ jsx("b", { children: "02" }), " Build the skill"] }),
+										/* @__PURE__ */ jsx("i", {}),
+										/* @__PURE__ */ jsxs("span", { children: [/* @__PURE__ */ jsx("b", { children: "03" }), " See your progress"] })
+									]
+								})
+							]
+						}),
+						/* @__PURE__ */ jsxs("div", {
+							className: "product-frame exam-preview",
+							"aria-label": `Illustrative ${exam} study path preview`,
+							children: [
+								/* @__PURE__ */ jsxs("div", {
+									className: "frame-float frame-float--signal",
+									"aria-hidden": "true",
+									children: [/* @__PURE__ */ jsx(Sparkles, {}), " Built around you"]
+								}),
+								/* @__PURE__ */ jsxs("div", {
+									className: "frame-top",
+									children: [
+										/* @__PURE__ */ jsx("span", {}),
+										/* @__PURE__ */ jsx("span", {}),
+										/* @__PURE__ */ jsx("span", {}),
+										/* @__PURE__ */ jsx("div", { children: "mentics.vercel.app" })
+									]
+								}),
+								/* @__PURE__ */ jsxs("div", {
+									className: "preview-shell",
+									children: [/* @__PURE__ */ jsxs("aside", {
+										className: "preview-rail",
+										children: [
+											/* @__PURE__ */ jsx(Brand, {}),
+											/* @__PURE__ */ jsxs("div", {
+												className: "preview-nav",
+												children: [/* @__PURE__ */ jsx(House, { size: 16 }), " Home"]
+											}),
+											/* @__PURE__ */ jsxs("div", {
+												className: "preview-nav active",
+												children: [/* @__PURE__ */ jsx(Target, { size: 16 }), " My path"]
+											}),
+											/* @__PURE__ */ jsxs("div", {
+												className: "preview-nav",
+												children: [/* @__PURE__ */ jsx(BarChart3, { size: 16 }), " Progress"]
+											})
+										]
+									}), /* @__PURE__ */ jsxs("div", {
+										className: "preview-main",
+										children: [
+											/* @__PURE__ */ jsx("div", {
+												className: "preview-heading",
+												children: /* @__PURE__ */ jsxs("div", { children: [
+													/* @__PURE__ */ jsxs("small", { children: [d.heroCard.label, " · EXAMPLE"] }),
+													/* @__PURE__ */ jsx("h2", { children: d.heroCard.title }),
+													/* @__PURE__ */ jsx("p", { children: d.heroCard.detail })
+												] })
+											}),
+											/* @__PURE__ */ jsx("ol", {
+												className: "exam-path",
+												children: d.heroCard.steps.map((step, index) => /* @__PURE__ */ jsxs("li", {
+													className: index === 2 ? "is-current" : "",
+													children: [
+														/* @__PURE__ */ jsx("b", { children: index < 2 ? /* @__PURE__ */ jsx(Check, { size: 15 }) : String(index + 1).padStart(2, "0") }),
+														/* @__PURE__ */ jsxs("span", { children: [index === 2 && /* @__PURE__ */ jsx("small", { children: "UP NEXT" }), step] }),
+														index === 2 && /* @__PURE__ */ jsx(ArrowRight, { size: 17 })
+													]
+												}, step))
+											}),
+											/* @__PURE__ */ jsxs("div", {
+												className: "exam-preview-note",
+												children: [/* @__PURE__ */ jsx(Sparkles, { size: 15 }), " A focused path. Room to adapt."]
+											})
+										]
+									})]
+								})
+							]
+						})
+					]
+				}),
+				/* @__PURE__ */ jsxs("section", {
+					className: "trust-strip",
+					"aria-label": `${exam} prep highlights`,
+					children: [
+						/* @__PURE__ */ jsx("span", { children: "A path that adapts" }),
+						/* @__PURE__ */ jsx("span", { children: "Focused daily action" }),
+						/* @__PURE__ */ jsx("span", { children: "Progress you can see" }),
+						/* @__PURE__ */ jsx("span", { children: "Guidance when you need it" })
+					]
+				}),
+				/* @__PURE__ */ jsxs("section", {
+					className: "landing-facts",
+					"aria-label": `${exam} prep at a glance`,
+					children: [
+						/* @__PURE__ */ jsxs("div", { children: [/* @__PURE__ */ jsx("strong", { children: "5" }), /* @__PURE__ */ jsxs("span", { children: [/* @__PURE__ */ jsx("b", { children: "steps at a time" }), /* @__PURE__ */ jsx("small", { children: "A clear starting point and a finish line you can reach." })] })] }),
+						/* @__PURE__ */ jsxs("div", { children: [/* @__PURE__ */ jsx("strong", { children: exam }), /* @__PURE__ */ jsxs("span", { children: [/* @__PURE__ */ jsx("b", { children: "your test, your focus" }), /* @__PURE__ */ jsx("small", { children: "Keep your goals, study plan, and scores connected." })] })] }),
+						/* @__PURE__ */ jsxs("div", { children: [/* @__PURE__ */ jsx("strong", { children: "1" }), /* @__PURE__ */ jsxs("span", { children: [/* @__PURE__ */ jsx("b", { children: "next useful move" }), /* @__PURE__ */ jsx("small", { children: "Spend less time deciding and more time making progress." })] })] })
+					]
+				}),
+				/* @__PURE__ */ jsxs("section", {
+					className: "section process story-chapter",
+					"data-chapter": "01",
+					id: "how-it-works",
+					children: [/* @__PURE__ */ jsxs("div", {
+						className: "section-heading",
+						children: [
+							/* @__PURE__ */ jsxs("div", {
+								className: "eyebrow",
+								children: [/* @__PURE__ */ jsx("span", {}), " THE MENTICS METHOD"]
+							}),
+							/* @__PURE__ */ jsx("h2", { children: d.methodTitle }),
+							/* @__PURE__ */ jsx("p", { children: d.methodIntro })
+						]
+					}), /* @__PURE__ */ jsx("div", {
+						className: "process-grid",
+						children: d.method.map(([number, title, copy], index) => {
+							const Icon = methodIcons[index];
+							return /* @__PURE__ */ jsxs("article", { children: [
+								/* @__PURE__ */ jsx("b", { children: number }),
+								/* @__PURE__ */ jsx(Icon, {}),
+								/* @__PURE__ */ jsx("h3", { children: title }),
+								/* @__PURE__ */ jsx("p", { children: copy })
+							] }, number);
+						})
+					})]
+				}),
+				/* @__PURE__ */ jsxs("section", {
+					className: "section platform story-chapter",
+					"data-chapter": "02",
+					id: "platform",
+					children: [/* @__PURE__ */ jsxs("div", {
+						className: "platform-copy",
+						children: [
+							/* @__PURE__ */ jsxs("div", {
+								className: "eyebrow",
+								children: [
+									/* @__PURE__ */ jsx("span", {}),
+									" YOUR ",
+									exam,
+									" WORKSPACE"
+								]
+							}),
+							/* @__PURE__ */ jsx("h2", { children: d.featureTitle }),
+							/* @__PURE__ */ jsx("p", { children: exam === "SAT" ? "Learn the concept, put it into practice, and understand what to work on next." : "Give your study time a clear purpose, with your goals and progress in one place." }),
+							/* @__PURE__ */ jsxs("a", {
+								href: destination,
+								children: [
+									"Build your ",
+									exam,
+									" path ",
+									/* @__PURE__ */ jsx(ArrowRight, { size: 17 })
+								]
+							})
+						]
+					}), /* @__PURE__ */ jsx("div", {
+						className: "feature-stack",
+						children: d.features.map(([Icon, title, copy]) => /* @__PURE__ */ jsxs("div", { children: [/* @__PURE__ */ jsx(Icon, {}), /* @__PURE__ */ jsxs("span", { children: [/* @__PURE__ */ jsx("b", { children: title }), /* @__PURE__ */ jsx("small", { children: copy })] })] }, title))
+					})]
+				}),
+				/* @__PURE__ */ jsxs("section", {
+					className: "section exam-detail story-chapter",
+					"data-chapter": "03",
+					children: [/* @__PURE__ */ jsxs("div", {
+						className: "section-heading",
+						children: [/* @__PURE__ */ jsxs("div", {
+							className: "eyebrow",
+							children: [/* @__PURE__ */ jsx("span", {}), " BUILT AROUND REAL PROGRESS"]
+						}), /* @__PURE__ */ jsx("h2", { children: d.detailTitle })]
+					}), /* @__PURE__ */ jsxs("div", { children: [/* @__PURE__ */ jsx("p", { children: d.detailCopy }), /* @__PURE__ */ jsxs("a", {
+						className: "button button--primary",
+						href: destination,
+						children: ["Find your next step ", /* @__PURE__ */ jsx(ArrowRight, { size: 18 })]
+					})] })]
+				}),
+				/* @__PURE__ */ jsxs("section", {
+					className: "section faq story-chapter",
+					"data-chapter": "04",
+					id: "faq",
+					children: [/* @__PURE__ */ jsxs("div", {
+						className: "section-heading",
+						children: [/* @__PURE__ */ jsxs("div", {
+							className: "eyebrow",
+							children: [/* @__PURE__ */ jsx("span", {}), " BEFORE YOU START"]
+						}), /* @__PURE__ */ jsx("h2", { children: "Good questions." })]
+					}), d.faq.map(([q, a]) => /* @__PURE__ */ jsxs("details", { children: [/* @__PURE__ */ jsxs("summary", { children: [q, /* @__PURE__ */ jsx(Plus, { size: 18 })] }), /* @__PURE__ */ jsx("p", { children: a })] }, q))]
+				}),
+				/* @__PURE__ */ jsx("section", {
+					className: "closing",
+					children: /* @__PURE__ */ jsxs("div", { children: [
+						/* @__PURE__ */ jsx(Brand, { inverse: true }),
+						/* @__PURE__ */ jsxs("h2", { children: [
+							"Your ",
+							exam,
+							" goal starts here."
+						] }),
+						/* @__PURE__ */ jsx("p", { children: "Make the next move clear. Then make it count." }),
+						/* @__PURE__ */ jsxs("a", {
+							className: "button button--light",
+							href: destination,
+							children: [
+								loggedIn ? "Open dashboard" : "Build your free path",
+								" ",
+								/* @__PURE__ */ jsx(ArrowRight, { size: 18 })
+							]
+						})
+					] })
+				})
+			] }),
+			/* @__PURE__ */ jsxs("footer", { children: [
+				/* @__PURE__ */ jsx(Brand, {}),
+				/* @__PURE__ */ jsx("span", { children: "© 2026 Mentics. All rights reserved." }),
+				/* @__PURE__ */ jsxs("div", { children: [
+					productLinks.map(([href, label]) => /* @__PURE__ */ jsx("a", {
+						href,
+						"aria-current": href === `/${kind}` ? "page" : void 0,
+						children: label
+					}, href)),
+					/* @__PURE__ */ jsx("a", {
+						href: "/terms",
+						children: "Terms"
+					}),
+					/* @__PURE__ */ jsx("a", {
+						href: "/privacy",
+						children: "Privacy"
+					}),
+					/* @__PURE__ */ jsx("a", {
+						href: "mailto:thementicsapp@gmail.com",
+						children: "Contact"
+					})
+				] }),
+				/* @__PURE__ */ jsx("p", {
+					className: "exam-disclaimer",
+					children: "Mentics is independent and is not affiliated with or endorsed by College Board or ACT, Inc. SAT is a registered trademark of College Board. ACT is a registered trademark of ACT, Inc."
+				})
+			] })
 		]
 	});
 }

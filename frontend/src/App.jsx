@@ -20,6 +20,7 @@ import './story-system.css'
 import './design-system.css'  // last: owns materials, motion, typography, a11y
 import './lesson-player.css'
 import './mentics-ui.css'  // last: owns chat guide, task modal, and map performance
+import './exam-landing.css'
 
 import { boot } from './boot'
 import { ArenaCustomizer, ArenaFighter, normalizeArenaAvatar } from './arena-fighter'
@@ -185,6 +186,7 @@ const productLinks = [
 ]
 
 function ProductPage({ kind }) {
+  if (kind !== 'college-planning') return <ExamLanding kind={kind} />
   const d = productPages[kind]
   return <div className="product-story">
     <header className="product-story-nav">
@@ -211,6 +213,57 @@ function ProductPage({ kind }) {
       <section className="product-story-cta"><Brand inverse /><h2>Make the next move obvious.</h2><p>Build a focused path from where you are to where you want to go.</p><a className="button button--light" href="/signup">Get started free <ArrowRight /></a></section>
     </main>
     <footer className="product-story-footer"><div><Brand /><p>Personalized test prep and college planning, one focused step at a time.</p></div><nav aria-label="Product links">{productLinks.map(([href, label]) => <a key={href} href={href}>{label}</a>)}</nav><nav aria-label="Legal links"><a href="/terms">Terms</a><a href="/privacy">Privacy</a><a href="mailto:thementicsapp@gmail.com">Contact</a></nav><p className="product-story-disclaimer">Mentics is independent and is not affiliated with or endorsed by College Board, ACT, Inc., or any college or university. SAT is a registered trademark of College Board. ACT is a registered trademark of ACT, Inc.</p><span>© 2026 Mentics. All rights reserved.</span></footer>
+  </div>
+}
+
+function ExamLanding({ kind }) {
+  const d = productPages[kind]
+  const exam = kind === 'act-prep' ? 'ACT' : 'SAT'
+  const loggedIn = useClientOnly(boot.data.isLoggedIn, false)
+  const destination = loggedIn ? '/dashboard' : '/signup'
+  const methodIcons = [Target, BookOpen, BarChart3]
+  return <div className="landing exam-landing">
+    <div className="story-progress" aria-hidden="true" />
+    <Starfield />
+    <header className="public-nav">
+      <Brand />
+      <nav aria-label="Main navigation"><a href="#how-it-works">How it works</a><a href="/sat-prep" aria-current={exam === 'SAT' ? 'page' : undefined}>SAT prep</a><a href="/act-prep" aria-current={exam === 'ACT' ? 'page' : undefined}>ACT prep</a><a href="/college-planning">College planning</a></nav>
+      <a className="button button--small button--dark" href={loggedIn ? '/dashboard' : '/login'}>{loggedIn ? 'Open dashboard' : 'Log in'} <ArrowRight size={15} /></a>
+    </header>
+    <main>
+      <section className="hero exam-hero">
+        <div className="hero-glow hero-glow--one" /><div className="hero-glow hero-glow--two" />
+        <svg className="hero-route" viewBox="0 0 620 420" aria-hidden="true"><path d="M22 355 C115 355 103 205 214 205 S318 72 420 72 S497 204 598 204" /><circle cx="22" cy="355" r="6" /><circle cx="214" cy="205" r="6" /><circle cx="420" cy="72" r="6" /><circle cx="598" cy="204" r="6" /></svg>
+        <div className="hero-copy">
+          <div className="eyebrow"><span /> {d.eyebrow}</div>
+          <h1>{kind === 'ai-sat-prep' ? 'AI SAT' : exam} PREP</h1>
+          <p className="exam-promise">{exam === 'ACT' ? 'Your goal. Five clear next steps.' : 'A clear path to your next best.'}</p>
+          <p className="hero-tagline">{d.intro}</p>
+          <div className="hero-actions"><a className="button button--primary" href={destination}>{loggedIn ? 'Continue your path' : d.primary} <ArrowRight size={18} /></a><a className="button button--quiet" href="#how-it-works">See how it works</a></div>
+          <div className="hero-signal"><span><b>01</b> Find your focus</span><i /><span><b>02</b> Build the skill</span><i /><span><b>03</b> See your progress</span></div>
+        </div>
+        <div className="product-frame exam-preview" aria-label={`Illustrative ${exam} study path preview`}>
+          <div className="frame-float frame-float--signal" aria-hidden="true"><Sparkles /> Built around you</div>
+          <div className="frame-top"><span /><span /><span /><div>mentics.vercel.app</div></div>
+          <div className="preview-shell">
+            <aside className="preview-rail"><Brand /><div className="preview-nav"><House size={16} /> Home</div><div className="preview-nav active"><Target size={16} /> My path</div><div className="preview-nav"><BarChart3 size={16} /> Progress</div></aside>
+            <div className="preview-main">
+              <div className="preview-heading"><div><small>{d.heroCard.label} · EXAMPLE</small><h2>{d.heroCard.title}</h2><p>{d.heroCard.detail}</p></div></div>
+              <ol className="exam-path">{d.heroCard.steps.map((step, index) => <li className={index === 2 ? 'is-current' : ''} key={step}><b>{index < 2 ? <Check size={15} /> : String(index + 1).padStart(2, '0')}</b><span>{index === 2 && <small>UP NEXT</small>}{step}</span>{index === 2 && <ArrowRight size={17} />}</li>)}</ol>
+              <div className="exam-preview-note"><Sparkles size={15} /> A focused path. Room to adapt.</div>
+            </div>
+          </div>
+        </div>
+      </section>
+      <section className="trust-strip" aria-label={`${exam} prep highlights`}><span>A path that adapts</span><span>Focused daily action</span><span>Progress you can see</span><span>Guidance when you need it</span></section>
+      <section className="landing-facts" aria-label={`${exam} prep at a glance`}><div><strong>5</strong><span><b>steps at a time</b><small>A clear starting point and a finish line you can reach.</small></span></div><div><strong>{exam}</strong><span><b>your test, your focus</b><small>Keep your goals, study plan, and scores connected.</small></span></div><div><strong>1</strong><span><b>next useful move</b><small>Spend less time deciding and more time making progress.</small></span></div></section>
+      <section className="section process story-chapter" data-chapter="01" id="how-it-works"><div className="section-heading"><div className="eyebrow"><span /> THE MENTICS METHOD</div><h2>{d.methodTitle}</h2><p>{d.methodIntro}</p></div><div className="process-grid">{d.method.map(([number, title, copy], index) => { const Icon = methodIcons[index]; return <article key={number}><b>{number}</b><Icon /><h3>{title}</h3><p>{copy}</p></article> })}</div></section>
+      <section className="section platform story-chapter" data-chapter="02" id="platform"><div className="platform-copy"><div className="eyebrow"><span /> YOUR {exam} WORKSPACE</div><h2>{d.featureTitle}</h2><p>{exam === 'SAT' ? 'Learn the concept, put it into practice, and understand what to work on next.' : 'Give your study time a clear purpose, with your goals and progress in one place.'}</p><a href={destination}>Build your {exam} path <ArrowRight size={17} /></a></div><div className="feature-stack">{d.features.map(([Icon, title, copy]) => <div key={title}><Icon /><span><b>{title}</b><small>{copy}</small></span></div>)}</div></section>
+      <section className="section exam-detail story-chapter" data-chapter="03"><div className="section-heading"><div className="eyebrow"><span /> BUILT AROUND REAL PROGRESS</div><h2>{d.detailTitle}</h2></div><div><p>{d.detailCopy}</p><a className="button button--primary" href={destination}>Find your next step <ArrowRight size={18} /></a></div></section>
+      <section className="section faq story-chapter" data-chapter="04" id="faq"><div className="section-heading"><div className="eyebrow"><span /> BEFORE YOU START</div><h2>Good questions.</h2></div>{d.faq.map(([q, a]) => <details key={q}><summary>{q}<Plus size={18} /></summary><p>{a}</p></details>)}</section>
+      <section className="closing"><div><Brand inverse /><h2>Your {exam} goal starts here.</h2><p>Make the next move clear. Then make it count.</p><a className="button button--light" href={destination}>{loggedIn ? 'Open dashboard' : 'Build your free path'} <ArrowRight size={18} /></a></div></section>
+    </main>
+    <footer><Brand /><span>© 2026 Mentics. All rights reserved.</span><div>{productLinks.map(([href, label]) => <a key={href} href={href} aria-current={href === `/${kind}` ? 'page' : undefined}>{label}</a>)}<a href="/terms">Terms</a><a href="/privacy">Privacy</a><a href="mailto:thementicsapp@gmail.com">Contact</a></div><p className="exam-disclaimer">Mentics is independent and is not affiliated with or endorsed by College Board or ACT, Inc. SAT is a registered trademark of College Board. ACT is a registered trademark of ACT, Inc.</p></footer>
   </div>
 }
 
