@@ -43,11 +43,30 @@ def init_app(app, database, *, enabled=True):
     app.extensions.setdefault('ratelimit', {})['db'] = database
 
 
+def _table_exists(target):
+    """Report whether the counter table is already present."""
+    if target.is_postgres:
+        row = target.execute_for_one("SELECT to_regclass('public.rate_limits') AS found")
+    else:
+        row = target.execute_for_one(
+            "SELECT name AS found FROM sqlite_master WHERE type='table' AND name='rate_limits'")
+    return bool(row and row.get('found'))
+
+
 def ensure_table(database=None):
-    """Create the counter table. Safe to call repeatedly."""
+    """Create the counter table. Safe to call repeatedly.
+
+    The production role deliberately holds no CREATE on schema public, and
+    PostgreSQL checks that privilege before it honors IF NOT EXISTS, so
+    issuing the CREATE against the existing table raises instead of skipping.
+    Probing first keeps the request path off a statement that can only fail.
+    """
     global _table_ready
     target = database or _db
     if target is None:
+        return
+    if _table_exists(target):
+        _table_ready = True
         return
     target.create_table('rate_limits', {
         'bucket': 'TEXT PRIMARY KEY',

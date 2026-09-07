@@ -15,6 +15,20 @@ _UNSET = object()
 _REQUEST_CONNECTION = ContextVar("mentics_request_connection", default=None)
 
 
+class _ScopedConnection:
+    """A request's reused connection and the RLS identity currently applied.
+
+    The identity is tracked next to the connection because it is pushed to
+    PostgreSQL as session settings, which outlive the statement that set them.
+    """
+
+    __slots__ = ("connection", "applied_rls")
+
+    def __init__(self, connection):
+        self.connection = connection
+        self.applied_rls = None
+
+
 class DatabaseTransaction:
     """Small transaction-scoped subset of DatabaseHandler's write API."""
 
@@ -113,13 +127,14 @@ class DatabaseHandler:
         if _REQUEST_CONNECTION.get() is not None:
             yield
             return
-        connection = self._connect()
-        token = _REQUEST_CONNECTION.set(connection)
+        scoped = _ScopedConnection(self._connect())
+        scoped.applied_rls = _RLS_CONTEXT.get()
+        token = _REQUEST_CONNECTION.set(scoped)
         try:
             yield
         finally:
             _REQUEST_CONNECTION.reset(token)
-            connection.close()
+            scoped.connection.close()
 
     @contextmanager
     def rls_scope(self, *, user_id=_UNSET, auth_email=_UNSET, system=_UNSET):
@@ -135,27 +150,39 @@ class DatabaseHandler:
         finally:
             self.reset_rls_context(token)
 
+    def _push_rls_context(self, connection):
+        """Bind the current identity to a PostgreSQL session.
+
+        Custom settings are parameterized and set before any tenant query can
+        run on the connection.
+        """
+        context = _RLS_CONTEXT.get()
+        connection.execute(
+            "SELECT set_config('mentics.user_id', %s, false), "
+            "set_config('mentics.auth_email', %s, false), "
+            "set_config('mentics.system', %s, false)",
+            (
+                str(context["user_id"] or ""),
+                context["auth_email"] or "",
+                "on" if context["system"] else "off",
+            ),
+        )
+        return context
+
     def _connect(self):
-        existing = _REQUEST_CONNECTION.get()
-        if existing is not None:
-            return existing
+        scoped = _REQUEST_CONNECTION.get()
+        if scoped is not None:
+            # The connection is opened once per request, so an rls_scope
+            # entered later would never reach the database on its own and its
+            # queries would run under the identity the request started with.
+            if self.is_postgres and scoped.applied_rls != _RLS_CONTEXT.get():
+                scoped.applied_rls = self._push_rls_context(scoped.connection)
+            return scoped.connection
         if self.is_postgres:
             import psycopg
             from psycopg.rows import dict_row
             connection = psycopg.connect(self.database, row_factory=dict_row)
-            context = _RLS_CONTEXT.get()
-            # Custom settings are parameterized and set on every fresh
-            # connection before any tenant query can run.
-            connection.execute(
-                "SELECT set_config('mentics.user_id', %s, false), "
-                "set_config('mentics.auth_email', %s, false), "
-                "set_config('mentics.system', %s, false)",
-                (
-                    str(context["user_id"] or ""),
-                    context["auth_email"] or "",
-                    "on" if context["system"] else "off",
-                ),
-            )
+            self._push_rls_context(connection)
             return connection
         conn = sqlite3.connect(self.database, timeout=10)
         conn.row_factory = sqlite3.Row
@@ -216,33 +243,41 @@ class DatabaseHandler:
                 result[key] = value.isoformat()
         return result
 
-    def execute(self, query, params=None):
+    @contextmanager
+    def _cursor(self):
+        """Yield a cursor on the request connection, or on a private one.
+
+        A failed statement leaves a PostgreSQL connection in an aborted
+        transaction, where every later statement errors out. Rolling back here
+        stops one tolerated failure, such as the rate limiter swallowing its
+        own, from taking down every remaining query in the same request.
+        """
         conn = self._connect()
         owns_connection = _REQUEST_CONNECTION.get() is None
         try:
-            cursor = conn.cursor()
+            yield conn, conn.cursor()
+        except Exception:
+            conn.rollback()
+            raise
+        finally:
+            if owns_connection:
+                conn.close()
+
+    def execute(self, query, params=None):
+        with self._cursor() as (conn, cursor):
             cursor.execute(self._query(query), params or ())
             verb = query.lstrip().split(None, 1)[0].lower()
             result = [self._row(row) for row in cursor.fetchall()] if verb == "select" else None
             conn.commit()
             return result
-        finally:
-            if owns_connection:
-                conn.close()
 
     def execute_write(self, query, params=None):
         """Execute a parameterized mutation and return the affected row count."""
-        conn = self._connect()
-        owns_connection = _REQUEST_CONNECTION.get() is None
-        try:
-            cursor = conn.cursor()
+        with self._cursor() as (conn, cursor):
             cursor.execute(self._query(query), params or ())
             affected = cursor.rowcount
             conn.commit()
             return affected
-        finally:
-            if owns_connection:
-                conn.close()
 
     def create_table(self, table_name, columns):
         table_name = self._identifier(table_name)
@@ -270,12 +305,9 @@ class DatabaseHandler:
         columns = self._columns(list(data))
         placeholders = ", ".join(["?"] * len(data))
         query = f"INSERT INTO {table_name} ({columns}) VALUES ({placeholders})"  # nosec B608
-        conn = self._connect()
-        owns_connection = _REQUEST_CONNECTION.get() is None
-        try:
-            cursor = conn.cursor()
-            if self.is_postgres and table_name != "gamification_stats":
-                query += " RETURNING id"
+        if self.is_postgres and table_name != "gamification_stats":
+            query += " RETURNING id"
+        with self._cursor() as (conn, cursor):
             cursor.execute(self._query(query), tuple(data.values()))
             if self.is_postgres:
                 row = cursor.fetchone() if query.endswith("RETURNING id") else None
@@ -284,9 +316,6 @@ class DatabaseHandler:
                 result = cursor.lastrowid
             conn.commit()
             return result
-        finally:
-            if owns_connection:
-                conn.close()
 
     def update(self, table_name, data, where):
         table_name = self._identifier(table_name)
@@ -332,29 +361,16 @@ class DatabaseHandler:
 
     def execute_returning_one(self, query, params=None):
         """Run a mutation that RETURNS a row and commit it, e.g. an atomic upsert."""
-        conn = self._connect()
-        owns_connection = _REQUEST_CONNECTION.get() is None
-        try:
-            cursor = conn.cursor()
+        with self._cursor() as (conn, cursor):
             cursor.execute(self._query(query), params or ())
-            row = cursor.fetchone()
-            result = self._row(row)
+            result = self._row(cursor.fetchone())
             conn.commit()
             return result
-        finally:
-            if owns_connection:
-                conn.close()
 
     def execute_for_one(self, query, params=None):
-        conn = self._connect()
-        owns_connection = _REQUEST_CONNECTION.get() is None
-        try:
-            cursor = conn.cursor()
+        with self._cursor() as (_conn, cursor):
             cursor.execute(self._query(query), params or ())
             return self._row(cursor.fetchone())
-        finally:
-            if owns_connection:
-                conn.close()
 
     def select_one(self, table_name, columns="*", where=None, order_by=None):
         table_name = self._identifier(table_name)
