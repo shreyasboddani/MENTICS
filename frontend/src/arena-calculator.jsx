@@ -8,14 +8,15 @@
 // grants `frame-src https://www.desmos.com` and leaves `script-src` alone.
 
 import { useEffect, useRef, useState } from 'react'
-import { Calculator, GripHorizontal, X } from 'lucide-react'
+import { createPortal } from 'react-dom'
+import { Calculator, GripHorizontal, Maximize2, Minimize2, X } from 'lucide-react'
 
 // `?embed` strips Desmos down to bare graph paper with no expression list, which
 // is useless for entering an equation, so the standard calculator URL is used and
 // the panel opens wide enough to fit the expression list beside the graph.
 const DESMOS_EMBED = 'https://www.desmos.com/calculator'
-const DEFAULT_SIZE = { width: 560, height: 480 }
-const MIN_SIZE = { width: 340, height: 300 }
+const DEFAULT_SIZE = { width: 680, height: 560 }
+const MIN_SIZE = { width: 440, height: 320 }
 const EDGE = 8
 
 function viewport() {
@@ -26,8 +27,8 @@ function viewport() {
 function clampSize(size) {
   const view = viewport()
   return {
-    width: Math.min(Math.max(size.width, MIN_SIZE.width), Math.max(MIN_SIZE.width, view.width - EDGE * 2)),
-    height: Math.min(Math.max(size.height, MIN_SIZE.height), Math.max(MIN_SIZE.height, view.height - EDGE * 2)),
+    width: Math.min(Math.max(size.width, MIN_SIZE.width), view.width - EDGE * 2),
+    height: Math.min(Math.max(size.height, MIN_SIZE.height), view.height - EDGE * 2),
   }
 }
 
@@ -40,7 +41,15 @@ function clampPosition(position, size) {
   }
 }
 
-function defaultSize() { return clampSize(DEFAULT_SIZE) }
+function defaultSize() {
+  // Mobile sheets must not overwrite a desktop workspace preference.
+  if (viewport().width <= 620) return DEFAULT_SIZE
+  try {
+    const saved = JSON.parse(sessionStorage.getItem('mentics:calculator-size'))
+    if (Number.isFinite(saved?.width) && Number.isFinite(saved?.height)) return clampSize(saved)
+  } catch { /* Storage can be disabled; sizing still works. */ }
+  return clampSize(DEFAULT_SIZE)
+}
 
 function defaultPosition() {
   const size = defaultSize()
@@ -56,14 +65,27 @@ export function ArenaCalculator({ open, onClose }) {
   const [everOpened, setEverOpened] = useState(open)
   const [loaded, setLoaded] = useState(false)
   const [interacting, setInteracting] = useState(false)
+  const [maximized, setMaximized] = useState(false)
   const gesture = useRef(null)
   const panelRef = useRef(null)
   if (open && !everOpened) setEverOpened(true)
 
   useEffect(() => {
     if (!open) return undefined
+    const previous = document.activeElement
+    panelRef.current?.querySelector('button')?.focus()
+    return () => { if (previous?.isConnected) previous.focus() }
+  }, [open])
+  useEffect(() => {
+    if (interacting || viewport().width <= 620) return
+    try { sessionStorage.setItem('mentics:calculator-size', JSON.stringify(size)) } catch { /* Optional preference. */ }
+  }, [size, interacting])
+
+  useEffect(() => {
+    if (!open) return undefined
     const onKeyDown = event => { if (event.key === 'Escape') onClose() }
     const onWindowResize = () => {
+      if (viewport().width <= 620 || maximized) return
       const bounds = panelRef.current?.getBoundingClientRect()
       if (!bounds) return
       const next = clampSize({ width: bounds.width, height: bounds.height })
@@ -76,16 +98,16 @@ export function ArenaCalculator({ open, onClose }) {
       window.removeEventListener('keydown', onKeyDown)
       window.removeEventListener('resize', onWindowResize)
     }
-  }, [open, onClose])
+  }, [open, onClose, maximized])
 
   // Pointer capture keeps a gesture on the handle that started it, so releasing
   // over the Desmos frame still ends it instead of stranding the panel.
   const beginGesture = (event, mode) => {
-    if (event.button !== 0) return
+    if (event.button !== 0 || maximized) return
     // A press on the close button has to stay a click. Capturing the pointer
     // here would retarget the pointerup to this header and swallow it, which is
     // exactly what stopped the X from ever firing.
-    if (event.target.closest('button')) return
+    if (mode === 'move' && event.target.closest('button')) return
     const bounds = panelRef.current.getBoundingClientRect()
     gesture.current = {
       mode,
@@ -98,7 +120,7 @@ export function ArenaCalculator({ open, onClose }) {
     }
     setInteracting(true)
     event.currentTarget.setPointerCapture(event.pointerId)
-    event.preventDefault()
+    if (event.pointerType !== 'mouse') event.preventDefault()
   }
 
   const onGestureMove = event => {
@@ -142,10 +164,13 @@ export function ArenaCalculator({ open, onClose }) {
   }
 
   if (!everOpened) return null
-  return <aside
+  return createPortal(<aside
     ref={panelRef}
     className="arena-calculator"
     hidden={!open}
+    role="dialog"
+    aria-modal="false"
+    data-maximized={maximized}
     data-interacting={interacting ? 'true' : undefined}
     style={{ left: `${position.x}px`, top: `${position.y}px`, width: `${size.width}px`, height: `${size.height}px` }}
     aria-label="Desmos graphing calculator"
@@ -167,10 +192,11 @@ export function ArenaCalculator({ open, onClose }) {
         <GripHorizontal aria-hidden="true" />
       </span>
       <b>DESMOS</b>
+      <button type="button" onClick={() => setMaximized(value => !value)} aria-label={maximized ? 'Restore calculator size' : 'Maximize calculator'}>{maximized ? <Minimize2 /> : <Maximize2 />}</button>
       <button type="button" onClick={onClose} aria-label="Close the calculator"><X /></button>
     </header>
     <div className="arena-calculator-frame">
-      {!loaded && <p className="arena-calculator-loading">Loading Desmos…</p>}
+      {!loaded && <p className="arena-calculator-loading" role="status">Opening your graphing workspace…</p>}
       <iframe
         src={DESMOS_EMBED}
         title="Desmos graphing calculator"
@@ -190,7 +216,7 @@ export function ArenaCalculator({ open, onClose }) {
       role="button"
       aria-label="Resize the calculator. Use the arrow keys to change its size."
     />
-  </aside>
+  </aside>, document.body)
 }
 
 export function ArenaCalculatorToggle({ open, onToggle }) {

@@ -9,6 +9,7 @@ import ratelimit
 import seo
 from ratelimit import rate_limit
 from functools import wraps
+from fractions import Fraction
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import json
 import time
@@ -680,21 +681,28 @@ def _gemini_config(max_output_tokens, *, system_instruction=None,
 
 def _generate_text(prompt, *, max_output_tokens=800, json_output=False,
                    json_schema=None, thinking_level="minimal", system_instruction=None,
-                   model=None):
+                   model=None, timeout_seconds=None):
     """Generate validated text through the single configured Gemini model."""
     client = _get_gemini_client()
     if client is None:
         raise RuntimeError("Gemini is not configured.")
-    response = client.models.generate_content(
-        model=model or GEMINI_MODEL,
-        contents=prompt,
-        config=_gemini_config(
+    config = _gemini_config(
             max_output_tokens,
             system_instruction=system_instruction,
             json_output=json_output,
             json_schema=json_schema,
             thinking_level=thinking_level,
-        ),
+        )
+    if timeout_seconds is not None:
+        config.automatic_function_calling = gemini_types.AutomaticFunctionCallingConfig(disable=True)
+        config.http_options = gemini_types.HttpOptions(
+            timeout=max(1, int(timeout_seconds * 1000)),
+            retry_options=gemini_types.HttpRetryOptions(attempts=1),
+        )
+    response = client.models.generate_content(
+        model=model or GEMINI_MODEL,
+        contents=prompt,
+        config=config,
     )
     if json_output:
         parsed = getattr(response, 'parsed', None)
@@ -5055,6 +5063,15 @@ SAT_BATTLE_AI_SINGLE_SCHEMA = {
     'required': ['question'],
 }
 
+SAT_BATTLE_AI_REVIEW_SCHEMA = {
+    'type': 'object',
+    'properties': {
+        'question': SAT_BATTLE_AI_QUESTION_SCHEMA,
+        'verified': {'type': 'boolean', 'description': 'True only if the FINAL returned item has consistent constraints and exactly one correct option, independently solved.'},
+    },
+    'required': ['question', 'verified'],
+}
+
 
 def _battle_question_fingerprint(question):
     return re.sub(r'[^a-z0-9]+', '', str(question or '').lower())[:260]
@@ -5191,6 +5208,11 @@ def _clean_battle_question(item, difficulty, seen, recent_fingerprints, *, index
     label = f'question {index + 1}'
     if not isinstance(item, dict):
         return None, f'{label} is not an object'
+    if any(not isinstance(item.get(key), str) for key in ('question_text', 'skill', 'domain', 'explanation')):
+        return None, f'{label} has a non-text field'
+    # bool and fractional floats must never silently become an answer index.
+    if type(item.get('correct_option')) is not int:
+        return None, f'{label} has an invalid answer key'
     minimum_lengths = SAT_BATTLE_MINIMUM_TEXT[difficulty]
     question_text = str(item.get('question_text') or '').strip()
     skill = str(item.get('skill') or '').strip()[:80]
@@ -5204,8 +5226,12 @@ def _clean_battle_question(item, difficulty, seen, recent_fingerprints, *, index
     fingerprint = _battle_question_fingerprint(question_text)
     maximum_length = 1200 if domain == 'math' else 1400
     minimum_length = minimum_lengths.get(domain, 100)
+    # A passage may discuss a historical transition without being a blank-fill
+    # question. Inspect the task sentence and skill, not arbitrary passage words.
+    task = question_text.rsplit('\n\n', 1)[-1]
     needs_blank = domain == 'reading_writing' and bool(
-        re.search(r'\b(?:completes?|completion|conventions?|transition)\b', f'{skill} {question_text}', re.I)
+        re.search(r'\b(?:completion|conventions?|transitions?)\b', skill, re.I)
+        or re.search(r'\b(?:completes? (?:the|this)|fill (?:in )?the blank)\b', task, re.I)
     )
     checks = [
         (len(question_text) < minimum_length, f'text shorter than {minimum_length} characters'),
@@ -5214,6 +5240,8 @@ def _clean_battle_question(item, difficulty, seen, recent_fingerprints, *, index
         (not skill, 'missing skill'),
         (domain not in {'math', 'reading_writing'}, 'invalid domain'),
         (len(explanation) < 45, 'explanation too short'),
+        (len(explanation) > 1200, 'explanation too long or unfinished'),
+        (bool(re.search(r"\b(?:wait[,!.]|let['’]s (?:re|adjust|check|make|use|pick|design)|re-evaluate|I made|my (?:error|mistake)|no (?:correct|valid) (?:answer|option))", explanation, re.I)), 'unfinished or self-contradictory solution'),
         (not isinstance(options, list) or len(options) != 4, 'invalid options'),
         (not 0 <= correct_option < 4, 'answer key out of range'),
         (not fingerprint, 'empty fingerprint'),
@@ -5224,9 +5252,29 @@ def _clean_battle_question(item, difficulty, seen, recent_fingerprints, *, index
     failure = next((reason for failed, reason in checks if failed), None)
     if failure:
         return None, f'{label}: {failure}'
-    cleaned_options = [str(option or '').strip()[:500] for option in options]
-    if any(not option for option in cleaned_options) or len({option.lower() for option in cleaned_options}) != 4:
+    if any(not isinstance(option, str) or len(option) > 500 for option in options):
+        return None, f'{label}: invalid option text'
+    cleaned_options = [option.strip() for option in options]
+    if any(not option for option in cleaned_options) or len({re.sub(r'\s+', ' ', option).casefold() for option in cleaned_options}) != 4:
         return None, f'{label}: empty or duplicate options'
+    # The renderer intentionally uses plain Unicode math. Reject escaped TeX,
+    # control characters and unbalanced math delimiters instead of displaying it.
+    content = [question_text, explanation, *cleaned_options]
+    if any(re.search(r'\\[a-zA-Z()[\]]|[\x00-\x08\x0b\x0c\x0e-\x1f]', text) for text in content):
+        return None, f'{label}: malformed math or control characters'
+    if domain == 'math' and any(text.count('(') != text.count(')') for text in content):
+        return None, f'{label}: unbalanced math parentheses'
+    numeric_options = []
+    for option in cleaned_options:
+        numeric = re.sub(r'\s+', '', option).replace('−', '-')
+        if re.fullmatch(r'-?\d+(?:\.\d+)?(?:/-?\d+(?:\.\d+)?)?', numeric):
+            try:
+                numerator, *denominator = numeric.split('/')
+                numeric_options.append(Fraction(numerator) / (Fraction(denominator[0]) if denominator else 1))
+            except ZeroDivisionError:
+                return None, f'{label}: undefined numeric option'
+    if len(numeric_options) != len(set(numeric_options)):
+        return None, f'{label}: equivalent numeric options'
     return {
         'question_text': question_text[:1800], 'options': cleaned_options,
         'correct_option': correct_option, 'skill': skill,
@@ -5333,26 +5381,32 @@ def _decode_ai_battle_json(raw):
     return json.JSONDecoder().raw_decode(candidate)[0]
 
 
-def _generate_arena_text(prompt, *, thinking_level, system_instruction):
+def _generate_arena_text(prompt, *, thinking_level, system_instruction, deadline=None, max_output_tokens=SAT_BATTLE_AI_MAX_OUTPUT_TOKENS, json_schema=SAT_BATTLE_AI_SINGLE_SCHEMA):
     """Call Gemini for one Arena item, surviving a thinking-budget overrun.
 
-    Grandmaster prompts are the longest in the product, and a long private
-    reasoning pass can consume the whole output budget and return nothing.
-    Retrying that specific failure once with a shorter thinking level is the
-    difference between a playable round and a 503.
+    A private reasoning pass can exhaust the output budget. Retry an empty
+    body once, within the same deadline; all responses still pass validation
+    and high-tier items must pass an independent blind audit.
     """
+    def remaining():
+        seconds = min(22, deadline - time.monotonic()) if deadline else 22
+        if seconds <= 0:
+            raise TimeoutError('Arena generation deadline reached.')
+        return seconds
     try:
         return _generate_text(
-            prompt, max_output_tokens=SAT_BATTLE_AI_MAX_OUTPUT_TOKENS, json_output=True,
-            json_schema=SAT_BATTLE_AI_SINGLE_SCHEMA, thinking_level=thinking_level,
+            prompt, max_output_tokens=max_output_tokens, json_output=True,
+            json_schema=json_schema, thinking_level=thinking_level,
             system_instruction=system_instruction, model=GEMINI_ARENA_MODEL,
+            timeout_seconds=remaining(),
         )
     except ValueError:
         # An empty or truncated body is the one failure a cheaper retry fixes.
         return _generate_text(
             prompt, max_output_tokens=SAT_BATTLE_AI_MAX_OUTPUT_TOKENS, json_output=True,
-            json_schema=SAT_BATTLE_AI_SINGLE_SCHEMA, thinking_level='low',
+            json_schema=json_schema, thinking_level='low',
             system_instruction=system_instruction, model=GEMINI_ARENA_MODEL,
+            timeout_seconds=remaining(),
         )
 
 
@@ -5366,9 +5420,8 @@ def _generate_ai_battle_questions(difficulty):
     if not gemini_api_key:
         return None
     recent_fingerprints, recent_stems = _recent_battle_question_material()
-    profile = SAT_BATTLE_AI_PROFILES[difficulty]
     thinking_level = SAT_BATTLE_THINKING_BY_RANK[difficulty]
-    recent_context = '\n'.join(f'- {stem}' for stem in recent_stems[:12]) or '- No previous Arena questions.'
+    recent_context = '\n'.join(f'- {stem}' for stem in recent_stems[:5]) or '- No previous Arena questions.'
     audited = difficulty in {'diamond', 'master', 'grandmaster'}
     slot_blueprints = [
         ('math', 'algebra and function structure appropriate to the tier'),
@@ -5388,9 +5441,9 @@ def _generate_ai_battle_questions(difficulty):
         'unknown parameter inferred from two separate conditions before the requested quantity can be found. Never '
         'use the standard tangent-line/perpendicular-radius setup, and never directly provide both the radius and '
         'center-to-chord distance; one theorem or chord formula is too easy.',
-        'A 130-180 word scientific or humanities stimulus requiring a multi-step inference about evidence, scope, '
+        'A 110-135 word scientific or humanities stimulus requiring a multi-step inference about evidence, scope, '
         'or causality. Every choice must share passage vocabulary so keyword matching fails.',
-        'A 130-180 word paired-text or notes-plus-data synthesis task. Preserve every qualifier and numerical '
+        'A 110-135 word paired-text or notes-plus-data synthesis task. Preserve every qualifier and numerical '
         'relationship; distractors subtly alter causality, scope, certainty, or comparison direction.',
     ]
 
@@ -5425,36 +5478,32 @@ def _generate_ai_battle_questions(difficulty):
     # Complete lazy client setup once before the worker threads use it.
     _get_gemini_client()
 
+    deadline = time.monotonic() + SAT_BATTLE_GENERATION_BUDGET_SECONDS
+
     def generate_slot(slot, nonce):
         domain, focus = slot_blueprints[slot]
         exact_focus = grandmaster_blueprints[slot] if difficulty == 'grandmaster' else focus
-        prompt = f"""
-Write ONE new, original Digital SAT-style question for a Mentics Arena round.
-
+        prompt = f"""Write ONE original Digital SAT item. Return only the supplied JSON schema.
 Tier: {difficulty.upper()}
-Tier contract: {profile}
 Slot: {slot + 1} of 5
-Required domain: {domain}
-Required focus: {exact_focus}{slot_contract_hint(slot)}
-Uniqueness nonce: {nonce}-{slot}
-
-Recent stems that must not be reused, lightly reworded, or recreated with new numbers:
+Domain: {domain}
+Focus: {exact_focus}{slot_contract_hint(slot)}
+Variation: {nonce}-{slot}
+Avoid these recent stems (do not paraphrase or just change their numbers):
 {recent_context}
 
-Return JSON only as {{"question":{{"domain":"{domain}","question_text":"...","options":["...","...","...","..."],"correct_option":0,"skill":"...","explanation":"..."}}}}.
-
-Requirements:
-- Stay strictly inside Digital SAT scope. Never use calculus, limits, matrices, linear programming, or college-level theory.
-- Meet the tier contract through actual reasoning, not advanced-looking vocabulary.
-- Supply every required fact, exactly four plausible choices, and exactly one defensible answer.
-- Privately solve the item from scratch. The explanation must prove the key and name a specific distractor trap.
-- Use original wording and values; never copy or paraphrase College Board material.
-- Use plain Unicode math without LaTeX/backslashes. Keep Math under 1,200 characters and Reading & Writing under 1,400.
-- Sentence-completion, transition, punctuation, and vocabulary-completion items must visibly contain ____.
-- Reject and rewrite the draft if a student at this tier could solve it in one routine step or by keyword matching.
+Design from a known consistent solution first. Independently re-solve and substitute into
+EVERY constraint before writing the four choices. Exactly one choice is defensible;
+all distractors reflect distinct plausible errors. Stay within Digital SAT scope.
+The requested difficulty comes from connected reasoning, never missing facts or ambiguity.
+Math: at most 1,200 characters, Unicode/plain math, no TeX. Reading: aim for 110-135 words
+at the highest tier, but follow the specified tier word range; total at most 1,400 characters.
+Separate passage and task with a blank line. Completion tasks need a visible ____.
+Explanation: a FINAL 45-90 word proof of the key and one distractor trap. No drafting,
+self-correction, uncertainty, or instructions to change the problem in the explanation.
 """
         raw = _generate_arena_text(
-            prompt, thinking_level=thinking_level,
+            prompt, thinking_level=thinking_level, deadline=deadline,
             system_instruction=(
                 'You are a rigorous Digital SAT assessment writer. Create one fully solvable, '
                 'original item at the exact requested tier and return structured JSON only.'
@@ -5464,65 +5513,51 @@ Requirements:
         question = parsed.get('question') if isinstance(parsed, dict) else None
         if not isinstance(question, dict):
             raise ValueError(f'Arena slot {slot + 1} did not contain a question.')
-        question['domain'] = domain
         return question
 
     def review_slot(slot, question):
         domain, focus = slot_blueprints[slot]
         exact_focus = grandmaster_blueprints[slot] if difficulty == 'grandmaster' else focus
-        prompt = f"""
-Independently audit and finalize this ONE original Digital SAT-style question.
-
-Tier: {difficulty.upper()}
-Tier contract: {profile}
-Required domain: {domain}
-Required focus: {exact_focus}{slot_contract_hint(slot)}
-
-First solve the question yourself without trusting a single line of its current answer key or explanation. Write the
-equations and recompute every intermediate value privately. Then return a corrected question in exactly the same JSON
-shape. Rewrite the entire stem and choices whenever the draft's conditions conflict or its solution is routine.
-
-You must verify all of the following:
-- Every stated constraint is mutually consistent and sufficient; substitute the final answer back into all constraints.
-- Every numerical condition is necessary: mentally remove each one, and rewrite the item if the answer remains unchanged.
-- Exactly one of the four choices is correct, and correct_option points to it.
-- The explanation re-solves the item and explicitly identifies at least one tempting wrong-choice trap.
-- Difficulty genuinely meets the tier contract. For Grandmaster, replace any routine percentage, direct formula,
-  simple discriminant, single-theorem geometry, or surface keyword-matching task with a substantially harder item.
-- For Grandmaster Reading & Writing, every option must remain compatible with the passage's explicit facts; choices
-  should differ only in exact inference, scope, causal direction, degree of certainty, or relationship between claims.
-- Math remains within 1,200 characters. Reading & Writing is 130-180 words and under 1,400 characters.
-- Completion-style language includes a visible ____; math uses Unicode/plain text and no LaTeX backslashes.
-
-Return JSON only as {{"question":{{...}}}}.
-
+        # Blind solving avoids anchoring the editor to the draft's possibly
+        # incorrect key/proof. It must derive both from the actual question.
+        blind_question = {key: value for key, value in question.items() if key not in {'correct_option', 'explanation'}}
+        prompt = f"""Independently audit this original Digital SAT question.
+Tier: {difficulty.upper()}. Domain: {domain}.
+Focus: {exact_focus}{slot_contract_hint(slot)}
+The draft's answer key and explanation have deliberately been withheld. Derive them
+independently from the stem. First check whether the described configuration can EXIST
+(all radii, side lengths, totals, and probabilities must agree). Then compute the answer.
+Check all constraints, units and arithmetic; substitute back into EACH given condition.
+Exactly one option must be defensible. Preserve necessary
+qualifiers; distractors must encode plausible mistakes. Correct defects; preserve valid work. Reject inconsistent totals, unsupported inferences, and equivalent numerical choices.
+Return question plus verified=true ONLY after the final item is consistent and uniquely solvable; otherwise verified=false. Plain Unicode math, no TeX. Explanation: 45-90 words
+proving the answer and identifying one trap. Include ____ in completion questions.
 DRAFT:
-{json.dumps({'question': question}, ensure_ascii=False)}
+{json.dumps({'question': blind_question}, ensure_ascii=False)}
 """
         raw = _generate_arena_text(
-            prompt, thinking_level=thinking_level,
-            system_instruction=(
-                'You are an adversarial Digital SAT item editor. Independently solve, correct, '
-                'and harden one item, then return structured JSON only.'
-            ),
+            prompt, thinking_level='medium', deadline=deadline, max_output_tokens=8192, json_schema=SAT_BATTLE_AI_REVIEW_SCHEMA,
+            system_instruction='You are a rigorous SAT item editor. Independently solve and correct the supplied item. Return JSON only.',
         )
         parsed = _decode_ai_battle_json(raw)
         reviewed = parsed.get('question') if isinstance(parsed, dict) else None
-        if not isinstance(reviewed, dict):
+        if not isinstance(reviewed, dict) or parsed.get('verified') is not True:
             raise ValueError(f'Arena review {slot + 1} did not contain a question.')
-        reviewed['domain'] = domain
         return reviewed
 
     def build_slot(slot, nonce):
-        """Draft then audit one slot, keeping the draft if the audit misfires."""
+        """Validate shape, then independently audit high-tier candidates."""
         draft = generate_slot(slot, nonce)
+        _cleaned, failure = _clean_battle_question(draft, difficulty, set(), recent_fingerprints, index=slot)
+        if failure:
+            return [draft]  # Do not pay for a model audit of a deterministically rejected item.
         if not audited:
             return [draft]
         try:
-            return [review_slot(slot, draft), draft]
-        except Exception as error:  # noqa: BLE001 - a good draft outranks a failed audit
-            app.logger.warning('Arena %s slot %s audit failed: %s', difficulty, slot + 1, error)
-            return [draft]
+            return [review_slot(slot, draft)]
+        except Exception as error:  # noqa: BLE001 - retry this slot without accepting an unaudited key
+            app.logger.warning('Arena %s slot %s audit failed: %s', difficulty, slot + 1, type(error).__name__)
+            return []
 
     accepted = [None] * SAT_BATTLE_QUESTION_COUNT
     # A slot that satisfies the non-negotiable item contract but misses its
@@ -5531,7 +5566,7 @@ DRAFT:
     # beats telling the student the Arena is unavailable.
     best_effort = [None] * SAT_BATTLE_QUESTION_COUNT
     seen, used_skills = set(), set()
-    deadline = time.monotonic() + SAT_BATTLE_GENERATION_BUDGET_SECONDS
+    generation_started = time.monotonic()
     pending = list(range(SAT_BATTLE_QUESTION_COUNT))
 
     for _attempt in range(SAT_BATTLE_SLOT_ATTEMPTS):
@@ -5539,14 +5574,21 @@ DRAFT:
             break
         nonce = secrets.token_urlsafe(12)
         drafts = {}
-        with ThreadPoolExecutor(max_workers=len(pending)) as executor:
-            futures = {executor.submit(build_slot, slot, nonce): slot for slot in pending}
-            for future in as_completed(futures):
+        executor = ThreadPoolExecutor(max_workers=len(pending))
+        futures = {executor.submit(build_slot, slot, nonce): slot for slot in pending}
+        try:
+            for future in as_completed(futures, timeout=max(.01, deadline - time.monotonic())):
                 slot = futures[future]
                 try:
                     drafts[slot] = future.result()
-                except Exception as error:  # noqa: BLE001 - one slot must not end the round
-                    app.logger.warning('Arena %s slot %s failed: %s', difficulty, slot + 1, error)
+                except Exception as error:
+                    app.logger.warning('Arena %s slot %s failed: %s', difficulty, slot + 1, type(error).__name__)
+        except TimeoutError:
+            app.logger.warning('Arena %s reached generation deadline.', difficulty)
+        finally:
+            # A context manager would wait for slow calls after the timeout.
+            # HTTP calls have their own deadline and do no database work.
+            executor.shutdown(wait=False, cancel_futures=True)
         # Validation runs here rather than inside the workers so duplicate and
         # skill detection see one consistent view of the round being built.
         still_pending = []
@@ -5590,6 +5632,7 @@ DRAFT:
     if round_failure:
         app.logger.warning('Arena %s assembled an invalid round: %s', difficulty, round_failure)
         return None
+    app.logger.info('Arena tier=%s generation_seconds=%.2f slots=%s', difficulty, time.monotonic() - generation_started, len(accepted))
     generation_id = secrets.token_urlsafe(12)
     for question in accepted:
         question['source'] = 'gemini'
@@ -5758,7 +5801,7 @@ def _battle_rating(user_id, user_name, outcome, opponent_rating):
 
 
 def _finish_battle_if_ready(battle):
-    if not battle or battle['status'] != 'active':
+    if not battle or battle['status'] != 'active' or not battle.get('started_at'):
         return battle
     now = _utc_now()
     started = _battle_time(battle.get('started_at')) or now
@@ -5817,13 +5860,21 @@ def _finish_battle_if_ready(battle):
 
 
 def _battle_payload(battle, user_id):
+    if not battle or user_id not in (battle['challenger_id'], battle.get('opponent_id')):
+        return None
+    # Recover a claimed match after a worker/gateway failure without awarding RP.
+    if battle['status'] == 'active' and not battle.get('started_at'):
+        created = _battle_time(battle.get('created_at'))
+        if created and (_utc_now() - created).total_seconds() > 180:
+            db.execute_write("UPDATE sat_battles SET status='expired' WHERE id=? AND status='active' AND started_at IS NULL", (battle['id'],))
+            battle = db.select_one('sat_battles', where={'id': battle['id']})
     if battle and battle['status'] == 'waiting':
         created_at = _battle_time(battle.get('created_at'))
         if created_at and (_utc_now() - created_at).total_seconds() >= SAT_BATTLE_BOT_WAIT_SECONDS:
             bot = _battle_bot()
             if bot and db.execute_write(
-                "UPDATE sat_battles SET opponent_id=?, opponent_name=?, status='active', started_at=? WHERE id=? AND status='waiting'",
-                (bot['id'], bot['name'], _utc_now().isoformat(), battle['id'])):
+                "UPDATE sat_battles SET opponent_id=?, opponent_name=?, status='active', started_at=NULL WHERE id=? AND status='waiting'",
+                (bot['id'], bot['name'], battle['id'])):
                 battle = db.select_one('sat_battles', where={'id': battle['id']})
                 try:
                     existing_questions = json.loads(battle.get('questions') or '[]')
@@ -5831,8 +5882,12 @@ def _battle_payload(battle, user_id):
                     existing_questions = []
                 if len(existing_questions) != SAT_BATTLE_QUESTION_COUNT:
                     db.update('sat_battles', {
-                        'questions': json.dumps(_battle_questions(_battle_rating_value(battle['challenger_id'])))
-                    }, where={'id': battle['id']})
+                        'questions': json.dumps(_battle_questions(_battle_rating_value(battle['challenger_id']))),
+                        'started_at': _utc_now().isoformat(),
+                    }, where={'id': battle['id'], 'status': 'active'})
+                    battle = db.select_one('sat_battles', where={'id': battle['id']})
+                else:
+                    db.update('sat_battles', {'started_at': _utc_now().isoformat()}, where={'id': battle['id'], 'status': 'active'})
                     battle = db.select_one('sat_battles', where={'id': battle['id']})
                 created_at = None
         if created_at and (_utc_now() - created_at).total_seconds() > 600:
@@ -5856,16 +5911,21 @@ def _battle_payload(battle, user_id):
         'id': battle['id'], 'status': battle['status'], 'opponentName': opponent_name,
         'startedAt': battle.get('started_at'), 'durationSeconds': SAT_BATTLE_DURATION_SECONDS,
         'submitted': bool(own_answers), 'createdAt': battle.get('created_at'),
+        'answers': own_answers,
+        'opponentSubmitted': bool(battle.get('opponent_answers') if is_challenger else battle.get('challenger_answers')),
+        'preparing': battle['status'] == 'active' and not battle.get('started_at'),
         'isBotBattle': is_bot_battle,
         'mode': _battle_mode(battle),
         'playerAvatar': _arena_avatar_for_user(user_id, battle_difficulty),
         'opponentAvatar': _arena_avatar_for_user(opponent_id, battle_difficulty),
     }
+    if result['preparing']:
+        result['status'] = 'waiting'
     stats = db.select_one('sat_battle_stats', where={'user_id': user_id})
     result['rank'] = _battle_rank(stats['rating'] if stats else 1000)
     result['winStreak'] = int((stats or {}).get('win_streak') or 0)
     result['bestWinStreak'] = int((stats or {}).get('best_win_streak') or 0)
-    if battle['status'] in {'active', 'complete'}:
+    if battle['status'] in {'active', 'complete'} and not result['preparing']:
         result['difficulty'] = battle_difficulty
         result['questionSource'] = (
             'gemini' if battle_questions and all(q.get('source') == 'gemini' for q in battle_questions)
@@ -5956,15 +6016,15 @@ def queue_sat_battle(user):
         if created_at and (now - created_at).total_seconds() > 600:
             db.update('sat_battles', {'status': 'expired'}, where={'id': waiting_battle['id']})
     paired = db.execute_returning_one(
-        """UPDATE sat_battles SET opponent_id=?, opponent_name=?, status='active', started_at=?
+        """UPDATE sat_battles SET opponent_id=?, opponent_name=?, status='active', started_at=NULL
            WHERE id=(SELECT id FROM sat_battles WHERE status='waiting' AND challenger_id != ? ORDER BY created_at ASC LIMIT 1)
              AND status='waiting' RETURNING *""",
-        (user.data['id'], user.get_name(), _utc_now().isoformat(), user.data['id']))
+        (user.data['id'], user.get_name(), user.data['id']))
     if paired:
         # A match is set at the stronger player's tier. That keeps a lower-ranked
         # challenger from being served a soft set against an advanced opponent.
         match_rating = max(_battle_rating_value(paired['challenger_id']), _battle_rating_value(user.data['id']))
-        db.update('sat_battles', {'questions': json.dumps(_battle_questions(match_rating))}, where={'id': paired['id']})
+        db.update('sat_battles', {'questions': json.dumps(_battle_questions(match_rating)), 'started_at': _utc_now().isoformat()}, where={'id': paired['id'], 'status': 'active'})
         paired = db.select_one('sat_battles', where={'id': paired['id']})
         return jsonify(_battle_payload(paired, user.data['id']))
     battle_id = db.insert('sat_battles', {
@@ -5994,7 +6054,7 @@ def train_with_sat_battle_bot(user):
     except ArenaQuestionGenerationError:
         app.logger.exception('Gemini could not create a validated SAT training round.')
         return jsonify({
-            'error': 'Gemini could not create a fresh, verified question set. Please try again in a moment.'
+            'error': 'We could not prepare a complete question set. Your rating is unchanged. Please try again.'
         }), 503
     battle_id = db.insert('sat_battles', {
         'status': 'active', 'challenger_id': user.data['id'],
@@ -6018,7 +6078,7 @@ def get_sat_battle(user, battle_id):
 @login_required
 def cancel_sat_battle(user, battle_id):
     cancelled = db.execute_write(
-        "UPDATE sat_battles SET status='expired' WHERE id=? AND challenger_id=? AND status='waiting'",
+        "UPDATE sat_battles SET status='expired' WHERE id=? AND challenger_id=? AND (status='waiting' OR (status='active' AND started_at IS NULL))",
         (battle_id, user.data['id']))
     if not cancelled:
         return jsonify({'error': 'This match can no longer be cancelled'}), 409
@@ -6033,7 +6093,7 @@ def submit_sat_battle(user, battle_id):
     if not battle or user.data['id'] not in (battle['challenger_id'], battle.get('opponent_id')):
         return jsonify({'error': 'Battle not found'}), 404
     battle = _finish_battle_if_ready(battle)
-    if battle['status'] != 'active':
+    if battle['status'] != 'active' or not battle.get('started_at'):
         return jsonify({'error': 'This battle has already ended'}), 409
     is_challenger = user.data['id'] == battle['challenger_id']
     answer_column = 'challenger_answers' if is_challenger else 'opponent_answers'

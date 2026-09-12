@@ -311,14 +311,14 @@ def test_sat_battle_round_uses_a_fresh_validated_ai_set_when_configured(tmp_path
         slot_match = re.search(r"Slot: (\d) of 5", prompt)
         skill_match = re.search(r'Advanced (?:math|reading) skill (\d)', prompt)
         slot = int(slot_match.group(1)) - 1 if slot_match else int(skill_match.group(1))
-        return json.dumps({"question": generated["questions"][slot]})
+        return json.dumps({"question": generated["questions"][slot], "verified": True})
 
     monkeypatch.setattr(app_module, "gemini_api_key", "test-key")
     monkeypatch.setattr(app_module, "_get_gemini_client", lambda: object())
     monkeypatch.setattr(app_module, "_generate_text", generate)
     questions = app_module._battle_questions(1750)
 
-    assert len(calls) == 10
+    assert len(calls) >= 10
     assert all("GRANDMASTER" in call[0] for call in calls)
     creation_calls = [call for call in calls if "Slot:" in call[0]]
     review_calls = [call for call in calls if "Independently audit" in call[0]]
@@ -326,6 +326,8 @@ def test_sat_battle_round_uses_a_fresh_validated_ai_set_when_configured(tmp_path
     assert all(call[1]["model"] == app_module.GEMINI_ARENA_MODEL for call in calls)
     assert all(call[1]["thinking_level"] == "medium" for call in creation_calls)
     assert all(call[1]["thinking_level"] == "medium" for call in review_calls)
+    assert all(call[1]["max_output_tokens"] == 8192 for call in review_calls)
+    assert all(0 < call[1]["timeout_seconds"] <= 22 for call in calls)
     assert {question["difficulty"] for question in questions} == {"grandmaster"}
     assert {question["source"] for question in questions} == {"gemini"}
     assert all(question["explanation"] for question in questions)
@@ -365,7 +367,7 @@ def test_configured_training_never_silently_reuses_the_fallback_bank(tmp_path, m
         response, status = train(challenger)
 
     assert status == 503
-    assert "Gemini" in response.get_json()["error"]
+    assert "try again" in response.get_json()["error"]
     assert database.execute("SELECT * FROM sat_battles") == []
 
 
@@ -473,16 +475,18 @@ def _arena_generator(script):
     the writer produces on each attempt.
     """
     calls = []
+    originals = {}
 
     def generate(prompt, **kwargs):
         calls.append(prompt)
         if "Independently audit" in prompt:
             draft = json.loads(prompt.split("DRAFT:\n", 1)[1])
-            return json.dumps(draft)
+            return json.dumps({'question': originals[draft['question']['question_text']], 'verified': True})
         slot = int(re.search(r"Slot: (\d) of 5", prompt).group(1)) - 1
         item = script[slot].pop(0)
         if isinstance(item, Exception):
             raise item
+        originals[item["question_text"]] = item
         return json.dumps({"question": item})
 
     return generate, calls
@@ -1101,7 +1105,7 @@ def test_training_rounds_do_not_touch_the_win_streak(tmp_path, monkeypatch):
 
 def test_flame_tiers_climb_without_gaps():
     """Every streak length has exactly one tier, and the tiers only go up."""
-    source = (Path(__file__).resolve().parents[1] / "frontend" / "src" / "App.jsx").read_text(encoding="utf-8")
+    source = (Path(__file__).resolve().parents[1] / "frontend" / "src" / "arena-page.jsx").read_text(encoding="utf-8")
     block = source.split("const WIN_STREAK_TIERS = [", 1)[1].split("\n]", 1)[0]
     tiers = [(int(at), key) for at, key in re.findall(r"at: (\d+), key: '(\w+)'", block)]
 
@@ -1112,3 +1116,130 @@ def test_flame_tiers_climb_without_gaps():
     assert tiers[0][0] == 1
     # Every tier is reachable: no two thresholds collide.
     assert len({at for at, _ in tiers}) == len(tiers)
+
+
+@pytest.mark.parametrize('field,value', [
+    ('correct_option', True), ('correct_option', 1.5),
+    ('correct_option', '1'), ('question_text', {'text': 'not text'}),
+    ('options', ['A', 'B', 'C', 4]),
+    ('options', ['A B', 'A  B', 'C', 'D']),
+    ('options', ['A', 'B', 'C', r'\frac{1}{2}']),
+    ('options', ['A', 'B', 'C', '(4']),
+    ('options', ['0.5', '1/2', '2', '3']),
+    ('options', ['1/0', '1', '2', '3']),
+    ('explanation', "Wait, let's re-evaluate the answer. The given constraints do not match the proposed answer key."),
+])
+def test_generated_question_contract_rejects_malformed_types_and_math(field, value):
+    item = _grandmaster_item(0)
+    item[field] = value
+    question, failure = app_module._clean_battle_question(item, 'grandmaster', set(), set())
+    assert question is None
+    assert failure
+
+
+def test_ranked_clock_and_questions_publish_together(tmp_path, monkeypatch):
+    database = DatabaseHandler(str(tmp_path / 'publication.db'))
+    monkeypatch.setattr(app_module, 'db', database)
+    app_module.init_db()
+    one = _user(database, 'one@example.test', 'One')
+    two = _user(database, 'two@example.test', 'Two')
+    queue = inspect.unwrap(app_module.queue_sat_battle)
+    with app_module.app.test_request_context('/api/sat-battles/queue', method='POST'):
+        waiting = queue(one).get_json()
+    ready_at = app_module._utc_now() + timedelta(seconds=20)
+
+    def generate(_rating):
+        row = database.select_one('sat_battles', where={'id': waiting['id']})
+        assert row['started_at'] is None
+        during = app_module._battle_payload(row, one.data['id'])
+        assert during['status'] == 'waiting'
+        assert during['preparing'] is True
+        assert 'questions' not in during
+        assert 'answerKey' not in during
+        monkeypatch.setattr(app_module, '_utc_now', lambda: ready_at)
+        return app_module._fallback_battle_questions('bronze')
+
+    monkeypatch.setattr(app_module, '_battle_questions', generate)
+    with app_module.app.test_request_context('/api/sat-battles/queue', method='POST'):
+        active = queue(two).get_json()
+    assert active['status'] == 'active'
+    assert active['startedAt'] == ready_at.isoformat()
+    assert len(active['questions']) == 5
+
+
+def test_cancelling_generation_does_not_resurrect_match(tmp_path, monkeypatch):
+    database = DatabaseHandler(str(tmp_path / 'cancel-generation.db'))
+    monkeypatch.setattr(app_module, 'db', database)
+    app_module.init_db()
+    one = _user(database, 'cancel-one@example.test', 'One')
+    two = _user(database, 'cancel-two@example.test', 'Two')
+    queue = inspect.unwrap(app_module.queue_sat_battle)
+    cancel = inspect.unwrap(app_module.cancel_sat_battle)
+    with app_module.app.test_request_context('/api/sat-battles/queue', method='POST'):
+        waiting = queue(one).get_json()
+
+    def generate(_rating):
+        with app_module.app.test_request_context('/cancel', method='POST'):
+            assert cancel(one, waiting['id']).get_json()['success']
+        return app_module._fallback_battle_questions('bronze')
+
+    monkeypatch.setattr(app_module, '_battle_questions', generate)
+    with app_module.app.test_request_context('/api/sat-battles/queue', method='POST'):
+        result = queue(two).get_json()
+    assert result['status'] == 'expired'
+    row = database.select_one('sat_battles', where={'id': waiting['id']})
+    assert row['started_at'] is None
+    assert database.select_one('sat_battle_stats', where={'user_id': one.data['id']}) is None
+
+
+def test_generation_deadline_returns_without_waiting_for_worker(tmp_path, monkeypatch):
+    import time
+    from threading import Event
+    _arena_database(tmp_path, monkeypatch, 'deadline.db')
+    release = Event()
+    monkeypatch.setattr(app_module, 'SAT_BATTLE_GENERATION_BUDGET_SECONDS', .05)
+
+    def stalled(*_args, **_kwargs):
+        release.wait(2)
+        raise TimeoutError('test worker')
+
+    monkeypatch.setattr(app_module, '_generate_text', stalled)
+    start = time.monotonic()
+    try:
+        assert app_module._generate_ai_battle_questions('grandmaster') is None
+        assert time.monotonic() - start < 1
+    finally:
+        release.set()
+
+
+def test_invalid_drafts_do_not_spend_an_audit_call(tmp_path, monkeypatch):
+    _arena_database(tmp_path, monkeypatch, 'skip-audit.db')
+    script = {slot: [_grandmaster_item(slot)] for slot in range(5)}
+    invalid = _grandmaster_item(0)
+    invalid['correct_option'] = True
+    script[0].insert(0, invalid)
+    generate, calls = _arena_generator(script)
+    monkeypatch.setattr(app_module, '_generate_text', generate)
+    result = app_module._generate_ai_battle_questions('grandmaster')
+    assert result and len(result) == 5
+    assert sum('Independently audit' in prompt for prompt in calls) == 5
+    assert sum('Slot: 1 of 5' in prompt for prompt in calls) == 2
+
+
+def test_high_tier_review_is_blind_and_unverified_items_cannot_escape(tmp_path, monkeypatch):
+    _arena_database(tmp_path, monkeypatch, 'blind-review.db')
+    seen_reviews = []
+
+    def generate(prompt, **_kwargs):
+        if 'Independently audit' in prompt:
+            blind = json.loads(prompt.split('DRAFT:\n', 1)[1])['question']
+            assert 'correct_option' not in blind
+            assert 'explanation' not in blind
+            seen_reviews.append(blind)
+            return json.dumps({'question': _grandmaster_item(0), 'verified': False})
+        slot = int(re.search(r'Slot: (\d) of 5', prompt).group(1)) - 1
+        return json.dumps({'question': _grandmaster_item(slot)})
+
+    monkeypatch.setattr(app_module, '_generate_text', generate)
+    assert app_module._generate_ai_battle_questions('grandmaster') is None
+    assert seen_reviews

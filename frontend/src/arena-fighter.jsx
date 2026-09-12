@@ -13,8 +13,9 @@
 // shapes, and it is what lets 20 independent cosmetic fields combine without
 // any particular pairing falling apart.
 
-import { memo, useMemo, useState } from 'react'
+import { memo, useEffect, useMemo, useRef, useState } from 'react'
 import { Check, Dices, RotateCcw, Sparkles, X } from 'lucide-react'
+import { ArenaAvatarPreview } from './arena-avatar-preview'
 
 // A single dark ink colour on every silhouette is what separates drawn
 // character art from a pile of flat coloured shapes. Limbs are stroked paths,
@@ -1248,28 +1249,44 @@ ArenaFighter.displayName = 'ArenaFighter'
 
 export function ArenaCustomizer({ avatar, onChange, onSave, onClose, saving }) {
   const [section, setSection] = useState('body')
+  const dialog = useRef(null)
+  useEffect(() => {
+    const previous = document.activeElement
+    const element = dialog.current
+    element.querySelector('button')?.focus()
+    const trap = event => {
+      if (event.key === 'Escape' && element.getAttribute('aria-busy') !== 'true') { event.preventDefault(); onClose(); return }
+      if (event.key !== 'Tab') return
+      const focusable = [...element.querySelectorAll('button:not(:disabled), input, [tabindex="0"]')]
+      const first = focusable[0], last = focusable.at(-1)
+      if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last?.focus() }
+      else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus() }
+    }
+    element.addEventListener('keydown', trap)
+    return () => { element.removeEventListener('keydown', trap); if (previous?.isConnected) previous.focus() }
+  }, [onClose])
   const current = normalizeArenaAvatar(avatar)
   const groups = (ARENA_CUSTOMIZER_SECTIONS.find(([key]) => key === section) || ARENA_CUSTOMIZER_SECTIONS[0])[2]
   return <div className="arena-customizer-backdrop" role="presentation"
-    onMouseDown={event => { if (event.target === event.currentTarget) onClose() }}>
-    <section className="arena-customizer" role="dialog" aria-modal="true" aria-labelledby="arena-customizer-title">
+    onMouseDown={event => { if (event.target === event.currentTarget && !saving) onClose() }}>
+    <section ref={dialog} className="arena-customizer" role="dialog" aria-modal="true" aria-labelledby="arena-customizer-title" aria-busy={saving}>
       <header>
         <div>
           <small>FIGHTER LOCKER</small>
           <h2 id="arena-customizer-title">Make the fighter yours.</h2>
-          <p>Twenty-one slots, mixed freely — every build, face, hairstyle, outfit, and effect combines.</p>
+          <p>Your look, your arena. Preview instantly, then equip to save.</p>
         </div>
-        <button type="button" onClick={onClose} aria-label="Close fighter locker" autoFocus><X /></button>
+        <button type="button" onClick={onClose} disabled={saving} aria-label="Close fighter locker"><X /></button>
       </header>
       <div className="arena-customizer-body">
         <div className="arena-customizer-preview">
           <i className="arena-preview-light" />
-          <ArenaFighter avatar={current} label="Your customized Arena fighter" />
+          <ArenaAvatarPreview avatar={section === 'hair' ? { ...current, gear: 'none' } : current} view={['hair', 'face'].includes(section) ? 'portrait' : 'full'} label="Your customized Arena fighter" />
           <strong>LIVE LOADOUT</strong>
           <span>{current.frame} · {current.body} · {current.outfit}</span>
           <div className="arena-preview-actions">
-            <button type="button" onClick={() => onChange(randomArenaAvatar())}><Dices /> Randomize</button>
-            <button type="button" onClick={() => onChange({ ...ARENA_AVATAR_DEFAULT })}><RotateCcw /> Reset</button>
+            <button type="button" disabled={saving} onClick={() => onChange(randomArenaAvatar())}><Dices /> Randomize</button>
+            <button type="button" disabled={saving} onClick={() => onChange({ ...ARENA_AVATAR_DEFAULT })}><RotateCcw /> Reset</button>
           </div>
         </div>
         <div className="arena-customizer-editor">
@@ -1278,12 +1295,13 @@ export function ArenaCustomizer({ avatar, onChange, onSave, onClose, saving }) {
               <button type="button" key={key} className={section === key ? 'selected' : ''}
                 aria-pressed={section === key} onClick={() => setSection(key)}>{title}</button>)}
           </nav>
-          <div className="arena-customizer-options">
+          <div className="arena-customizer-options" data-category={section}>
+            {section === 'hair' && <p className="arena-hair-hint">A closer look. Rotate to see the cut from every angle.{current.gear !== 'none' && ' Headwear is hidden in this preview.'}</p>}
             {groups.map(([key, title, choices, swatchKey]) => <fieldset key={key}>
               <legend>{title}</legend>
               <div>{choices.map(([value, optionLabel]) => {
                 const swatch = swatchKey ? SWATCH_SOURCES[swatchKey]?.(value) : null
-                return <button type="button" key={value} className={current[key] === value ? 'selected' : ''}
+                return <button type="button" disabled={saving} key={value} className={current[key] === value ? 'selected' : ''}
                   aria-pressed={current[key] === value} onClick={() => onChange({ ...current, [key]: value })}>
                   {swatch && <i style={{ background: swatch }} />}
                   <span>{optionLabel}</span>
