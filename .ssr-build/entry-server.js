@@ -4456,7 +4456,7 @@ function ExamLanding({ kind }) {
 										d.eyebrow
 									]
 								}),
-								/* @__PURE__ */ jsxs("h1", { children: [kind === "ai-sat-prep" ? "AI SAT" : exam, " PREP"] }),
+								/* @__PURE__ */ jsx("h1", { children: d.title }),
 								/* @__PURE__ */ jsx("p", {
 									className: "exam-promise",
 									children: exam === "ACT" ? "Your goal. Five clear next steps." : "A clear path to your next best."
@@ -5199,7 +5199,7 @@ function Landing() {
 									/* @__PURE__ */ jsx(UsersRound, {}),
 									/* @__PURE__ */ jsx("small", { children: "COMMUNITY" }),
 									/* @__PURE__ */ jsx("h3", { children: "Move forward together." }),
-									/* @__PURE__ */ jsx("p", { children: "Ask questions, share approaches, and celebrate real consistency on the leaderboard." })
+									/* @__PURE__ */ jsx("p", { children: "Ask questions, share approaches, and keep your own progress private." })
 								]
 							})
 						]
@@ -5367,9 +5367,9 @@ var navItems = [
 		"Community"
 	],
 	[
-		"/leaderboard",
-		Trophy,
-		"Leaderboard"
+		"/points",
+		Award,
+		"Points & achievements"
 	],
 	[
 		"/account",
@@ -5902,8 +5902,8 @@ function Dashboard() {
 									})
 								}),
 								/* @__PURE__ */ jsxs("a", {
-									href: "/leaderboard",
-									children: ["View leaderboard ", /* @__PURE__ */ jsx(ArrowRight, {})]
+									href: "/points",
+									children: ["View points & achievements ", /* @__PURE__ */ jsx(ArrowRight, {})]
 								})
 							]
 						})
@@ -11435,29 +11435,63 @@ function ForumPage() {
 		})
 	});
 }
-function LeaderboardPage() {
+function PointsPage() {
 	const d = boot.data;
+	const achievements = d.achievements || [];
+	const earned = achievements.filter((item) => item.is_earned).length;
+	const iconFor = (id) => id.startsWith("points_") ? Zap : id.startsWith("streak_") ? Flame : id === "first_step" ? Check : Trophy;
 	return /* @__PURE__ */ jsx(AppShell, {
 		name: d.name,
 		children: /* @__PURE__ */ jsxs("main", {
-			className: "app-main",
-			children: [/* @__PURE__ */ jsx(PageIntro, {
-				kicker: "COMMUNITY MOMENTUM",
-				title: "Consistency deserves the spotlight.",
-				copy: "Points celebrate completed work—not comparison for its own sake."
-			}), /* @__PURE__ */ jsx("section", {
-				className: "leaderboard-list",
-				children: d.leaderboard?.map((row, index) => /* @__PURE__ */ jsxs("article", {
-					className: index < 3 ? "top" : "",
+			className: "app-main points-page",
+			children: [
+				/* @__PURE__ */ jsx(PageIntro, {
+					kicker: "YOUR MOMENTUM",
+					title: "Track progress that belongs to you.",
+					copy: "Your points, streak, and achievements are private—built to help you notice your own consistency."
+				}),
+				/* @__PURE__ */ jsxs("section", {
+					className: "points-overview",
+					"aria-label": "Your points summary",
 					children: [
-						/* @__PURE__ */ jsx("span", { children: index + 1 }),
-						/* @__PURE__ */ jsx("div", { children: String(row.name || "M").slice(0, 1).toUpperCase() }),
-						/* @__PURE__ */ jsx("b", { children: row.name }),
-						/* @__PURE__ */ jsxs("strong", { children: [row.points, " pts"] }),
-						index === 0 && /* @__PURE__ */ jsx(Trophy, {})
+						/* @__PURE__ */ jsxs("article", {
+							className: "points-total",
+							children: [
+								/* @__PURE__ */ jsx("small", { children: "TOTAL POINTS" }),
+								/* @__PURE__ */ jsx("strong", { children: Number(d.points || 0).toLocaleString() }),
+								/* @__PURE__ */ jsx("p", { children: "Earned from completed work" })
+							]
+						}),
+						/* @__PURE__ */ jsxs("article", { children: [/* @__PURE__ */ jsx(Flame, {}), /* @__PURE__ */ jsxs("div", { children: [
+							/* @__PURE__ */ jsx("small", { children: "DAY STREAK" }),
+							/* @__PURE__ */ jsx("strong", { children: d.streak || 0 }),
+							/* @__PURE__ */ jsx("p", { children: "Keep showing up one day at a time" })
+						] })] }),
+						/* @__PURE__ */ jsxs("article", { children: [/* @__PURE__ */ jsx(Award, {}), /* @__PURE__ */ jsxs("div", { children: [
+							/* @__PURE__ */ jsx("small", { children: "ACHIEVEMENTS" }),
+							/* @__PURE__ */ jsxs("strong", { children: [earned, /* @__PURE__ */ jsxs("span", { children: ["/", achievements.length] })] }),
+							/* @__PURE__ */ jsx("p", { children: "Unlocked on your path" })
+						] })] })
 					]
-				}, `${row.name}-${index}`))
-			})]
+				}),
+				/* @__PURE__ */ jsxs("section", {
+					className: "achievements-panel",
+					children: [/* @__PURE__ */ jsxs("header", { children: [/* @__PURE__ */ jsxs("div", { children: [/* @__PURE__ */ jsx("small", { children: "YOUR COLLECTION" }), /* @__PURE__ */ jsx("h2", { children: "Achievements" })] }), /* @__PURE__ */ jsxs("span", { children: [earned, " unlocked"] })] }), /* @__PURE__ */ jsx("div", {
+						className: "achievements-grid",
+						children: achievements.map((item) => {
+							const Icon = iconFor(item.id);
+							return /* @__PURE__ */ jsxs("article", {
+								className: item.is_earned ? "is-earned" : "is-locked",
+								children: [
+									/* @__PURE__ */ jsx("i", { children: item.is_earned ? /* @__PURE__ */ jsx(Icon, {}) : /* @__PURE__ */ jsx(LockKeyhole, {}) }),
+									/* @__PURE__ */ jsxs("div", { children: [/* @__PURE__ */ jsx("b", { children: item.title }), /* @__PURE__ */ jsx("p", { children: item.description })] }),
+									/* @__PURE__ */ jsx("span", { children: item.is_earned ? /* @__PURE__ */ jsx(Check, {}) : "Locked" })
+								]
+							}, item.id);
+						})
+					})]
+				})
+			]
 		})
 	});
 }
@@ -11634,7 +11668,7 @@ var legalCopy = {
 		intro: "Welcome to Mentics. This policy explains how Mentics collects, uses, discloses, and safeguards information when you use our website and services.",
 		sections: [
 			["1. Information we collect", "We collect account information such as your name, email, and securely hashed password or Google profile details. Educational data can include goals, learning style, anxieties, GPA, SAT/ACT scores, strengths, weaknesses, test dates, grade level, majors, and target colleges. We also collect content you choose to submit, including forum posts and replies, AI-assistant conversations, essays and prompts, plus activity data such as completed tasks, generated paths, and stat updates. Our servers may also receive technical information such as IP address, browser, operating system, access times, and viewed pages."],
-			["2. How we use information", "We use this information to create and manage accounts; generate personalized test-prep and college-planning paths; provide contextual chat and essay feedback; operate the forum and leaderboard; display progress; analyze and improve Mentics; and administer points, streaks, and achievements."],
+			["2. How we use information", "We use this information to create and manage accounts; generate personalized test-prep and college-planning paths; provide contextual chat and essay feedback; operate the forum; display private progress; analyze and improve Mentics; and administer points, streaks, and achievements."],
 			["3. Disclosure of information", "Mentics does not sell personal information. We may disclose information when required by law or needed to protect rights, property, and safety. We share inputs such as chat messages and essay text with Google Gemini only to provide the AI features you request, subject to Google’s privacy policies. We do not currently share user information with third-party advertisers."],
 			["4. Children's privacy", "Mentics is intended for high school students generally over age 13. We do not knowingly collect personally identifiable information from children under 13. If we learn that a user is under 13, we will require verifiable parental consent; parents or guardians may contact us to request appropriate action."],
 			["5. Your rights and choices", "You may review or change account information from account settings and may contact us to opt out of communications or ask about your information."],
@@ -11773,8 +11807,8 @@ function App() {
 		case "forum":
 			page = /* @__PURE__ */ jsx(ForumPage, {});
 			break;
-		case "leaderboard":
-			page = /* @__PURE__ */ jsx(LeaderboardPage, {});
+		case "points":
+			page = /* @__PURE__ */ jsx(PointsPage, {});
 			break;
 		case "account":
 			page = /* @__PURE__ */ jsx(AccountPage, {});

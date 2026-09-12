@@ -1448,6 +1448,48 @@
 @keyframes path-regenerating-orbit { to { transform: rotate(360deg); } }
 @media (prefers-reduced-motion: reduce) { .path-regenerating-orbit { animation: none; } }
 
+/* Private points and achievement tracking. */
+.points-page { max-width: 1180px; }
+.points-overview { display: grid; grid-template-columns: 1.2fr 1fr 1fr; gap: 14px; margin-top: 22px; }
+.points-overview > article { display: flex; align-items: flex-start; gap: 15px; min-height: 150px; padding: 26px; border: 1px solid rgba(255,255,255,.78); border-radius: 18px; background: linear-gradient(145deg,rgba(255,255,255,.82),rgba(244,243,251,.62)); box-shadow: 0 24px 60px -42px rgba(31,24,75,.46),inset 0 1px rgba(255,255,255,.94); }
+.points-overview > article > svg { flex: none; width: 22px; height: 22px; padding: 10px; box-sizing: content-box; color: #7040cf; border-radius: 13px; background: #f0ebff; }
+.points-overview > article > div { display: grid; gap: 5px; }
+.points-overview small,.achievements-panel header small { color: #766c82; font-size: 10px; font-weight: 800; letter-spacing: .13em; }
+.points-overview strong { display: block; margin-top: 19px; color: #211a36; font-size: clamp(2.4rem,5vw,4.2rem); line-height: .9; letter-spacing: -.07em; }
+.points-overview > article:not(.points-total) strong { margin-top: 6px; font-size: 2.8rem; }
+.points-overview strong span { margin-left: 3px; color: #91899d; font-size: 1rem; letter-spacing: 0; }
+.points-overview p { margin: 8px 0 0; color: #7d7588; font-size: 12px; line-height: 1.45; }
+.points-total { color: #fff; border-color: rgba(255,255,255,.1) !important; background: radial-gradient(circle at 88% 8%,rgba(172,128,248,.42),transparent 32%),linear-gradient(145deg,#32296f,#211c42) !important; }
+.points-total small,.points-total p { color: #d8d1ed; }
+.points-total strong { color: #fff; }
+.achievements-panel { margin-top: 18px; padding: 30px; border: 1px solid rgba(255,255,255,.78); border-radius: 18px; background: linear-gradient(145deg,rgba(255,255,255,.8),rgba(245,244,251,.58)); box-shadow: 0 24px 60px -42px rgba(31,24,75,.46),inset 0 1px rgba(255,255,255,.94); }
+.achievements-panel > header { display: flex; align-items: center; justify-content: space-between; gap: 14px; }
+.achievements-panel h2 { margin: 5px 0 0; color: #211a36; font-size: clamp(1.7rem,3vw,2.35rem); letter-spacing: -.05em; }
+.achievements-panel > header > span { padding: 7px 10px; color: #6840ba; border: 1px solid #ded7ef; border-radius: 999px; background: #f7f4ff; font-size: 10px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
+.achievements-grid { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 10px; margin-top: 20px; }
+.achievements-grid article { display: grid; grid-template-columns: 40px minmax(0,1fr) auto; align-items: center; gap: 11px; min-width: 0; padding: 14px; border: 1px solid #e1e0e9; border-radius: 13px; background: rgba(255,255,255,.72); }
+.achievements-grid article > i { display: grid; place-items: center; width: 40px; height: 40px; color: #7040cf; border-radius: 11px; background: #f0ebff; }
+.achievements-grid article > i svg { width: 18px; }
+.achievements-grid article > div { min-width: 0; }
+.achievements-grid article b { display: block; overflow: hidden; color: #282139; font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
+.achievements-grid article p { margin: 4px 0 0; color: #7d7588; font-size: 11px; line-height: 1.4; }
+.achievements-grid article > span { color: #7040cf; font-size: 11px; font-weight: 800; }
+.achievements-grid article > span svg { width: 16px; height: 16px; }
+.achievements-grid article.is-locked { opacity: .62; background: rgba(246,246,250,.7); }
+.achievements-grid article.is-locked > i { color: #8a8496; background: #ecebf1; }
+.achievements-grid article.is-locked > span { color: #8a8496; font-weight: 650; }
+
+@media (max-width: 860px) {
+  .points-overview { grid-template-columns: 1fr 1fr; }
+  .points-total { grid-column: 1 / -1; }
+  .achievements-grid { grid-template-columns: repeat(2,minmax(0,1fr)); }
+}
+@media (max-width: 560px) {
+  .points-overview,.achievements-grid { grid-template-columns: 1fr; }
+  .points-total { grid-column: auto; }
+  .achievements-panel { padding: 22px 17px; }
+}
+
 /* SAT Battle Arena — a distinct competitive space that still uses the Mentics
    violet, indigo, and glass vocabulary. */
 .battle-page { max-width: 1280px; }

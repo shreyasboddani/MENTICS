@@ -846,6 +846,60 @@ def _live_streak(row, today=None):
     return streak if last in (today, today - timedelta(days=1)) else 0
 
 
+def _get_gamification_stats(user_id):
+    """Return a student's private gamification row, creating it if needed."""
+    row = db.select_one("gamification_stats", where={"user_id": user_id})
+    if row:
+        return row
+    db.insert("gamification_stats", {
+        "user_id": user_id,
+        "points": 0,
+        "current_streak": 0,
+    })
+    return db.select_one("gamification_stats", where={"user_id": user_id}) or {
+        "user_id": user_id,
+        "points": 0,
+        "current_streak": 0,
+    }
+
+
+def _achievement_catalog(all_tasks, gamification_stats):
+    """Build the private achievement state for one student."""
+    completed_tasks = sum(1 for task in all_tasks if task.get("is_completed"))
+    streak = _live_streak(gamification_stats)
+    points = int(gamification_stats.get("points") or 0)
+    achievements = [
+        {"id": "pioneer_test", "title": "Test Prep Pioneer",
+            "description": "Generate your first Test Prep path.",
+            "is_earned": any(t.get("category") == "Test Prep" for t in all_tasks)},
+        {"id": "planner_college", "title": "College Planner",
+            "description": "Generate your first College Planning path.",
+            "is_earned": any(t.get("category") == "College Planning" for t in all_tasks)},
+        {"id": "first_step", "title": "First Step",
+            "description": "Complete your first task.",
+            "is_earned": completed_tasks >= 1},
+        {"id": "task_master_10", "title": "Task Master",
+            "description": "Complete 10 tasks.",
+            "is_earned": completed_tasks >= 10},
+        {"id": "pathfinder_pro_25", "title": "Pathfinder Pro",
+            "description": "Complete 25 tasks.",
+            "is_earned": completed_tasks >= 25},
+        {"id": "streak_3", "title": "On a Roll",
+            "description": "Maintain a 3-day streak.",
+            "is_earned": streak >= 3},
+        {"id": "streak_7", "title": "Committed",
+            "description": "Maintain a 7-day streak.",
+            "is_earned": streak >= 7},
+        {"id": "points_100", "title": "Point Collector",
+            "description": "Earn 100 points.",
+            "is_earned": points >= 100},
+        {"id": "points_500", "title": "Point Pro",
+            "description": "Earn 500 points.",
+            "is_earned": points >= 500},
+    ]
+    return achievements
+
+
 def _advance_completion_streak(user_id):
     """Advance a student's streak once for a newly completed path step."""
     row = db.select_one("gamification_stats", where={"user_id": user_id})
@@ -2309,7 +2363,7 @@ def _get_test_prep_ai_chat_response(history, user_stats, stat_history="", user_i
         "- **AI Assistant (Your Role)**: You are the chat interface. You help users when they are stuck on a task, provide encouragement, and offer deeper explanations.\n"
         "- **Stats & Tracker**: A dashboard where users input their scores (GPA, SAT, ACT) and track their progress over time with charts.\n"
         "- **Gamification**: The app includes points and streaks for completing tasks to keep users motivated.\n"
-        "- **Forum & Leaderboard**: Social features where users can connect and compete.\n\n"
+        "- **Forum & private progress**: Social features plus personal points, streaks, and achievements.\n\n"
 
         f"## CURRENT STUDENT ANALYSIS (CONTEXT FOR YOUR RESPONSE)\n"
         f"This is the specific student you are currently coaching:\n"
@@ -2457,7 +2511,7 @@ def _get_college_planning_ai_chat_response(history, user_stats, stat_history="",
         "- **AI Assistant (Your Role)**: You are the chat interface. You help users when they are stuck on a task, provide encouragement, and offer deeper explanations.\n"
         "- **Stats & Tracker**: A dashboard where users input their scores (GPA, SAT, ACT) and track their progress over time with charts.\n"
         "- **Gamification**: The app includes points and streaks for completing tasks to keep users motivated.\n"
-        "- **Forum & Leaderboard**: Social features where users can connect and compete.\n\n"
+        "- **Forum & private progress**: Social features plus personal points, streaks, and achievements.\n\n"
 
         f"## CURRENT STUDENT ANALYSIS\n"
         f"This is the specific student you are currently advising:\n"
@@ -3096,16 +3150,7 @@ def dashboard(user):
     all_tasks = db.select("paths", where={"user_id": user_id})
 
     # --- Gamification Stats ---
-    gamification_stats_list = db.select(
-        "gamification_stats", where={"user_id": user_id})
-    if not gamification_stats_list:
-        # Fallback to create stats if they don't exist for some reason
-        db.insert("gamification_stats", {
-                  "user_id": user_id, "points": 0, "current_streak": 0})
-        gamification_stats_list = db.select(
-            "gamification_stats", where={"user_id": user_id})
-
-    gamification_stats = gamification_stats_list[0]
+    gamification_stats = _get_gamification_stats(user_id)
 
     game_stats = {
         "points": gamification_stats['points'],
@@ -3206,48 +3251,7 @@ def dashboard(user):
         except (ValueError, TypeError):
             pass
 
-    all_achievements = [
-        {"id": "pioneer_test", "icon": "🚀", "title": "Test Prep Pioneer",
-            "description": "Generated your first Test Prep path.", "is_earned": False},
-        {"id": "planner_college", "icon": "🏛️", "title": "College Planner",
-            "description": "Generated your first College Planning path.", "is_earned": False},
-        {"id": "first_step", "icon": "✅", "title": "First Step",
-            "description": "Completed your first task.", "is_earned": False},
-        {"id": "task_master_10", "icon": "🔥", "title": "Task Master",
-            "description": "Completed 10 tasks.", "is_earned": False},
-        {"id": "pathfinder_pro_25", "icon": "🏆", "title": "Pathfinder Pro",
-            "description": "Completed 25 tasks.", "is_earned": False},
-        {"id": "streak_3", "icon": "⚡", "title": "On a Roll",
-            "description": "Maintained a 3-day streak.", "is_earned": False},
-        {"id": "streak_7", "icon": "🌟", "title": "Committed",
-            "description": "Maintained a 7-day streak.", "is_earned": False},
-        {"id": "points_100", "icon": "💯", "title": "Point Collector",
-            "description": "Earned 100 points.", "is_earned": False},
-        {"id": "points_500", "icon": "💎", "title": "Point Pro",
-            "description": "Earned 500 points.", "is_earned": False}
-    ]
-
-    all_completed_tasks = total_test_prep_completed + total_college_planning_completed
-
-    if any(t['category'] == 'Test Prep' for t in all_tasks):
-        all_achievements[0]['is_earned'] = True
-    if any(t['category'] == 'College Planning' for t in all_tasks):
-        all_achievements[1]['is_earned'] = True
-    if all_completed_tasks >= 1:
-        all_achievements[2]['is_earned'] = True
-    if all_completed_tasks >= 10:
-        all_achievements[3]['is_earned'] = True
-    if all_completed_tasks >= 25:
-        all_achievements[4]['is_earned'] = True
-    if game_stats['streak'] >= 3:
-        all_achievements[5]['is_earned'] = True
-    if game_stats['streak'] >= 7:
-        all_achievements[6]['is_earned'] = True
-    if game_stats['points'] >= 100:
-        all_achievements[7]['is_earned'] = True
-    if game_stats['points'] >= 500:
-        all_achievements[8]['is_earned'] = True
-
+    all_achievements = _achievement_catalog(all_tasks, gamification_stats)
     earned_achievements = [a for a in all_achievements if a['is_earned']]
 
     return render_react("dashboard", {
@@ -4541,26 +4545,30 @@ def _get_proactive_ai_suggestions(user):
         return "Welcome to Mentics! Let's get started on your path to success."
 
 
-# --- NEW SOCIAL ROUTES ---
+# --- Personal progress routes ---
+@app.route('/points')
+@login_required
+def points(user):
+    """Show only the signed-in student's points and achievements."""
+    user_id = user.data['id']
+    gamification_stats = _get_gamification_stats(user_id)
+    all_tasks = db.select("paths", where={"user_id": user_id}) or []
+    achievements = _achievement_catalog(all_tasks, gamification_stats)
+    earned_count = sum(1 for achievement in achievements if achievement['is_earned'])
+    return render_react("points", {
+        "name": user.get_name(),
+        "points": int(gamification_stats.get('points') or 0),
+        "streak": _live_streak(gamification_stats),
+        "achievements": achievements,
+        "earnedAchievements": earned_count,
+    }, "Points & Achievements | Mentics")
+
+
 @app.route('/leaderboard')
 @login_required
-def leaderboard(user):
-    # Names and totals are intentionally public inside the signed-in community;
-    # the narrow system scope avoids weakening the users-table tenant policy.
-    with db.rls_scope(system=True):
-        leaderboard_data = db.execute(
-            """
-            SELECT u.name, g.points
-            FROM gamification_stats g
-            JOIN users u ON g.user_id = u.id
-            ORDER BY g.points DESC
-            LIMIT 10
-            """
-        )
-    return render_react("leaderboard", {
-        "name": user.get_name(),
-        "leaderboard": [dict(row) for row in leaderboard_data],
-    }, "Leaderboard | Mentics")
+def leaderboard_legacy_redirect(user):
+    """Keep old bookmarks private while removing the public leaderboard."""
+    return redirect(url_for('points'))
 
 
 @app.route('/forum')

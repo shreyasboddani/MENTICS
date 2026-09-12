@@ -237,7 +237,7 @@ function ExamLanding({ kind }) {
         <svg className="hero-route" viewBox="0 0 620 420" aria-hidden="true"><path d="M22 355 C115 355 103 205 214 205 S318 72 420 72 S497 204 598 204" /><circle cx="22" cy="355" r="6" /><circle cx="214" cy="205" r="6" /><circle cx="420" cy="72" r="6" /><circle cx="598" cy="204" r="6" /></svg>
         <div className="hero-copy">
           <div className="eyebrow"><span /> {d.eyebrow}</div>
-          <h1>{kind === 'ai-sat-prep' ? 'AI SAT' : exam} PREP</h1>
+          <h1>{d.title}</h1>
           <p className="exam-promise">{exam === 'ACT' ? 'Your goal. Five clear next steps.' : 'A clear path to your next best.'}</p>
           <p className="hero-tagline">{d.intro}</p>
           <div className="hero-actions"><a className="button button--primary" href={destination}>{loggedIn ? 'Continue your path' : d.primary} <ArrowRight size={18} /></a><a className="button button--quiet" href="#how-it-works">See how it works</a></div>
@@ -393,7 +393,7 @@ function Landing() {
           <article className="suite-sprint"><Zap /><small>FOCUSED SPRINTS</small><h3>Practice with purpose.</h3><p>Short assessments, strategy articles, and immediate explanations make every session count.</p></article>
           <article className="suite-essay"><PenLine /><small>ESSAY FEEDBACK</small><h3>Make every word stronger.</h3><p>Get structured feedback while keeping your voice, story, and ideas unmistakably yours.</p></article>
           <article className="suite-progress"><LineChart /><small>VISIBLE PROGRESS</small><h3>See the work adding up.</h3><p>Scores, milestones, history, points, and streaks reveal the pattern behind improvement.</p></article>
-          <article className="suite-community"><UsersRound /><small>COMMUNITY</small><h3>Move forward together.</h3><p>Ask questions, share approaches, and celebrate real consistency on the leaderboard.</p></article>
+          <article className="suite-community"><UsersRound /><small>COMMUNITY</small><h3>Move forward together.</h3><p>Ask questions, share approaches, and keep your own progress private.</p></article>
         </div>
       </section>
 
@@ -428,7 +428,7 @@ const navItems = [
   ['/dashboard/tracker', LineChart, 'Tracker'],
   ['/battles', Swords, 'SAT Battles'],
   ['/forum', MessageCircle, 'Community'],
-  ['/leaderboard', Trophy, 'Leaderboard'],
+  ['/points', Award, 'Points & achievements'],
   ['/account', Settings, 'Settings']
 ]
 
@@ -550,7 +550,7 @@ function Dashboard() {
       <article className="dash-module vital-module"><header><small>VITAL STATS</small><a href="/dashboard/stats/edit">Update</a></header><dl><div><dt>GPA</dt><dd>{d.gpa}</dd></div><div><dt>SAT</dt><dd>{d.satTotal}</dd></div><div><dt>ACT</dt><dd>{d.actAverage}</dd></div></dl></article>
       <article className="dash-module insight-module"><div className="countdown">{d.testDateInfo?.days_left != null ? <><strong>{d.testDateInfo.days_left}</strong><span>DAYS TO {d.testDateInfo.test_type}</span><small>{d.testDateInfo.date_str}</small></> : <><CalendarDays /><span>NO TEST DATE SET</span><a href="/dashboard/test-path-builder">Set your date</a></>}</div><div className="insight"><Brain /><small>MENTICS INSIGHT</small><p>{suggestion}</p></div></article>
       <article className="dash-module updates-module"><header><div><small>LATEST SIGNALS</small><h2>Recent updates</h2></div><Clock3 /></header><div>{d.recentActivities?.length ? d.recentActivities.slice(0, 4).map((a, i) => <span key={i}><i><Check /></i><p><b>{activityTitle(a)}</b><small>{activityDetail(a)}</small></p></span>) : <div className="empty-state"><Target /><p>Your completed work will show up here.</p></div>}</div></article>
-      <article className={`dash-module trophies-module ${trophies.length ? '' : 'trophies-module--empty'}`}><header><div><small>MILESTONES</small><h2>Trophies</h2></div>{trophies.length ? <span className="trophy-total">{trophies.length} earned</span> : <Award />}</header><div className="trophy-list">{trophies.length ? trophies.slice(0, 6).map(item => <div className="trophy-item" key={item.id}><i><Trophy /></i><div><b>{item.title}</b><small>{item.description}</small></div></div>) : <div className="trophy-empty"><i><Trophy /></i><div><b>No trophies yet</b><small>Complete your first path task to earn one.</small></div></div>}</div><a href="/leaderboard">View leaderboard <ArrowRight /></a></article>
+      <article className={`dash-module trophies-module ${trophies.length ? '' : 'trophies-module--empty'}`}><header><div><small>MILESTONES</small><h2>Trophies</h2></div>{trophies.length ? <span className="trophy-total">{trophies.length} earned</span> : <Award />}</header><div className="trophy-list">{trophies.length ? trophies.slice(0, 6).map(item => <div className="trophy-item" key={item.id}><i><Trophy /></i><div><b>{item.title}</b><small>{item.description}</small></div></div>) : <div className="trophy-empty"><i><Trophy /></i><div><b>No trophies yet</b><small>Complete your first path task to earn one.</small></div></div>}</div><a href="/points">View points &amp; achievements <ArrowRight /></a></article>
     </section>
     <PortalSelector open={portalOpen} onClose={() => setPortalOpen(false)} />
   </main></AppShell>
@@ -2169,7 +2169,24 @@ function ForumPage() {
   const editButton = (kind, item) => <button type="button" className="forum-edit" onClick={() => setEditing({ kind, id: item.id })}><PenLine size={14} /> Edit</button>
   return <AppShell name={d.name}><main className="app-main"><PageIntro kicker="MENTICS COMMUNITY" title="Students helping students." copy="Compare approaches, ask better questions, and move forward together." actions={<button className="button button--primary" onClick={() => setCreating(!creating)}><Plus /> New discussion</button>} />{error && <p className="form-error">{error}</p>}{creating && <form className="new-post-panel" onSubmit={submitPost}><Field name="title" label="Discussion title" required /><Field name="content" label="What do you want to share or ask?" textarea required /><button className="button button--primary" disabled={busy}>Publish discussion</button></form>}<form className="forum-search" method="GET"><Search /><input name="search" defaultValue={d.searchQuery || ''} placeholder="Search discussions" /><button>Search</button></form><section className="forum-layout"><div className="thread-list">{d.posts?.length ? d.posts.map(post => <article className="thread" key={post.id}><header><span>{String(post.user_name || 'M').slice(0, 1)}</span><div><b>{post.title}</b><small>{post.user_name} · {String(post.created_at).slice(0, 10)}</small></div>{post.user_id === d.viewerId && !editingItem('post', post.id) && editButton('post', post)}</header>{editingItem('post', post.id) ? <form className="forum-edit-form" onSubmit={e => saveEdit('post', post.id, e)}><input name="title" defaultValue={post.title} maxLength="200" required /><textarea name="content" defaultValue={post.content} maxLength="5000" required /><div><button className="button button--primary" disabled={busy}>Save changes</button><button type="button" className="button button--quiet" onClick={() => setEditing(null)}>Cancel</button></div></form> : <p>{post.content}</p>}{post.replies?.length > 0 && <div className="replies">{post.replies.map(r => <div key={r.id}>{editingItem('reply', r.id) ? <form className="forum-edit-form" onSubmit={e => saveEdit('reply', r.id, e)}><textarea name="content" defaultValue={r.content} maxLength="5000" required /><div><button className="button button--primary" disabled={busy}>Save</button><button type="button" className="button button--quiet" onClick={() => setEditing(null)}>Cancel</button></div></form> : <><div className="reply-meta"><b>{r.user_name}</b>{r.user_id === d.viewerId && editButton('reply', r)}</div><p>{r.content}</p></>}</div>)}</div>}<form onSubmit={e => reply(post.id, e)}><input name="content" required placeholder="Add a thoughtful reply" /><button disabled={busy}><Send /></button></form></article>) : <div className="empty-state"><MessageCircle /><p>No discussions match this search yet.</p></div>}</div><aside className="community-aside"><UsersRound /><h3>Today in Mentics</h3><strong>{d.todaysThreads?.length || 0}</strong><span>new discussions</span><p>Keep posts specific, respectful, and useful to the next student.</p></aside></section></main></AppShell> }
 
-function LeaderboardPage() { const d = boot.data; return <AppShell name={d.name}><main className="app-main"><PageIntro kicker="COMMUNITY MOMENTUM" title="Consistency deserves the spotlight." copy="Points celebrate completed work—not comparison for its own sake." /><section className="leaderboard-list">{d.leaderboard?.map((row, index) => <article className={index < 3 ? 'top' : ''} key={`${row.name}-${index}`}><span>{index + 1}</span><div>{String(row.name || 'M').slice(0, 1).toUpperCase()}</div><b>{row.name}</b><strong>{row.points} pts</strong>{index === 0 && <Trophy />}</article>)}</section></main></AppShell> }
+function PointsPage() {
+  const d = boot.data
+  const achievements = d.achievements || []
+  const earned = achievements.filter(item => item.is_earned).length
+  const iconFor = id => id.startsWith('points_') ? Zap : id.startsWith('streak_') ? Flame : id === 'first_step' ? Check : Trophy
+  return <AppShell name={d.name}><main className="app-main points-page">
+    <PageIntro kicker="YOUR MOMENTUM" title="Track progress that belongs to you." copy="Your points, streak, and achievements are private—built to help you notice your own consistency." />
+    <section className="points-overview" aria-label="Your points summary">
+      <article className="points-total"><small>TOTAL POINTS</small><strong>{Number(d.points || 0).toLocaleString()}</strong><p>Earned from completed work</p></article>
+      <article><Flame /><div><small>DAY STREAK</small><strong>{d.streak || 0}</strong><p>Keep showing up one day at a time</p></div></article>
+      <article><Award /><div><small>ACHIEVEMENTS</small><strong>{earned}<span>/{achievements.length}</span></strong><p>Unlocked on your path</p></div></article>
+    </section>
+    <section className="achievements-panel">
+      <header><div><small>YOUR COLLECTION</small><h2>Achievements</h2></div><span>{earned} unlocked</span></header>
+      <div className="achievements-grid">{achievements.map(item => { const Icon = iconFor(item.id); return <article className={item.is_earned ? 'is-earned' : 'is-locked'} key={item.id}><i>{item.is_earned ? <Icon /> : <LockKeyhole />}</i><div><b>{item.title}</b><p>{item.description}</p></div><span>{item.is_earned ? <Check /> : 'Locked'}</span></article> })}</div>
+    </section>
+  </main></AppShell>
+}
 
 function AccountPage() {
   const d = boot.data
@@ -2184,7 +2201,7 @@ const legalCopy = {
     intro: 'Welcome to Mentics. This policy explains how Mentics collects, uses, discloses, and safeguards information when you use our website and services.',
     sections: [
       ['1. Information we collect', 'We collect account information such as your name, email, and securely hashed password or Google profile details. Educational data can include goals, learning style, anxieties, GPA, SAT/ACT scores, strengths, weaknesses, test dates, grade level, majors, and target colleges. We also collect content you choose to submit, including forum posts and replies, AI-assistant conversations, essays and prompts, plus activity data such as completed tasks, generated paths, and stat updates. Our servers may also receive technical information such as IP address, browser, operating system, access times, and viewed pages.'],
-      ['2. How we use information', 'We use this information to create and manage accounts; generate personalized test-prep and college-planning paths; provide contextual chat and essay feedback; operate the forum and leaderboard; display progress; analyze and improve Mentics; and administer points, streaks, and achievements.'],
+      ['2. How we use information', 'We use this information to create and manage accounts; generate personalized test-prep and college-planning paths; provide contextual chat and essay feedback; operate the forum; display private progress; analyze and improve Mentics; and administer points, streaks, and achievements.'],
       ['3. Disclosure of information', 'Mentics does not sell personal information. We may disclose information when required by law or needed to protect rights, property, and safety. We share inputs such as chat messages and essay text with Google Gemini only to provide the AI features you request, subject to Google’s privacy policies. We do not currently share user information with third-party advertisers.'],
       ["4. Children's privacy", 'Mentics is intended for high school students generally over age 13. We do not knowingly collect personally identifiable information from children under 13. If we learn that a user is under 13, we will require verifiable parental consent; parents or guardians may contact us to request appropriate action.'],
       ['5. Your rights and choices', 'You may review or change account information from account settings and may contact us to opt out of communications or ask about your information.'],
@@ -2255,7 +2272,7 @@ function App() {
     case 'college-builder': page = <BuilderPage kind="college" />; break
     case 'tracker': page = <TrackerPage />; break
     case 'forum': page = <ForumPage />; break
-    case 'leaderboard': page = <LeaderboardPage />; break
+    case 'points': page = <PointsPage />; break
     case 'account': page = <AccountPage />; break
     case 'privacy': page = <LegalPage type="privacy" />; break
     case 'terms': page = <LegalPage type="terms" />; break

@@ -105,6 +105,7 @@ DISALLOWED_PREFIXES = [
     "/onboarding",
     "/forum",
     "/leaderboard",
+    "/points",
     "/strategy_article",
     "/authorize",
     "/google-login",

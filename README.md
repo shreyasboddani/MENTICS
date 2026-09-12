@@ -38,7 +38,7 @@ Mentics has evolved to become a holistic platform for student success, incorpora
     * **Points System**: Earn points for completing tasks, with bonus points for major "milestone" and "boss battle" tasks.
     * **Streaks**: Build and maintain a daily streak by completing at least one task each day.
     * **Achievements**: Unlock achievements for reaching key milestones, such as completing a certain number of tasks or maintaining a long streak.
-* **Leaderboard**: A public leaderboard showcases the top users based on points earned, fostering a sense of friendly competition.
+* **Private progress tracking**: Students can review their own points, streaks, and unlocked achievements without comparing their work to other users.
 
 ### Account & Authentication
 * **Secure User Authentication**: Full support for user registration and login with both traditional email/password and seamless **Google OAuth 2.0**.
