@@ -80,7 +80,7 @@ fairness decisions. The current five-question contract stays intact.
   merits ongoing review, especially when a slot uses the legacy best-effort tier.
 - Shared initial JavaScript is approximately **145 KB gzip**, down from the
   original **167 KB** entry. The Arena route is about **27 KB gzip**; its additional
-  3D renderer is about **138 KB gzip**, fetched only for visible character previews.
+  3D renderer is about **143 KB gzip**, fetched only for visible character previews.
   Vite still reports the renderer exceeding its 500 KB uncompressed chunk warning.
   The pre-existing absolute font URL warning also remains; the font loads in Flask.
 
