@@ -327,7 +327,10 @@ def test_sat_battle_round_uses_a_fresh_validated_ai_set_when_configured(tmp_path
     assert all(call[1]["thinking_level"] == "medium" for call in creation_calls)
     assert all(call[1]["thinking_level"] == "medium" for call in review_calls)
     assert all(call[1]["max_output_tokens"] == 8192 for call in review_calls)
-    assert all(0 < call[1]["timeout_seconds"] <= 22 for call in calls)
+    # Bounded by the round's own remaining budget. The old flat 22-second cap
+    # truncated a slow call while the round still had time left to spend.
+    assert all(0 < call[1]["timeout_seconds"] <= app_module.SAT_BATTLE_GENERATION_BUDGET_SECONDS
+               for call in calls)
     assert {question["difficulty"] for question in questions} == {"grandmaster"}
     assert {question["source"] for question in questions} == {"gemini"}
     assert all(question["explanation"] for question in questions)

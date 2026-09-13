@@ -67,8 +67,16 @@ validation or the high-tier audit.
 
 Two gates judge an item and they are not interchangeable. `SAT_BATTLE_TIER_CONTRACT` decides whether an item is the right *hardness* for its tier; missing that band is retryable and a near-miss is eventually accepted rather than failing the round. `SAT_BATTLE_MINIMUM_TEXT` is the *item* contract and is fatal. Repeating the tier's own Math floor in the fatal gate meant a correct Bronze stem such as "If 3x + 7 = 22, what is the value of 6x - 4?" was thrown out for being 44 characters, the slot could never fill, and every Bronze round failed. The fatal gate is now a sanity floor only. A retry is also told why its last attempt was rejected; a blind retry returned the same item with the same fault.
 
-Generation has a 44-second collection deadline and bounded individual HTTP
-requests. Executors no longer wait indefinitely on exit. Failed training leaves
+Generation's collection deadline is not quality control; it exists only because
+a host kills the request anyway. It is derived from that wall clock rather than
+guessed at: `SAT_BATTLE_FUNCTION_LIMIT_SECONDS` (default 60, matching
+`maxDuration` in `vercel.json`) less eight seconds for the response, so 52 by
+default. Set it to match `maxDuration` if that changes, or to 0 on a host that
+will let a slow request run to completion, which removes the deadline entirely.
+Individual calls are bounded by whatever budget remains rather than by a flat 22
+seconds, which used to truncate a slow call while the round still had time to
+spend. Master is the slowest tier at roughly 35-39 seconds, so raising
+`maxDuration` is what buys real headroom. Executors no longer wait indefinitely on exit. Failed training leaves
 no partial battle. Ranked rows are claimed before generation but questions and
 the clock publish together, so loading cannot consume round time. Cancellation
 cannot resurrect a preparing round; abandoned preparation expires without RP.

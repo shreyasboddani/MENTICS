@@ -5133,9 +5133,17 @@ def _recent_battle_question_fingerprints():
 # other four questions they were already going to be served.
 
 SAT_BATTLE_SLOT_ATTEMPTS = 3
-# Vercel gives the function 60s. Stop starting new Gemini waves well before the
-# gateway hangs up so a slow tier fails with a real message instead of a 504.
-SAT_BATTLE_GENERATION_BUDGET_SECONDS = 44
+# A deadline is not quality control: it exists only because a host kills the
+# request anyway, and a round that needs seventy seconds should take seventy
+# seconds. So derive the budget from that wall clock rather than guessing at
+# it, and leave room for the response. On Vercel the limit is maxDuration in
+# vercel.json; set SAT_BATTLE_FUNCTION_LIMIT_SECONDS to match if it changes,
+# or to 0 on a host that will let a slow request run to completion.
+SAT_BATTLE_FUNCTION_LIMIT_SECONDS = int(os.getenv('SAT_BATTLE_FUNCTION_LIMIT_SECONDS', '60'))
+SAT_BATTLE_GENERATION_BUDGET_SECONDS = max(0, SAT_BATTLE_FUNCTION_LIMIT_SECONDS - 8)
+# Used per call when nothing is going to hang up on us, so the Arena keeps its
+# single-attempt retry policy instead of falling back to the SDK default.
+SAT_BATTLE_UNBOUNDED_CALL_SECONDS = 900
 SAT_BATTLE_AI_MAX_OUTPUT_TOKENS = 12000
 
 _ARENA_COMPLEXITY_PATTERN = re.compile(
@@ -5405,7 +5413,9 @@ def _generate_arena_text(prompt, *, thinking_level, system_instruction, deadline
     and high-tier items must pass an independent blind audit.
     """
     def remaining():
-        seconds = min(22, deadline - time.monotonic()) if deadline else 22
+        if deadline is None:
+            return SAT_BATTLE_UNBOUNDED_CALL_SECONDS
+        seconds = deadline - time.monotonic()
         if seconds <= 0:
             raise TimeoutError('Arena generation deadline reached.')
         return seconds
@@ -5494,7 +5504,8 @@ def _generate_ai_battle_questions(difficulty):
     # Complete lazy client setup once before the worker threads use it.
     _get_gemini_client()
 
-    deadline = time.monotonic() + SAT_BATTLE_GENERATION_BUDGET_SECONDS
+    budget = SAT_BATTLE_GENERATION_BUDGET_SECONDS
+    deadline = time.monotonic() + budget if budget else None
 
     def retry_note(note):
         """Name the fault to the retry. A blind retry returns the same item."""
@@ -5598,14 +5609,15 @@ DRAFT:
     pending = list(range(SAT_BATTLE_QUESTION_COUNT))
 
     for _attempt in range(SAT_BATTLE_SLOT_ATTEMPTS):
-        if not pending or time.monotonic() >= deadline:
+        if not pending or (deadline is not None and time.monotonic() >= deadline):
             break
         nonce = secrets.token_urlsafe(12)
         drafts = {}
         executor = ThreadPoolExecutor(max_workers=len(pending))
         futures = {executor.submit(build_slot, slot, nonce, slot_notes[slot]): slot for slot in pending}
         try:
-            for future in as_completed(futures, timeout=max(.01, deadline - time.monotonic())):
+            remaining_budget = None if deadline is None else max(.01, deadline - time.monotonic())
+            for future in as_completed(futures, timeout=remaining_budget):
                 slot = futures[future]
                 try:
                     drafts[slot] = future.result()
