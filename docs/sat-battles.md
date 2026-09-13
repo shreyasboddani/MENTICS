@@ -4,8 +4,9 @@
 
 `/battles` still boots from Flask. The existing avatar POST, queue POST,
 training POST, battle GET, cancellation and submission endpoints remain.
-Five shared questions, the two-minute clock, server-side grading, stronger-player
-rank selection, bot drop-in, Elo, streaks and private training are preserved.
+Five shared questions, server-side grading, stronger-player rank selection, bot
+drop-in, Elo, streaks and private training are preserved. The flat two-minute
+clock is not: it is now sized to the round.
 No migrations or changes to saved cosmetic keys are required.
 
 The server still owns answer keys. Active responses only add the current
@@ -33,6 +34,21 @@ flag. Explanations and keys remain available only after completion.
 - `app-runtime.jsx` contains the shared shell/CSRF/API primitives extracted from
   App. Hashed shared chunks prevent lazy imports from executing Flask's
   query-versioned `app.js` entry twice. Vite's base matches `/static/react/`.
+
+## Round clock
+
+The clock is derived from the questions actually served rather than fixed at two
+minutes, which gave five items 24 seconds each — under half the time the
+generator is told to write a bronze item for, and a quarter of a grandmaster
+one. Official Digital SAT pacing is about 71 seconds per Reading and Writing
+question and 95 per Math question; the Arena is a race, so it runs brisker than
+that at the low tiers and approaches real pacing at the top. A round costs 78
+seconds per Math item and 60 per Reading and Writing item, scaled by tier
+(bronze 0.72 through grandmaster 1.20), rounded to a quarter minute and clamped
+to 150-600 seconds. A standard three-Math round therefore runs 4:15 at bronze
+and 7:00 at grandmaster. The lobby advertises the clock the selected tier earns,
+the battle header counts that clock down, and the bot answers at 62 percent of
+it so finishing early still wins a tie on time.
 
 ## Generation
 

@@ -101,7 +101,9 @@ function BattleRatingResult({ rank, previousRank, delta }) {
   </div>
 }
 
-function BattleClock({ startedAt, durationSeconds }) {
+const clockText = seconds => `${Math.floor(seconds / 60)}:${String(Math.round(seconds) % 60).padStart(2, '0')}`
+
+function BattleClock({ startedAt, durationSeconds = 300 }) {
   const [secondsLeft, setSecondsLeft] = useState(null)
   useEffect(() => {
     if (!startedAt) return undefined
@@ -111,12 +113,15 @@ function BattleClock({ startedAt, durationSeconds }) {
     const timer = window.setInterval(tick, 1000)
     return () => window.clearInterval(timer)
   }, [startedAt, durationSeconds])
-  const clock = secondsLeft == null ? '2:00' : `${Math.floor(secondsLeft / 60)}:${String(secondsLeft % 60).padStart(2, '0')}`
-  return <strong className={secondsLeft != null && secondsLeft < 20 ? 'urgent' : ''}><Clock3 /> {clock}</strong>
+  // The round's own clock, never a hard-coded two minutes: a grandmaster set of
+  // Math items is not paced like five easy Reading questions.
+  const clock = clockText(secondsLeft == null ? durationSeconds : secondsLeft)
+  return <strong className={secondsLeft != null && secondsLeft < 30 ? 'urgent' : ''}><Clock3 /> {clock}</strong>
 }
 
-function ArenaGameLobby({ paused, name, rank, rankProgress, avatar, openCustomizer, mode, setMode, trainingRank, setTrainingRank, selectedTier, busy, join, train, winStreak, bestWinStreak }) {
+function ArenaGameLobby({ paused, name, rank, rankProgress, avatar, openCustomizer, mode, setMode, trainingRank, setTrainingRank, selectedTier, busy, join, train, winStreak, bestWinStreak, clocks }) {
   const ranked = mode === 'ranked'
+  const tierClock = clocks?.[ranked ? rank?.key : trainingRank] ?? clocks?.bronze ?? 300
   return <section className="arena-game-shell" data-mode={mode} aria-label="SAT Battle Arena game lobby">
     <div className="arena-game-sky" aria-hidden="true"><i /><i /><i /><i /></div>
     <header className="arena-game-bar"><span><Swords /> SAT BATTLES</span><b>MENTICS / ARENA</b><em><i /> Online</em></header>
@@ -146,7 +151,7 @@ function ArenaGameLobby({ paused, name, rank, rankProgress, avatar, openCustomiz
         <div className="arena-difficulty-callout"><Target /><span><small>QUESTION TIER</small><b>{ranked ? `${rank?.label || 'Bronze'} matchmaking` : `${selectedTier[1]} simulation`}</b></span></div>
         <p className="arena-scale-copy">Every rank gets full-length, original SAT-style questions. Higher ranks add denser passages, tighter traps, multi-constraint math, and dramatically harder reasoning.</p>
         <button type="button" className="arena-deploy-button" onClick={ranked ? join : train} disabled={busy}><span>{busy ? 'INITIALIZING…' : ranked ? 'FIND A MATCH' : 'START TRAINING'}</span><i>{ranked ? <Swords /> : <Zap />}</i></button>
-        <footer><span><b>05</b> QUESTIONS</span><span><b>2:00</b> CLOCK</span><span><b>{ranked ? 'RP' : '0 RP'}</b> {ranked ? 'AT STAKE' : 'RISK'}</span></footer>
+        <footer><span><b>05</b> QUESTIONS</span><span><b>{clockText(tierClock)}</b> CLOCK</span><span><b>{ranked ? 'RP' : '0 RP'}</b> {ranked ? 'AT STAKE' : 'RISK'}</span></footer>
         {ranked && <p className="arena-match-note">An Arena bot joins if no player matches within 30 seconds.</p>}
       </aside>
     </div>
@@ -361,7 +366,7 @@ export default function BattleArena() {
   const selectedTrainingTier = BATTLE_TRAINING_RANKS.find(([key]) => key === trainingRank) || BATTLE_TRAINING_RANKS[0]
   const advanceQuestion = () => setActiveQuestion(index => Math.min(index + 1, Math.max(0, questionCount - 1)))
   return <AppShell name={d.name}><main className={`app-main battle-page ${active ? 'battle-page--in-match' : waiting ? 'battle-page--queue' : complete ? 'battle-page--complete' : ''}`}>
-    {idle && !busy && <ArenaGameLobby paused={customizing} name={d.name} rank={rank} rankProgress={rankProgress} avatar={avatar} openCustomizer={() => setCustomizing(true)} mode={lobbyMode} setMode={setLobbyMode} trainingRank={trainingRank} setTrainingRank={setTrainingRank} selectedTier={selectedTrainingTier} busy={busy} join={join} train={train} winStreak={winStreak} bestWinStreak={bestWinStreak} />}
+    {idle && !busy && <ArenaGameLobby paused={customizing} name={d.name} rank={rank} rankProgress={rankProgress} avatar={avatar} openCustomizer={() => setCustomizing(true)} mode={lobbyMode} setMode={setLobbyMode} trainingRank={trainingRank} setTrainingRank={setTrainingRank} selectedTier={selectedTrainingTier} clocks={d.battleClocks} busy={busy} join={join} train={train} winStreak={winStreak} bestWinStreak={bestWinStreak} />}
     {idle && busy && <BattleLoadingScreen rank={selectedTrainingTier[1]} matchmaking={lobbyMode === 'ranked'} />}
     {idle && customizing && typeof document !== 'undefined' && createPortal(<ArenaCustomizer avatar={avatar} onChange={setAvatar} onSave={saveAvatar} onClose={closeCustomizer} saving={savingAvatar} />, document.body)}
     {error && <div className="error-banner" role="alert">{error}<button onClick={() => window.location.reload()}>Reload battle</button><button onClick={() => setError('')}>Dismiss</button></div>}
@@ -386,7 +391,7 @@ export default function BattleArena() {
           <WinStreakFlame streak={battle.winStreak || 0} best={battle.bestWinStreak || 0} /></>
         : <em className={`battle-result-rank battle-result-rank--${battle.rank?.key}`}>{battle.rank?.label} · {battle.rank?.rating} RP</em>}<button className="button button--primary" onClick={() => { requestVersion.current += 1; setCalculatorOpen(false); setBattle(null); setAnswers({}); setActiveQuestion(0) }}>{battle.mode === 'training' ? 'Train again' : 'Find another battle'} <Swords /></button></section>}
     {complete && <BattleReview battle={battle} answers={answers} />}
-    <section className="battle-lower"><div className="battle-rules"><small>HOW IT WORKS</small><h2>One clean round. No fluff.</h2><div><article><b>01</b><span><strong>Match</strong><p>We pair you with one student and serve the same question set.</p></span></article><article><b>02</b><span><strong>Race</strong><p>Answer all five in two minutes. Your clock starts together.</p></span></article><article><b>03</b><span><strong>Climb</strong><p>Accuracy takes it. Faster completion breaks a tied score.</p></span></article></div></div><aside className="battle-leaderboard"><header><span><Trophy /> BATTLE LEADERBOARD</span><a href="#battle-rankings">View rankings</a></header>{d.leaderboard?.length ? d.leaderboard.slice(0, 5).map((row, index) => <div key={row.user_id}><i>{index + 1}</i><span>{String(row.user_name || 'M').slice(0, 1)}</span><b>{row.user_name}<small className={`battle-rank-label battle-rank-label--${row.rank.key}`}>{row.rank.label}</small></b><strong>{row.rating}</strong></div>) : <p>The first completed battle earns a place here.</p>}</aside></section>
+    <section className="battle-lower"><div className="battle-rules"><small>HOW IT WORKS</small><h2>One clean round. No fluff.</h2><div><article><b>01</b><span><strong>Match</strong><p>We pair you with one student and serve the same question set.</p></span></article><article><b>02</b><span><strong>Race</strong><p>Answer all five before the clock runs out. It is sized to the tier, and it starts together.</p></span></article><article><b>03</b><span><strong>Climb</strong><p>Accuracy takes it. Faster completion breaks a tied score.</p></span></article></div></div><aside className="battle-leaderboard"><header><span><Trophy /> BATTLE LEADERBOARD</span><a href="#battle-rankings">View rankings</a></header>{d.leaderboard?.length ? d.leaderboard.slice(0, 5).map((row, index) => <div key={row.user_id}><i>{index + 1}</i><span>{String(row.user_name || 'M').slice(0, 1)}</span><b>{row.user_name}<small className={`battle-rank-label battle-rank-label--${row.rank.key}`}>{row.rank.label}</small></b><strong>{row.rating}</strong></div>) : <p>The first completed battle earns a place here.</p>}</aside></section>
     <section className="battle-spotlight" id="battle-rankings"><div><small>ARENA SPOTLIGHT</small><h2>{spotlight ? `${spotlight.challenger_name} vs ${spotlight.opponent_name}` : 'The next great battle starts with you.'}</h2><p>{spotlight ? 'The latest completed head-to-head round in the Mentics arena.' : 'Enter the arena to set the first battle on the board.'}</p></div><div>{spotlight ? <><strong>{spotlight.winner_id ? 'WINNER DECIDED' : 'DRAW'}</strong><span>Latest completed battle</span></> : <><strong>OPEN</strong><span>Matchmaking is ready</span></>}</div></section>
   </main></AppShell>
 }

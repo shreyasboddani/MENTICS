@@ -1057,7 +1057,7 @@ async function api(url, options = {}) {
 }
 //#endregion
 //#region frontend/src/App.jsx
-var BattleArena = lazy(() => import("./assets/arena-page-OnUfJ9b0.js").then((n) => n.t));
+var BattleArena = lazy(() => import("./assets/arena-page-tKe-sm9N.js").then((n) => n.t));
 var productPages = {
 	"ai-sat-prep": {
 		eyebrow: "PERSONALIZED AI SAT PREP",

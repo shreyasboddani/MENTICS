@@ -1715,10 +1715,6 @@
 .battle-stage--active .battle-question header small { color: #b99dff; }
 .battle-stage--active .battle-question header span { color: #b9adc9; }
 .battle-stage--active .battle-question h2 { color: #fff; font-size: clamp(1.08rem, 2vw, 1.32rem); }
-.battle-stage--active .battle-question button { border-color: rgba(213, 202, 255, .14); color: #eeeaff; background: rgba(255,255,255,.055); }
-.battle-stage--active .battle-question button i { color: #c2b8d8; background: rgba(255,255,255,.11); }
-.battle-stage--active .battle-question button.selected { border-color: #ad8aff; color: #fff; background: linear-gradient(135deg, rgba(132, 85, 233, .62), rgba(75, 60, 186, .62)); box-shadow: 0 0 0 1px #ad8aff, 0 0 25px rgba(138, 85, 234, .28), inset 0 1px rgba(255,255,255,.2); }
-.battle-stage--active .battle-question button.selected i { background: #cab7ff; color: #392176; }
 .battle-stage--active .battle-round-actions p { color: #c5bdd7; }
 .battle-stage--active .battle-round-actions .button { color: #f5f1ff; border-color: rgba(223, 215, 255, .22); background: rgba(255,255,255,.08); }
 .battle-stage--active .battle-lock { box-shadow: 0 16px 32px -17px rgba(122, 70, 242, .86), inset 0 1px rgba(255,255,255,.35); }

@@ -1243,3 +1243,53 @@ def test_high_tier_review_is_blind_and_unverified_items_cannot_escape(tmp_path, 
     monkeypatch.setattr(app_module, '_generate_text', generate)
     assert app_module._generate_ai_battle_questions('grandmaster') is None
     assert seen_reviews
+
+
+def test_round_clock_is_sized_to_its_questions_not_a_flat_two_minutes():
+    def mix(tier):
+        return [{'difficulty': tier, 'domain': domain} for domain in
+                ('math', 'math', 'math', 'reading_writing', 'reading_writing')]
+
+    bronze = app_module._battle_duration_seconds(mix('bronze'))
+    grandmaster = app_module._battle_duration_seconds(mix('grandmaster'))
+    # Five items in 120 seconds gave 24 seconds each, under half the time a
+    # bronze item is written for and a quarter of a grandmaster one.
+    assert bronze >= 45 * app_module.SAT_BATTLE_QUESTION_COUNT
+    assert grandmaster >= 60 * app_module.SAT_BATTLE_QUESTION_COUNT
+    assert bronze < grandmaster <= app_module.SAT_BATTLE_CLOCK_CEILING_SECONDS
+    # Math costs more than Reading and Writing at the same tier.
+    all_math = [{'difficulty': 'gold', 'domain': 'math'} for _ in range(5)]
+    all_verbal = [{'difficulty': 'gold', 'domain': 'reading_writing'} for _ in range(5)]
+    assert app_module._battle_duration_seconds(all_math) > app_module._battle_duration_seconds(all_verbal)
+    # A round with no questions yet still advertises a usable clock.
+    assert app_module._battle_duration_seconds([]) == app_module.SAT_BATTLE_DURATION_SECONDS
+    assert app_module._battle_duration_seconds(None) == app_module.SAT_BATTLE_DURATION_SECONDS
+
+
+def test_battle_times_out_on_its_own_clock(tmp_path, monkeypatch):
+    database = _arena_database(tmp_path, monkeypatch, 'clock.db')
+    player = _user(database, 'clock@example.test', 'Clock')
+    bot = app_module._battle_bot()
+    questions = app_module._fallback_battle_questions('bronze')
+    duration = app_module._battle_duration_seconds(questions)
+    assert duration > 120, 'a bronze round should outlast the old flat clock'
+
+    def battle_started(seconds_ago):
+        database.execute_write('DELETE FROM sat_battles WHERE challenger_id=?', (player.data['id'],))
+        database.insert('sat_battles', {
+            'challenger_id': player.data['id'], 'challenger_name': 'Clock',
+            'opponent_id': bot['id'], 'opponent_name': bot['name'],
+            'status': 'active', 'questions': json.dumps(questions),
+            'created_at': app_module._utc_now().isoformat(),
+            'started_at': (app_module._utc_now() - timedelta(seconds=seconds_ago)).isoformat(),
+        })
+        row = database.select_one('sat_battles', where={'challenger_id': player.data['id']})
+        return app_module._battle_payload(row, player.data['id'])
+
+    # Still running where the old two-minute clock would already have expired.
+    running = battle_started(duration - 30)
+    assert running['status'] == 'active'
+    assert running['durationSeconds'] == duration
+    assert app_module._battle_duration_seconds(questions) == duration
+    # And finished once its own clock runs out.
+    assert battle_started(duration + 5)['status'] == 'complete'

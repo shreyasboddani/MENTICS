@@ -33,7 +33,7 @@ function ArenaAvatarPreview({ avatar, label = "Your fighter", paused = false, vi
 		const observer = new IntersectionObserver((entries) => {
 			if (!entries[0].isIntersecting) return;
 			observer.disconnect();
-			import("./arena-avatar-scene-BxKc8trN.js").then(({ createAvatarScene }) => {
+			import("./arena-avatar-scene-DzW3HvU1.js").then(({ createAvatarScene }) => {
 				if (cancelled) return;
 				scene.current = createAvatarScene(element, latest.current, () => setFailed(true));
 				setReady(true);
@@ -3643,7 +3643,8 @@ function BattleRatingResult({ rank, previousRank, delta }) {
 		})]
 	});
 }
-function BattleClock({ startedAt, durationSeconds }) {
+var clockText = (seconds) => `${Math.floor(seconds / 60)}:${String(Math.round(seconds) % 60).padStart(2, "0")}`;
+function BattleClock({ startedAt, durationSeconds = 300 }) {
 	const [secondsLeft, setSecondsLeft] = useState(null);
 	useEffect(() => {
 		if (!startedAt) return void 0;
@@ -3652,9 +3653,9 @@ function BattleClock({ startedAt, durationSeconds }) {
 		const timer = window.setInterval(tick, 1e3);
 		return () => window.clearInterval(timer);
 	}, [startedAt, durationSeconds]);
-	const clock = secondsLeft == null ? "2:00" : `${Math.floor(secondsLeft / 60)}:${String(secondsLeft % 60).padStart(2, "0")}`;
+	const clock = clockText(secondsLeft == null ? durationSeconds : secondsLeft);
 	return /* @__PURE__ */ jsxs("strong", {
-		className: secondsLeft != null && secondsLeft < 20 ? "urgent" : "",
+		className: secondsLeft != null && secondsLeft < 30 ? "urgent" : "",
 		children: [
 			/* @__PURE__ */ jsx(Clock3, {}),
 			" ",
@@ -3662,8 +3663,9 @@ function BattleClock({ startedAt, durationSeconds }) {
 		]
 	});
 }
-function ArenaGameLobby({ paused, name, rank, rankProgress, avatar, openCustomizer, mode, setMode, trainingRank, setTrainingRank, selectedTier, busy, join, train, winStreak, bestWinStreak }) {
+function ArenaGameLobby({ paused, name, rank, rankProgress, avatar, openCustomizer, mode, setMode, trainingRank, setTrainingRank, selectedTier, busy, join, train, winStreak, bestWinStreak, clocks }) {
 	const ranked = mode === "ranked";
+	const tierClock = clocks?.[ranked ? rank?.key : trainingRank] ?? clocks?.bronze ?? 300;
 	return /* @__PURE__ */ jsxs("section", {
 		className: "arena-game-shell",
 		"data-mode": mode,
@@ -3829,7 +3831,7 @@ function ArenaGameLobby({ paused, name, rank, rankProgress, avatar, openCustomiz
 							}),
 							/* @__PURE__ */ jsxs("footer", { children: [
 								/* @__PURE__ */ jsxs("span", { children: [/* @__PURE__ */ jsx("b", { children: "05" }), " QUESTIONS"] }),
-								/* @__PURE__ */ jsxs("span", { children: [/* @__PURE__ */ jsx("b", { children: "2:00" }), " CLOCK"] }),
+								/* @__PURE__ */ jsxs("span", { children: [/* @__PURE__ */ jsx("b", { children: clockText(tierClock) }), " CLOCK"] }),
 								/* @__PURE__ */ jsxs("span", { children: [
 									/* @__PURE__ */ jsx("b", { children: ranked ? "RP" : "0 RP" }),
 									" ",
@@ -4242,6 +4244,7 @@ function BattleArena() {
 					trainingRank,
 					setTrainingRank,
 					selectedTier: selectedTrainingTier,
+					clocks: d.battleClocks,
 					busy,
 					join,
 					train,
@@ -4682,7 +4685,7 @@ function BattleArena() {
 							/* @__PURE__ */ jsx("h2", { children: "One clean round. No fluff." }),
 							/* @__PURE__ */ jsxs("div", { children: [
 								/* @__PURE__ */ jsxs("article", { children: [/* @__PURE__ */ jsx("b", { children: "01" }), /* @__PURE__ */ jsxs("span", { children: [/* @__PURE__ */ jsx("strong", { children: "Match" }), /* @__PURE__ */ jsx("p", { children: "We pair you with one student and serve the same question set." })] })] }),
-								/* @__PURE__ */ jsxs("article", { children: [/* @__PURE__ */ jsx("b", { children: "02" }), /* @__PURE__ */ jsxs("span", { children: [/* @__PURE__ */ jsx("strong", { children: "Race" }), /* @__PURE__ */ jsx("p", { children: "Answer all five in two minutes. Your clock starts together." })] })] }),
+								/* @__PURE__ */ jsxs("article", { children: [/* @__PURE__ */ jsx("b", { children: "02" }), /* @__PURE__ */ jsxs("span", { children: [/* @__PURE__ */ jsx("strong", { children: "Race" }), /* @__PURE__ */ jsx("p", { children: "Answer all five before the clock runs out. It is sized to the tier, and it starts together." })] })] }),
 								/* @__PURE__ */ jsxs("article", { children: [/* @__PURE__ */ jsx("b", { children: "03" }), /* @__PURE__ */ jsxs("span", { children: [/* @__PURE__ */ jsx("strong", { children: "Climb" }), /* @__PURE__ */ jsx("p", { children: "Accuracy takes it. Faster completion breaks a tied score." })] })] })
 							] })
 						]

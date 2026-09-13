@@ -4818,7 +4818,22 @@ SAT_BATTLE_BASE_RATING = 1000
 SAT_BATTLE_RATING_FLOOR = 800
 # Rounds before a rating is treated as settled and stops moving in big steps.
 SAT_BATTLE_PLACEMENT_ROUNDS = 10
-SAT_BATTLE_DURATION_SECONDS = 120
+# Official Digital SAT pacing is roughly 71 seconds per Reading and Writing
+# question and 95 per Math question. The Arena is a race rather than a section,
+# so it runs brisker than that at the low tiers and approaches real pacing at
+# the top, where an item is written to take a prepared student 60-90 seconds.
+SAT_BATTLE_QUESTION_SECONDS = {'math': 78, 'reading_writing': 60}
+SAT_BATTLE_PACE_BY_TIER = {
+    'bronze': .72, 'silver': .80, 'gold': .88, 'platinum': .96,
+    'diamond': 1.04, 'master': 1.12, 'grandmaster': 1.20,
+}
+SAT_BATTLE_CLOCK_FLOOR_SECONDS = 150
+SAT_BATTLE_CLOCK_CEILING_SECONDS = 600
+# Used before a round's questions exist, and as the clock the lobby advertises.
+SAT_BATTLE_DURATION_SECONDS = 300
+# The bot answers partway through rather than at the buzzer, so finishing early
+# still wins a tie on time.
+SAT_BATTLE_BOT_FINISH_FRACTION = .62
 SAT_BATTLE_BOT_WAIT_SECONDS = 30
 SAT_BATTLE_BOT_EMAIL = "arena-bot@mentics.system"
 SAT_BATTLE_BOT_CORRECT_BY_RANK = {
@@ -5675,6 +5690,38 @@ def _battle_questions(rating=1000, *, require_ai=False):
     return _fallback_battle_questions(difficulty)
 
 
+def _battle_question_list(battle):
+    try:
+        return json.loads((battle or {}).get('questions') or '[]')
+    except (TypeError, ValueError, json.JSONDecodeError):
+        return []
+
+
+def _battle_duration_seconds(questions):
+    """Size the clock to the round actually served.
+
+    A flat two minutes gave five questions 24 seconds each, under half the time
+    the generator is told to write a bronze item for and a quarter of what a
+    grandmaster item is meant to take.
+    """
+    if not questions:
+        return SAT_BATTLE_DURATION_SECONDS
+    pace = SAT_BATTLE_PACE_BY_TIER.get(questions[0].get('difficulty'), 1)
+    budget = sum(SAT_BATTLE_QUESTION_SECONDS.get(q.get('domain'), 66) for q in questions) * pace
+    rounded = round(budget / 15) * 15
+    return int(min(SAT_BATTLE_CLOCK_CEILING_SECONDS, max(SAT_BATTLE_CLOCK_FLOOR_SECONDS, rounded)))
+
+
+def _battle_clock_by_tier():
+    """The clock each tier earns, for a lobby that promises the real number."""
+    return {
+        tier: _battle_duration_seconds([
+            {'difficulty': tier, 'domain': 'math' if i < 3 else 'reading_writing'}
+            for i in range(SAT_BATTLE_QUESTION_COUNT)
+        ]) for tier in SAT_BATTLE_PACE_BY_TIER
+    }
+
+
 def _battle_bot():
     with db.rls_scope(system=True):
         bot = db.select_one('users', where={'email': SAT_BATTLE_BOT_EMAIL})
@@ -5805,13 +5852,16 @@ def _finish_battle_if_ready(battle):
         return battle
     now = _utc_now()
     started = _battle_time(battle.get('started_at')) or now
-    timed_out = (now - started).total_seconds() >= SAT_BATTLE_DURATION_SECONDS
+    # The clock belongs to the round, so a set of hard Math items is not scored
+    # against the same two minutes as five easy Reading questions.
+    duration = _battle_duration_seconds(_battle_question_list(battle))
+    timed_out = (now - started).total_seconds() >= duration
     challenger_done = bool(battle.get('challenger_answers'))
     opponent_done = bool(battle.get('opponent_answers'))
     bot = _battle_bot()
     is_bot_battle = bool(bot and battle.get('opponent_id') == bot['id'])
     if is_bot_battle and (challenger_done or timed_out) and not opponent_done:
-        bot_finish = (started + timedelta(seconds=75)).isoformat()
+        bot_finish = (started + timedelta(seconds=round(duration * SAT_BATTLE_BOT_FINISH_FRACTION))).isoformat()
         db.update('sat_battles', {
             'opponent_answers': json.dumps(_battle_bot_answers(json.loads(battle['questions']))),
             'opponent_finished_at': bot_finish,
@@ -5909,7 +5959,7 @@ def _battle_payload(battle, user_id):
     is_bot_battle = bool(bot and battle.get('opponent_id') == bot['id'])
     result = {
         'id': battle['id'], 'status': battle['status'], 'opponentName': opponent_name,
-        'startedAt': battle.get('started_at'), 'durationSeconds': SAT_BATTLE_DURATION_SECONDS,
+        'startedAt': battle.get('started_at'), 'durationSeconds': _battle_duration_seconds(battle_questions),
         'submitted': bool(own_answers), 'createdAt': battle.get('created_at'),
         'answers': own_answers,
         'opponentSubmitted': bool(battle.get('opponent_answers') if is_challenger else battle.get('challenger_answers')),
@@ -5980,6 +6030,7 @@ def battle_arena(user):
         'currentBattle': _battle_payload(current, user.data['id']) if current else None,
         'arenaAvatar': _arena_avatar_for_user(user.data['id']),
         'battleRank': _battle_rank(stats['rating'] if stats else 1000),
+        'battleClocks': _battle_clock_by_tier(),
         'battleStats': stats or {'wins': 0, 'losses': 0, 'draws': 0, 'battles_played': 0},
         'winStreak': int((stats or {}).get('win_streak') or 0),
         'bestWinStreak': int((stats or {}).get('best_win_streak') or 0),

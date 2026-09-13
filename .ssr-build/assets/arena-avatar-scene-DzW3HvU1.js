@@ -1,4 +1,4 @@
-import { a as ARENA_AVATAR_PALETTES, i as ARENA_AVATAR_HAIR, n as ARENA_AVATAR_ACCENTS, o as ARENA_AVATAR_SKINS, r as ARENA_AVATAR_EYES, s as normalizeArenaAvatar } from "./arena-page-OnUfJ9b0.js";
+import { a as ARENA_AVATAR_PALETTES, i as ARENA_AVATAR_HAIR, n as ARENA_AVATAR_ACCENTS, o as ARENA_AVATAR_SKINS, r as ARENA_AVATAR_EYES, s as normalizeArenaAvatar } from "./arena-page-tKe-sm9N.js";
 import * as THREE from "three";
 import { RoundedBoxGeometry } from "three/addons/geometries/RoundedBoxGeometry.js";
 //#region frontend/src/arena-avatar-hair.js
