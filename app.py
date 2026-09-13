@@ -5049,14 +5049,15 @@ SAT_BATTLE_THINKING_BY_RANK = {
     'diamond': 'medium', 'master': 'medium', 'grandmaster': 'medium',
 }
 
+# A sanity floor, not a difficulty gate. SAT_BATTLE_TIER_CONTRACT decides
+# whether an item is the right hardness for its tier, and missing that band is
+# retryable. Repeating the tier's own floor here made the same judgement fatal:
+# a correct Bronze stem was thrown out for being short, the slot could never
+# fill, and the whole round failed. "If 3x + 7 = 22, what is the value of
+# 6x - 4?" is 44 characters and a real Bronze Math item.
 SAT_BATTLE_MINIMUM_TEXT = {
-    'bronze': {'math': 90, 'reading_writing': 170},
-    'silver': {'math': 105, 'reading_writing': 220},
-    'gold': {'math': 120, 'reading_writing': 280},
-    'platinum': {'math': 135, 'reading_writing': 340},
-    'diamond': {'math': 150, 'reading_writing': 420},
-    'master': {'math': 165, 'reading_writing': 500},
-    'grandmaster': {'math': 180, 'reading_writing': 560},
+    tier: {'math': 34, 'reading_writing': 120}
+    for tier in ('bronze', 'silver', 'gold', 'platinum', 'diamond', 'master', 'grandmaster')
 }
 
 SAT_BATTLE_AI_QUESTION_SCHEMA = {
@@ -5495,7 +5496,15 @@ def _generate_ai_battle_questions(difficulty):
 
     deadline = time.monotonic() + SAT_BATTLE_GENERATION_BUDGET_SECONDS
 
-    def generate_slot(slot, nonce):
+    def retry_note(note):
+        """Name the fault to the retry. A blind retry returns the same item."""
+        if not note:
+            return ''
+        return (f'\nThe previous attempt at this slot was rejected: {note}\n'
+                'Write a different item that does not repeat that fault. '
+                'Do not resubmit the same stem.\n')
+
+    def generate_slot(slot, nonce, note=None):
         domain, focus = slot_blueprints[slot]
         exact_focus = grandmaster_blueprints[slot] if difficulty == 'grandmaster' else focus
         prompt = f"""Write ONE original Digital SAT item. Return only the supplied JSON schema.
@@ -5516,7 +5525,7 @@ at the highest tier, but follow the specified tier word range; total at most 1,4
 Separate passage and task with a blank line. Completion tasks need a visible ____.
 Explanation: a FINAL 45-90 word proof of the key and one distractor trap. No drafting,
 self-correction, uncertainty, or instructions to change the problem in the explanation.
-"""
+{retry_note(note)}"""
         raw = _generate_arena_text(
             prompt, thinking_level=thinking_level, deadline=deadline,
             system_instruction=(
@@ -5560,9 +5569,9 @@ DRAFT:
             raise ValueError(f'Arena review {slot + 1} did not contain a question.')
         return reviewed
 
-    def build_slot(slot, nonce):
+    def build_slot(slot, nonce, note=None):
         """Validate shape, then independently audit high-tier candidates."""
-        draft = generate_slot(slot, nonce)
+        draft = generate_slot(slot, nonce, note)
         _cleaned, failure = _clean_battle_question(draft, difficulty, set(), recent_fingerprints, index=slot)
         if failure:
             return [draft]  # Do not pay for a model audit of a deterministically rejected item.
@@ -5580,6 +5589,10 @@ DRAFT:
     # cannot do better, because a slightly off-brief Grandmaster item still
     # beats telling the student the Arena is unavailable.
     best_effort = [None] * SAT_BATTLE_QUESTION_COUNT
+    # Why this slot's last attempt was thrown out. A retry that is not told
+    # returns the same item with the same fault, so three attempts cost three
+    # times as much and fail the round anyway.
+    slot_notes = [None] * SAT_BATTLE_QUESTION_COUNT
     seen, used_skills = set(), set()
     generation_started = time.monotonic()
     pending = list(range(SAT_BATTLE_QUESTION_COUNT))
@@ -5590,7 +5603,7 @@ DRAFT:
         nonce = secrets.token_urlsafe(12)
         drafts = {}
         executor = ThreadPoolExecutor(max_workers=len(pending))
-        futures = {executor.submit(build_slot, slot, nonce): slot for slot in pending}
+        futures = {executor.submit(build_slot, slot, nonce, slot_notes[slot]): slot for slot in pending}
         try:
             for future in as_completed(futures, timeout=max(.01, deadline - time.monotonic())):
                 slot = futures[future]
@@ -5614,15 +5627,18 @@ DRAFT:
                     candidate, difficulty, seen, recent_fingerprints, index=slot)
                 if failure:
                     app.logger.warning('Arena %s rejected a candidate: %s', difficulty, failure)
+                    slot_notes[slot] = failure
                     continue
                 if question['skill'].lower() in used_skills:
                     app.logger.warning(
                         'Arena %s slot %s repeated the skill %r', difficulty, slot + 1, question['skill'])
+                    slot_notes[slot] = f"the skill {question['skill']!r} is already used by another slot"
                     spare = spare or question
                     continue
                 tier_failure = _battle_tier_contract_failure(question, slot, difficulty)
                 if tier_failure:
                     app.logger.warning('Arena %s missed its contract: %s', difficulty, tier_failure)
+                    slot_notes[slot] = tier_failure
                     spare = spare or question
                     continue
                 chosen = question

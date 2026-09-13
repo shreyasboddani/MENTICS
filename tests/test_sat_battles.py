@@ -1293,3 +1293,29 @@ def test_battle_times_out_on_its_own_clock(tmp_path, monkeypatch):
     assert app_module._battle_duration_seconds(questions) == duration
     # And finished once its own clock runs out.
     assert battle_started(duration + 5)['status'] == 'complete'
+
+
+def test_short_but_correct_bronze_math_item_survives_the_item_contract():
+    """A concise easy Math stem is a real item, not a malformed one.
+
+    SAT_BATTLE_TIER_CONTRACT judges hardness and missing it is retryable.
+    SAT_BATTLE_MINIMUM_TEXT is fatal, so repeating the tier floor there left
+    Bronze Math slots that could never fill and rounds that always failed.
+    """
+    item = {
+        'domain': 'math',
+        'question_text': 'If 3x + 7 = 22, what is the value of 6x - 4?',
+        'options': ['26', '30', '5', '15'],
+        'correct_option': 0,
+        'skill': 'Linear equations',
+        'explanation': ('Subtracting 7 gives 3x = 15, so x = 5 and 6x - 4 = 30 - 4 = 26. '
+                        'The trap 30 stops at 6x and never subtracts the 4.'),
+    }
+    question, failure = app_module._clean_battle_question(item, 'bronze', set(), set())
+    assert failure is None, failure
+    assert question['domain'] == 'math'
+    # Shorter than the tier's own floor, which is exactly the case that broke:
+    # that judgement belongs to the retryable band, not to the fatal contract.
+    floor = app_module.SAT_BATTLE_TIER_CONTRACT['bronze']['math'][0]
+    assert len(item['question_text']) < floor
+    assert app_module.SAT_BATTLE_MINIMUM_TEXT['bronze']['math'] < floor

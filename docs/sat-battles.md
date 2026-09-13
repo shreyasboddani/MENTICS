@@ -65,6 +65,8 @@ parentheses. Existing repetition and tier gates remain. The legacy best-effort
 tier allowance is retained for usable, audited items; it does not waive structural
 validation or the high-tier audit.
 
+Two gates judge an item and they are not interchangeable. `SAT_BATTLE_TIER_CONTRACT` decides whether an item is the right *hardness* for its tier; missing that band is retryable and a near-miss is eventually accepted rather than failing the round. `SAT_BATTLE_MINIMUM_TEXT` is the *item* contract and is fatal. Repeating the tier's own Math floor in the fatal gate meant a correct Bronze stem such as "If 3x + 7 = 22, what is the value of 6x - 4?" was thrown out for being 44 characters, the slot could never fill, and every Bronze round failed. The fatal gate is now a sanity floor only. A retry is also told why its last attempt was rejected; a blind retry returned the same item with the same fault.
+
 Generation has a 44-second collection deadline and bounded individual HTTP
 requests. Executors no longer wait indefinitely on exit. Failed training leaves
 no partial battle. Ranked rows are claimed before generation but questions and
