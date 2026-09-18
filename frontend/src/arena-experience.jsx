@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { Check, ChevronRight, Swords, X } from 'lucide-react'
 import { ArenaCalculatorToggle } from './arena-calculator'
 
-export function BattleLoadingScreen({ rank, matchmaking = false }) {
+export function BattleLoadingScreen({ rank, exam = 'SAT', matchmaking = false }) {
   const [elapsed, setElapsed] = useState(0)
   useEffect(() => {
     const started = Date.now()
@@ -11,7 +11,7 @@ export function BattleLoadingScreen({ rank, matchmaking = false }) {
   }, [])
   return <section className="arena-loading" role="status" aria-live="polite" aria-atomic="true">
     <div className="arena-loading-insignia" aria-hidden="true"><Swords /><i /><i /><i /></div>
-    <small>{matchmaking ? 'CONNECTING TO THE ARENA' : `${rank} TRAINING`}</small>
+    <small>{matchmaking ? `${exam} MATCHMAKING` : `${exam} / ${rank} TRAINING`}</small>
     <h2>{elapsed < 20 ? 'Building your battle.' : 'Good questions take thought.'}</h2>
     <p>{matchmaking ? 'Finding your match and preparing a shared question set.' : 'Creating original questions and checking the set for your chosen difficulty.'}</p>
     <div className="arena-loading-track" aria-hidden="true"><i /></div>
@@ -42,7 +42,7 @@ export function BattleQuestionPanel({ question, index, selected, onSelect, calcu
   }, [index, question.options, onSelect, disabled])
   return <div className="battle-questions" ref={root}>
     <article className="battle-question battle-question--focus" data-domain={question.domain}>
-      <header><small>{question.domain === 'math' ? 'MATH' : 'READING & WRITING'} <span> / </span> {question.skill}</small>
+      <header><small>{question.section?.toUpperCase() || (question.domain === 'math' ? 'MATH' : 'READING & WRITING')} <span> / </span> {question.skill}</small>
         {question.domain === 'math' && <ArenaCalculatorToggle open={calculatorOpen} onToggle={onToggleCalculator} />}
       </header>
       <div className="arena-question-copy" tabIndex={-1} id={`arena-question-${index}`}>

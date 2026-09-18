@@ -108,11 +108,15 @@ SKILL_TAXONOMY = {
 _MATH_SUBJECTS = {"Math"}
 
 
-def skill_catalog(test_focus="sat"):
+def skill_catalog(test_focus="sat", subject_focus="all"):
     """Skill keys the planner may choose from, filtered to the student's test."""
     focus = (test_focus or "sat").lower()
     allowed = []
-    for key, (_, _, _, test) in SKILL_TAXONOMY.items():
+    for key, (_, subject, _, test) in SKILL_TAXONOMY.items():
+        if subject_focus == "math" and subject != "Math":
+            continue
+        if subject_focus == "ela" and subject not in {"Reading and Writing", "English", "Reading"}:
+            continue
         if test == "BOTH":
             allowed.append(key)
         elif focus == "both":
@@ -630,7 +634,7 @@ def _candidate_skills(profile):
                 and key != "pacing_and_timing":
             seen.add(key)
             ranked.append(key)
-    return ranked or HIGH_YIELD_DEFAULTS[focus]
+    return ranked or [key for key in SKILL_TAXONOMY if key in allowed]
 
 
 def _normalize_plan(data, shape, profile):
@@ -648,6 +652,9 @@ def _normalize_plan(data, shape, profile):
             continue
 
         skill = resolve_skill(raw.get("skill_key"), raw.get("title") or "")
+        if skill["skill_key"] not in profile.get("skill_options", SKILL_TAXONOMY):
+            raw = {}
+            skill = resolve_skill("pacing_and_timing")
         if skill["skill_key"] == "pacing_and_timing" and not raw.get("skill_key"):
             previous = nodes[-1] if nodes else None
             if node_type == "quiz" and used_order:

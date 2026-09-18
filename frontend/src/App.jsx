@@ -21,10 +21,12 @@ import './design-system.css'  // last: owns materials, motion, typography, a11y
 import './lesson-player.css'
 import './mentics-ui.css'  // last: owns chat guide, task modal, and map performance
 import './exam-landing.css'
+import './quick-practice.css'
 
 import { HomeHero } from './home-hero'
 import { boot } from './boot'
 import { ArenaRouteBoundary, AppShell, Starfield, Brand, CsrfField, useClientOnly, api } from './app-runtime'
+const QuickPractice = lazy(() => import('./quick-practice'))
 const BattleArena = lazy(() => import('./arena-page'))
 
 // The CSRF token is per-session, so it cannot be baked into prerendered HTML.
@@ -355,7 +357,7 @@ function Landing() {
       </section>
 
       <section className="battle-landing story-chapter" data-chapter="04" aria-labelledby="battle-landing-title">
-        <div className="battle-landing-copy"><div className="eyebrow"><span /> SAT BATTLE ARENA</div><h2 id="battle-landing-title">A faster way to prove what you know.</h2><p>Meet one student in a clean, timed five-question SAT round. Both of you get the same original questions. Accuracy decides it; speed breaks the tie.</p><a className="button button--primary" href={loggedIn ? '/battles' : '/signup'}><Swords /> {loggedIn ? 'Enter the arena' : 'Build your path first'} <ArrowRight size={17} /></a></div>
+        <div className="battle-landing-copy"><div className="eyebrow"><span /> SAT + ACT BATTLES</div><h2 id="battle-landing-title">A faster way to prove what you know.</h2><p>Meet one student in a clean, timed five-question SAT or ACT round. Both of you get the same original questions. Accuracy decides it; speed breaks the tie.</p><a className="button button--primary" href={loggedIn ? '/battles' : '/signup'}><Swords /> {loggedIn ? 'Enter the arena' : 'Build your path first'} <ArrowRight size={17} /></a></div>
         <div className="battle-landing-preview" aria-hidden="true"><header><span><i /> LIVE ROUND</span><strong><Clock3 /> 1:18</strong></header><div><small>QUESTION 3 · ALGEBRA</small><b>If 3x + 8 = 29, what is x?</b><span><i>A</i> 5</span><span className="selected"><i>B</i> 7 <Check /></span><span><i>C</i> 9</span></div><footer><span>YOU <b>2</b></span><i>VS</i><span><b>2</b> RIVAL</span></footer></div>
       </section>
 
@@ -445,7 +447,7 @@ function Dashboard() {
     <section className="dashboard-welcome"><div><small>{today}</small><h1>Welcome back, <span>{first}</span></h1><p>Your dashboard is ready. Let’s build momentum.</p></div><div className="dashboard-totals"><span><Flame /><b>{d.gameStats?.streak || 0}</b><small>DAY STREAK</small></span><span><Zap /><b>{d.gameStats?.points || 0}</b><small>POINTS</small></span></div></section>
     <section className="command-grid">
       <button className="path-launcher" onClick={() => setPortalOpen(true)}><span className="path-launcher-grid" /><div><small>THE CORE EXPERIENCE</small><h2>Path Builder</h2><p>Launch the Mentics portal to generate or update your personalized roadmap.</p><b>Open portal <ArrowRight /></b></div><div className="path-radar"><i /><i /><i /><Target /></div></button>
-      <a className="dash-module battle-dashboard-card" href="/battles"><div><small>SAT BATTLE ARENA</small><h2>Put your speed to the test.</h2><p>Race a matched student through five SAT-style questions. Accuracy wins; speed settles the tie.</p><b>Enter the arena <ArrowRight /></b></div><span><Swords /><i>1:1</i><small>LIVE</small></span></a>
+      <a className="dash-module battle-dashboard-card" href="/battles"><div><small>SAT + ACT BATTLES</small><h2>Put your speed to the test.</h2><p>Choose SAT or ACT, then race a student on the same exam. Accuracy wins; speed settles the tie.</p><b>Enter the arena <ArrowRight /></b></div><span><Swords /><i>1:1</i><small>LIVE</small></span></a>
       <ProgressTile type="test" value={d.testPrepCompleted || 0} /><ProgressTile type="college" value={d.collegePlanningCompleted || 0} />
       <article className="dash-module activity-module"><header><div><small>ACTIVITY TREND</small><h2>Focus intensity</h2></div><BarChart3 /></header><div className="command-chart">{chart.map((v, i) => <div key={i}><b>{v}</b><i style={{ height: `${Math.max(7, v / max * 100)}%` }} /><small>{d.activityData?.labels?.[i]}</small></div>)}</div></article>
       <article className="dash-module vital-module"><header><small>VITAL STATS</small><a href="/dashboard/stats/edit">Update</a></header><dl><div><dt>GPA</dt><dd>{d.gpa}</dd></div><div><dt>SAT</dt><dd>{d.satTotal}</dd></div><div><dt>ACT</dt><dd>{d.actAverage}</dd></div></dl></article>
@@ -562,7 +564,8 @@ function PathPage() {
     }
   }
   return <AppShell name={boot.data.name}><main className={`app-main path-page ${chatOpen ? 'chat-docked' : ''}`}>
-    <div className="path-header"><div><div className="eyebrow"><span /> {category.toUpperCase()}</div><h1>Your five-step path.</h1><p>Finish what is in front of you. The path adapts from there.</p></div><div className="path-header-actions">{!isTest && <button className="button button--quiet" onClick={() => setEssayOpen(true)}><PenLine size={17} /> Essay feedback</button>}{!chatOpen && <button className="button button--quiet" onClick={() => setChatOpen(true)}><MessageCircle size={17} /> Ask Mentics</button>}<a className="button button--dark" href={builder}>Edit goals <ArrowRight size={16} /></a></div></div>
+    <div className="path-header"><div><div className="eyebrow"><span /> {isTest && boot.data.testFocus ? `${boot.data.testFocus.toUpperCase()} ? ${{ math: 'MATH', ela: 'ELA', all: 'ALL SUBJECTS' }[boot.data.subjectFocus || 'all']}` : category.toUpperCase()}</div><h1>Your five-step path.</h1><p>Finish what is in front of you. The path adapts from there.</p></div><div className="path-header-actions">{!isTest && <button className="button button--quiet" onClick={() => setEssayOpen(true)}><PenLine size={17} /> Essay feedback</button>}{!chatOpen && <button className="button button--quiet" onClick={() => setChatOpen(true)}><MessageCircle size={17} /> Ask Mentics</button>}<a className="button button--dark" href={builder}>Edit goals <ArrowRight size={16} /></a></div></div>
+    {isTest && <a className="prep-shortcut" href="/dashboard/quick-practice"><span><Zap /><b>Short on time? Make it a quick round.</b><small>SAT or ACT ? Math or ELA ? Strategies, streaks, and mistake review</small></span><ArrowRight /></a>}
     <div className="path-progress"><span style={{ width: `${completed / progressTotal * 100}%` }} /><p><b><span>{completed}</span><i>/</i><span>{progressTotal}</span></b><span>core steps complete</span></p></div>
     {error && <div className="error-banner">{error}<button onClick={() => loadTasks()}>Try again</button></div>}
     {loading && !tasks.length ? <PathSkeleton /> : <section className={`journey-map ${regenerating ? 'journey-map--regenerating' : ''}`} style={{ height: journeyHeight }} aria-label={`${category} learning journey`} aria-busy={regenerating}>
@@ -1674,17 +1677,21 @@ function CollegePicker({ value = '' }) {
 function BuilderPage({ kind }) {
   const d = boot.data
   const test = kind === 'test'
-  const [focus, setFocus] = useState(d.test_focus || '')
+  const [focus, setFocus] = useState(['sat', 'act'].includes(d.test_focus) ? d.test_focus : '')
+  const [subject, setSubject] = useState(d.subject_focus || 'all')
   const [stage, setStage] = useState(d.planning_stage || '')
   const showsSat = focus === 'sat' || focus === 'both'
   const showsAct = focus === 'act' || focus === 'both'
-  const testChoices = [['sat', 'SAT only', 'One focused score plan'], ['act', 'ACT only', 'One focused score plan'], ['both', 'SAT + ACT', 'Compare before committing']]
+  const testChoices = [['sat', 'SAT', 'Math + Reading & Writing'], ['act', 'ACT', 'Math + English & Reading; optional Science in a full plan']]
   const stages = [['exploring', 'Explore', 'Clarify what matters before building a list'], ['researching', 'Research', 'Turn possible schools into informed choices'], ['applying', 'Apply', 'Move essays and applications forward']]
   return <AppShell name={d.name}><main className="app-main form-page">
-    <PageIntro kicker={test ? 'TEST PREPARATION' : 'COLLEGE PLANNING'} title={test ? 'Build a plan for the test you are taking.' : 'Build a college plan with a point of view.'} copy={test ? 'Choose SAT, ACT, or both. Mentics will only ask for the scores that matter to that choice.' : 'Your grade, current stage, priorities, and school list become the context behind every lesson and assignment.'} />
+    <PageIntro kicker={test ? 'TEST PREPARATION' : 'COLLEGE PLANNING'} title={test ? 'Build a plan for the test you are taking.' : 'Build a college plan with a point of view.'} copy={test ? 'Choose one exam, then your subject. Keep your lessons, strategies, and score goals focused on the test you are taking.' : 'Your grade, current stage, priorities, and school list become the context behind every lesson and assignment.'} />
+    {test && <a className="prep-shortcut" href="/dashboard/quick-practice"><span><Zap /><b>Test coming up? Jump into Quick Practice.</b><small>Choose your exam and subject. Drill strategies in a five-question round.</small></span><ArrowRight /></a>}
+    {d.error && <p className="form-error" role="alert">{d.error}</p>}
     <form method="POST" className="settings-form builder-form">
       {test ? <>
-        <fieldset><legend>What are you preparing for?</legend><p className="builder-help">Switching focus immediately reshapes the score fields below.</p><div className="choice-grid choice-grid--three">{testChoices.map(([value, label, copy]) => <label className={focus === value ? 'selected' : ''} key={value}><input type="radio" name="test_focus" value={value} required checked={focus === value} onChange={() => setFocus(value)} /><BookOpen /><b>{label}</b><small>{copy}</small></label>)}</div></fieldset>
+        <fieldset><legend>What are you preparing for?</legend><p className="builder-help">Switching focus immediately reshapes the score fields below.</p><div className="choice-grid choice-grid--two">{testChoices.map(([value, label, copy]) => <label className={focus === value ? 'selected' : ''} key={value}><input type="radio" name="test_focus" value={value} required checked={focus === value} onChange={() => setFocus(value)} /><BookOpen /><b>{label}</b><small>{copy}</small></label>)}</div></fieldset>
+        {focus && <fieldset><legend>Choose your subject</legend><p className="builder-help">Lessons and drills stay within this focus; the final checkpoint is a full practice test. ELA means Reading &amp; Writing for SAT, and English &amp; Reading for ACT.</p><div className="choice-grid choice-grid--three">{[['math', 'Math', 'Equations, problem solving, and quantitative reasoning'], ['ela', 'ELA', 'Reading, grammar, and writing skills'], ['all', 'All subjects', 'A broader study plan across your selected exam']].map(([value, label, copy]) => <label className={subject === value ? 'selected' : ''} key={value}><input type="radio" name="subject_focus" value={value} checked={subject === value} onChange={() => setSubject(value)} /><BookOpen /><b>{label}</b><small>{copy}</small></label>)}</div></fieldset>}
         {focus && <div className="builder-score-groups">
           {showsSat && <fieldset className="builder-score-group"><legend>SAT goals and baseline</legend><p>Use your latest official or full-length practice scores if you have them.</p><div className="form-field-grid"><Field name="desired_sat" label="Goal SAT score" type="number" min="400" max="1600" step="10" value={d.desired_sat} /><Field name="current_sat_ebrw" label="Current Reading & Writing" type="number" min="200" max="800" value={d.current_sat_ebrw} /><Field name="current_sat_math" label="Current Math" type="number" min="200" max="800" value={d.current_sat_math} /></div></fieldset>}
           {showsAct && <fieldset className="builder-score-group"><legend>ACT goals and baseline</legend><p>Use your latest composite and section scores if you have them.</p><div className="form-field-grid"><Field name="desired_act" label="Goal ACT score" type="number" min="1" max="36" value={d.desired_act} /><Field name="current_act_composite" label="Current composite" type="number" min="1" max="36" value={d.current_act_composite} /><Field name="current_act_math" label="Current Math" type="number" min="1" max="36" value={d.current_act_math} /><Field name="current_act_reading" label="Current Reading" type="number" min="1" max="36" value={d.current_act_reading} /><Field name="current_act_science" label="Current Science" type="number" min="1" max="36" value={d.current_act_science} /></div></fieldset>}
@@ -1808,6 +1815,7 @@ function App() {
   let page
   switch (boot.page) {
     case 'dashboard': page = <Dashboard />; break
+    case 'quick-practice': page = <QuickPractice />; break
     case 'path': page = <PathPage />; break
     case 'battles': page = <ArenaRouteBoundary><Suspense fallback={<AppShell name={boot.data.name}><main className="app-main" role="status"><h1>Entering the Arena</h1><p>Preparing your lobby and loadout…</p></main></AppShell>}><BattleArena /></Suspense></ArenaRouteBoundary>; break
     case 'login': page = <AuthPage mode="login" />; break

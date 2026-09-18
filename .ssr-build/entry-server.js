@@ -797,6 +797,11 @@ var navItems = [
 		"Test path"
 	],
 	[
+		"/dashboard/quick-practice",
+		Target,
+		"Quick practice"
+	],
+	[
 		"/dashboard/college-path-view",
 		GraduationCap,
 		"College path"
@@ -814,7 +819,7 @@ var navItems = [
 	[
 		"/battles",
 		Swords,
-		"SAT Battles"
+		"SAT + ACT Battles"
 	],
 	[
 		"/forum",
@@ -1057,7 +1062,8 @@ async function api(url, options = {}) {
 }
 //#endregion
 //#region frontend/src/App.jsx
-var BattleArena = lazy(() => import("./assets/arena-page-tKe-sm9N.js").then((n) => n.t));
+var QuickPractice = lazy(() => import("./assets/quick-practice-BNg19sXh.js"));
+var BattleArena = lazy(() => import("./assets/arena-page-BE-VOIv7.js").then((n) => n.t));
 var productPages = {
 	"ai-sat-prep": {
 		eyebrow: "PERSONALIZED AI SAT PREP",
@@ -2248,13 +2254,13 @@ function Landing() {
 						children: [
 							/* @__PURE__ */ jsxs("div", {
 								className: "eyebrow",
-								children: [/* @__PURE__ */ jsx("span", {}), " SAT BATTLE ARENA"]
+								children: [/* @__PURE__ */ jsx("span", {}), " SAT + ACT BATTLES"]
 							}),
 							/* @__PURE__ */ jsx("h2", {
 								id: "battle-landing-title",
 								children: "A faster way to prove what you know."
 							}),
-							/* @__PURE__ */ jsx("p", { children: "Meet one student in a clean, timed five-question SAT round. Both of you get the same original questions. Accuracy decides it; speed breaks the tie." }),
+							/* @__PURE__ */ jsx("p", { children: "Meet one student in a clean, timed five-question SAT or ACT round. Both of you get the same original questions. Accuracy decides it; speed breaks the tie." }),
 							/* @__PURE__ */ jsxs("a", {
 								className: "button button--primary",
 								href: loggedIn ? "/battles" : "/signup",
@@ -2766,9 +2772,9 @@ function Dashboard() {
 							className: "dash-module battle-dashboard-card",
 							href: "/battles",
 							children: [/* @__PURE__ */ jsxs("div", { children: [
-								/* @__PURE__ */ jsx("small", { children: "SAT BATTLE ARENA" }),
+								/* @__PURE__ */ jsx("small", { children: "SAT + ACT BATTLES" }),
 								/* @__PURE__ */ jsx("h2", { children: "Put your speed to the test." }),
-								/* @__PURE__ */ jsx("p", { children: "Race a matched student through five SAT-style questions. Accuracy wins; speed settles the tie." }),
+								/* @__PURE__ */ jsx("p", { children: "Choose SAT or ACT, then race a student on the same exam. Accuracy wins; speed settles the tie." }),
 								/* @__PURE__ */ jsxs("b", { children: ["Enter the arena ", /* @__PURE__ */ jsx(ArrowRight, {})] })
 							] }), /* @__PURE__ */ jsxs("span", { children: [
 								/* @__PURE__ */ jsx(Swords, {}),
@@ -3054,7 +3060,11 @@ function PathPage() {
 							children: [
 								/* @__PURE__ */ jsx("span", {}),
 								" ",
-								category.toUpperCase()
+								isTest && boot.data.testFocus ? `${boot.data.testFocus.toUpperCase()} ? ${{
+									math: "MATH",
+									ela: "ELA",
+									all: "ALL SUBJECTS"
+								}[boot.data.subjectFocus || "all"]}` : category.toUpperCase()
 							]
 						}),
 						/* @__PURE__ */ jsx("h1", { children: "Your five-step path." }),
@@ -3079,6 +3089,15 @@ function PathPage() {
 							})
 						]
 					})]
+				}),
+				isTest && /* @__PURE__ */ jsxs("a", {
+					className: "prep-shortcut",
+					href: "/dashboard/quick-practice",
+					children: [/* @__PURE__ */ jsxs("span", { children: [
+						/* @__PURE__ */ jsx(Zap, {}),
+						/* @__PURE__ */ jsx("b", { children: "Short on time? Make it a quick round." }),
+						/* @__PURE__ */ jsx("small", { children: "SAT or ACT ? Math or ELA ? Strategies, streaks, and mistake review" })
+					] }), /* @__PURE__ */ jsx(ArrowRight, {})]
 				}),
 				/* @__PURE__ */ jsxs("div", {
 					className: "path-progress",
@@ -6515,7 +6534,8 @@ function CollegePicker({ value = "" }) {
 function BuilderPage({ kind }) {
 	const d = boot.data;
 	const test = kind === "test";
-	const [focus, setFocus] = useState(d.test_focus || "");
+	const [focus, setFocus] = useState(["sat", "act"].includes(d.test_focus) ? d.test_focus : "");
+	const [subject, setSubject] = useState(d.subject_focus || "all");
 	const [stage, setStage] = useState(d.planning_stage || "");
 	const showsSat = focus === "sat" || focus === "both";
 	const showsAct = focus === "act" || focus === "both";
@@ -6523,286 +6543,339 @@ function BuilderPage({ kind }) {
 		name: d.name,
 		children: /* @__PURE__ */ jsxs("main", {
 			className: "app-main form-page",
-			children: [/* @__PURE__ */ jsx(PageIntro, {
-				kicker: test ? "TEST PREPARATION" : "COLLEGE PLANNING",
-				title: test ? "Build a plan for the test you are taking." : "Build a college plan with a point of view.",
-				copy: test ? "Choose SAT, ACT, or both. Mentics will only ask for the scores that matter to that choice." : "Your grade, current stage, priorities, and school list become the context behind every lesson and assignment."
-			}), /* @__PURE__ */ jsxs("form", {
-				method: "POST",
-				className: "settings-form builder-form",
-				children: [test ? /* @__PURE__ */ jsxs(Fragment, { children: [/* @__PURE__ */ jsxs("fieldset", { children: [
-					/* @__PURE__ */ jsx("legend", { children: "What are you preparing for?" }),
-					/* @__PURE__ */ jsx("p", {
-						className: "builder-help",
-						children: "Switching focus immediately reshapes the score fields below."
-					}),
-					/* @__PURE__ */ jsx("div", {
-						className: "choice-grid choice-grid--three",
-						children: [
-							[
-								"sat",
-								"SAT only",
-								"One focused score plan"
-							],
-							[
-								"act",
-								"ACT only",
-								"One focused score plan"
-							],
-							[
-								"both",
-								"SAT + ACT",
-								"Compare before committing"
-							]
-						].map(([value, label, copy]) => /* @__PURE__ */ jsxs("label", {
-							className: focus === value ? "selected" : "",
-							children: [
-								/* @__PURE__ */ jsx("input", {
-									type: "radio",
-									name: "test_focus",
-									value,
-									required: true,
-									checked: focus === value,
-									onChange: () => setFocus(value)
-								}),
-								/* @__PURE__ */ jsx(BookOpen, {}),
-								/* @__PURE__ */ jsx("b", { children: label }),
-								/* @__PURE__ */ jsx("small", { children: copy })
-							]
-						}, value))
-					})
-				] }), focus && /* @__PURE__ */ jsxs("div", {
-					className: "builder-score-groups",
-					children: [
-						showsSat && /* @__PURE__ */ jsxs("fieldset", {
-							className: "builder-score-group",
-							children: [
-								/* @__PURE__ */ jsx("legend", { children: "SAT goals and baseline" }),
-								/* @__PURE__ */ jsx("p", { children: "Use your latest official or full-length practice scores if you have them." }),
-								/* @__PURE__ */ jsxs("div", {
-									className: "form-field-grid",
+			children: [
+				/* @__PURE__ */ jsx(PageIntro, {
+					kicker: test ? "TEST PREPARATION" : "COLLEGE PLANNING",
+					title: test ? "Build a plan for the test you are taking." : "Build a college plan with a point of view.",
+					copy: test ? "Choose one exam, then your subject. Keep your lessons, strategies, and score goals focused on the test you are taking." : "Your grade, current stage, priorities, and school list become the context behind every lesson and assignment."
+				}),
+				test && /* @__PURE__ */ jsxs("a", {
+					className: "prep-shortcut",
+					href: "/dashboard/quick-practice",
+					children: [/* @__PURE__ */ jsxs("span", { children: [
+						/* @__PURE__ */ jsx(Zap, {}),
+						/* @__PURE__ */ jsx("b", { children: "Test coming up? Jump into Quick Practice." }),
+						/* @__PURE__ */ jsx("small", { children: "Choose your exam and subject. Drill strategies in a five-question round." })
+					] }), /* @__PURE__ */ jsx(ArrowRight, {})]
+				}),
+				d.error && /* @__PURE__ */ jsx("p", {
+					className: "form-error",
+					role: "alert",
+					children: d.error
+				}),
+				/* @__PURE__ */ jsxs("form", {
+					method: "POST",
+					className: "settings-form builder-form",
+					children: [test ? /* @__PURE__ */ jsxs(Fragment, { children: [
+						/* @__PURE__ */ jsxs("fieldset", { children: [
+							/* @__PURE__ */ jsx("legend", { children: "What are you preparing for?" }),
+							/* @__PURE__ */ jsx("p", {
+								className: "builder-help",
+								children: "Switching focus immediately reshapes the score fields below."
+							}),
+							/* @__PURE__ */ jsx("div", {
+								className: "choice-grid choice-grid--two",
+								children: [[
+									"sat",
+									"SAT",
+									"Math + Reading & Writing"
+								], [
+									"act",
+									"ACT",
+									"Math + English & Reading; optional Science in a full plan"
+								]].map(([value, label, copy]) => /* @__PURE__ */ jsxs("label", {
+									className: focus === value ? "selected" : "",
 									children: [
-										/* @__PURE__ */ jsx(Field, {
-											name: "desired_sat",
-											label: "Goal SAT score",
-											type: "number",
-											min: "400",
-											max: "1600",
-											step: "10",
-											value: d.desired_sat
+										/* @__PURE__ */ jsx("input", {
+											type: "radio",
+											name: "test_focus",
+											value,
+											required: true,
+											checked: focus === value,
+											onChange: () => setFocus(value)
 										}),
-										/* @__PURE__ */ jsx(Field, {
-											name: "current_sat_ebrw",
-											label: "Current Reading & Writing",
-											type: "number",
-											min: "200",
-											max: "800",
-											value: d.current_sat_ebrw
+										/* @__PURE__ */ jsx(BookOpen, {}),
+										/* @__PURE__ */ jsx("b", { children: label }),
+										/* @__PURE__ */ jsx("small", { children: copy })
+									]
+								}, value))
+							})
+						] }),
+						focus && /* @__PURE__ */ jsxs("fieldset", { children: [
+							/* @__PURE__ */ jsx("legend", { children: "Choose your subject" }),
+							/* @__PURE__ */ jsx("p", {
+								className: "builder-help",
+								children: "Lessons and drills stay within this focus; the final checkpoint is a full practice test. ELA means Reading & Writing for SAT, and English & Reading for ACT."
+							}),
+							/* @__PURE__ */ jsx("div", {
+								className: "choice-grid choice-grid--three",
+								children: [
+									[
+										"math",
+										"Math",
+										"Equations, problem solving, and quantitative reasoning"
+									],
+									[
+										"ela",
+										"ELA",
+										"Reading, grammar, and writing skills"
+									],
+									[
+										"all",
+										"All subjects",
+										"A broader study plan across your selected exam"
+									]
+								].map(([value, label, copy]) => /* @__PURE__ */ jsxs("label", {
+									className: subject === value ? "selected" : "",
+									children: [
+										/* @__PURE__ */ jsx("input", {
+											type: "radio",
+											name: "subject_focus",
+											value,
+											checked: subject === value,
+											onChange: () => setSubject(value)
 										}),
-										/* @__PURE__ */ jsx(Field, {
-											name: "current_sat_math",
-											label: "Current Math",
-											type: "number",
-											min: "200",
-											max: "800",
-											value: d.current_sat_math
+										/* @__PURE__ */ jsx(BookOpen, {}),
+										/* @__PURE__ */ jsx("b", { children: label }),
+										/* @__PURE__ */ jsx("small", { children: copy })
+									]
+								}, value))
+							})
+						] }),
+						focus && /* @__PURE__ */ jsxs("div", {
+							className: "builder-score-groups",
+							children: [
+								showsSat && /* @__PURE__ */ jsxs("fieldset", {
+									className: "builder-score-group",
+									children: [
+										/* @__PURE__ */ jsx("legend", { children: "SAT goals and baseline" }),
+										/* @__PURE__ */ jsx("p", { children: "Use your latest official or full-length practice scores if you have them." }),
+										/* @__PURE__ */ jsxs("div", {
+											className: "form-field-grid",
+											children: [
+												/* @__PURE__ */ jsx(Field, {
+													name: "desired_sat",
+													label: "Goal SAT score",
+													type: "number",
+													min: "400",
+													max: "1600",
+													step: "10",
+													value: d.desired_sat
+												}),
+												/* @__PURE__ */ jsx(Field, {
+													name: "current_sat_ebrw",
+													label: "Current Reading & Writing",
+													type: "number",
+													min: "200",
+													max: "800",
+													value: d.current_sat_ebrw
+												}),
+												/* @__PURE__ */ jsx(Field, {
+													name: "current_sat_math",
+													label: "Current Math",
+													type: "number",
+													min: "200",
+													max: "800",
+													value: d.current_sat_math
+												})
+											]
 										})
 									]
-								})
-							]
-						}),
-						showsAct && /* @__PURE__ */ jsxs("fieldset", {
-							className: "builder-score-group",
-							children: [
-								/* @__PURE__ */ jsx("legend", { children: "ACT goals and baseline" }),
-								/* @__PURE__ */ jsx("p", { children: "Use your latest composite and section scores if you have them." }),
-								/* @__PURE__ */ jsxs("div", {
-									className: "form-field-grid",
+								}),
+								showsAct && /* @__PURE__ */ jsxs("fieldset", {
+									className: "builder-score-group",
 									children: [
-										/* @__PURE__ */ jsx(Field, {
-											name: "desired_act",
-											label: "Goal ACT score",
-											type: "number",
-											min: "1",
-											max: "36",
-											value: d.desired_act
-										}),
-										/* @__PURE__ */ jsx(Field, {
-											name: "current_act_composite",
-											label: "Current composite",
-											type: "number",
-											min: "1",
-											max: "36",
-											value: d.current_act_composite
-										}),
-										/* @__PURE__ */ jsx(Field, {
-											name: "current_act_math",
-											label: "Current Math",
-											type: "number",
-											min: "1",
-											max: "36",
-											value: d.current_act_math
-										}),
-										/* @__PURE__ */ jsx(Field, {
-											name: "current_act_reading",
-											label: "Current Reading",
-											type: "number",
-											min: "1",
-											max: "36",
-											value: d.current_act_reading
-										}),
-										/* @__PURE__ */ jsx(Field, {
-											name: "current_act_science",
-											label: "Current Science",
-											type: "number",
-											min: "1",
-											max: "36",
-											value: d.current_act_science
+										/* @__PURE__ */ jsx("legend", { children: "ACT goals and baseline" }),
+										/* @__PURE__ */ jsx("p", { children: "Use your latest composite and section scores if you have them." }),
+										/* @__PURE__ */ jsxs("div", {
+											className: "form-field-grid",
+											children: [
+												/* @__PURE__ */ jsx(Field, {
+													name: "desired_act",
+													label: "Goal ACT score",
+													type: "number",
+													min: "1",
+													max: "36",
+													value: d.desired_act
+												}),
+												/* @__PURE__ */ jsx(Field, {
+													name: "current_act_composite",
+													label: "Current composite",
+													type: "number",
+													min: "1",
+													max: "36",
+													value: d.current_act_composite
+												}),
+												/* @__PURE__ */ jsx(Field, {
+													name: "current_act_math",
+													label: "Current Math",
+													type: "number",
+													min: "1",
+													max: "36",
+													value: d.current_act_math
+												}),
+												/* @__PURE__ */ jsx(Field, {
+													name: "current_act_reading",
+													label: "Current Reading",
+													type: "number",
+													min: "1",
+													max: "36",
+													value: d.current_act_reading
+												}),
+												/* @__PURE__ */ jsx(Field, {
+													name: "current_act_science",
+													label: "Current Science",
+													type: "number",
+													min: "1",
+													max: "36",
+													value: d.current_act_science
+												})
+											]
 										})
 									]
-								})
-							]
-						}),
-						/* @__PURE__ */ jsxs("fieldset", {
-							className: "builder-score-group builder-score-group--shared",
-							children: [
-								/* @__PURE__ */ jsx("legend", { children: "Your study reality" }),
-								/* @__PURE__ */ jsxs("div", {
-									className: "form-field-grid",
-									children: [/* @__PURE__ */ jsx(Field, {
-										name: "hours_per_week",
-										label: "Hours available each week",
-										type: "number",
-										min: "1",
-										max: "40",
-										value: d.hours_per_week
-									}), /* @__PURE__ */ jsx(Field, {
-										name: "test_date",
-										label: "Test date",
-										type: "date",
-										value: d.test_date
-									})]
 								}),
-								/* @__PURE__ */ jsx(Field, {
-									name: "strengths",
-									label: "Your strengths",
-									textarea: true,
-									value: d.strengths
-								}),
-								/* @__PURE__ */ jsx(Field, {
-									name: "weaknesses",
-									label: "Where you need the most help",
-									textarea: true,
-									required: true,
-									value: d.weaknesses
+								/* @__PURE__ */ jsxs("fieldset", {
+									className: "builder-score-group builder-score-group--shared",
+									children: [
+										/* @__PURE__ */ jsx("legend", { children: "Your study reality" }),
+										/* @__PURE__ */ jsxs("div", {
+											className: "form-field-grid",
+											children: [/* @__PURE__ */ jsx(Field, {
+												name: "hours_per_week",
+												label: "Hours available each week",
+												type: "number",
+												min: "1",
+												max: "40",
+												value: d.hours_per_week
+											}), /* @__PURE__ */ jsx(Field, {
+												name: "test_date",
+												label: "Test date",
+												type: "date",
+												value: d.test_date
+											})]
+										}),
+										/* @__PURE__ */ jsx(Field, {
+											name: "strengths",
+											label: "Your strengths",
+											textarea: true,
+											value: d.strengths
+										}),
+										/* @__PURE__ */ jsx(Field, {
+											name: "weaknesses",
+											label: "Where you need the most help",
+											textarea: true,
+											required: true,
+											value: d.weaknesses
+										})
+									]
 								})
 							]
 						})
-					]
-				})] }) : /* @__PURE__ */ jsxs(Fragment, { children: [
-					/* @__PURE__ */ jsxs("div", {
-						className: "college-plan-steps",
-						"aria-label": "College plan setup",
-						children: [
-							/* @__PURE__ */ jsxs("span", { children: [/* @__PURE__ */ jsx("b", { children: "01" }), " Your starting point"] }),
-							/* @__PURE__ */ jsx("i", {}),
-							/* @__PURE__ */ jsxs("span", { children: [/* @__PURE__ */ jsx("b", { children: "02" }), " Your direction"] }),
-							/* @__PURE__ */ jsx("i", {}),
-							/* @__PURE__ */ jsxs("span", { children: [/* @__PURE__ */ jsx("b", { children: "03" }), " Your list"] })
-						]
-					}),
-					/* @__PURE__ */ jsxs("fieldset", {
-						className: "builder-score-group",
-						children: [/* @__PURE__ */ jsx("legend", { children: "Where are you right now?" }), /* @__PURE__ */ jsx("div", {
-							className: "form-field-grid",
-							children: /* @__PURE__ */ jsxs("label", { children: ["Current grade", /* @__PURE__ */ jsxs("select", {
-								name: "current_grade",
-								required: true,
-								defaultValue: d.grade || "",
-								children: [/* @__PURE__ */ jsx("option", {
-									value: "",
-									children: "Choose grade"
-								}), [
-									"9",
-									"10",
-									"11",
-									"12"
-								].map((v) => /* @__PURE__ */ jsxs("option", {
-									value: v,
-									children: [v, "th grade"]
-								}, v))]
-							})] })
-						})]
-					}),
-					/* @__PURE__ */ jsxs("fieldset", { children: [/* @__PURE__ */ jsx("legend", { children: "What should this plan move forward?" }), /* @__PURE__ */ jsx("div", {
-						className: "choice-grid choice-grid--three",
-						children: [
-							[
-								"exploring",
-								"Explore",
-								"Clarify what matters before building a list"
-							],
-							[
-								"researching",
-								"Research",
-								"Turn possible schools into informed choices"
-							],
-							[
-								"applying",
-								"Apply",
-								"Move essays and applications forward"
-							]
-						].map(([value, label, copy]) => /* @__PURE__ */ jsxs("label", {
-							className: stage === value ? "selected" : "",
+					] }) : /* @__PURE__ */ jsxs(Fragment, { children: [
+						/* @__PURE__ */ jsxs("div", {
+							className: "college-plan-steps",
+							"aria-label": "College plan setup",
 							children: [
-								/* @__PURE__ */ jsx("input", {
-									type: "radio",
-									name: "planning_stage",
-									value,
-									required: true,
-									checked: stage === value,
-									onChange: () => setStage(value)
-								}),
-								/* @__PURE__ */ jsx(Target, {}),
-								/* @__PURE__ */ jsx("b", { children: label }),
-								/* @__PURE__ */ jsx("small", { children: copy })
+								/* @__PURE__ */ jsxs("span", { children: [/* @__PURE__ */ jsx("b", { children: "01" }), " Your starting point"] }),
+								/* @__PURE__ */ jsx("i", {}),
+								/* @__PURE__ */ jsxs("span", { children: [/* @__PURE__ */ jsx("b", { children: "02" }), " Your direction"] }),
+								/* @__PURE__ */ jsx("i", {}),
+								/* @__PURE__ */ jsxs("span", { children: [/* @__PURE__ */ jsx("b", { children: "03" }), " Your list"] })
 							]
-						}, value))
-					})] }),
-					/* @__PURE__ */ jsxs("fieldset", {
-						className: "builder-score-group",
-						children: [
-							/* @__PURE__ */ jsx("legend", { children: "What matters to you?" }),
-							/* @__PURE__ */ jsx("p", { children: "Tell Mentics what should lead your decisions, not just what looks impressive." }),
-							/* @__PURE__ */ jsx(Field, {
-								name: "interested_majors",
-								label: "Possible majors or interests",
-								textarea: true,
-								value: d.majors
-							}),
-							/* @__PURE__ */ jsx(Field, {
-								name: "college_priorities",
-								label: "Your college priorities",
-								textarea: true,
-								value: d.priorities,
-								placeholder: "Examples: engineering opportunities, an active campus, affordability, being close to home, strong arts programs"
-							})
-						]
-					}),
-					/* @__PURE__ */ jsx(CollegePicker, { value: d.target_colleges })
-				] }), /* @__PURE__ */ jsxs("div", {
-					className: "form-actions",
-					children: [/* @__PURE__ */ jsx("a", {
-						className: "button button--quiet",
-						href: "/dashboard",
-						children: "Cancel"
-					}), /* @__PURE__ */ jsxs("button", {
-						className: "button button--primary",
-						type: "submit",
-						children: ["Build my path ", /* @__PURE__ */ jsx(ArrowRight, {})]
+						}),
+						/* @__PURE__ */ jsxs("fieldset", {
+							className: "builder-score-group",
+							children: [/* @__PURE__ */ jsx("legend", { children: "Where are you right now?" }), /* @__PURE__ */ jsx("div", {
+								className: "form-field-grid",
+								children: /* @__PURE__ */ jsxs("label", { children: ["Current grade", /* @__PURE__ */ jsxs("select", {
+									name: "current_grade",
+									required: true,
+									defaultValue: d.grade || "",
+									children: [/* @__PURE__ */ jsx("option", {
+										value: "",
+										children: "Choose grade"
+									}), [
+										"9",
+										"10",
+										"11",
+										"12"
+									].map((v) => /* @__PURE__ */ jsxs("option", {
+										value: v,
+										children: [v, "th grade"]
+									}, v))]
+								})] })
+							})]
+						}),
+						/* @__PURE__ */ jsxs("fieldset", { children: [/* @__PURE__ */ jsx("legend", { children: "What should this plan move forward?" }), /* @__PURE__ */ jsx("div", {
+							className: "choice-grid choice-grid--three",
+							children: [
+								[
+									"exploring",
+									"Explore",
+									"Clarify what matters before building a list"
+								],
+								[
+									"researching",
+									"Research",
+									"Turn possible schools into informed choices"
+								],
+								[
+									"applying",
+									"Apply",
+									"Move essays and applications forward"
+								]
+							].map(([value, label, copy]) => /* @__PURE__ */ jsxs("label", {
+								className: stage === value ? "selected" : "",
+								children: [
+									/* @__PURE__ */ jsx("input", {
+										type: "radio",
+										name: "planning_stage",
+										value,
+										required: true,
+										checked: stage === value,
+										onChange: () => setStage(value)
+									}),
+									/* @__PURE__ */ jsx(Target, {}),
+									/* @__PURE__ */ jsx("b", { children: label }),
+									/* @__PURE__ */ jsx("small", { children: copy })
+								]
+							}, value))
+						})] }),
+						/* @__PURE__ */ jsxs("fieldset", {
+							className: "builder-score-group",
+							children: [
+								/* @__PURE__ */ jsx("legend", { children: "What matters to you?" }),
+								/* @__PURE__ */ jsx("p", { children: "Tell Mentics what should lead your decisions, not just what looks impressive." }),
+								/* @__PURE__ */ jsx(Field, {
+									name: "interested_majors",
+									label: "Possible majors or interests",
+									textarea: true,
+									value: d.majors
+								}),
+								/* @__PURE__ */ jsx(Field, {
+									name: "college_priorities",
+									label: "Your college priorities",
+									textarea: true,
+									value: d.priorities,
+									placeholder: "Examples: engineering opportunities, an active campus, affordability, being close to home, strong arts programs"
+								})
+							]
+						}),
+						/* @__PURE__ */ jsx(CollegePicker, { value: d.target_colleges })
+					] }), /* @__PURE__ */ jsxs("div", {
+						className: "form-actions",
+						children: [/* @__PURE__ */ jsx("a", {
+							className: "button button--quiet",
+							href: "/dashboard",
+							children: "Cancel"
+						}), /* @__PURE__ */ jsxs("button", {
+							className: "button button--primary",
+							type: "submit",
+							children: ["Build my path ", /* @__PURE__ */ jsx(ArrowRight, {})]
+						})]
 					})]
-				})]
-			})]
+				})
+			]
 		})
 	});
 }
@@ -7375,6 +7448,9 @@ function App() {
 	switch (boot.page) {
 		case "dashboard":
 			page = /* @__PURE__ */ jsx(Dashboard, {});
+			break;
+		case "quick-practice":
+			page = /* @__PURE__ */ jsx(QuickPractice, {});
 			break;
 		case "path":
 			page = /* @__PURE__ */ jsx(PathPage, {});

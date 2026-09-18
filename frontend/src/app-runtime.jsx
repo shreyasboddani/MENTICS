@@ -37,10 +37,11 @@ export function Brand({ inverse = false }) {
 const navItems = [
   ['/dashboard', LayoutDashboard, 'Home'],
   ['/dashboard/test-path-view', Target, 'Test path'],
+  ['/dashboard/quick-practice', Target, 'Quick practice'],
   ['/dashboard/college-path-view', GraduationCap, 'College path'],
   ['/dashboard/stats', BarChart3, 'Stats'],
   ['/dashboard/tracker', LineChart, 'Tracker'],
-  ['/battles', Swords, 'SAT Battles'],
+  ['/battles', Swords, 'SAT + ACT Battles'],
   ['/forum', MessageCircle, 'Community'],
   ['/points', Award, 'Points & achievements'],
   ['/account', Settings, 'Settings']

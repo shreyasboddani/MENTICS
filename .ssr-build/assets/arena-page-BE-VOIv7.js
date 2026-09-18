@@ -33,7 +33,7 @@ function ArenaAvatarPreview({ avatar, label = "Your fighter", paused = false, vi
 		const observer = new IntersectionObserver((entries) => {
 			if (!entries[0].isIntersecting) return;
 			observer.disconnect();
-			import("./arena-avatar-scene-DzW3HvU1.js").then(({ createAvatarScene }) => {
+			import("./arena-avatar-scene-BhgLiyrE.js").then(({ createAvatarScene }) => {
 				if (cancelled) return;
 				scene.current = createAvatarScene(element, latest.current, () => setFailed(true));
 				setReady(true);
@@ -3267,7 +3267,7 @@ function ArenaCalculatorToggle({ open, onToggle }) {
 }
 //#endregion
 //#region frontend/src/arena-experience.jsx
-function BattleLoadingScreen({ rank, matchmaking = false }) {
+function BattleLoadingScreen({ rank, exam = "SAT", matchmaking = false }) {
 	const [elapsed, setElapsed] = useState(0);
 	useEffect(() => {
 		const started = Date.now();
@@ -3290,7 +3290,7 @@ function BattleLoadingScreen({ rank, matchmaking = false }) {
 					/* @__PURE__ */ jsx("i", {})
 				]
 			}),
-			/* @__PURE__ */ jsx("small", { children: matchmaking ? "CONNECTING TO THE ARENA" : `${rank} TRAINING` }),
+			/* @__PURE__ */ jsx("small", { children: matchmaking ? `${exam} MATCHMAKING` : `${exam} / ${rank} TRAINING` }),
 			/* @__PURE__ */ jsx("h2", { children: elapsed < 20 ? "Building your battle." : "Good questions take thought." }),
 			/* @__PURE__ */ jsx("p", { children: matchmaking ? "Finding your match and preparing a shared question set." : "Creating original questions and checking the set for your chosen difficulty." }),
 			/* @__PURE__ */ jsx("div", {
@@ -3357,7 +3357,7 @@ function BattleQuestionPanel({ question, index, selected, onSelect, calculatorOp
 			"data-domain": question.domain,
 			children: [
 				/* @__PURE__ */ jsxs("header", { children: [/* @__PURE__ */ jsxs("small", { children: [
-					question.domain === "math" ? "MATH" : "READING & WRITING",
+					question.section?.toUpperCase() || (question.domain === "math" ? "MATH" : "READING & WRITING"),
 					" ",
 					/* @__PURE__ */ jsx("span", { children: " / " }),
 					" ",
@@ -3462,7 +3462,7 @@ var BATTLE_TRAINING_RANKS = [
 	[
 		"bronze",
 		"Bronze",
-		"SAT essentials"
+		"Exam essentials"
 	],
 	[
 		"silver",
@@ -3492,7 +3492,7 @@ var BATTLE_TRAINING_RANKS = [
 	[
 		"grandmaster",
 		"Grandmaster",
-		"Hardest SAT-style sets"
+		"Hardest exam-style sets"
 	]
 ];
 var WIN_STREAK_TIERS = [
@@ -3663,13 +3663,13 @@ function BattleClock({ startedAt, durationSeconds = 300 }) {
 		]
 	});
 }
-function ArenaGameLobby({ paused, name, rank, rankProgress, avatar, openCustomizer, mode, setMode, trainingRank, setTrainingRank, selectedTier, busy, join, train, winStreak, bestWinStreak, clocks }) {
+function ArenaGameLobby({ exam, setExam, paused, name, rank, rankProgress, avatar, openCustomizer, mode, setMode, trainingRank, setTrainingRank, selectedTier, busy, join, train, winStreak, bestWinStreak, clocks }) {
 	const ranked = mode === "ranked";
 	const tierClock = clocks?.[ranked ? rank?.key : trainingRank] ?? clocks?.bronze ?? 300;
 	return /* @__PURE__ */ jsxs("section", {
 		className: "arena-game-shell",
 		"data-mode": mode,
-		"aria-label": "SAT Battle Arena game lobby",
+		"aria-label": `${exam} Battle Arena game lobby`,
 		children: [
 			/* @__PURE__ */ jsxs("div", {
 				className: "arena-game-sky",
@@ -3684,7 +3684,12 @@ function ArenaGameLobby({ paused, name, rank, rankProgress, avatar, openCustomiz
 			/* @__PURE__ */ jsxs("header", {
 				className: "arena-game-bar",
 				children: [
-					/* @__PURE__ */ jsxs("span", { children: [/* @__PURE__ */ jsx(Swords, {}), " SAT BATTLES"] }),
+					/* @__PURE__ */ jsxs("span", { children: [
+						/* @__PURE__ */ jsx(Swords, {}),
+						" ",
+						exam,
+						" BATTLES"
+					] }),
 					/* @__PURE__ */ jsx("b", { children: "MENTICS / ARENA" }),
 					/* @__PURE__ */ jsxs("em", { children: [/* @__PURE__ */ jsx("i", {}), " Online"] })
 				]
@@ -3696,6 +3701,24 @@ function ArenaGameLobby({ paused, name, rank, rankProgress, avatar, openCustomiz
 						className: "arena-mode-rail",
 						"aria-label": "Choose game mode",
 						children: [
+							/* @__PURE__ */ jsxs("div", {
+								className: "arena-exam-select",
+								children: [
+									/* @__PURE__ */ jsx("small", { children: "CHOOSE YOUR EXAM" }),
+									/* @__PURE__ */ jsx("div", {
+										role: "group",
+										"aria-label": "Battle exam",
+										children: ["SAT", "ACT"].map((value) => /* @__PURE__ */ jsx("button", {
+											type: "button",
+											"aria-pressed": exam === value,
+											className: exam === value ? "selected" : "",
+											onClick: () => setExam(value),
+											children: value
+										}, value))
+									}),
+									/* @__PURE__ */ jsx("p", { children: exam === "ACT" ? "Math / English / Reading" : "Math / Reading & Writing" })
+								]
+							}),
 							/* @__PURE__ */ jsx("small", { children: "CHOOSE YOUR MODE" }),
 							/* @__PURE__ */ jsxs("button", {
 								type: "button",
@@ -3818,9 +3841,13 @@ function ArenaGameLobby({ paused, name, rank, rankProgress, avatar, openCustomiz
 								className: "arena-difficulty-callout",
 								children: [/* @__PURE__ */ jsx(Target, {}), /* @__PURE__ */ jsxs("span", { children: [/* @__PURE__ */ jsx("small", { children: "QUESTION TIER" }), /* @__PURE__ */ jsx("b", { children: ranked ? `${rank?.label || "Bronze"} matchmaking` : `${selectedTier[1]} simulation` })] })]
 							}),
-							/* @__PURE__ */ jsx("p", {
+							/* @__PURE__ */ jsxs("p", {
 								className: "arena-scale-copy",
-								children: "Every rank gets full-length, original SAT-style questions. Higher ranks add denser passages, tighter traps, multi-constraint math, and dramatically harder reasoning."
+								children: [
+									"Every rank gets full-length, original ",
+									exam,
+									"-style questions. Higher ranks add denser passages, tighter traps, multi-constraint math, and dramatically harder reasoning."
+								]
 							}),
 							/* @__PURE__ */ jsxs("button", {
 								type: "button",
@@ -3838,9 +3865,9 @@ function ArenaGameLobby({ paused, name, rank, rankProgress, avatar, openCustomiz
 									ranked ? "AT STAKE" : "RISK"
 								] })
 							] }),
-							ranked && /* @__PURE__ */ jsx("p", {
+							ranked && /* @__PURE__ */ jsxs("p", {
 								className: "arena-match-note",
-								children: "An Arena bot joins if no player matches within 30 seconds."
+								children: [exam, " opponents only. A bot joins after 30 seconds. One shared SAT + ACT rating."]
 							})
 						]
 					})
@@ -3853,7 +3880,11 @@ function ArenaGameLobby({ paused, name, rank, rankProgress, avatar, openCustomiz
 					/* @__PURE__ */ jsx("i", {}),
 					/* @__PURE__ */ jsx("span", { children: "ACCURACY WINS · SPEED BREAKS THE TIE" }),
 					/* @__PURE__ */ jsx("i", {}),
-					/* @__PURE__ */ jsx("span", { children: "GRANDMASTER = MAXIMUM SAT DIFFICULTY" })
+					/* @__PURE__ */ jsxs("span", { children: [
+						"GRANDMASTER = MAXIMUM ",
+						exam,
+						" DIFFICULTY"
+					] })
 				]
 			})
 		]
@@ -3862,6 +3893,8 @@ function ArenaGameLobby({ paused, name, rank, rankProgress, avatar, openCustomiz
 function BattleArena() {
 	const d = boot.data;
 	const [battle, setBattle] = useState(d.currentBattle);
+	const [exam, setExam] = useState(d.currentBattle?.exam || "SAT");
+	const battleExam = battle?.exam || exam;
 	const [answers, setAnswers] = useState(() => {
 		if (d.currentBattle?.answers?.length) return Object.fromEntries(d.currentBattle.answers.map((a) => [a.question_index, a.selected_option]));
 		try {
@@ -4117,6 +4150,7 @@ function BattleArena() {
 		boot.data.currentBattle = null;
 	}, [battle]);
 	const startBattle = (nextBattle) => {
+		setExam(nextBattle.exam || "SAT");
 		requestVersion.current += 1;
 		setCalculatorOpen(false);
 		setAnswers({});
@@ -4129,7 +4163,10 @@ function BattleArena() {
 		setBusy(true);
 		setError("");
 		try {
-			startBattle(await api("/api/sat-battles/queue", { method: "POST" }));
+			startBattle(await api("/api/sat-battles/queue", {
+				method: "POST",
+				body: JSON.stringify({ exam })
+			}));
 		} catch (x) {
 			stopArenaMusic();
 			setError(x.message);
@@ -4144,7 +4181,10 @@ function BattleArena() {
 		try {
 			startBattle(await api("/api/sat-battles/train", {
 				method: "POST",
-				body: JSON.stringify({ rank: trainingRank })
+				body: JSON.stringify({
+					rank: trainingRank,
+					exam
+				})
 			}));
 		} catch (x) {
 			stopArenaMusic();
@@ -4233,6 +4273,8 @@ function BattleArena() {
 			className: `app-main battle-page ${active ? "battle-page--in-match" : waiting ? "battle-page--queue" : complete ? "battle-page--complete" : ""}`,
 			children: [
 				idle && !busy && /* @__PURE__ */ jsx(ArenaGameLobby, {
+					exam,
+					setExam,
 					paused: customizing,
 					name: d.name,
 					rank,
@@ -4244,7 +4286,7 @@ function BattleArena() {
 					trainingRank,
 					setTrainingRank,
 					selectedTier: selectedTrainingTier,
-					clocks: d.battleClocks,
+					clocks: d.battleClocksByExam?.[exam] || d.battleClocks,
 					busy,
 					join,
 					train,
@@ -4252,6 +4294,7 @@ function BattleArena() {
 					bestWinStreak
 				}),
 				idle && busy && /* @__PURE__ */ jsx(BattleLoadingScreen, {
+					exam,
 					rank: selectedTrainingTier[1],
 					matchmaking: lobbyMode === "ranked"
 				}),
@@ -4325,9 +4368,13 @@ function BattleArena() {
 								})
 							]
 						}),
-						/* @__PURE__ */ jsx("p", {
+						/* @__PURE__ */ jsxs("p", {
 							className: "arena-queue-note",
-							children: "Both players receive the same fresh SAT set. If nobody joins within 30 seconds, an Arena bot enters automatically."
+							children: [
+								"Both players receive the same ",
+								battleExam,
+								" set. If nobody joins within 30 seconds, an Arena bot enters automatically."
+							]
 						}),
 						/* @__PURE__ */ jsxs("div", {
 							className: "battle-wait-actions",
@@ -4359,7 +4406,7 @@ function BattleArena() {
 				active && /* @__PURE__ */ jsxs("section", {
 					ref: stageRef,
 					className: `battle-stage battle-stage--active ${answers[currentQuestionIndex] != null ? "is-striking" : ""}`,
-					"aria-label": "Active SAT battle",
+					"aria-label": `Active ${battleExam} battle`,
 					children: [
 						cinematic && /* @__PURE__ */ jsxs("div", {
 							className: "arena-cinematic",
@@ -4418,7 +4465,7 @@ function BattleArena() {
 							children: [
 								/* @__PURE__ */ jsxs("span", { children: [
 									/* @__PURE__ */ jsx("i", {}),
-									/* @__PURE__ */ jsx("b", { children: battle.mode === "training" ? "PRIVATE BOT DRILL" : `${battleDifficulty} SAT BATTLE` }),
+									/* @__PURE__ */ jsx("b", { children: battle.mode === "training" ? `${battleExam} BOT DRILL` : `${battleDifficulty} ${battleExam} BATTLE` }),
 									/* @__PURE__ */ jsxs("small", { children: [
 										"vs ",
 										battle.opponentName || "your challenger",
@@ -4484,7 +4531,7 @@ function BattleArena() {
 										children: [
 											/* @__PURE__ */ jsx("i", {}),
 											/* @__PURE__ */ jsx("b", { children: "VS" }),
-											/* @__PURE__ */ jsx("span", { children: currentQuestion?.skill || "SAT ARENA" })
+											/* @__PURE__ */ jsx("span", { children: currentQuestion?.skill || `${battleExam} ARENA` })
 										]
 									}),
 									/* @__PURE__ */ jsxs("article", {
@@ -4599,7 +4646,7 @@ function BattleArena() {
 							className: "battle-result-mark",
 							children: battle.youWon ? /* @__PURE__ */ jsx(Trophy, {}) : battle.draw ? /* @__PURE__ */ jsx(Target, {}) : /* @__PURE__ */ jsx(Swords, {})
 						}),
-						/* @__PURE__ */ jsx("small", { children: battle.mode === "training" ? "BOT DRILL COMPLETE" : battle.youWon ? "VICTORY" : battle.draw ? "DRAW" : "BATTLE COMPLETE" }),
+						/* @__PURE__ */ jsx("small", { children: battle.mode === "training" ? `${battleExam} BOT DRILL COMPLETE` : battle.youWon ? "VICTORY" : battle.draw ? "DRAW" : "BATTLE COMPLETE" }),
 						/* @__PURE__ */ jsx("h2", { children: battle.mode === "training" ? "A sharper round in the bank." : battle.youWon ? "You won the race." : battle.draw ? "A dead-even finish." : "A strong round. Run it back." }),
 						/* @__PURE__ */ jsxs("div", {
 							className: "arena-result-versus",
@@ -4684,14 +4731,14 @@ function BattleArena() {
 							/* @__PURE__ */ jsx("small", { children: "HOW IT WORKS" }),
 							/* @__PURE__ */ jsx("h2", { children: "One clean round. No fluff." }),
 							/* @__PURE__ */ jsxs("div", { children: [
-								/* @__PURE__ */ jsxs("article", { children: [/* @__PURE__ */ jsx("b", { children: "01" }), /* @__PURE__ */ jsxs("span", { children: [/* @__PURE__ */ jsx("strong", { children: "Match" }), /* @__PURE__ */ jsx("p", { children: "We pair you with one student and serve the same question set." })] })] }),
+								/* @__PURE__ */ jsxs("article", { children: [/* @__PURE__ */ jsx("b", { children: "01" }), /* @__PURE__ */ jsxs("span", { children: [/* @__PURE__ */ jsx("strong", { children: "Match" }), /* @__PURE__ */ jsx("p", { children: "Choose SAT or ACT. Match with a student preparing for the same exam, on the same question set." })] })] }),
 								/* @__PURE__ */ jsxs("article", { children: [/* @__PURE__ */ jsx("b", { children: "02" }), /* @__PURE__ */ jsxs("span", { children: [/* @__PURE__ */ jsx("strong", { children: "Race" }), /* @__PURE__ */ jsx("p", { children: "Answer all five before the clock runs out. It is sized to the tier, and it starts together." })] })] }),
 								/* @__PURE__ */ jsxs("article", { children: [/* @__PURE__ */ jsx("b", { children: "03" }), /* @__PURE__ */ jsxs("span", { children: [/* @__PURE__ */ jsx("strong", { children: "Climb" }), /* @__PURE__ */ jsx("p", { children: "Accuracy takes it. Faster completion breaks a tied score." })] })] })
 							] })
 						]
 					}), /* @__PURE__ */ jsxs("aside", {
 						className: "battle-leaderboard",
-						children: [/* @__PURE__ */ jsxs("header", { children: [/* @__PURE__ */ jsxs("span", { children: [/* @__PURE__ */ jsx(Trophy, {}), " BATTLE LEADERBOARD"] }), /* @__PURE__ */ jsx("a", {
+						children: [/* @__PURE__ */ jsxs("header", { children: [/* @__PURE__ */ jsxs("span", { children: [/* @__PURE__ */ jsx(Trophy, {}), " SAT + ACT LEADERBOARD"] }), /* @__PURE__ */ jsx("a", {
 							href: "#battle-rankings",
 							children: "View rankings"
 						})] }), d.leaderboard?.length ? d.leaderboard.slice(0, 5).map((row, index) => /* @__PURE__ */ jsxs("div", { children: [

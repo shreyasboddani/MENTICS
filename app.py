@@ -4,6 +4,7 @@ from flask import Flask, Response, render_template, request, redirect, url_for, 
 from werkzeug.security import generate_password_hash, check_password_hash
 from dbhelper import DatabaseHandler
 from userhelper import User
+import act_arena
 import learning
 import ratelimit
 import seo
@@ -288,6 +289,7 @@ def init_db():
         "FOREIGN KEY(opponent_id)": "REFERENCES users(id) ON DELETE CASCADE"
     })
     db.add_column("sat_battles", "mode", "TEXT NOT NULL DEFAULT 'ranked'")
+    db.add_column("sat_battles", "exam_type", "TEXT NOT NULL DEFAULT 'SAT'")
     # Elo is path dependent: once a rating moves, the swing that produced it
     # cannot be recomputed. It is stored with the round that caused it.
     db.add_column("sat_battles", "challenger_rating_delta", "INTEGER")
@@ -513,6 +515,7 @@ def init_db():
         'idx_sprint_results_user': 'sprint_results (user_id)',
         'idx_forum_replies_post': 'forum_replies (post_id, created_at)',
         'idx_sat_battles_status': 'sat_battles (status, created_at)',
+        'idx_sat_battles_exam_queue': 'sat_battles (exam_type, status, created_at)',
         'idx_sat_battles_challenger': 'sat_battles (challenger_id, status)',
         'idx_sat_battles_opponent': 'sat_battles (opponent_id, status)',
         'idx_lesson_steps_lesson': 'lesson_steps (lesson_id, step_order)',
@@ -2131,7 +2134,8 @@ def _build_learner_profile(user_id, test_path_info, chat_history):
         "standing_focus": _describe_standing_focus(test_path_info),
         "chat_history": _format_chat_history_for_prompt(chat_history or []),
         "level_hint": level_hint,
-        "skill_options": learning.skill_catalog(test_focus),
+        "skill_options": learning.skill_catalog(test_focus, test_path_info.get("subject_focus", "all")),
+        "subject_focus": test_path_info.get("subject_focus", "all"),
         "_mastery_rows": mastery_rows,
         "_completed_lessons": len(taught_labels),
     }
@@ -3410,13 +3414,20 @@ def account(user):
 def test_path_builder(user):
     stats = user.get_stats()
 
-    current_test_path_info = stats.get("test_path", {})
+    current_test_path_info = dict(stats.get("test_path", {}))
+    if request.method == "GET":
+        for field, choices in (("test_focus", {"sat", "act", "both"}), ("subject_focus", {"math", "ela", "all"})):
+            if request.args.get(field) in choices:
+                current_test_path_info[field] = request.args[field]
 
     if request.method == "POST":
         try:
             test_focus = request.form.get("test_focus", "")
             if test_focus not in {'sat', 'act', 'both'}:
                 raise ValueError("Choose SAT, ACT, or both.")
+            subject_focus = request.form.get("subject_focus", "all")
+            if subject_focus not in {"math", "ela", "all"}:
+                raise ValueError("Choose Math, ELA, or all subjects.")
             test_date = request.form.get("test_date", "").strip()
             if test_date:
                 date.fromisoformat(test_date)
@@ -3425,6 +3436,7 @@ def test_path_builder(user):
                 raise ValueError("Tell Mentics where you need the most help.")
             test_path = {
                 "test_focus": test_focus,
+                "subject_focus": subject_focus,
                 "desired_sat": _optional_number(request.form.get("desired_sat"), 400, 1600, "Desired SAT"),
                 "desired_act": _optional_number(request.form.get("desired_act"), 1, 36, "Desired ACT"),
                 "current_sat_ebrw": _optional_number(request.form.get("current_sat_ebrw"), 200, 800, "Current SAT reading and writing"),
@@ -3455,11 +3467,20 @@ def test_path_builder(user):
     }, "Build Test Path | Mentics")
 
 
+@app.route("/dashboard/quick-practice")
+@login_required
+def quick_practice(user):
+    return render_react("quick-practice", {"name": user.get_name()}, "Quick Practice | Mentics")
+
+
 @app.route("/dashboard/test-path-view")
 @login_required
 def test_path_view(user):
+    prep = user.get_stats().get("test_path", {})
     return render_react("path", {
         "category": "Test Prep",
+        "testFocus": prep.get("test_focus", ""),
+        "subjectFocus": prep.get("subject_focus", "all"),
         "name": user.get_name(),
     }, "Test Path | Mentics")
 
@@ -5436,7 +5457,7 @@ def _generate_arena_text(prompt, *, thinking_level, system_instruction, deadline
         )
 
 
-def _generate_ai_battle_questions(difficulty):
+def _generate_ai_battle_questions(difficulty, exam="SAT"):
     """Build five Arena items in parallel, regenerating only the slots that fail.
 
     Every slot runs its own draft-then-audit pipeline on its own thread, so the
@@ -5445,6 +5466,7 @@ def _generate_ai_battle_questions(difficulty):
     """
     if not gemini_api_key:
         return None
+    exam_label = "ACT" if exam == "ACT" else "Digital SAT"
     recent_fingerprints, recent_stems = _recent_battle_question_material()
     thinking_level = SAT_BATTLE_THINKING_BY_RANK[difficulty]
     recent_context = '\n'.join(f'- {stem}' for stem in recent_stems[:5]) or '- No previous Arena questions.'
@@ -5472,6 +5494,12 @@ def _generate_ai_battle_questions(difficulty):
         'A 110-135 word paired-text or notes-plus-data synthesis task. Preserve every qualifier and numerical '
         'relationship; distractors subtly alter causality, scope, certainty, or comparison direction.',
     ]
+
+    if exam == "ACT":
+        slot_blueprints[3] = ('reading_writing', 'ACT Reading: a coherent literary or informational passage followed by a detail, inference, purpose, or comparison question. No notes-and-bullets synthesis.')
+        slot_blueprints[4] = ('reading_writing', 'ACT English: a coherent prose paragraph with a bracketed phrase or sentence to revise; ask about usage, mechanics, concision, organization, or purpose. Include enough surrounding context. No SAT notes synthesis.')
+        grandmaster_blueprints[3] = slot_blueprints[3][1] + ' Require careful integration of evidence and subtle qualification, with close plausible distractors.'
+        grandmaster_blueprints[4] = slot_blueprints[4][1] + ' Require sophisticated rhetorical judgment across the paragraph, not a simple isolated comma rule.'
 
     def slot_contract_hint(slot):
         """State, in words, exactly what the tier gate is going to measure.
@@ -5518,18 +5546,19 @@ def _generate_ai_battle_questions(difficulty):
     def generate_slot(slot, nonce, note=None):
         domain, focus = slot_blueprints[slot]
         exact_focus = grandmaster_blueprints[slot] if difficulty == 'grandmaster' else focus
-        prompt = f"""Write ONE original Digital SAT item. Return only the supplied JSON schema.
+        prompt = f"""Write ONE original {exam_label} item. Return only the supplied JSON schema.
 Tier: {difficulty.upper()}
 Slot: {slot + 1} of 5
 Domain: {domain}
 Focus: {exact_focus}{slot_contract_hint(slot)}
+{("The skill label MUST begin ACT " + ("Math" if slot < 3 else ("Reading" if slot == 3 else "English")) + ":. Preserve this section and domain in every revision.") if exam == "ACT" else ""}
 Variation: {nonce}-{slot}
 Avoid these recent stems (do not paraphrase or just change their numbers):
 {recent_context}
 
 Design from a known consistent solution first. Independently re-solve and substitute into
 EVERY constraint before writing the four choices. Exactly one choice is defensible;
-all distractors reflect distinct plausible errors. Stay within Digital SAT scope.
+all distractors reflect distinct plausible errors. Stay within {exam_label} scope. These are short Arena adaptations, not a full test.
 The requested difficulty comes from connected reasoning, never missing facts or ambiguity.
 Math: at most 1,200 characters, Unicode/plain math, no TeX. Reading: aim for 110-135 words
 at the highest tier, but follow the specified tier word range; total at most 1,400 characters.
@@ -5540,7 +5569,7 @@ self-correction, uncertainty, or instructions to change the problem in the expla
         raw = _generate_arena_text(
             prompt, thinking_level=thinking_level, deadline=deadline,
             system_instruction=(
-                'You are a rigorous Digital SAT assessment writer. Create one fully solvable, '
+                f'You are a rigorous {exam_label} assessment writer. Create one fully solvable, '
                 'original item at the exact requested tier and return structured JSON only.'
             ),
         )
@@ -5548,6 +5577,10 @@ self-correction, uncertainty, or instructions to change the problem in the expla
         question = parsed.get('question') if isinstance(parsed, dict) else None
         if not isinstance(question, dict):
             raise ValueError(f'Arena slot {slot + 1} did not contain a question.')
+        if exam == 'ACT':
+            section = 'Math' if slot < 3 else ('Reading' if slot == 3 else 'English')
+            if question.get('domain') != domain or not str(question.get('skill', '')).startswith(f'ACT {section}:'):
+                raise ValueError('ACT question did not match its required section.')
         return question
 
     def review_slot(slot, question):
@@ -5556,9 +5589,10 @@ self-correction, uncertainty, or instructions to change the problem in the expla
         # Blind solving avoids anchoring the editor to the draft's possibly
         # incorrect key/proof. It must derive both from the actual question.
         blind_question = {key: value for key, value in question.items() if key not in {'correct_option', 'explanation'}}
-        prompt = f"""Independently audit this original Digital SAT question.
+        prompt = f"""Independently audit this original {exam_label} question.
 Tier: {difficulty.upper()}. Domain: {domain}.
 Focus: {exact_focus}{slot_contract_hint(slot)}
+Preserve the supplied skill label and domain.
 The draft's answer key and explanation have deliberately been withheld. Derive them
 independently from the stem. First check whether the described configuration can EXIST
 (all radii, side lengths, totals, and probabilities must agree). Then compute the answer.
@@ -5572,12 +5606,16 @@ DRAFT:
 """
         raw = _generate_arena_text(
             prompt, thinking_level='medium', deadline=deadline, max_output_tokens=8192, json_schema=SAT_BATTLE_AI_REVIEW_SCHEMA,
-            system_instruction='You are a rigorous SAT item editor. Independently solve and correct the supplied item. Return JSON only.',
+            system_instruction=f'You are a rigorous {exam_label} item editor. Independently solve and correct the supplied item. Return JSON only.',
         )
         parsed = _decode_ai_battle_json(raw)
         reviewed = parsed.get('question') if isinstance(parsed, dict) else None
         if not isinstance(reviewed, dict) or parsed.get('verified') is not True:
             raise ValueError(f'Arena review {slot + 1} did not contain a question.')
+        if exam == 'ACT':
+            section = 'Math' if slot < 3 else ('Reading' if slot == 3 else 'English')
+            if reviewed.get('domain') != domain or not str(reviewed.get('skill', '')).startswith(f'ACT {section}:'):
+                raise ValueError('ACT audit changed the required section.')
         return reviewed
 
     def build_slot(slot, nonce, note=None):
@@ -5677,7 +5715,9 @@ DRAFT:
         return None
     app.logger.info('Arena tier=%s generation_seconds=%.2f slots=%s', difficulty, time.monotonic() - generation_started, len(accepted))
     generation_id = secrets.token_urlsafe(12)
-    for question in accepted:
+    for slot, question in enumerate(accepted):
+        question['exam'] = exam
+        question['section'] = ('Math' if slot < 3 else ('Reading' if slot == 3 else 'English')) if exam == 'ACT' else ('Math' if slot < 3 else 'Reading & Writing')
         question['source'] = 'gemini'
         question['generation_id'] = generation_id
     return accepted
@@ -5705,17 +5745,24 @@ class ArenaQuestionGenerationError(RuntimeError):
     """Raised when a configured Arena cannot produce a safe Gemini set."""
 
 
-def _battle_questions(rating=1000, *, require_ai=False):
+def _battle_questions(rating=1000, *, require_ai=False, exam="SAT"):
     """Return a new AI-authored SAT round, falling back safely when needed."""
     difficulty = _battle_difficulty_for_rating(rating)
-    generated = _generate_ai_battle_questions(difficulty)
+    generated = _generate_ai_battle_questions(difficulty, exam="ACT") if exam == "ACT" else _generate_ai_battle_questions(difficulty)
     if generated:
         return generated
     if require_ai and gemini_api_key:
         raise ArenaQuestionGenerationError(
             'Gemini could not produce a valid Arena set. No repeated fallback round was created.'
         )
-    return _fallback_battle_questions(difficulty)
+    return act_arena.fallback_questions(difficulty) if exam == "ACT" else _fallback_battle_questions(difficulty)
+
+
+def _questions_for_exam(rating, exam, *, require_ai=False):
+    # Preserve the original SAT call contract for integrations and older tests.
+    if exam == "ACT":
+        return _battle_questions(rating, require_ai=require_ai, exam="ACT")
+    return _battle_questions(rating, require_ai=True) if require_ai else _battle_questions(rating)
 
 
 def _battle_question_list(battle):
@@ -5735,16 +5782,22 @@ def _battle_duration_seconds(questions):
     if not questions:
         return SAT_BATTLE_DURATION_SECONDS
     pace = SAT_BATTLE_PACE_BY_TIER.get(questions[0].get('difficulty'), 1)
-    budget = sum(SAT_BATTLE_QUESTION_SECONDS.get(q.get('domain'), 66) for q in questions) * pace
+    # Arena pacing is a game target, not official section timing.
+    budget = sum(
+        {'Math': 70, 'Reading': 90, 'English': 45}.get(q.get('section'), 70)
+        if q.get('exam') == 'ACT' else SAT_BATTLE_QUESTION_SECONDS.get(q.get('domain'), 66)
+        for q in questions
+    ) * pace
     rounded = round(budget / 15) * 15
     return int(min(SAT_BATTLE_CLOCK_CEILING_SECONDS, max(SAT_BATTLE_CLOCK_FLOOR_SECONDS, rounded)))
 
 
-def _battle_clock_by_tier():
+def _battle_clock_by_tier(exam="SAT"):
     """The clock each tier earns, for a lobby that promises the real number."""
     return {
         tier: _battle_duration_seconds([
-            {'difficulty': tier, 'domain': 'math' if i < 3 else 'reading_writing'}
+            {'difficulty': tier, 'domain': 'math' if i < 3 else 'reading_writing',
+             'exam': exam, 'section': 'Math' if i < 3 else ('Reading' if i == 3 else 'English')}
             for i in range(SAT_BATTLE_QUESTION_COUNT)
         ]) for tier in SAT_BATTLE_PACE_BY_TIER
     }
@@ -5960,7 +6013,7 @@ def _battle_payload(battle, user_id):
                     existing_questions = []
                 if len(existing_questions) != SAT_BATTLE_QUESTION_COUNT:
                     db.update('sat_battles', {
-                        'questions': json.dumps(_battle_questions(_battle_rating_value(battle['challenger_id']))),
+                        'questions': json.dumps(_questions_for_exam(_battle_rating_value(battle['challenger_id']), battle.get('exam_type', 'SAT'))),
                         'started_at': _utc_now().isoformat(),
                     }, where={'id': battle['id'], 'status': 'active'})
                     battle = db.select_one('sat_battles', where={'id': battle['id']})
@@ -5987,6 +6040,7 @@ def _battle_payload(battle, user_id):
     is_bot_battle = bool(bot and battle.get('opponent_id') == bot['id'])
     result = {
         'id': battle['id'], 'status': battle['status'], 'opponentName': opponent_name,
+        'exam': battle.get('exam_type', 'SAT'),
         'startedAt': battle.get('started_at'), 'durationSeconds': _battle_duration_seconds(battle_questions),
         'submitted': bool(own_answers), 'createdAt': battle.get('created_at'),
         'answers': own_answers,
@@ -6012,6 +6066,7 @@ def _battle_payload(battle, user_id):
         result['questions'] = [{
             'question_text': q['question_text'], 'options': q['options'], 'skill': q['skill'],
             'domain': q.get('domain', 'reading_writing'),
+            'section': q.get('section') or ('Math' if q.get('domain') == 'math' else 'Reading & Writing'),
         } for q in battle_questions]
     if battle['status'] == 'complete':
         questions = json.loads(battle['questions'])
@@ -6059,12 +6114,13 @@ def battle_arena(user):
         'arenaAvatar': _arena_avatar_for_user(user.data['id']),
         'battleRank': _battle_rank(stats['rating'] if stats else 1000),
         'battleClocks': _battle_clock_by_tier(),
+        'battleClocksByExam': {'SAT': _battle_clock_by_tier(), 'ACT': _battle_clock_by_tier('ACT')},
         'battleStats': stats or {'wins': 0, 'losses': 0, 'draws': 0, 'battles_played': 0},
         'winStreak': int((stats or {}).get('win_streak') or 0),
         'bestWinStreak': int((stats or {}).get('best_win_streak') or 0),
         'leaderboard': leaderboard,
         'spotlight': spotlight[0] if spotlight else None,
-    }, 'SAT Battles | Mentics')
+    }, 'SAT & ACT Battles | Mentics')
 
 
 @app.route('/api/sat-battles/avatar', methods=['POST'])
@@ -6086,6 +6142,10 @@ def update_sat_battle_avatar(user):
 @login_required
 @rate_limit('12/hour', name='sat_battle_queue', message='Take a moment before searching for another battle.')
 def queue_sat_battle(user):
+    payload = request.get_json(silent=True) or {}
+    if not isinstance(payload, dict) or not isinstance(payload.get('exam', 'SAT'), str) or payload.get('exam', 'SAT') not in {'SAT', 'ACT'}:
+        return jsonify({'error': 'Choose SAT or ACT.'}), 400
+    exam = payload.get('exam', 'SAT')
     current = _user_current_battle(user.data['id'])
     if current:
         return jsonify(_battle_payload(current, user.data['id']))
@@ -6096,14 +6156,14 @@ def queue_sat_battle(user):
             db.update('sat_battles', {'status': 'expired'}, where={'id': waiting_battle['id']})
     paired = db.execute_returning_one(
         """UPDATE sat_battles SET opponent_id=?, opponent_name=?, status='active', started_at=NULL
-           WHERE id=(SELECT id FROM sat_battles WHERE status='waiting' AND challenger_id != ? ORDER BY created_at ASC LIMIT 1)
+           WHERE id=(SELECT id FROM sat_battles WHERE status='waiting' AND challenger_id != ? AND exam_type=? ORDER BY created_at ASC LIMIT 1)
              AND status='waiting' RETURNING *""",
-        (user.data['id'], user.get_name(), user.data['id']))
+        (user.data['id'], user.get_name(), user.data['id'], exam))
     if paired:
         # A match is set at the stronger player's tier. That keeps a lower-ranked
         # challenger from being served a soft set against an advanced opponent.
         match_rating = max(_battle_rating_value(paired['challenger_id']), _battle_rating_value(user.data['id']))
-        db.update('sat_battles', {'questions': json.dumps(_battle_questions(match_rating)), 'started_at': _utc_now().isoformat()}, where={'id': paired['id'], 'status': 'active'})
+        db.update('sat_battles', {'questions': json.dumps(_questions_for_exam(match_rating, exam)), 'started_at': _utc_now().isoformat()}, where={'id': paired['id'], 'status': 'active'})
         paired = db.select_one('sat_battles', where={'id': paired['id']})
         return jsonify(_battle_payload(paired, user.data['id']))
     battle_id = db.insert('sat_battles', {
@@ -6111,6 +6171,7 @@ def queue_sat_battle(user):
         # Do not spend an AI request until this becomes a real two-player or bot
         # round. Waiting players never see a question set.
         'questions': json.dumps([]),
+        'exam_type': exam,
     })
     return jsonify(_battle_payload(db.select_one('sat_battles', where={'id': battle_id}), user.data['id']))
 
@@ -6123,21 +6184,25 @@ def train_with_sat_battle_bot(user):
     if current:
         return jsonify({'error': 'Finish or leave your current battle first.'}), 409
     payload = request.get_json(silent=True) or {}
+    if not isinstance(payload, dict) or not isinstance(payload.get('exam', 'SAT'), str) or payload.get('exam', 'SAT') not in {'SAT', 'ACT'}:
+        return jsonify({'error': 'Choose SAT or ACT.'}), 400
+    exam = payload.get('exam', 'SAT')
     requested_rank = _battle_rank_by_key(payload.get('rank')) if payload.get('rank') is not None else None
     if payload.get('rank') is not None and not requested_rank:
         return jsonify({'error': 'Choose a valid training rank.'}), 400
     bot = _battle_bot()
     rating = requested_rank['minimum'] if requested_rank else _battle_rating_value(user.data['id'])
     try:
-        questions = _battle_questions(rating, require_ai=True)
+        questions = _questions_for_exam(rating, exam, require_ai=True)
     except ArenaQuestionGenerationError:
-        app.logger.exception('Gemini could not create a validated SAT training round.')
+        app.logger.exception('Gemini could not create a validated %s training round.', exam)
         return jsonify({
             'error': 'We could not prepare a complete question set. Your rating is unchanged. Please try again.'
         }), 503
     battle_id = db.insert('sat_battles', {
         'status': 'active', 'challenger_id': user.data['id'],
         'challenger_name': user.get_name(), 'opponent_id': bot['id'], 'opponent_name': _training_bot_name(requested_rank),
+        **({'exam_type': exam} if exam == 'ACT' else {}),
         'questions': json.dumps(questions), 'started_at': _utc_now().isoformat(),
     })
     return jsonify(_battle_payload(db.select_one('sat_battles', where={'id': battle_id}), user.data['id']))
