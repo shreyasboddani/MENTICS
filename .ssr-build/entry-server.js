@@ -4,7 +4,7 @@ import { createPortal } from "react-dom";
 import DOMPurify from "dompurify";
 import { marked } from "marked";
 import { Toaster, toast } from "sonner";
-import { AlertTriangle, ArrowLeft, ArrowRight, Award, BarChart3, BookOpen, Brain, Calculator, CalendarDays, Check, ChevronRight, Clock3, Dices, Flag, Flame, GraduationCap, GripHorizontal, Hand, Headphones, House, LayoutDashboard, Lightbulb, LineChart, LockKeyhole, LogOut, Mail, Maximize2, Menu, MessageCircle, Minimize2, PenLine, Plus, RotateCcw, RotateCw, Search, Send, Settings, ShieldCheck, SkipForward, Sparkles, Swords, Target, Trophy, UserRound, UsersRound, Volume2, VolumeX, X, Zap } from "lucide-react";
+import { AlertTriangle, ArrowLeft, ArrowRight, Award, BarChart3, BookOpen, Brain, Calculator, CalendarDays, Check, ChevronRight, CircleCheck, Clock3, Dices, Flag, Flame, GraduationCap, GripHorizontal, Hand, Headphones, House, LayoutDashboard, Lightbulb, LineChart, LockKeyhole, LogOut, Mail, Maximize2, Menu, MessageCircle, Minimize2, PenLine, Plus, RotateCcw, RotateCw, Search, Send, Settings, ShieldCheck, SkipForward, Sparkles, Swords, Target, TrendingUp, Trophy, UserRound, UsersRound, Volume2, VolumeX, X, Zap } from "lucide-react";
 import { Fragment, jsx, jsxs } from "react/jsx-runtime";
 //#region frontend/src/boot.js
 var initial = typeof window !== "undefined" && window.__MENTICS__ ? window.__MENTICS__ : {
@@ -8053,6 +8053,9 @@ function PortalSelector({ open, onClose }) {
 function Dashboard() {
 	const d = boot.data;
 	const trophies = d.earnedAchievements || [];
+	const learning = d.learningSummary || {};
+	const focusSkills = learning.focusSkills || [];
+	const strongestSkills = learning.strongestSkills || [];
 	const [suggestion, setSuggestion] = useState("Reviewing your latest progress…");
 	const [portalOpen, setPortalOpen] = useState(false);
 	useEffect(() => {
@@ -8109,9 +8112,13 @@ function Dashboard() {
 								/* @__PURE__ */ jsx("span", { className: "path-launcher-grid" }),
 								/* @__PURE__ */ jsxs("div", { children: [
 									/* @__PURE__ */ jsx("small", { children: "THE CORE EXPERIENCE" }),
-									/* @__PURE__ */ jsx("h2", { children: "Path Builder" }),
-									/* @__PURE__ */ jsx("p", { children: "Launch the Mentics portal to generate or update your personalized roadmap." }),
-									/* @__PURE__ */ jsxs("b", { children: ["Open portal ", /* @__PURE__ */ jsx(ArrowRight, {})] })
+									/* @__PURE__ */ jsx("h2", { children: learning.nextTask ? "Your next move" : "Path Builder" }),
+									/* @__PURE__ */ jsx("p", { children: learning.nextTask ? `${learning.activeTrackLabel} is ready for ${learning.nextTask.title}. Your path will keep adapting as you work.` : "Launch the Mentics portal to generate or update your personalized roadmap." }),
+									/* @__PURE__ */ jsxs("b", { children: [
+										learning.nextTask ? "Continue your path" : "Open portal",
+										" ",
+										/* @__PURE__ */ jsx(ArrowRight, {})
+									] })
 								] }),
 								/* @__PURE__ */ jsxs("div", {
 									className: "path-radar",
@@ -8138,24 +8145,89 @@ function Dashboard() {
 								/* @__PURE__ */ jsx("small", { children: "LIVE" })
 							] })]
 						}),
+						/* @__PURE__ */ jsxs("article", {
+							className: "dash-module learning-signal-module",
+							children: [
+								/* @__PURE__ */ jsxs("header", { children: [/* @__PURE__ */ jsxs("div", { children: [/* @__PURE__ */ jsx("small", { children: "ADAPTIVE LEARNING SIGNAL" }), /* @__PURE__ */ jsx("h2", { children: "What Mentics is tracking" })] }), /* @__PURE__ */ jsxs("a", {
+									href: "/dashboard/stats",
+									children: ["View progress ", /* @__PURE__ */ jsx(ArrowRight, {})]
+								})] }),
+								/* @__PURE__ */ jsxs("div", {
+									className: "learning-signal-summary",
+									children: [
+										/* @__PURE__ */ jsxs("div", { children: [
+											/* @__PURE__ */ jsx("small", { children: "CURRENT SECTION" }),
+											/* @__PURE__ */ jsx("b", { children: learning.activeTrackLabel || "SAT MATH" }),
+											/* @__PURE__ */ jsx("span", { children: learning.trackAttempts ? `${learning.trackAttempts} measured answers` : "Start a benchmark to measure it" })
+										] }),
+										/* @__PURE__ */ jsxs("div", { children: [
+											/* @__PURE__ */ jsx("small", { children: "SECTION ACCURACY" }),
+											/* @__PURE__ */ jsx("b", { children: learning.trackAccuracy == null ? "—" : `${learning.trackAccuracy}%` }),
+											/* @__PURE__ */ jsx("span", { children: learning.benchmarkCount ? `${learning.benchmarkCount} benchmark${learning.benchmarkCount === 1 ? "" : "s"} complete` : "Diagnostic not started" })
+										] }),
+										/* @__PURE__ */ jsxs("div", { children: [
+											/* @__PURE__ */ jsx("small", { children: "NEXT UP" }),
+											/* @__PURE__ */ jsx("b", { children: learning.nextTask?.kind || "Choose a path" }),
+											/* @__PURE__ */ jsx("span", { children: learning.nextTask?.title || "Your focused next step will appear here" })
+										] })
+									]
+								}),
+								/* @__PURE__ */ jsxs("div", {
+									className: "learning-skill-columns",
+									children: [/* @__PURE__ */ jsxs("div", { children: [/* @__PURE__ */ jsx("small", { children: "FOCUS NOW" }), focusSkills.length ? focusSkills.map((skill) => /* @__PURE__ */ jsxs("div", {
+										className: "learning-skill",
+										children: [
+											/* @__PURE__ */ jsxs("span", { children: [/* @__PURE__ */ jsx("b", { children: skill.label }), /* @__PURE__ */ jsxs("small", { children: [
+												skill.subject || "Test prep",
+												" · ",
+												skill.attempts,
+												" answers"
+											] })] }),
+											/* @__PURE__ */ jsx("em", { children: /* @__PURE__ */ jsx("i", { style: { width: `${skill.accuracy}%` } }) }),
+											/* @__PURE__ */ jsxs("strong", { children: [skill.accuracy, "%"] })
+										]
+									}, `${skill.subject}-${skill.label}`)) : /* @__PURE__ */ jsx("p", { children: "Complete a benchmark or Quick Practice session to reveal the skills that need attention." })] }), /* @__PURE__ */ jsxs("div", { children: [/* @__PURE__ */ jsx("small", { children: "BUILDING ON" }), strongestSkills.length ? strongestSkills.map((skill) => /* @__PURE__ */ jsxs("div", {
+										className: "learning-skill learning-skill--strong",
+										children: [/* @__PURE__ */ jsx(CircleCheck, {}), /* @__PURE__ */ jsxs("span", { children: [/* @__PURE__ */ jsx("b", { children: skill.label }), /* @__PURE__ */ jsxs("small", { children: [
+											skill.accuracy,
+											"% across ",
+											skill.attempts,
+											" answers"
+										] })] })]
+									}, `${skill.subject}-${skill.label}`)) : /* @__PURE__ */ jsx("p", { children: "Strong skills will appear here as your evidence builds." })] })]
+								})
+							]
+						}),
 						/* @__PURE__ */ jsx(ProgressTile, {
 							type: "test",
-							value: d.testPrepCompleted || 0
+							value: d.testPrepCompleted || 0,
+							total: d.testPrepTotal || 0
 						}),
 						/* @__PURE__ */ jsx(ProgressTile, {
 							type: "college",
-							value: d.collegePlanningCompleted || 0
+							value: d.collegePlanningCompleted || 0,
+							total: d.collegePlanningTotal || 0
 						}),
 						/* @__PURE__ */ jsxs("article", {
 							className: "dash-module activity-module",
-							children: [/* @__PURE__ */ jsxs("header", { children: [/* @__PURE__ */ jsxs("div", { children: [/* @__PURE__ */ jsx("small", { children: "ACTIVITY TREND" }), /* @__PURE__ */ jsx("h2", { children: "Focus intensity" })] }), /* @__PURE__ */ jsx(BarChart3, {})] }), /* @__PURE__ */ jsx("div", {
-								className: "command-chart",
-								children: chart.map((v, i) => /* @__PURE__ */ jsxs("div", { children: [
-									/* @__PURE__ */ jsx("b", { children: v }),
-									/* @__PURE__ */ jsx("i", { style: { height: `${Math.max(7, v / max * 100)}%` } }),
-									/* @__PURE__ */ jsx("small", { children: d.activityData?.labels?.[i] })
-								] }, i))
-							})]
+							children: [
+								/* @__PURE__ */ jsxs("header", { children: [/* @__PURE__ */ jsxs("div", { children: [/* @__PURE__ */ jsx("small", { children: "CONSISTENCY TRACKER" }), /* @__PURE__ */ jsx("h2", { children: "Focus intensity" })] }), /* @__PURE__ */ jsx(TrendingUp, {})] }),
+								/* @__PURE__ */ jsx("p", {
+									className: "activity-caption",
+									children: d.gameStats?.streak ? `You’re on a ${d.gameStats.streak}-day study streak. A completed session today keeps it alive.` : "Complete a path step, Quick Practice session, benchmark, or battle to start your streak."
+								}),
+								/* @__PURE__ */ jsx("div", {
+									className: "command-chart",
+									children: chart.map((v, i) => /* @__PURE__ */ jsxs("div", {
+										"data-today": i === chart.length - 1,
+										children: [
+											/* @__PURE__ */ jsx("b", { children: v }),
+											/* @__PURE__ */ jsx("i", { style: { height: `${Math.max(7, v / max * 100)}%` } }),
+											/* @__PURE__ */ jsx("small", { children: d.activityData?.labels?.[i] })
+										]
+									}, i))
+								})
+							]
 						}),
 						/* @__PURE__ */ jsxs("article", {
 							className: "dash-module vital-module",
@@ -8233,16 +8305,18 @@ function Dashboard() {
 		})
 	});
 }
-function ProgressTile({ type, value }) {
+function ProgressTile({ type, value, total }) {
 	const test = type === "test";
 	const Icon = test ? BookOpen : GraduationCap;
+	const safeTotal = Math.max(0, Number(total) || 0);
+	const progress = safeTotal ? Math.min(100, value / safeTotal * 100) : 0;
 	return /* @__PURE__ */ jsxs("a", {
 		className: `dash-module progress-tile progress-tile--${type}`,
 		href: test ? "/dashboard/test-path-view" : "/dashboard/college-path-view",
 		children: [
 			/* @__PURE__ */ jsxs("header", { children: [/* @__PURE__ */ jsx(Icon, {}), /* @__PURE__ */ jsx("small", { children: test ? "TEST PREP" : "COLLEGE PLAN" })] }),
-			/* @__PURE__ */ jsxs("div", { children: [/* @__PURE__ */ jsxs("strong", { children: [/* @__PURE__ */ jsx("b", { children: value }), /* @__PURE__ */ jsx("i", { children: "/5" })] }), /* @__PURE__ */ jsx("span", { children: value === 5 ? "PATH COMPLETE" : "TASKS DONE" })] }),
-			/* @__PURE__ */ jsx("em", { children: /* @__PURE__ */ jsx("i", { style: { width: `${value / 5 * 100}%` } }) })
+			/* @__PURE__ */ jsxs("div", { children: [/* @__PURE__ */ jsxs("strong", { children: [/* @__PURE__ */ jsx("b", { children: value }), /* @__PURE__ */ jsxs("i", { children: ["/", safeTotal || "—"] })] }), /* @__PURE__ */ jsx("span", { children: safeTotal ? value >= safeTotal ? "PATH COMPLETE" : "TASKS DONE" : "NO ACTIVE PATH" })] }),
+			/* @__PURE__ */ jsx("em", { children: /* @__PURE__ */ jsx("i", { style: { width: `${progress}%` } }) })
 		]
 	});
 }
@@ -8251,11 +8325,14 @@ function activityTitle(a) {
 		task_completed: "Task completed",
 		path_generated: "New path created",
 		stat_updated: "Progress updated",
-		task_added: "Task added"
+		task_added: "Task added",
+		quick_practice: "Quick Practice completed",
+		adaptive_session_completed: "Adaptive session completed",
+		battle_completed: "Battle submitted"
 	}[a.type] || "Progress recorded";
 }
 function activityDetail(a) {
-	return a.details?.description || a.details?.stat_name || "A step forward on your Mentics path";
+	return a.details?.description || a.details?.stat_name || a.details?.track?.replace("_", " ").toUpperCase() || "A step forward on your Mentics path";
 }
 function Markdown({ children }) {
 	const html = useMemo(() => DOMPurify.sanitize(marked.parse(children || "", { breaks: true })), [children]);

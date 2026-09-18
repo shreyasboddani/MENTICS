@@ -918,7 +918,7 @@ def _achievement_catalog(all_tasks, gamification_stats):
 
 
 def _advance_completion_streak(user_id):
-    """Advance a student's streak once for a newly completed path step."""
+    """Advance a student's daily learning streak once for meaningful work."""
     row = db.select_one("gamification_stats", where={"user_id": user_id})
     if not row:
         db.insert("gamification_stats", {
@@ -943,6 +943,17 @@ def _advance_completion_streak(user_id):
     }, where={"user_id": user_id})
 
 
+def _record_learning_completion(user_id, activity_type, details=None):
+    """Persist a finished learning session and count its calendar day once.
+
+    A streak measures meaningful completed work, not page views or individual
+    answers. This shared entry point keeps paths, Quick Practice, benchmarks,
+    and battles on the same durable day counter.
+    """
+    log_activity(user_id, activity_type, details)
+    _advance_completion_streak(user_id)
+
+
 def _record_task_completion(user_id, task):
     """Claim a completion once, then record its activity and streak effects."""
     claimed = db.execute_write(
@@ -952,10 +963,9 @@ def _record_task_completion(user_id, task):
     )
     if not claimed:
         return False
-    log_activity(user_id, "task_completed", {
+    _record_learning_completion(user_id, "task_completed", {
         "description": task["description"], "category": task["category"],
     })
-    _advance_completion_streak(user_id)
     return True
 
 
@@ -3295,6 +3305,63 @@ def dashboard(user):
 
     academic_scores = _academic_score_snapshot(stats)
 
+    # The dashboard is the quick read of the same evidence used by Quick
+    # Practice and Learning Paths. Keep it compact, but never manufacture a
+    # "personalized" focus when there is no measured work yet.
+    test_path = stats.get('test_path') or {}
+    tracks = test_path.get('tracks') if isinstance(test_path, dict) else {}
+    tracks = tracks if isinstance(tracks, dict) else {}
+    active_track = test_path.get('active_track') if isinstance(test_path, dict) else None
+    if active_track not in adaptive.TRACKS:
+        active_track = next((key for key in tracks if key in adaptive.TRACKS), None)
+    if active_track not in adaptive.TRACKS:
+        active_track = next((task.get('track_key') for task in active_test_tasks if task.get('track_key') in adaptive.TRACKS), 'sat_math')
+
+    event_totals = db.execute(
+        """SELECT track_key, COUNT(*) AS attempts,
+                  SUM(CASE WHEN is_correct THEN 1 ELSE 0 END) AS correct
+           FROM learning_events WHERE user_id=? GROUP BY track_key""", (user_id,))
+    totals_by_track = {row['track_key']: row for row in event_totals}
+    all_attempts = sum(int(row.get('attempts') or 0) for row in event_totals)
+    all_correct = sum(int(row.get('correct') or 0) for row in event_totals)
+    mastery_rows = _get_mastery_rows(user_id)
+    measured_mastery = [row for row in mastery_rows if int(row.get('attempts') or 0) >= 2]
+    measured_mastery.sort(key=lambda row: (row['accuracy'], -row['attempts'], row['skill_label']))
+    focus_skills = [{
+        'label': row['skill_label'], 'accuracy': round(row['accuracy'] * 100),
+        'attempts': row['attempts'], 'subject': row['subject'],
+    } for row in measured_mastery[:3]]
+    strongest_mastery = [row for row in measured_mastery if row['accuracy'] >= .7]
+    strongest_skills = [{
+        'label': row['skill_label'], 'accuracy': round(row['accuracy'] * 100),
+        'attempts': row['attempts'], 'subject': row['subject'],
+    } for row in list(reversed(strongest_mastery[-2:]))]
+    active_track_tasks = sorted(
+        [task for task in active_test_tasks if task.get('track_key') == active_track],
+        key=lambda task: (task.get('task_order') or 0, task.get('id') or 0),
+    )
+    next_task = next((task for task in active_track_tasks if not task.get('is_completed') and not task.get('is_skipped')), None)
+    active_track_label = active_track.replace('_', ' ').upper()
+    track_total = totals_by_track.get(active_track, {})
+    benchmark_rows = db.execute(
+        "SELECT COUNT(*) AS completed FROM adaptive_tracks WHERE user_id=? AND benchmark_completed_at IS NOT NULL", (user_id,)
+    )
+    learning_summary = {
+        'activeTrack': active_track, 'activeTrackLabel': active_track_label,
+        'attempts': all_attempts, 'accuracy': round(all_correct / all_attempts * 100) if all_attempts else None,
+        'trackAttempts': int(track_total.get('attempts') or 0),
+        'trackAccuracy': round(int(track_total.get('correct') or 0) / int(track_total.get('attempts') or 1) * 100) if track_total else None,
+        'focusSkills': focus_skills, 'strongestSkills': strongest_skills,
+        'benchmarkCount': int((benchmark_rows[0] if benchmark_rows else {}).get('completed') or 0),
+        'nextTask': ({
+            'title': next_task.get('title') or next_task.get('description') or 'Continue your path',
+            'kind': {
+                'practice_sprint': 'Practice sprint', 'boss_battle': 'Boss battle',
+                'quiz': 'Knowledge check', 'lesson': 'Lesson', 'benchmark': 'Benchmark',
+            }.get(next_task.get('task_format'), 'Learning step'),
+        } if next_task else None),
+    }
+
     # --- Recent Activity Fetch ---
     recent_activities_raw = db.select(
         "activity_log",
@@ -3378,7 +3445,9 @@ def dashboard(user):
     return render_react("dashboard", {
         "name": name,
         "testPrepCompleted": test_prep_completed_current,
+        "testPrepTotal": len(active_test_tasks),
         "collegePlanningCompleted": college_planning_completed_current,
+        "collegePlanningTotal": len(active_college_tasks),
         "gpa": academic_scores['gpa'] or "—",
         "satTotal": academic_scores['satTotal'] or "—",
         "actAverage": academic_scores['actAverage'] or "—",
@@ -3387,6 +3456,7 @@ def dashboard(user):
         "testDateInfo": test_date_info,
         "earnedAchievements": earned_achievements,
         "gameStats": game_stats,
+        "learningSummary": learning_summary,
     }, "Dashboard | Mentics")
 
 
@@ -3684,7 +3754,15 @@ def adaptive_session(user,session_id):
             if action=='answer':
                 adaptive.answer(db,user.data['id'],session_id,data)
             elif action=='finish':
+                before = db.select_one('adaptive_sessions', where={'id': session_id, 'user_id': user.data['id']})
                 adaptive.finish(db,user.data['id'],session_id)
+                # Finishing a benchmark or an adaptive practice set is a real
+                # study session. The status check keeps refresh/retry requests
+                # from creating duplicate activity rows.
+                if before and before.get('status') != 'completed':
+                    _record_learning_completion(user.data['id'], 'adaptive_session_completed', {
+                        'track': before.get('track_key'), 'kind': before.get('kind'),
+                    })
             elif action=='next_path':
                 saved=db.select_one('adaptive_sessions',where={'id':session_id,'user_id':user.data['id']})
                 if not saved or saved['kind']!='benchmark' or saved['status']!='completed':
@@ -3729,7 +3807,7 @@ def save_quick_practice(user):
                 'question_text':question['prompt'],'difficulty':'easy'},exam)
             adaptive.record_event_tx(tx,user.data['id'],track,'legacy_quick',f"{track}:{answer['id']}",measured,
                 answer['selected']==question['options'][question['answer']],chosen=question['options'].index(answer['selected']))
-    log_activity(user.data['id'], 'quick_practice', {'track': track, 'results': results})
+    _record_learning_completion(user.data['id'], 'quick_practice', {'track': track, 'results': results})
     return jsonify({'saved': True})
 
 
@@ -6581,6 +6659,9 @@ def submit_sat_battle(user, battle_id):
             track,measured=adaptive.arena_question(question,str(current.get('exam_type') or 'SAT').lower())
             adaptive.record_event_tx(tx,user.data['id'],track,'battle',f'{battle_id}:{index}',measured,
                 answer['selected_option']==question['correct_option'],chosen=answer['selected_option'])
+    _record_learning_completion(user.data['id'], 'battle_completed', {
+        'battle_id': battle_id, 'exam': current.get('exam_type') or 'SAT',
+    })
     return jsonify(_battle_payload(db.select_one('sat_battles', where={'id': battle_id}), user.data['id']))
 
 

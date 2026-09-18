@@ -5,11 +5,11 @@ import { marked } from 'marked'
 import { Toaster, toast } from 'sonner'
 import {
   AlertTriangle, ArrowLeft, ArrowRight, Award, BarChart3, BookOpen, Brain, CalendarDays,
-  Check, Clock3, Flame, Calculator,
+  Check, CircleCheck, Clock3, Flame, Calculator,
   GraduationCap, Hand, Headphones, House, LineChart,
   LockKeyhole, Mail, MessageCircle, PenLine, Plus, RotateCcw, SkipForward,
   Search, Send, ShieldCheck, Sparkles, Swords, Target, Trophy, UserRound,
-  UsersRound, X, Zap
+  TrendingUp, UsersRound, X, Zap
 } from 'lucide-react'
 import './styles.css'
 import './experience.css'
@@ -438,6 +438,9 @@ function PortalSelector({ open, onClose }) {
 function Dashboard() {
   const d = boot.data
   const trophies = d.earnedAchievements || []
+  const learning = d.learningSummary || {}
+  const focusSkills = learning.focusSkills || []
+  const strongestSkills = learning.strongestSkills || []
   const [suggestion, setSuggestion] = useState('Reviewing your latest progress…')
   const [portalOpen, setPortalOpen] = useState(false)
   useEffect(() => { fetch('/api/get-suggestion').then(r => r.json()).then(x => setSuggestion(x.suggestion || 'Your next clear step is waiting.')).catch(() => setSuggestion('Keep the next step small, specific, and finishable.')) }, [])
@@ -448,10 +451,11 @@ function Dashboard() {
   return <AppShell name={d.name}><main className="app-main dashboard-page dashboard-original">
     <section className="dashboard-welcome"><div><small>{today}</small><h1>Welcome back, <span>{first}</span></h1><p>Your dashboard is ready. Let’s build momentum.</p></div><div className="dashboard-totals"><span><Flame /><b>{d.gameStats?.streak || 0}</b><small>DAY STREAK</small></span><span><Zap /><b>{d.gameStats?.points || 0}</b><small>POINTS</small></span></div></section>
     <section className="command-grid">
-      <button className="path-launcher" onClick={() => setPortalOpen(true)}><span className="path-launcher-grid" /><div><small>THE CORE EXPERIENCE</small><h2>Path Builder</h2><p>Launch the Mentics portal to generate or update your personalized roadmap.</p><b>Open portal <ArrowRight /></b></div><div className="path-radar"><i /><i /><i /><Target /></div></button>
+      <button className="path-launcher" onClick={() => setPortalOpen(true)}><span className="path-launcher-grid" /><div><small>THE CORE EXPERIENCE</small><h2>{learning.nextTask ? 'Your next move' : 'Path Builder'}</h2><p>{learning.nextTask ? `${learning.activeTrackLabel} is ready for ${learning.nextTask.title}. Your path will keep adapting as you work.` : 'Launch the Mentics portal to generate or update your personalized roadmap.'}</p><b>{learning.nextTask ? 'Continue your path' : 'Open portal'} <ArrowRight /></b></div><div className="path-radar"><i /><i /><i /><Target /></div></button>
       <a className="dash-module battle-dashboard-card" href="/battles"><div><small>SAT + ACT BATTLES</small><h2>Put your speed to the test.</h2><p>Choose SAT or ACT, then race a student on the same exam. Accuracy wins; speed settles the tie.</p><b>Enter the arena <ArrowRight /></b></div><span><Swords /><i>1:1</i><small>LIVE</small></span></a>
-      <ProgressTile type="test" value={d.testPrepCompleted || 0} /><ProgressTile type="college" value={d.collegePlanningCompleted || 0} />
-      <article className="dash-module activity-module"><header><div><small>ACTIVITY TREND</small><h2>Focus intensity</h2></div><BarChart3 /></header><div className="command-chart">{chart.map((v, i) => <div key={i}><b>{v}</b><i style={{ height: `${Math.max(7, v / max * 100)}%` }} /><small>{d.activityData?.labels?.[i]}</small></div>)}</div></article>
+      <article className="dash-module learning-signal-module"><header><div><small>ADAPTIVE LEARNING SIGNAL</small><h2>What Mentics is tracking</h2></div><a href="/dashboard/stats">View progress <ArrowRight /></a></header><div className="learning-signal-summary"><div><small>CURRENT SECTION</small><b>{learning.activeTrackLabel || 'SAT MATH'}</b><span>{learning.trackAttempts ? `${learning.trackAttempts} measured answers` : 'Start a benchmark to measure it'}</span></div><div><small>SECTION ACCURACY</small><b>{learning.trackAccuracy == null ? '—' : `${learning.trackAccuracy}%`}</b><span>{learning.benchmarkCount ? `${learning.benchmarkCount} benchmark${learning.benchmarkCount === 1 ? '' : 's'} complete` : 'Diagnostic not started'}</span></div><div><small>NEXT UP</small><b>{learning.nextTask?.kind || 'Choose a path'}</b><span>{learning.nextTask?.title || 'Your focused next step will appear here'}</span></div></div><div className="learning-skill-columns"><div><small>FOCUS NOW</small>{focusSkills.length ? focusSkills.map(skill => <div className="learning-skill" key={`${skill.subject}-${skill.label}`}><span><b>{skill.label}</b><small>{skill.subject || 'Test prep'} · {skill.attempts} answers</small></span><em><i style={{ width: `${skill.accuracy}%` }} /></em><strong>{skill.accuracy}%</strong></div>) : <p>Complete a benchmark or Quick Practice session to reveal the skills that need attention.</p>}</div><div><small>BUILDING ON</small>{strongestSkills.length ? strongestSkills.map(skill => <div className="learning-skill learning-skill--strong" key={`${skill.subject}-${skill.label}`}><CircleCheck /><span><b>{skill.label}</b><small>{skill.accuracy}% across {skill.attempts} answers</small></span></div>) : <p>Strong skills will appear here as your evidence builds.</p>}</div></div></article>
+      <ProgressTile type="test" value={d.testPrepCompleted || 0} total={d.testPrepTotal || 0} /><ProgressTile type="college" value={d.collegePlanningCompleted || 0} total={d.collegePlanningTotal || 0} />
+      <article className="dash-module activity-module"><header><div><small>CONSISTENCY TRACKER</small><h2>Focus intensity</h2></div><TrendingUp /></header><p className="activity-caption">{d.gameStats?.streak ? `You’re on a ${d.gameStats.streak}-day study streak. A completed session today keeps it alive.` : 'Complete a path step, Quick Practice session, benchmark, or battle to start your streak.'}</p><div className="command-chart">{chart.map((v, i) => <div key={i} data-today={i === chart.length - 1}><b>{v}</b><i style={{ height: `${Math.max(7, v / max * 100)}%` }} /><small>{d.activityData?.labels?.[i]}</small></div>)}</div></article>
       <article className="dash-module vital-module"><header><small>VITAL STATS</small><a href="/dashboard/stats/edit">Update</a></header><dl><div><dt>GPA</dt><dd>{d.gpa}</dd></div><div><dt>SAT</dt><dd>{d.satTotal}</dd></div><div><dt>ACT</dt><dd>{d.actAverage}</dd></div></dl></article>
       <article className="dash-module insight-module"><div className="countdown">{d.testDateInfo?.days_left != null ? <><strong>{d.testDateInfo.days_left}</strong><span>DAYS TO {d.testDateInfo.test_type}</span><small>{d.testDateInfo.date_str}</small></> : <><CalendarDays /><span>NO TEST DATE SET</span><a href="/dashboard/test-path-builder">Set your date</a></>}</div><div className="insight"><Brain /><small>MENTICS INSIGHT</small><p>{suggestion}</p></div></article>
       <article className="dash-module updates-module"><header><div><small>LATEST SIGNALS</small><h2>Recent updates</h2></div><Clock3 /></header><div>{d.recentActivities?.length ? d.recentActivities.slice(0, 4).map((a, i) => <span key={i}><i><Check /></i><p><b>{activityTitle(a)}</b><small>{activityDetail(a)}</small></p></span>) : <div className="empty-state"><Target /><p>Your completed work will show up here.</p></div>}</div></article>
@@ -461,16 +465,18 @@ function Dashboard() {
   </main></AppShell>
 }
 
-function ProgressTile({ type, value }) {
+function ProgressTile({ type, value, total }) {
   const test = type === 'test'
   const Icon = test ? BookOpen : GraduationCap
-  return <a className={`dash-module progress-tile progress-tile--${type}`} href={test ? '/dashboard/test-path-view' : '/dashboard/college-path-view'}><header><Icon /><small>{test ? 'TEST PREP' : 'COLLEGE PLAN'}</small></header><div><strong><b>{value}</b><i>/5</i></strong><span>{value === 5 ? 'PATH COMPLETE' : 'TASKS DONE'}</span></div><em><i style={{ width: `${value / 5 * 100}%` }} /></em></a>
+  const safeTotal = Math.max(0, Number(total) || 0)
+  const progress = safeTotal ? Math.min(100, value / safeTotal * 100) : 0
+  return <a className={`dash-module progress-tile progress-tile--${type}`} href={test ? '/dashboard/test-path-view' : '/dashboard/college-path-view'}><header><Icon /><small>{test ? 'TEST PREP' : 'COLLEGE PLAN'}</small></header><div><strong><b>{value}</b><i>/{safeTotal || '—'}</i></strong><span>{safeTotal ? (value >= safeTotal ? 'PATH COMPLETE' : 'TASKS DONE') : 'NO ACTIVE PATH'}</span></div><em><i style={{ width: `${progress}%` }} /></em></a>
 }
 
 function activityTitle(a) {
-  return ({ task_completed: 'Task completed', path_generated: 'New path created', stat_updated: 'Progress updated', task_added: 'Task added' })[a.type] || 'Progress recorded'
+  return ({ task_completed: 'Task completed', path_generated: 'New path created', stat_updated: 'Progress updated', task_added: 'Task added', quick_practice: 'Quick Practice completed', adaptive_session_completed: 'Adaptive session completed', battle_completed: 'Battle submitted' })[a.type] || 'Progress recorded'
 }
-function activityDetail(a) { return a.details?.description || a.details?.stat_name || 'A step forward on your Mentics path' }
+function activityDetail(a) { return a.details?.description || a.details?.stat_name || a.details?.track?.replace('_', ' ').toUpperCase() || 'A step forward on your Mentics path' }
 
 function Markdown({ children }) {
   const html = useMemo(() => DOMPurify.sanitize(marked.parse(children || '', { breaks: true })), [children])

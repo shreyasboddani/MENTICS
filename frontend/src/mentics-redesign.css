@@ -387,6 +387,30 @@ button,a { -webkit-tap-highlight-color: transparent; }
 .insight-module { grid-column: span 3; }
 .updates-module { grid-column: span 3; }
 .trophies-module { grid-column: span 6; min-height: 0; }
+.learning-signal-module { grid-column: span 6; min-height: 300px; }
+.learning-signal-module > header > a { display: inline-flex; align-items: center; gap: 5px; color: var(--mx-violet); font-size: .64rem; font-weight: 800; }
+.learning-signal-module > header > a svg { width: 14px; height: 14px; }
+.learning-signal-summary { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 10px; margin-top: 20px; }
+.learning-signal-summary > div { min-width: 0; display: grid; gap: 6px; padding: 15px; border: 1px solid rgba(117,99,162,.14); border-radius: 13px; background: rgba(255,255,255,.58); }
+.learning-signal-summary small,.learning-skill-columns > div > small { color: #777188; font-size: .55rem; font-weight: 850; letter-spacing: .12em; }
+.learning-signal-summary b { overflow: hidden; color: #282338; font-size: .85rem; letter-spacing: -.02em; text-overflow: ellipsis; text-transform: capitalize; white-space: nowrap; }
+.learning-signal-summary span { overflow: hidden; color: #7f7a8d; font-size: .61rem; line-height: 1.35; text-overflow: ellipsis; white-space: nowrap; }
+.learning-skill-columns { display: grid; grid-template-columns: 1.25fr .75fr; gap: 22px; margin-top: 21px; }
+.learning-skill-columns > div { min-width: 0; }
+.learning-skill-columns > div > p { margin: 10px 0 0; color: #777285; font-size: .68rem; line-height: 1.5; }
+.learning-skill { display: grid; grid-template-columns: minmax(0,1fr) minmax(52px,.7fr) auto; align-items: center; gap: 10px; padding: 9px 0; border-bottom: 1px solid rgba(109,100,139,.12); }
+.learning-skill > span { min-width: 0; display: grid; gap: 3px; }
+.learning-skill b { overflow: hidden; color: #403a51; font-size: .68rem; text-overflow: ellipsis; white-space: nowrap; }
+.learning-skill span small { overflow: hidden; color: #8a8496; font-size: .56rem; text-overflow: ellipsis; white-space: nowrap; }
+.learning-skill em { height: 5px; overflow: hidden; border-radius: 999px; background: #e7e3ef; }
+.learning-skill em i { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg,#8b5cf6,#4f63cf); }
+.learning-skill strong { color: #5e3fb0; font-size: .62rem; }
+.learning-skill--strong { grid-template-columns: 22px minmax(0,1fr); }
+.learning-skill--strong svg { width: 18px; color: #2b9e79; }
+.learning-skill--strong b { color: #31554d; }
+.activity-caption { min-height: 18px; margin: 12px 0 -12px; color: #767185; font-size: .67rem; line-height: 1.45; }
+.command-chart > div[data-today="true"] small { color: #5e3bb1; font-weight: 850; }
+.command-chart > div[data-today="true"] i { background: linear-gradient(#a175ff,#5b39cf); box-shadow: 0 0 14px rgba(112,69,218,.24); }
 .dash-module,.settings-form,.trend-panel,.kpi-panel,.history-section,.analysis-panel,.stat-feature,.score-panels > article,.thread,.community-aside,.leaderboard-list article,.account-sections form,.article-page > article,.new-post-panel {
   border: 1px solid rgba(255,255,255,.78) !important;
   border-radius: 18px;
@@ -447,6 +471,7 @@ button,a { -webkit-tap-highlight-color: transparent; }
   .activity-module { grid-column: span 8; }
   .vital-module { grid-column: span 4; }
   .insight-module { grid-column: span 8; }
+  .learning-signal-module { grid-column: span 8; }
   .updates-module,.trophies-module { grid-column: span 6; }
 }
 
@@ -630,7 +655,7 @@ button,a { -webkit-tap-highlight-color: transparent; }
   .dashboard-totals { width: 100%; }
   .dashboard-totals > span { flex: 1; min-width: 0; }
   .command-grid { grid-template-columns: 1fr; }
-  .path-launcher,.progress-tile,.activity-module,.vital-module,.insight-module,.updates-module,.trophies-module { grid-column: auto; }
+  .path-launcher,.progress-tile,.activity-module,.vital-module,.insight-module,.updates-module,.trophies-module,.learning-signal-module { grid-column: auto; }
   .path-launcher { min-height: 335px; padding: 27px; }
   .path-radar { width: 160px; height: 160px; opacity: .34; }
   .progress-tile { min-height: 205px; }
@@ -638,6 +663,8 @@ button,a { -webkit-tap-highlight-color: transparent; }
   .trophies-module > .trophy-list { grid-template-columns: 1fr; }
   .trophy-empty { max-width: none; }
   .dash-module { padding: 23px; border-radius: 15px; }
+  .learning-signal-summary,.learning-skill-columns { grid-template-columns: 1fr; gap: 10px; }
+  .learning-skill-columns { margin-top: 17px; }
   .page-intro--color { min-height: 205px; padding: 30px 23px; border-radius: 0 18px 18px 0; }
   .page-intro h1 { font-size: 3rem; }
   .page-actions { margin-top: 22px; }
