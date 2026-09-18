@@ -33,7 +33,7 @@ function ArenaAvatarPreview({ avatar, label = "Your fighter", paused = false, vi
 		const observer = new IntersectionObserver((entries) => {
 			if (!entries[0].isIntersecting) return;
 			observer.disconnect();
-			import("./arena-avatar-scene-BhgLiyrE.js").then(({ createAvatarScene }) => {
+			import("./arena-avatar-scene-DLyc3v_P.js").then(({ createAvatarScene }) => {
 				if (cancelled) return;
 				scene.current = createAvatarScene(element, latest.current, () => setFailed(true));
 				setReady(true);
@@ -3704,19 +3704,27 @@ function ArenaGameLobby({ exam, setExam, paused, name, rank, rankProgress, avata
 							/* @__PURE__ */ jsxs("div", {
 								className: "arena-exam-select",
 								children: [
-									/* @__PURE__ */ jsx("small", { children: "CHOOSE YOUR EXAM" }),
+									/* @__PURE__ */ jsxs("div", {
+										className: "arena-exam-select__label",
+										children: [/* @__PURE__ */ jsx("small", { children: "YOUR BATTLE TRACK" }), /* @__PURE__ */ jsx("span", { children: "01" })]
+									}),
 									/* @__PURE__ */ jsx("div", {
+										className: "arena-exam-select__switch",
 										role: "group",
 										"aria-label": "Battle exam",
-										children: ["SAT", "ACT"].map((value) => /* @__PURE__ */ jsx("button", {
+										children: ["SAT", "ACT"].map((value) => /* @__PURE__ */ jsxs("button", {
 											type: "button",
 											"aria-pressed": exam === value,
 											className: exam === value ? "selected" : "",
 											onClick: () => setExam(value),
-											children: value
+											children: [/* @__PURE__ */ jsx("b", { children: value }), /* @__PURE__ */ jsx("small", { children: value === "SAT" ? "Digital suite" : "Core sections" })]
 										}, value))
 									}),
-									/* @__PURE__ */ jsx("p", { children: exam === "ACT" ? "Math / English / Reading" : "Math / Reading & Writing" })
+									/* @__PURE__ */ jsxs("p", { children: [
+										/* @__PURE__ */ jsx("i", {}),
+										" ",
+										exam === "ACT" ? "Math, English, and Reading" : "Math and Reading & Writing"
+									] })
 								]
 							}),
 							/* @__PURE__ */ jsx("small", { children: "CHOOSE YOUR MODE" }),

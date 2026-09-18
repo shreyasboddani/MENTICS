@@ -127,7 +127,13 @@ function ArenaGameLobby({ exam, setExam, paused, name, rank, rankProgress, avata
     <header className="arena-game-bar"><span><Swords /> {exam} BATTLES</span><b>MENTICS / ARENA</b><em><i /> Online</em></header>
     <div className="arena-game-grid">
       <nav className="arena-mode-rail" aria-label="Choose game mode">
-        <div className="arena-exam-select"><small>CHOOSE YOUR EXAM</small><div role="group" aria-label="Battle exam">{['SAT', 'ACT'].map(value => <button type="button" key={value} aria-pressed={exam === value} className={exam === value ? 'selected' : ''} onClick={() => setExam(value)}>{value}</button>)}</div><p>{exam === 'ACT' ? 'Math / English / Reading' : 'Math / Reading & Writing'}</p></div>
+        <div className="arena-exam-select">
+          <div className="arena-exam-select__label"><small>YOUR BATTLE TRACK</small><span>01</span></div>
+          <div className="arena-exam-select__switch" role="group" aria-label="Battle exam">
+            {['SAT', 'ACT'].map(value => <button type="button" key={value} aria-pressed={exam === value} className={exam === value ? 'selected' : ''} onClick={() => setExam(value)}><b>{value}</b><small>{value === 'SAT' ? 'Digital suite' : 'Core sections'}</small></button>)}
+          </div>
+          <p><i /> {exam === 'ACT' ? 'Math, English, and Reading' : 'Math and Reading & Writing'}</p>
+        </div>
         <small>CHOOSE YOUR MODE</small>
         <button type="button" className={ranked ? 'selected' : ''} onClick={() => setMode('ranked')}><i><Swords /></i><span><b>Ranked duel</b><small>Climb the ladder</small></span></button>
         <button type="button" className={!ranked ? 'selected' : ''} onClick={() => setMode('training')}><i><Brain /></i><span><b>Training room</b><small>Choose any tier</small></span></button>
@@ -398,4 +404,3 @@ export default function BattleArena() {
     <section className="battle-spotlight" id="battle-rankings"><div><small>ARENA SPOTLIGHT</small><h2>{spotlight ? `${spotlight.challenger_name} vs ${spotlight.opponent_name}` : 'The next great battle starts with you.'}</h2><p>{spotlight ? 'The latest completed head-to-head round in the Mentics arena.' : 'Enter the arena to set the first battle on the board.'}</p></div><div>{spotlight ? <><strong>{spotlight.winner_id ? 'WINNER DECIDED' : 'DRAW'}</strong><span>Latest completed battle</span></> : <><strong>OPEN</strong><span>Matchmaking is ready</span></>}</div></section>
   </main></AppShell>
 }
-

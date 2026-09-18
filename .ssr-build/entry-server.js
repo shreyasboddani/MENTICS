@@ -1062,8 +1062,8 @@ async function api(url, options = {}) {
 }
 //#endregion
 //#region frontend/src/App.jsx
-var QuickPractice = lazy(() => import("./assets/quick-practice-BNg19sXh.js"));
-var BattleArena = lazy(() => import("./assets/arena-page-BE-VOIv7.js").then((n) => n.t));
+var QuickPractice = lazy(() => import("./assets/quick-practice-DADo_OKa.js"));
+var BattleArena = lazy(() => import("./assets/arena-page-R-9DY_b2.js").then((n) => n.t));
 var productPages = {
 	"ai-sat-prep": {
 		eyebrow: "PERSONALIZED AI SAT PREP",

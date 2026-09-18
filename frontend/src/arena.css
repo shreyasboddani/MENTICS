@@ -296,12 +296,17 @@
   .battle-page *,.arena-customizer * { animation: none !important; scroll-behavior: auto !important; transition: none !important; }
   .arena-loading-track i { width: 100%; opacity: .6; }
 }
-/* The exam is chosen before mode and remains fixed for the whole match. */
-.arena-mode-rail .arena-exam-select { width:100%; margin-bottom:14px; padding-bottom:19px; border-bottom:1px solid #c7a6ff26; }
-.arena-exam-select > small { display:block; margin-bottom:11px; color:#c4aee2; font-size:9px; letter-spacing:.13em; }
-.arena-exam-select > div { display:grid; grid-template-columns:1fr 1fr; gap:5px; padding:4px; background:#16112388; border:1px solid #b68be32e; border-radius:12px; }
-.arena-mode-rail .arena-exam-select button { display:block; min-height:40px; padding:9px 12px; text-align:center; font-size:13px; font-weight:800; border:1px solid transparent; border-radius:8px; color:#bda9d2; background:transparent; }
-.arena-mode-rail .arena-exam-select button.selected { color:#f6eaff; background:#7951a8; border-color:#c098ee6b; box-shadow:0 3px 15px #0c061d30; }
-.arena-exam-select > p { margin:10px 0 0; color:#b29cc8; font-size:9px; line-height:1.6; }
+/* Battle track selector: a dedicated control, not another rail menu item. */
+.arena-mode-rail .arena-exam-select { width:100%; margin:0 0 22px; padding:0 0 20px; border-bottom:1px solid #ffffff14; }
+.arena-exam-select__label { display:flex; align-items:center; justify-content:space-between; margin:0 2px 10px; }
+.arena-exam-select__label small { color:#a7a0b7; font-size:9px; font-weight:750; letter-spacing:.13em; }
+.arena-exam-select__label span { color:#756c85; font-size:9px; font-weight:700; letter-spacing:.08em; }
+.arena-exam-select__switch { display:grid; grid-template-columns:1fr 1fr; gap:2px; padding:3px; border:1px solid #ffffff1a; border-radius:9px; background:#0c0e15; box-shadow:inset 0 1px #ffffff06; }
+.arena-mode-rail .arena-exam-select .arena-exam-select__switch button { display:grid; justify-items:start; align-content:center; min-height:52px; padding:8px 9px; border:1px solid transparent; border-radius:6px; background:transparent; color:#918ba2; box-shadow:none; }
+.arena-mode-rail .arena-exam-select .arena-exam-select__switch button b { color:inherit; font-size:14px; font-weight:800; line-height:1; letter-spacing:.03em; }
+.arena-mode-rail .arena-exam-select .arena-exam-select__switch button small { margin-top:5px; color:inherit; font-size:8px; font-weight:600; line-height:1; letter-spacing:.03em; opacity:.65; }
+.arena-mode-rail .arena-exam-select .arena-exam-select__switch button.selected { border-color:#bc9cff70; color:#f7f3ff; background:linear-gradient(135deg,#6a4b9c,#49356a); box-shadow:inset 0 1px #ffffff1c,0 4px 12px #08071280; }
+.arena-exam-select > p { display:flex; align-items:center; gap:7px; margin:11px 2px 0; color:#9692a4; font-size:10px; line-height:1.45; }
+.arena-exam-select > p i { width:5px; height:5px; border-radius:50%; background:#ad92eb; box-shadow:0 0 0 3px #ad92eb17; }
 .arena-exam-select button:focus-visible { outline:2px solid #dfc4ff; outline-offset:3px; }
-@media(max-width:700px) { .arena-mode-rail .arena-exam-select { grid-column:1/-1; margin-bottom:6px; padding-bottom:12px; }.arena-exam-select > div { max-width:320px; }.arena-exam-select > p { margin-top:6px; } }
+@media(max-width:700px) { .arena-mode-rail .arena-exam-select { grid-column:1/-1; margin-bottom:6px; padding-bottom:12px; }.arena-exam-select__switch { max-width:340px; }.arena-exam-select > p { margin-top:8px; } }

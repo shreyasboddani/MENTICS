@@ -461,13 +461,14 @@ function QuickPractice() {
 				"aria-label": `${exam.toUpperCase()} ${labels[exam][subject]} practice`,
 				children: [/* @__PURE__ */ jsxs("div", {
 					className: "prep-session-bar",
-					children: [/* @__PURE__ */ jsxs("span", { children: [
+					children: [/* @__PURE__ */ jsxs("div", { children: [/* @__PURE__ */ jsxs("span", {
+						className: "prep-session-kicker",
+						children: ["MENTICS PRACTICE / ", mode === "sprint" ? "SPEED" : "STRATEGY"]
+					}), /* @__PURE__ */ jsxs("strong", { children: [
 						/* @__PURE__ */ jsx("b", { children: exam.toUpperCase() }),
 						" ",
-						labels[exam][subject],
-						" · ",
-						mode === "sprint" ? "Speed round" : "Strategy practice"
-					] }), /* @__PURE__ */ jsx("button", {
+						labels[exam][subject]
+					] })] }), /* @__PURE__ */ jsx("button", {
 						className: "text-button",
 						onClick: reset,
 						children: finished ? "Change practice" : "End round"
@@ -475,15 +476,22 @@ function QuickPractice() {
 				}), finished ? /* @__PURE__ */ jsxs("div", {
 					className: "prep-results",
 					children: [
-						/* @__PURE__ */ jsx(Trophy, { className: "prep-trophy" }),
+						/* @__PURE__ */ jsxs("div", {
+							className: "prep-result-mark",
+							children: [/* @__PURE__ */ jsx(Trophy, { className: "prep-trophy" }), /* @__PURE__ */ jsxs("span", { children: [
+								"ROUND",
+								/* @__PURE__ */ jsx("br", {}),
+								"COMPLETE"
+							] })]
+						}),
 						/* @__PURE__ */ jsx("div", {
 							className: "eyebrow",
-							children: "ROUND COMPLETE"
+							children: "YOUR PRACTICE RECEIPT"
 						}),
 						/* @__PURE__ */ jsx("h2", {
 							ref: questionHeading,
 							tabIndex: -1,
-							children: correct === round.length ? "Clean sweep." : "Every miss is a next move."
+							children: correct === round.length ? "Clean sweep." : "The next move is clear."
 						}),
 						/* @__PURE__ */ jsxs("p", { children: [
 							correct,
@@ -492,14 +500,14 @@ function QuickPractice() {
 							" correct",
 							mode === "sprint" ? ` in ${formatTime(seconds)}` : "",
 							". ",
-							missed.length ? "Review the explanation, then try the missed questions again." : "Keep the momentum with another mix of strategies."
+							missed.length ? "Bring the misses back for another rep." : "Keep the momentum with another set."
 						] }),
 						/* @__PURE__ */ jsxs("div", {
 							className: "prep-result-stats",
 							children: [
-								/* @__PURE__ */ jsxs("span", { children: [/* @__PURE__ */ jsx("b", { children: points }), "round points"] }),
-								/* @__PURE__ */ jsxs("span", { children: [/* @__PURE__ */ jsxs("b", { children: [Math.round(correct / round.length * 100), "%"] }), "accuracy"] }),
-								/* @__PURE__ */ jsxs("span", { children: [/* @__PURE__ */ jsx("b", { children: bestStreak }), "best streak"] })
+								/* @__PURE__ */ jsxs("span", { children: [/* @__PURE__ */ jsx("small", { children: "ROUND POINTS" }), /* @__PURE__ */ jsx("b", { children: points })] }),
+								/* @__PURE__ */ jsxs("span", { children: [/* @__PURE__ */ jsx("small", { children: "ACCURACY" }), /* @__PURE__ */ jsxs("b", { children: [Math.round(correct / round.length * 100), "%"] })] }),
+								/* @__PURE__ */ jsxs("span", { children: [/* @__PURE__ */ jsx("small", { children: "BEST STREAK" }), /* @__PURE__ */ jsx("b", { children: bestStreak })] })
 							]
 						}),
 						/* @__PURE__ */ jsxs("div", {
@@ -547,13 +555,10 @@ function QuickPractice() {
 					/* @__PURE__ */ jsxs("div", {
 						className: "prep-hud",
 						children: [
-							/* @__PURE__ */ jsxs("span", { children: [
-								/* @__PURE__ */ jsx(Target, {}),
-								" ",
-								index + 1,
-								" / ",
-								round.length
-							] }),
+							/* @__PURE__ */ jsxs("span", {
+								className: "prep-round-count",
+								children: [/* @__PURE__ */ jsx("small", { children: "QUESTION" }), /* @__PURE__ */ jsxs("b", { children: [String(index + 1).padStart(2, "0"), /* @__PURE__ */ jsxs("i", { children: ["/ ", String(round.length).padStart(2, "0")] })] })]
+							}),
 							/* @__PURE__ */ jsxs("span", { children: [
 								/* @__PURE__ */ jsx(Flame, {}),
 								" ",
@@ -587,9 +592,12 @@ function QuickPractice() {
 					/* @__PURE__ */ jsxs("div", {
 						className: "prep-question",
 						children: [
-							/* @__PURE__ */ jsx("div", {
-								className: "eyebrow",
-								children: question.skill
+							/* @__PURE__ */ jsxs("div", {
+								className: "prep-question-meta",
+								children: [/* @__PURE__ */ jsx("div", {
+									className: "eyebrow",
+									children: question.skill
+								}), /* @__PURE__ */ jsx("span", { children: mode === "sprint" ? "MAKE THE CALL" : "WORK THE MOVE" })]
 							}),
 							/* @__PURE__ */ jsx("h2", {
 								ref: questionHeading,
@@ -608,7 +616,7 @@ function QuickPractice() {
 									className: `${selected === i ? "is-selected" : ""} ${revealed && i === question.answer ? "is-correct" : ""} ${revealed && selected === i && i !== question.answer ? "is-wrong" : ""}`,
 									children: [
 										/* @__PURE__ */ jsx("span", { children: "ABCD"[i] }),
-										option,
+										/* @__PURE__ */ jsx("b", { children: option }),
 										revealed && i === question.answer && /* @__PURE__ */ jsx(Check, { "aria-label": "Correct answer" })
 									]
 								}, i))
