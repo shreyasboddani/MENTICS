@@ -18,8 +18,8 @@ _REQUEST_CONNECTION = ContextVar("mentics_request_connection", default=None)
 class _ScopedConnection:
     """A request's reused connection and the RLS identity currently applied.
 
-    The identity is tracked next to the connection because it is pushed to
-    PostgreSQL as session settings, which outlive the statement that set them.
+    Identity is rebound as transaction-local PostgreSQL settings on each
+    operation because a pool can change backends between transactions.
     """
 
     __slots__ = ("connection", "applied_rls")
@@ -151,16 +151,16 @@ class DatabaseHandler:
             self.reset_rls_context(token)
 
     def _push_rls_context(self, connection):
-        """Bind the current identity to a PostgreSQL session.
+        """Bind the current identity to the current PostgreSQL transaction.
 
         Custom settings are parameterized and set before any tenant query can
         run on the connection.
         """
         context = _RLS_CONTEXT.get()
         connection.execute(
-            "SELECT set_config('mentics.user_id', %s, false), "
-            "set_config('mentics.auth_email', %s, false), "
-            "set_config('mentics.system', %s, false)",
+            "SELECT set_config('mentics.user_id', %s, true), "
+            "set_config('mentics.auth_email', %s, true), "
+            "set_config('mentics.system', %s, true)",
             (
                 str(context["user_id"] or ""),
                 context["auth_email"] or "",
@@ -172,10 +172,11 @@ class DatabaseHandler:
     def _connect(self):
         scoped = _REQUEST_CONNECTION.get()
         if scoped is not None:
-            # The connection is opened once per request, so an rls_scope
-            # entered later would never reach the database on its own and its
-            # queries would run under the identity the request started with.
-            if self.is_postgres and scoped.applied_rls != _RLS_CONTEXT.get():
+            # A pooled connection can use a different backend after each commit.
+            # Bind identity inside every operation's transaction, even when the
+            # Python request identity has not changed. Transaction-local settings
+            # also cannot leak to the next borrower of that backend.
+            if self.is_postgres:
                 scoped.applied_rls = self._push_rls_context(scoped.connection)
             return scoped.connection
         if self.is_postgres:

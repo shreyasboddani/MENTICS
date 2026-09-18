@@ -46,4 +46,6 @@ Apply `migrations/004_adaptive_learning.sql` using a direct Neon owner connectio
 
 The runtime role has owner-only RLS on all new tables. Account deletion removes the new learning data. Existing lesson/quiz/sprint scoring writes first-attempt evidence atomically under a user lock. Stats include the new sources without counting path answers twice.
 
+RLS identity is reapplied as transaction-local settings for every database operation. A request may reuse its connection, but Neon transaction pooling can assign a different backend after a commit; cached session identity must never be assumed to survive that boundary.
+
 Verification is covered in `tests/test_adaptive_learning.py` and the existing track, completion, account deletion, and Arena suites. Browser checks should include questionnaire → benchmark → refresh → submission → five steps → lesson → Quick Practice → hints → summary, at desktop, tablet, and phone widths. Database checks must also run with `mentics_app`, not only the migration owner.

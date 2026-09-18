@@ -119,9 +119,9 @@ def test_rls_scope_reaches_an_already_open_request_connection(monkeypatch):
         assert connection.settings[-1] == ("", "", "off")
 
 
-def test_an_unchanged_identity_is_not_pushed_again(monkeypatch):
-    # Re-pushing on every query would give back the round trip the scoped
-    # connection was introduced to save.
+def test_identity_is_rebound_after_each_pooled_transaction(monkeypatch):
+    # Transaction pooling may replace the backend at every commit. A cached
+    # Python identity does not mean the next backend has the same RLS settings.
     connection = FakeConnection(next_row={"id": 7})
     database = _handler(monkeypatch, connection)
 
@@ -129,7 +129,8 @@ def test_an_unchanged_identity_is_not_pushed_again(monkeypatch):
         for _ in range(3):
             database.select_one("users", where={"email": "student@example.com"})
 
-    assert len(connection.settings) == 1
+    assert len(connection.settings) == 4
+    assert all("false" not in sql for sql in connection.statements if "set_config" in sql)
 
 
 def test_ensure_table_skips_the_create_it_is_not_allowed_to_run(monkeypatch):
