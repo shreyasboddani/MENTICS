@@ -505,13 +505,15 @@ function PathPage() {
   const [chatOpen, setChatOpen] = useState(() => window.matchMedia('(min-width: 1050px)').matches)
   const [adding, setAdding] = useState(false)
   const [essayOpen, setEssayOpen] = useState(false)
+  const tracks = isTest ? (boot.data.tracks || []) : []
+  const [activeTrack, setActiveTrack] = useState(boot.data.activeTrack || tracks[0]?.key || '')
   const pathRequest = useRef(0)
-  const builder = isTest ? '/dashboard/test-path-builder' : '/dashboard/college-path-builder'
+  const builder = isTest ? `/dashboard/test-path-builder?test_focus=${activeTrack.split('_')[0] || 'sat'}&subject_focus=${activeTrack.split('_')[1] || 'math'}` : '/dashboard/college-path-builder'
   const loadTasks = async (regenerate = false) => {
     const requestId = ++pathRequest.current
     setLoading(true); setRegenerating(regenerate); setError('')
     try {
-      const data = await api(`/api/tasks?category=${encodeURIComponent(category)}`, regenerate ? { method: 'POST' } : {})
+      const data = await api(`/api/tasks?category=${encodeURIComponent(category)}${isTest ? `&track=${activeTrack}` : ''}`, regenerate ? { method: 'POST' } : {})
       if (!Array.isArray(data)) throw new Error('Your path could not be loaded.')
       if (requestId === pathRequest.current) setTasks(data.map(normalizeTask))
     } catch (e) { if (requestId === pathRequest.current) setError(e.message) } finally { if (requestId === pathRequest.current) { setLoading(false); setRegenerating(false) } }
@@ -519,7 +521,7 @@ function PathPage() {
   useEffect(() => {
     const requestId = ++pathRequest.current
     let mounted = true
-    api(`/api/tasks?category=${encodeURIComponent(category)}`)
+    api(`/api/tasks?category=${encodeURIComponent(category)}${isTest ? `&track=${activeTrack}` : ''}`)
       .then(data => {
         if (!Array.isArray(data)) throw new Error('Your path could not be loaded.')
         if (mounted && requestId === pathRequest.current) setTasks(data.map(normalizeTask))
@@ -527,7 +529,7 @@ function PathPage() {
       .catch(e => { if (mounted && requestId === pathRequest.current) setError(e.message) })
       .finally(() => { if (mounted && requestId === pathRequest.current) setLoading(false) })
     return () => { mounted = false }
-  }, [category])
+  }, [category, activeTrack, isTest])
   useEffect(() => {
     const desktop = window.matchMedia('(min-width: 1050px)')
     const keepPathVisible = event => { if (!event.matches) setChatOpen(false) }
@@ -564,7 +566,8 @@ function PathPage() {
     }
   }
   return <AppShell name={boot.data.name}><main className={`app-main path-page ${chatOpen ? 'chat-docked' : ''}`}>
-    <div className="path-header"><div><div className="eyebrow"><span /> {isTest && boot.data.testFocus ? `${boot.data.testFocus.toUpperCase()} ? ${{ math: 'MATH', ela: 'ELA', all: 'ALL SUBJECTS' }[boot.data.subjectFocus || 'all']}` : category.toUpperCase()}</div><h1>Your five-step path.</h1><p>Finish what is in front of you. The path adapts from there.</p></div><div className="path-header-actions">{!isTest && <button className="button button--quiet" onClick={() => setEssayOpen(true)}><PenLine size={17} /> Essay feedback</button>}{!chatOpen && <button className="button button--quiet" onClick={() => setChatOpen(true)}><MessageCircle size={17} /> Ask Mentics</button>}<a className="button button--dark" href={builder}>Edit goals <ArrowRight size={16} /></a></div></div>
+    <div className="path-header"><div><div className="eyebrow"><span /> {activeTrack ? activeTrack.replace('_', ' ').toUpperCase() : category.toUpperCase()}</div><h1>Your five-step path.</h1><p>Finish what is in front of you. The path adapts from there.</p></div><div className="path-header-actions">{!isTest && <button className="button button--quiet" onClick={() => setEssayOpen(true)}><PenLine size={17} /> Essay feedback</button>}{!chatOpen && <button className="button button--quiet" onClick={() => setChatOpen(true)}><MessageCircle size={17} /> Ask Mentics</button>}<a className="button button--dark" href={builder}>Edit goals <ArrowRight size={16} /></a></div></div>
+    {isTest && <nav className="path-track-switcher" aria-label="Active prep track">{tracks.map(track => <button type="button" key={track.key} className={activeTrack === track.key ? 'selected' : ''} onClick={() => setActiveTrack(track.key)}><small>{track.exam.toUpperCase()}</small><b>{track.subject === 'ela' ? 'ELA' : 'Math'}</b></button>)}<a href="/dashboard/test-path-builder?test_focus=sat&subject_focus=math">+ New track</a></nav>}
     {isTest && <a className="prep-shortcut" href="/dashboard/quick-practice"><span><Zap /><b>Short on time? Make it a quick round.</b><small>SAT or ACT ? Math or ELA ? Strategies, streaks, and mistake review</small></span><ArrowRight /></a>}
     <div className="path-progress"><span style={{ width: `${completed / progressTotal * 100}%` }} /><p><b><span>{completed}</span><i>/</i><span>{progressTotal}</span></b><span>core steps complete</span></p></div>
     {error && <div className="error-banner">{error}<button onClick={() => loadTasks()}>Try again</button></div>}

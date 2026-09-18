@@ -3633,15 +3633,17 @@ function PathPage() {
 	const [chatOpen, setChatOpen] = useState(() => window.matchMedia("(min-width: 1050px)").matches);
 	const [adding, setAdding] = useState(false);
 	const [essayOpen, setEssayOpen] = useState(false);
+	const tracks = isTest ? boot.data.tracks || [] : [];
+	const [activeTrack, setActiveTrack] = useState(boot.data.activeTrack || tracks[0]?.key || "");
 	const pathRequest = useRef(0);
-	const builder = isTest ? "/dashboard/test-path-builder" : "/dashboard/college-path-builder";
+	const builder = isTest ? `/dashboard/test-path-builder?test_focus=${activeTrack.split("_")[0] || "sat"}&subject_focus=${activeTrack.split("_")[1] || "math"}` : "/dashboard/college-path-builder";
 	const loadTasks = async (regenerate = false) => {
 		const requestId = ++pathRequest.current;
 		setLoading(true);
 		setRegenerating(regenerate);
 		setError("");
 		try {
-			const data = await api(`/api/tasks?category=${encodeURIComponent(category)}`, regenerate ? { method: "POST" } : {});
+			const data = await api(`/api/tasks?category=${encodeURIComponent(category)}${isTest ? `&track=${activeTrack}` : ""}`, regenerate ? { method: "POST" } : {});
 			if (!Array.isArray(data)) throw new Error("Your path could not be loaded.");
 			if (requestId === pathRequest.current) setTasks(data.map(normalizeTask));
 		} catch (e) {
@@ -3656,7 +3658,7 @@ function PathPage() {
 	useEffect(() => {
 		const requestId = ++pathRequest.current;
 		let mounted = true;
-		api(`/api/tasks?category=${encodeURIComponent(category)}`).then((data) => {
+		api(`/api/tasks?category=${encodeURIComponent(category)}${isTest ? `&track=${activeTrack}` : ""}`).then((data) => {
 			if (!Array.isArray(data)) throw new Error("Your path could not be loaded.");
 			if (mounted && requestId === pathRequest.current) setTasks(data.map(normalizeTask));
 		}).catch((e) => {
@@ -3667,7 +3669,11 @@ function PathPage() {
 		return () => {
 			mounted = false;
 		};
-	}, [category]);
+	}, [
+		category,
+		activeTrack,
+		isTest
+	]);
 	useEffect(() => {
 		const desktop = window.matchMedia("(min-width: 1050px)");
 		const keepPathVisible = (event) => {
@@ -3727,11 +3733,7 @@ function PathPage() {
 							children: [
 								/* @__PURE__ */ jsx("span", {}),
 								" ",
-								isTest && boot.data.testFocus ? `${boot.data.testFocus.toUpperCase()} ? ${{
-									math: "MATH",
-									ela: "ELA",
-									all: "ALL SUBJECTS"
-								}[boot.data.subjectFocus || "all"]}` : category.toUpperCase()
+								activeTrack ? activeTrack.replace("_", " ").toUpperCase() : category.toUpperCase()
 							]
 						}),
 						/* @__PURE__ */ jsx("h1", { children: "Your five-step path." }),
@@ -3755,6 +3757,19 @@ function PathPage() {
 								children: ["Edit goals ", /* @__PURE__ */ jsx(ArrowRight, { size: 16 })]
 							})
 						]
+					})]
+				}),
+				isTest && /* @__PURE__ */ jsxs("nav", {
+					className: "path-track-switcher",
+					"aria-label": "Active prep track",
+					children: [tracks.map((track) => /* @__PURE__ */ jsxs("button", {
+						type: "button",
+						className: activeTrack === track.key ? "selected" : "",
+						onClick: () => setActiveTrack(track.key),
+						children: [/* @__PURE__ */ jsx("small", { children: track.exam.toUpperCase() }), /* @__PURE__ */ jsx("b", { children: track.subject === "ela" ? "ELA" : "Math" })]
+					}, track.key)), /* @__PURE__ */ jsx("a", {
+						href: "/dashboard/test-path-builder?test_focus=sat&subject_focus=math",
+						children: "+ New track"
 					})]
 				}),
 				isTest && /* @__PURE__ */ jsxs("a", {

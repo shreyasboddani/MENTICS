@@ -213,6 +213,8 @@ def init_db():
     db.add_column("paths", "task_format", "TEXT DEFAULT 'link'")
     db.add_column("paths", "is_skipped", "BOOLEAN DEFAULT FALSE")
     db.add_column("paths", "task_content_id", "INTEGER")
+    # Each prep lane advances independently (sat_math, sat_ela, act_math, act_ela).
+    db.add_column("paths", "track_key", "TEXT")
 
     db.create_table("subtasks", {
         "id": "INTEGER PRIMARY KEY AUTOINCREMENT",
@@ -1195,8 +1197,9 @@ def _has_incomplete_earlier_task(user_id, task):
     return bool(db.execute_for_one(
         """SELECT id FROM paths
            WHERE user_id=? AND category=? AND is_active=True
+             AND COALESCE(track_key, 'legacy')=COALESCE(?, 'legacy')
              AND task_order<? AND is_completed=False LIMIT 1""",
-        (user_id, task['category'], task['task_order'])
+        (user_id, task['category'], task.get('track_key'), task['task_order'])
     ))
 
 
@@ -2152,14 +2155,33 @@ def _official_examples_for_skill(skill):
     return f"# OFFICIAL QUESTIONS TO MATCH IN STYLE AND DIFFICULTY\n{examples}\n"
 
 
-def _persist_unit(user_id, unit, category="Test Prep"):
+def _test_track_key(test_focus, subject_focus):
+    if test_focus not in {"sat", "act"} or subject_focus not in {"math", "ela"}:
+        raise ValueError("Choose one exam and either Math or ELA for this path.")
+    return f"{test_focus}_{subject_focus}"
+
+
+def _track_path_info(test_path_info, track_key):
+    """Use one lane for the plan, retaining the student's complete prep context."""
+    exam, subject = track_key.split("_", 1)
+    profile = dict(test_path_info or {})
+    profile.update((test_path_info or {}).get("tracks", {}).get(track_key, {}))
+    profile.update({"test_focus": exam, "subject_focus": subject, "active_track": track_key})
+    profile["other_tracks"] = [key.replace("_", " ").upper() for key in profile.get("tracks", {}) if key != track_key]
+    return profile
+
+
+def _persist_unit(user_id, unit, category="Test Prep", track_key=None):
     """Write a generated unit to the database as the student's active path."""
     saved = []
     with db.transaction() as transaction:
-        transaction.update("paths", {"is_active": False}, where={
+        active_where = {
             "user_id": user_id, "category": category, "is_active": True,
             "is_user_added": False,
-        })
+        }
+        if track_key:
+            active_where["track_key"] = track_key
+        transaction.update("paths", {"is_active": False}, where=active_where)
 
         for index, node in enumerate(unit["nodes"]):
             skill = node["skill"]
@@ -2185,6 +2207,7 @@ def _persist_unit(user_id, unit, category="Test Prep"):
                 "type": "milestone" if node_type in ("boss_battle", "milestone") else "standard",
                 "stat_to_update": node.get("stat_to_update"),
                 "category": category, "is_active": True, "is_completed": False,
+                "track_key": track_key,
                 "task_format": task_format,
                 "skill_key": skill["skill_key"], "skill_label": skill["skill_label"],
                 "subject": skill["subject"], "node_type": node_type,
@@ -2260,14 +2283,15 @@ def _persist_unit(user_id, unit, category="Test Prep"):
     return saved
 
 
-def _generate_and_save_new_test_path(user_id, test_path_info, chat_history=None):
+def _generate_and_save_new_test_path(user_id, test_path_info, chat_history=None, track_key=None):
     """Build the next adaptive unit: plan once, then generate every node's content.
 
     Content generation is fanned out across several small Gemini calls rather
     than one large one. A node whose content call fails is downgraded to a
     format that still works instead of poisoning the whole path.
     """
-    profile = _build_learner_profile(user_id, test_path_info or {}, chat_history or [])
+    track_key = track_key or _test_track_key(test_path_info.get("test_focus", "sat"), test_path_info.get("subject_focus", "math"))
+    profile = _build_learner_profile(user_id, _track_path_info(test_path_info, track_key), chat_history or [])
     shape = learning.choose_shape(profile["_mastery_rows"], profile["_completed_lessons"])
 
     unit = learning.build_unit(
@@ -2306,7 +2330,7 @@ def _generate_and_save_new_test_path(user_id, test_path_info, chat_history=None)
             node["teaching"] = teaching
             node["steps"] = learning._interleave_lesson(teaching, [])
 
-    saved = _persist_unit(user_id, unit, "Test Prep")
+    saved = _persist_unit(user_id, unit, "Test Prep", track_key=track_key)
     if len(saved) != 5:
         raise ValueError("Path generation must produce exactly five usable steps.")
     return saved
@@ -3423,11 +3447,11 @@ def test_path_builder(user):
     if request.method == "POST":
         try:
             test_focus = request.form.get("test_focus", "")
-            if test_focus not in {'sat', 'act', 'both'}:
-                raise ValueError("Choose SAT, ACT, or both.")
+            if test_focus not in {'sat', 'act'}:
+                raise ValueError("Choose SAT or ACT for this path.")
             subject_focus = request.form.get("subject_focus", "all")
-            if subject_focus not in {"math", "ela", "all"}:
-                raise ValueError("Choose Math, ELA, or all subjects.")
+            if subject_focus not in {"math", "ela"}:
+                raise ValueError("Choose Math or ELA for this path.")
             test_date = request.form.get("test_date", "").strip()
             if test_date:
                 date.fromisoformat(test_date)
@@ -3454,12 +3478,17 @@ def test_path_builder(user):
             return render_react("test-builder", {
                 "name": user.get_name(), "error": str(error), **request.form.to_dict()
             }, "Build Test Path | Mentics", 400)
+        track_key = _test_track_key(test_focus, subject_focus)
+        # Preserve every existing lane and shared score/context fields.
+        prior_tracks = current_test_path_info.get("tracks", {})
+        test_path["tracks"] = {**prior_tracks, track_key: dict(test_path)}
+        test_path["active_track"] = track_key
         stats["test_path"] = test_path
         user.set_stats(stats)
         _generate_and_save_new_test_path(
 
-            user.data['id'], test_path)
-        return redirect(url_for("test_path_view"))
+            user.data['id'], test_path, track_key=track_key)
+        return redirect(url_for("test_path_view", track=track_key))
 
     return render_react("test-builder", {
         "name": user.get_name(),
@@ -3477,10 +3506,15 @@ def quick_practice(user):
 @login_required
 def test_path_view(user):
     prep = user.get_stats().get("test_path", {})
+    tracks = prep.get("tracks", {})
+    active_track = request.args.get("track") if request.args.get("track") in tracks else prep.get("active_track")
+    active_track = active_track or next(iter(tracks), None)
     return render_react("path", {
         "category": "Test Prep",
         "testFocus": prep.get("test_focus", ""),
         "subjectFocus": prep.get("subject_focus", "all"),
+        "tracks": [{"key": key, "exam": key.split("_", 1)[0], "subject": key.split("_", 1)[1]} for key in tracks],
+        "activeTrack": active_track,
         "name": user.get_name(),
     }, "Test Path | Mentics")
 
@@ -3743,18 +3777,24 @@ def api_tasks(user):
     user_id = user.data['id']
     stats = user.get_stats()
     category = request.args.get('category', 'Test Prep')
+    track_key = request.args.get('track') if category == 'Test Prep' else None
     try:
         if category not in {'Test Prep', 'College Planning'}:
             return jsonify({"error": "Invalid category"}), 400
+        if category == 'Test Prep':
+            track_key = track_key or stats.get("test_path", {}).get("active_track")
+            if not track_key or track_key not in {"sat_math", "sat_ela", "act_math", "act_ela"}:
+                return jsonify({"error": "Choose a Math or ELA prep track first."}), 400
 
         _repair_legacy_active_path(user_id, category)
+        active_where = {
+            "user_id": user_id, "is_active": True, "category": category,
+        }
+        if track_key:
+            active_where["track_key"] = track_key
         active_path = db.select(
             "paths",
-            where={
-                "user_id": user_id,
-                "is_active": True,
-                "category": category,
-            },
+            where=active_where,
             order_by="task_order ASC"
         )
 
@@ -3771,7 +3811,7 @@ def api_tasks(user):
                 else:
                     test_path_info = stats.get("test_path", {})
                     tasks = _generate_and_save_new_test_path(
-                        user_id, test_path_info, chat_history)
+                        user_id, test_path_info, chat_history, track_key=track_key)
             except Exception:
                 app.logger.exception("Path generation failed for user %s", user_id)
                 return jsonify({
@@ -3811,6 +3851,7 @@ def api_tasks(user):
                     "objective": r.get('objective'),
                     "xp_reward": r.get('xp_reward') or 10,
                     "unit_title": r.get('unit_title'),
+                    "track_key": r.get('track_key'),
                 })
             return jsonify(tasks_with_subtasks)
 
