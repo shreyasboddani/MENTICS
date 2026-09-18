@@ -1,0 +1,16 @@
+.prep-lanes { margin: 24px 0; border: 1px solid #ded9e8; border-radius: 20px; overflow: hidden; background: #fff; }
+.prep-lanes .prep-exams { display: flex; border-bottom: 1px solid #e8e3ef; background: #f5f2fa; padding: 7px; gap: 6px; }
+.prep-lanes .prep-exams button { flex: 1; display: flex; align-items: center; justify-content: center; gap: 12px; padding: 14px; border: 0; border-radius: 12px; background: transparent; color: #756b85; font: inherit; font-weight: 800; cursor: pointer; }
+.prep-lanes .prep-exams button[aria-pressed=true] { background: #282037; color: #fff; box-shadow: 0 3px 8px #28203718; }
+.prep-lanes .prep-exams small { font-size: 11px; font-weight: 500; opacity: .8; }
+.prep-lanes .prep-subjects { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; padding: 18px 18px 8px; }
+.prep-lanes .prep-subjects button { display: flex; align-items: center; gap: 12px; text-align: left; font: inherit; padding: 16px; border: 1px solid #e5dfec; border-radius: 12px; color: #60566e; background: #fff; cursor: pointer; min-width: 0; }
+.prep-lanes .prep-subjects button[aria-pressed=true] { border-color: #9374c8; background: #f4effc; color: #543a7d; box-shadow: inset 0 0 0 1px #9374c8; }
+.prep-lanes .prep-subjects span { flex: 1; }
+.prep-lanes .prep-subjects b, .prep-lanes .prep-subjects small { display: block; }
+.prep-lanes .prep-subjects small { font-size: 11px; line-height: 1.5; margin-top: 3px; }
+.prep-lanes > p { font-size: 12px; color: #756b85; margin: 8px 18px 16px; }
+.prep-ready { display: flex; align-items: center; gap: 14px; padding: 20px; border-radius: 16px; background: #f0ebf8; color: #543a7d; }
+.prep-ready p { margin: 5px 0 0; font-size: 13px; line-height: 1.6; }
+.prep-lanes button:focus-visible { outline: 3px solid #9875d1; outline-offset: -3px; }
+@media (max-width: 560px) { .prep-lanes .prep-subjects { padding: 12px 12px 5px; gap: 8px; } .prep-lanes .prep-subjects button { padding: 12px; gap: 8px; } .prep-lanes .prep-subjects button > svg:last-child { display: none; } .prep-lanes .prep-exams small { font-size: 10px; } }

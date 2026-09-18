@@ -513,6 +513,10 @@ Design one adaptive learning unit for a student preparing for the {profile['focu
 - Self-reported weaknesses: {profile['weaknesses']}
 
 # MEASURED PERFORMANCE
+Active section: {profile.get('subject_focus', 'all')}. Generate only skills in the allowed catalog for this exam and section, even if background context discusses another track.
+Other saved tracks (background context; never a request to switch sections):
+{profile.get('cross_track_context', 'None yet')}
+
 Per-skill mastery from work already graded inside Mentics:
 {profile['mastery_summary']}
 

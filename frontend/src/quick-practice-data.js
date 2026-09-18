@@ -18,6 +18,22 @@ const actEla = [
   item('English · Punctuation', 'An introductory dependent clause needs a comma before the main clause.', 'Choose the correct punctuation: Although the trail was steep _____ the hikers reached the summit before noon.', [',', ';', ':', '.'], 0, '“Although the trail was steep” is a dependent clause. A comma separates it from the independent main clause.'),
   item('Reading · Inference', 'Separate a reasonable inference from a claim the passage cannot prove.', 'At rehearsal, Eli paused before a difficult passage. After practicing it slowly several times, he played the entire piece without stopping. What is best supported?', ['Eli had never played the instrument.', 'The piece had no difficult passages.', 'Focused practice helped Eli perform more fluently.', 'Eli will never make another mistake.'], 2, 'His performance became continuous after targeted practice. The passage supports that improvement without sweeping claims.'),
 ]
+satEla.push(
+  item('Sentence boundaries', 'Check for a complete clause on each side.', 'The telescope captured a faint signal _____ the team repeated the observation. Which punctuation correctly joins the clauses?', [';', ',', ': because', 'without'], 0, 'Both clauses are complete. A semicolon joins them; a comma alone cannot.'),
+  item('Sentence boundaries', 'A colon follows a complete clause and introduces an explanation, example, or list.', 'The team needed three supplies _____ paper, tape, and string. Which punctuation best completes the sentence?', [',', ':', ';', '.'], 1, 'The complete clause introduces a list of the three supplies, so a colon fits. The list cannot stand alone after a semicolon or period.'),
+  item('Transitions', 'Decide whether the second statement supports, contrasts with, or results from the first.', 'The route was longer than expected. _____, the hikers arrived before sunset. Which transition fits?', ['For example', 'Therefore', 'Nevertheless', 'Similarly'], 2, 'Arriving early despite a longer route is a contrast. Nevertheless expresses that contrast.'),
+  item('Transitions', 'Name the logical connection before choosing a transition.', 'The city added protected bike lanes. _____, the share of commuters cycling to work increased. Which transition most clearly presents the increase as a result?', ['Consequently', 'Instead', 'Nevertheless', 'For instance'], 0, 'Consequently explicitly presents the increase as a result, as the question requests.'),
+  item('Evidence', 'Choose the narrow claim directly supported by the text.', 'A survey found that 36 of 60 students in one class preferred morning study sessions. Which statement is supported?', ['All students study best in the morning.', 'A majority of the surveyed class preferred morning sessions.', 'Morning study improves every student’s score.', 'Exactly 36 students in the entire school study in the morning.'], 1, '36 of 60 is a majority of this surveyed class. The survey establishes preference, not effectiveness or school-wide behavior.'),
+  item('Evidence', 'Separate measured results from claims about their cause.', 'A library recorded 400 visits in April and 500 in May. Which claim do these records support?', ['A new advertising campaign caused the change.', 'Visits will continue to rise every month.', 'May had 100 more visits than April.', 'Every visitor borrowed a book.'], 2, '500 minus 400 is 100. The records do not explain causes, future trends, or borrowing.'),
+)
+actEla.push(
+  item('English · Concision', 'Remove repeated meaning without removing necessary information.', 'Choose the most concise replacement for “cooperated together” in: The two teams cooperated together on the mural.', ['cooperated', 'jointly cooperated together', 'together cooperated jointly', 'cooperated with one another together'], 0, 'Cooperated already conveys working together. The added words are redundant.'),
+  item('English · Concision', 'Keep the action and remove duplicate time markers.', 'Choose the most concise replacement for “at this current point in time”: At this current point in time, the bridge is closed.', ['At this moment in the current time', 'Now', 'At this time currently', 'In the present current moment'], 1, 'Now expresses the same present-time meaning clearly and concisely.'),
+  item('English · Agreement', 'Ignore the phrase between the subject and verb.', 'The box of old maps _____ on the top shelf. Which verb completes the sentence?', ['are', 'were', 'is', 'have been'], 2, 'The singular subject is box, not maps. Is agrees with box.'),
+  item('English · Agreement', 'Identify the subject before choosing the verb.', 'The musicians in the final row _____ ready to perform. Which choice is correct?', ['is', 'was', 'has been', 'are'], 3, 'Musicians is plural, so are agrees. The phrase in the final row does not change the subject.'),
+  item('Reading · Detail', 'Find the explicit cause in the passage.', 'Omar usually walked to school. On Tuesday, a broken sidewalk blocked his usual route, so he took the bus. Why did Omar take the bus?', ['His usual route was blocked.', 'He woke up late.', 'He disliked walking.', 'The weather was cold.'], 0, 'The passage names the blocked sidewalk as the reason. The other explanations are not stated.'),
+  item('Reading · Detail', 'Return to the exact sentence rather than guessing from context.', 'The volunteers sorted books in the morning and repaired shelves after lunch. Before leaving, they swept the floor. What did they do immediately after lunch?', ['Swept the floor', 'Sorted books', 'Repaired shelves', 'Bought new books'], 2, 'The passage explicitly says they repaired shelves after lunch.'),
+)
 function mathBank(exam) {
   const offset = exam === 'act' ? 3 : 0
   return Array.from({ length: 4 }, (_, index) => {
@@ -32,14 +48,18 @@ function mathBank(exam) {
     ]
   }).flat()
 }
-export const drillBanks = { sat: { math: mathBank('sat'), ela: satEla }, act: { math: mathBank('act'), ela: actEla } }
-export function makeRound(exam, subject) {
-  const pool = [...drillBanks[exam][subject]]
+const graphDrills = Array.from({ length: 5 }, (_, i) => {
+  const x = i + 2, intercept = i + 3, y = 2 * x + intercept
+  return item('Desmos intersections', 'Graph the two sides as y-expressions. Read the requested coordinate and verify it in the equation.', `The graphs y = 2x + ${intercept} and y = ${y} intersect. What is the x-coordinate of their intersection?`, [String(y), String(x), String(x + 1), String(intercept + y)], 1, `At an intersection, 2x + ${intercept} = ${y}. So 2x = ${2 * x} and x = ${x}. In Desmos the point is (${x}, ${y}); use the x-coordinate, not ${y}.`)
+})
+export const drillBanks = { sat: { math: [...mathBank('sat'), ...graphDrills], ela: satEla }, act: { math: mathBank('act'), ela: actEla } }
+export function makeRound(exam, subject, skill = null) {
+  const pool = drillBanks[exam][subject].map((q, id) => ({ ...q, id })).filter(q => !skill || q.skill === skill)
   for (let i = pool.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1)); [pool[i], pool[j]] = [pool[j], pool[i]]
   }
   // Prioritize different tactics within a round, not repeated numeric variants.
-  const unique = pool.filter((question, index) => pool.findIndex(other => other.skill === question.skill) === index)
+  const unique = skill ? pool : pool.filter((question, index) => pool.findIndex(other => other.skill === question.skill) === index)
   return unique.slice(0, 5).map(question => {
     const choices = question.options.map((text, index) => ({ text, correct: index === question.answer }))
     for (let i = choices.length - 1; i > 0; i--) {

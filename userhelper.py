@@ -22,7 +22,9 @@ class User:
 
     def get_stats(self):
         if self.data and 'stats' in self.data:
-            return json.loads(self.data['stats'])
+            raw = self.data['stats']
+            parsed = json.loads(raw) if isinstance(raw, str) else raw
+            return parsed if isinstance(parsed, dict) else {}
         return {"sat": "0", "act": "0", "gpa": "0.0"}
 
     def set_stats(self, stats):

@@ -138,3 +138,18 @@
   .prep-result-stats span { padding:15px 7px; }
   .prep-result-stats b { font-size:23px; }
 }
+.prep-playbook { grid-column: 1 / -1; margin: 18px 0 28px; }
+.prep-playbook header h2 { margin: 10px 0 8px; font-size: clamp(25px, 3vw, 34px); letter-spacing: -.8px; }
+.prep-playbook header p { color: #71687d; font-size: 14px; line-height: 1.7; }
+.prep-strategy-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; margin: 22px 0; }
+.prep-strategy-grid article { padding: 24px; border: 1px solid #ddd6e7; border-radius: 18px; background: #fff; display: flex; flex-direction: column; }
+.prep-strategy-grid article > small { font-size: 11px; line-height: 1.6; color: #7c639c; }
+.prep-strategy-grid h3 { font-size: 20px; margin: 14px 0 8px; }
+.prep-strategy-grid p { font-size: 13px; line-height: 1.75; }
+.prep-strategy-grid blockquote { margin: 10px 0; padding: 14px; border-left: 3px solid #b79cd9; background: #f6f2fa; border-radius: 0 8px 8px 0; font-size: 13px; line-height: 1.7; }
+.prep-strategy-trap { color: #71687d; }
+.prep-strategy-grid button { margin-top: auto; padding-top: 12px; }
+.prep-strategy-source { font-size: 11px; line-height: 1.8; color: #71687d; }
+.prep-strategy-source a { color: #684495; text-decoration: underline; }
+@media(max-width: 850px) { .prep-strategy-grid { grid-template-columns: 1fr; } }
+.prep-save-status { grid-column: 1 / -1; font-size: 13px; line-height: 1.6; color: #604581; padding: 12px 16px; background: #f1ebf8; border-radius: 12px; }

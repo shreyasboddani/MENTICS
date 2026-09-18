@@ -1,16 +1,17 @@
 import { useEffect, useRef, useState } from 'react'
 import { ArrowRight, BookOpen, Check, Clock3, Flame, RotateCcw, Target, Trophy, Zap } from 'lucide-react'
-import { AppShell } from './app-runtime'
+import { AppShell, api } from './app-runtime'
 import { boot } from './boot'
 import { makeRound } from './quick-practice-data'
+import { strategyGuides } from './prep-strategies'
 import './quick-practice.css'
 
 const labels = { sat: { math: 'Math', ela: 'Reading & Writing' }, act: { math: 'Math', ela: 'English & Reading' } }
 const formatTime = seconds => `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`
 
 export default function QuickPractice() {
-  const [exam, setExam] = useState('sat')
-  const [subject, setSubject] = useState('math')
+  const [exam, setExam] = useState(() => typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('exam') === 'act' ? 'act' : 'sat')
+  const [subject, setSubject] = useState(() => typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('subject') === 'ela' ? 'ela' : 'math')
   const [mode, setMode] = useState('sprint')
   const [round, setRound] = useState(null)
   const [answers, setAnswers] = useState([])
@@ -20,6 +21,7 @@ export default function QuickPractice() {
   const [seconds, setSeconds] = useState(0)
   const [finished, setFinished] = useState(false)
   const [review, setReview] = useState(false)
+  const [saveStatus, setSaveStatus] = useState('')
   const started = useRef(0)
   const questionHeading = useRef(null)
   const index = answers.length - (revealed ? 1 : 0)
@@ -37,6 +39,7 @@ export default function QuickPractice() {
   useEffect(() => { if (round) questionHeading.current?.focus() }, [round, index, finished, review])
 
   const start = (questions = makeRound(exam, subject)) => {
+    setSaveStatus('')
     setRound(questions); setAnswers([]); setSelected(null); setRevealed(false); setHint(false)
     setFinished(false); setReview(false); setSeconds(0); started.current = Date.now()
   }
@@ -46,14 +49,21 @@ export default function QuickPractice() {
     setRevealed(true)
   }
   const next = () => {
-    if (answers.length === round.length) { setSeconds(Math.floor((Date.now() - started.current) / 1000)); setFinished(true) }
+    if (answers.length === round.length) {
+      setSeconds(Math.floor((Date.now() - started.current) / 1000)); setFinished(true)
+      setSaveStatus('Saving this round for your path guide…')
+      api('/api/quick-practice', { method: 'POST', body: JSON.stringify({ track: `${exam}_${subject}`, answers: answers.map(a => ({ id: a.question.id, selected: a.question.options[a.selected] })) }) })
+        .then(() => setSaveStatus('Saved. Your path guide can use this round to focus your next steps.'))
+        .catch(() => setSaveStatus('This round could not be saved to your guide. You can still review your answers here.'))
+    }
     else { setSelected(null); setRevealed(false); setHint(false) }
   }
   const reset = () => { setRound(null); setFinished(false); setReview(false) }
   const missed = answers.filter(answer => !answer.correct)
 
   return <AppShell name={boot.data.name}><main className={`app-main quick-prep ${round ? 'prep-in-round' : ''}`}>
-    <header className="prep-heading"><div><div className="eyebrow"><span /> TEST PREP / QUICK PRACTICE</div><h1>{round ? 'Make your move.' : 'Get into your rhythm.'}</h1><p>{round ? 'One question. One strategy. A sharper next attempt.' : 'A little focus today. A little more confidence on test day.'}</p></div><a href="/dashboard/test-path-view" className="prep-path-link">My study path <ArrowRight size={16} /></a></header>
+    {finished && saveStatus && <p className="prep-save-status" role="status">{saveStatus}</p>}
+    <header className="prep-heading"><div><div className="eyebrow"><span /> TEST PREP / QUICK PRACTICE</div><h1>{round ? 'Make your move.' : 'Get into your rhythm.'}</h1><p>{round ? 'One question. One strategy. A sharper next attempt.' : 'A little focus today. A little more confidence on test day.'}</p></div><a href={`/dashboard/test-path-view?track=${exam}_${subject}`} className="prep-path-link">My study path <ArrowRight size={16} /></a></header>
     {!round ? <>
       <section className="prep-config" aria-label="Choose your practice">
         <div className="prep-config-title"><span className="prep-step-tag">01</span><div><h2>Make it your session.</h2><p>Pick your exam, your focus, and your pace.</p></div></div><div className="prep-section-heading"><span>EXAM</span></div>
@@ -65,7 +75,8 @@ export default function QuickPractice() {
       </section>
       <aside className="prep-launch"><div className="prep-launch-top"><span><i /> READY WHEN YOU ARE</span><Zap size={20} /></div><div className="prep-orbit" aria-hidden="true"><i /><i /><span>05<small>QUESTIONS</small></span><b><Zap size={19} /></b></div><div className="prep-launch-copy"><span className="prep-exam-chip">{exam.toUpperCase()} / {labels[exam][subject]}</span><h2>{mode === 'sprint' ? 'Find your fast.' : 'Learn the move.'}</h2><p>{mode === 'sprint' ? 'Beat the trap. Build your streak. Turn five focused minutes into real practice.' : 'Slow it down. Learn a useful shortcut, then put it to work on the next question.'}</p></div><div className="prep-launch-metrics"><span><Clock3 size={15} />{mode === 'sprint' ? '5-minute target' : 'No timer pressure'}</span><span><Flame size={15} />Streaks + points</span></div><button className="button button--primary" onClick={() => start()}>Start {mode === 'sprint' ? 'speed round' : 'practicing'} <ArrowRight /></button><small>Original strategy drills / Instant explanations</small></aside>
       <section className="prep-bottom" aria-label="Keep building"><a className="prep-long-path" href={`/dashboard/test-path-builder?test_focus=${exam}&subject_focus=${subject}`}><span className="prep-path-icon"><BookOpen /></span><span><small>THE LONG GAME</small><b>Build a stronger foundation.</b><p>Lessons and a study plan shaped around you.</p></span><ArrowRight /></a><div className="prep-how"><span><b>01</b> Try a tactic</span><span><b>02</b> Get feedback</span><span><b>03</b> Retry the miss</span></div></section>
-      <p className="prep-fine-print">Round points: 100 per correct answer, or 50 with a hint. Separate from account points. These short drills are not full test simulations.{exam === 'act' ? ' Find Science in the full ACT study path.' : ''}</p>
+      <section className="prep-playbook" aria-label="Test-day strategies"><header><div className="eyebrow">{exam.toUpperCase()} / {labels[exam][subject]}</div><h2>Learn the move. Then drill it.</h2><p>Have 10 minutes? Pick one strategy, practise it, and review every miss.</p></header><div className="prep-strategy-grid">{strategyGuides[exam][subject].map((guide, i) => <article key={guide.title}><small>0{i + 1} / {guide.cue}</small><h3>{guide.title}</h3><p>{guide.move}</p><blockquote>{guide.example}</blockquote><p className="prep-strategy-trap"><b>Watch for:</b> {guide.trap}</p><button className="text-button" onClick={() => { setMode('learn'); start(makeRound(exam, subject, guide.skill)) }}>Practise this move <ArrowRight size={16} /></button></article>)}</div><p className="prep-strategy-source">{exam === 'sat' ? <>Inspired by the Desmos and grammar emphasis in <a href="https://www.skool.com/sat/about" target="_blank" rel="noreferrer">James Lu’s public SAT prep</a>. Original Mentics examples; not affiliated. <a href="https://satsuite.collegeboard.org/in-school-assessments/calculator-policy" target="_blank" rel="noreferrer">SAT calculator rules</a>.</> : <>These drills target ACT Math, English, and Reading. Online ACT includes a built-in Desmos calculator; paper testing uses an approved handheld. <a href="https://www.act.org/content/act/en/products-and-services/the-act/test-day/calculator-policy.html" target="_blank" rel="noreferrer">Check ACT calculator rules</a>.</>}</p></section>
+      <p className="prep-fine-print">Round points: 100 per correct answer, or 50 with a hint. Separate from account points. These short drills are not full test simulations.</p>
     </> : <section className="prep-session" aria-label={`${exam.toUpperCase()} ${labels[exam][subject]} practice`}>
       <div className="prep-session-bar"><div><span className="prep-session-kicker">MENTICS PRACTICE / {mode === 'sprint' ? 'SPEED' : 'STRATEGY'}</span><strong><b>{exam.toUpperCase()}</b> {labels[exam][subject]}</strong></div><button className="text-button" onClick={reset}>{finished ? 'Change practice' : 'End round'}</button></div>
       {finished ? <div className="prep-results"><div className="prep-result-mark"><Trophy className="prep-trophy" /><span>ROUND<br />COMPLETE</span></div><div className="eyebrow">YOUR PRACTICE RECEIPT</div><h2 ref={questionHeading} tabIndex={-1}>{correct === round.length ? 'Clean sweep.' : 'The next move is clear.'}</h2><p>{correct} of {round.length} correct{mode === 'sprint' ? ` in ${formatTime(seconds)}` : ''}. {missed.length ? 'Bring the misses back for another rep.' : 'Keep the momentum with another set.'}</p><div className="prep-result-stats"><span><small>ROUND POINTS</small><b>{points}</b></span><span><small>ACCURACY</small><b>{Math.round(correct / round.length * 100)}%</b></span><span><small>BEST STREAK</small><b>{bestStreak}</b></span></div><div className="prep-result-actions"><button className="button button--primary" onClick={() => start()}>New round <ArrowRight /></button>{missed.length > 0 && <button className="button button--quiet" onClick={() => start(missed.map(answer => answer.question))}><RotateCcw /> Retry {missed.length} missed</button>}<button className="text-button" aria-expanded={review} onClick={() => setReview(!review)}>{review ? 'Hide' : 'Review'} answers</button></div>{review && <div className="prep-review">{answers.map((answer, i) => <article key={i}><small>{answer.correct ? 'CORRECT' : 'PRACTICE AGAIN'} · {answer.question.skill}</small><h3>{answer.question.prompt}</h3><p>Your answer: {answer.question.options[answer.selected]}</p><b>Correct answer: {answer.question.options[answer.question.answer]}</b><p>{answer.question.explanation}</p></article>)}</div>}</div> : <>

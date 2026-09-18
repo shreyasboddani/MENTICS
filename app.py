@@ -6,6 +6,7 @@ from dbhelper import DatabaseHandler
 from userhelper import User
 import act_arena
 import learning
+import prep_tracks
 import ratelimit
 import seo
 from ratelimit import rate_limit
@@ -1050,14 +1051,15 @@ def _generate_chat_reply(history, system_instruction):
     return text
 
 
-def _get_current_numbered_tasks(user_id, category):
+def _get_current_numbered_tasks(user_id, category, track_key=None):
     """Helper function to get current active tasks with numbering for a specific category."""
     active_tasks = db.select(
         "paths",
         where={
             "user_id": user_id,
             "is_active": True,
-            "category": category
+            "category": category,
+            **({'track_key': track_key} if track_key else {}),
         },
         order_by="task_order ASC"
     )
@@ -1102,6 +1104,9 @@ def _repair_legacy_active_path(user_id, category):
     Personal steps remain active. Historical AI rows are retained for progress
     history, but only the first five generated steps form the live roadmap.
     """
+    if category == 'Test Prep':
+        # Independent tracks can legitimately have twenty active core steps.
+        return
     generated = db.select(
         "paths",
         where={
@@ -1269,7 +1274,7 @@ def submit_sprint_results(user):
 _ASSESSMENT_SOURCES = {
     'quiz': (
         """SELECT qq.id, qq.correct_option, qq.options, qq.explanation, qq.question_text,
-                  qq.skill_key, p.id AS task_id, p.category, p.task_order,
+                  qq.skill_key, p.id AS task_id, p.category, p.task_order, p.track_key,
                   p.skill_label, p.subject, p.xp_reward
            FROM quiz_questions qq
            JOIN quizzes q ON q.id=qq.quiz_id
@@ -1279,7 +1284,7 @@ _ASSESSMENT_SOURCES = {
     ),
     'sprint': (
         """SELECT sq.id, sq.correct_option, sq.options, sq.explanation, sq.question_text,
-                  sq.skill_key, p.id AS task_id, p.category, p.task_order,
+                  sq.skill_key, p.id AS task_id, p.category, p.task_order, p.track_key,
                   p.skill_label, p.subject, p.xp_reward
            FROM sprint_questions sq
            JOIN practice_sprints ps ON ps.id=sq.sprint_id
@@ -2072,7 +2077,7 @@ def _build_learner_profile(user_id, test_path_info, chat_history):
     for key, label in (
         ("current_sat_ebrw", "SAT Reading & Writing"), ("current_sat_math", "SAT Math"),
         ("current_act_composite", "ACT Composite"), ("current_act_math", "ACT Math"),
-        ("current_act_reading", "ACT Reading"), ("current_act_science", "ACT Science"),
+        ("current_act_reading", "ACT Reading"), ("current_act_english", "ACT English"), ("current_act_science", "ACT Science"),
     ):
         if test_path_info.get(key):
             current.append(f"{label} {test_path_info[key]}")
@@ -2095,11 +2100,14 @@ def _build_learner_profile(user_id, test_path_info, chat_history):
             test_date_info = "Not set"
 
     mastery_rows = _get_mastery_rows(user_id)
+    allowed_skills = learning.skill_catalog(test_focus, test_path_info.get('subject_focus', 'all'))
+    all_mastery = learning.format_mastery_summary(mastery_rows)
+    mastery_rows = [row for row in mastery_rows if row.get('skill_key') in allowed_skills]
     taught = db.execute(
         """SELECT DISTINCT skill_label FROM paths
            WHERE user_id=? AND category='Test Prep' AND node_type='lesson'
-             AND is_completed=True AND skill_label IS NOT NULL LIMIT 15""",
-        (user_id,),
+             AND is_completed=True AND skill_label IS NOT NULL AND track_key=? LIMIT 15""",
+        (user_id, test_path_info.get('active_track')),
     ) or []
     taught_labels = [row["skill_label"] for row in taught if row.get("skill_label")]
 
@@ -2109,14 +2117,15 @@ def _build_learner_profile(user_id, test_path_info, chat_history):
     )
 
     # A rough ability read so the teaching call pitches at the right level.
-    scores = [int(test_path_info[k]) for k in ("current_sat_ebrw", "current_sat_math")
+    score_keys = (('current_act_math',) if test_path_info.get('subject_focus') == 'math' else ('current_act_reading', 'current_act_english')) if test_focus == 'act' else (('current_sat_math',) if test_path_info.get('subject_focus') == 'math' else ('current_sat_ebrw',))
+    scores = [int(test_path_info[k]) for k in score_keys
               if str(test_path_info.get(k) or "").isdigit()]
     if scores:
         average = sum(scores) / len(scores)
         level_hint = ("advanced -- already scoring high, so target the hardest question types"
-                      if average >= 700 else
+                      if average >= (30 if test_focus == 'act' else 700) else
                       "solid mid-range -- knows the basics, loses points on multi-step and trap questions"
-                      if average >= 550 else
+                      if average >= (23 if test_focus == 'act' else 550) else
                       "building fundamentals -- needs the underlying concept before test tactics")
     else:
         level_hint = "unknown baseline -- teach the fundamentals clearly before advanced tactics"
@@ -2139,6 +2148,7 @@ def _build_learner_profile(user_id, test_path_info, chat_history):
         "level_hint": level_hint,
         "skill_options": learning.skill_catalog(test_focus, test_path_info.get("subject_focus", "all")),
         "subject_focus": test_path_info.get("subject_focus", "all"),
+        "cross_track_context": _prep_context(user_id, test_path_info) + '\nAll measured skills (background only):\n' + all_mastery,
         "_mastery_rows": mastery_rows,
         "_completed_lessons": len(taught_labels),
     }
@@ -2171,10 +2181,67 @@ def _track_path_info(test_path_info, track_key):
     return profile
 
 
-def _persist_unit(user_id, unit, category="Test Prep", track_key=None):
+def _prep_context(user_id, prep):
+    """Bounded, labelled cross-track context; never changes the active lane."""
+    paths = db.execute("""SELECT track_key, description, is_completed, is_skipped
+        FROM paths WHERE user_id=? AND category='Test Prep' AND is_active=True
+        ORDER BY track_key, task_order""", (user_id,))
+    conversations = db.execute("""SELECT category, history FROM chat_conversations
+        WHERE user_id=? AND (category='Test Prep' OR category LIKE 'Test Prep:%')""", (user_id,))
+    chats = {}
+    for row in conversations:
+        history = json.loads(row['history'] or '[]')
+        chats[row['category']] = [{**message, 'content': str(message.get('content', ''))[:800]} for message in history[-4:]]
+    quick = db.execute("""SELECT details FROM activity_log WHERE user_id=?
+        AND activity_type='quick_practice' ORDER BY id DESC LIMIT 8""", (user_id,))
+    return json.dumps({'profiles': prep.get('tracks', {}), 'active_paths': paths,
+                       'recent_conversations': chats, 'quick_practice': [json.loads(r['details']) for r in quick]})
+
+
+def _ensure_prep_tracks(user):
+    """Provision missing lanes without replacing any saved work."""
+    stats = user.get_stats() or {}
+    prep = dict(stats.get('test_path') or {})
+    tracks = dict(prep.get('tracks') or {})
+    exam = prep.get('test_focus') if prep.get('test_focus') in {'sat', 'act'} else 'sat'
+    for key in prep_tracks.TRACKS:
+        tracks.setdefault(key, {})
+    prep['tracks'] = tracks
+    if prep.get('active_track') not in prep_tracks.TRACKS:
+        prep['active_track'] = f'{exam}_math'
+    # Preserve legacy rows, content IDs, and results. Infer their lane from
+    # their taxonomy; do not delete or restart students' completed work.
+    legacy = db.execute("SELECT id, skill_key, subject FROM paths WHERE user_id=? AND category='Test Prep' AND track_key IS NULL", (user.data['id'],))
+    for row in legacy:
+        skill = row.get('skill_key') or ''
+        lane_exam = 'act' if skill.startswith('act_') else exam
+        subject = 'math' if (row.get('subject') or '').lower() == 'math' else 'ela'
+        if not row.get('subject'):
+            subject = prep.get('subject_focus') if prep.get('subject_focus') in {'math', 'ela'} else 'math'
+        db.update('paths', {'track_key': f'{lane_exam}_{subject}'}, where={'id': row['id'], 'user_id': user.data['id']})
+    if stats.get('test_path') != prep:
+        stats['test_path'] = prep
+        user.set_stats(stats)
+    existing = {row['track_key'] for row in db.execute("SELECT DISTINCT track_key FROM paths WHERE user_id=? AND category='Test Prep' AND is_active=True AND is_user_added=False", (user.data['id'],))}
+    for key in prep_tracks.TRACKS:
+        if key not in existing:
+            _persist_unit(user.data['id'], prep_tracks.starter_unit(key), track_key=key, only_if_missing=True)
+    return prep
+
+
+def _persist_unit(user_id, unit, category="Test Prep", track_key=None, only_if_missing=False):
     """Write a generated unit to the database as the student's active path."""
     saved = []
     with db.transaction() as transaction:
+        # Serializing persistence also prevents overlapping regeneration requests
+        # from leaving two active units in the same lane.
+        transaction.execute_write('UPDATE users SET stats=stats WHERE id=?', (user_id,))
+        if only_if_missing:
+            cursor = transaction.connection.cursor()
+            cursor.execute(db._query("SELECT * FROM paths WHERE user_id=? AND category=? AND track_key=? AND is_active=True AND is_user_added=False ORDER BY task_order"), (user_id, category, track_key))
+            existing = [dict(row) for row in cursor.fetchall()]
+            if existing:
+                return existing
         active_where = {
             "user_id": user_id, "category": category, "is_active": True,
             "is_user_added": False,
@@ -2293,6 +2360,7 @@ def _generate_and_save_new_test_path(user_id, test_path_info, chat_history=None,
     track_key = track_key or _test_track_key(test_path_info.get("test_focus", "sat"), test_path_info.get("subject_focus", "math"))
     profile = _build_learner_profile(user_id, _track_path_info(test_path_info, track_key), chat_history or [])
     shape = learning.choose_shape(profile["_mastery_rows"], profile["_completed_lessons"])
+    shape = ['quiz' if kind == 'boss_battle' else kind for kind in shape]
 
     unit = learning.build_unit(
         profile, shape=shape, official_examples_fn=_official_examples_for_skill,
@@ -2382,7 +2450,7 @@ def _get_test_prep_ai_chat_response(history, user_stats, stat_history="", user_i
             test_date_info = f"The student has set a test date, but it's in an invalid format: {test_date_str}."
 
     current_tasks = "No tasks available." if user_id is None else _get_current_numbered_tasks(
-        user_id, "Test Prep")
+        user_id, "Test Prep", test_path_info.get('active_track'))
 
     focus_desc = "SAT"
     if test_focus == 'act':
@@ -2404,6 +2472,8 @@ def _get_test_prep_ai_chat_response(history, user_stats, stat_history="", user_i
         f"## CURRENT STUDENT ANALYSIS (CONTEXT FOR YOUR RESPONSE)\n"
         f"This is the specific student you are currently coaching:\n"
         f"- **Primary Test Focus:** {focus_desc}\n"
+        f"- **Active section:** {test_path_info.get('subject_focus', 'math')}. Teach and regenerate ONLY this exam/section. Other lanes retain their progress. Ask the student to switch tabs if they want a different lane.\n"
+        f"- **Other lanes and practice (background only):** {_prep_context(user_id, test_path_info) if user_id else '{}'}\n"
 
         f"- Current SAT EBRW: {current_sat_ebrw}, Current SAT Math: {current_sat_math}\n"
 
@@ -3436,22 +3506,23 @@ def account(user):
 @login_required
 @rate_limit('12/hour', name='test_path_build', methods={'POST'}, message='Path generation is limited to a few runs an hour. Try again shortly.')
 def test_path_builder(user):
-    stats = user.get_stats()
+    stats = user.get_stats() or {}
 
-    current_test_path_info = dict(stats.get("test_path", {}))
+    current_test_path_info = dict(stats.get("test_path") or {})
     if request.method == "GET":
         for field, choices in (("test_focus", {"sat", "act", "both"}), ("subject_focus", {"math", "ela", "all"})):
             if request.args.get(field) in choices:
                 current_test_path_info[field] = request.args[field]
+        exam = current_test_path_info.get('test_focus', 'sat')
+        saved = (current_test_path_info.get('tracks') or {}).get(f'{exam}_math', {})
+        current_test_path_info.update(saved)
+        current_test_path_info['test_focus'] = exam
 
     if request.method == "POST":
         try:
             test_focus = request.form.get("test_focus", "")
             if test_focus not in {'sat', 'act'}:
                 raise ValueError("Choose SAT or ACT for this path.")
-            subject_focus = request.form.get("subject_focus", "all")
-            if subject_focus not in {"math", "ela"}:
-                raise ValueError("Choose Math or ELA for this path.")
             test_date = request.form.get("test_date", "").strip()
             if test_date:
                 date.fromisoformat(test_date)
@@ -3460,7 +3531,6 @@ def test_path_builder(user):
                 raise ValueError("Tell Mentics where you need the most help.")
             test_path = {
                 "test_focus": test_focus,
-                "subject_focus": subject_focus,
                 "desired_sat": _optional_number(request.form.get("desired_sat"), 400, 1600, "Desired SAT"),
                 "desired_act": _optional_number(request.form.get("desired_act"), 1, 36, "Desired ACT"),
                 "current_sat_ebrw": _optional_number(request.form.get("current_sat_ebrw"), 200, 800, "Current SAT reading and writing"),
@@ -3468,6 +3538,7 @@ def test_path_builder(user):
                 "current_act_composite": _optional_number(request.form.get("current_act_composite"), 1, 36, "Current ACT composite"),
                 "current_act_math": _optional_number(request.form.get("current_act_math"), 1, 36, "Current ACT math"),
                 "current_act_reading": _optional_number(request.form.get("current_act_reading"), 1, 36, "Current ACT reading"),
+                "current_act_english": _optional_number(request.form.get("current_act_english"), 1, 36, "Current ACT English"),
                 "current_act_science": _optional_number(request.form.get("current_act_science"), 1, 36, "Current ACT science"),
                 "strengths": request.form.get("strengths", "").strip()[:2000],
                 "weaknesses": weaknesses,
@@ -3478,16 +3549,18 @@ def test_path_builder(user):
             return render_react("test-builder", {
                 "name": user.get_name(), "error": str(error), **request.form.to_dict()
             }, "Build Test Path | Mentics", 400)
-        track_key = _test_track_key(test_focus, subject_focus)
-        # Preserve every existing lane and shared score/context fields.
-        prior_tracks = current_test_path_info.get("tracks", {})
-        test_path["tracks"] = {**prior_tracks, track_key: dict(test_path)}
-        test_path["active_track"] = track_key
-        stats["test_path"] = test_path
+        track_key = f'{test_focus}_math'
+        other_exam = 'act' if test_focus == 'sat' else 'sat'
+        for key in list(test_path):
+            if key.startswith(f'current_{other_exam}') or key == f'desired_{other_exam}':
+                test_path[key] = current_test_path_info.get(key, '')
+        prior_tracks = dict(current_test_path_info.get('tracks') or {})
+        for subject in ('math', 'ela'):
+            key = f'{test_focus}_{subject}'
+            prior_tracks[key] = {**prior_tracks.get(key, {}), **test_path, 'subject_focus': subject}
+        stats['test_path'] = {**current_test_path_info, **test_path, 'tracks': prior_tracks, 'active_track': track_key}
         user.set_stats(stats)
-        _generate_and_save_new_test_path(
-
-            user.data['id'], test_path, track_key=track_key)
+        _ensure_prep_tracks(user)
         return redirect(url_for("test_path_view", track=track_key))
 
     return render_react("test-builder", {
@@ -3502,10 +3575,37 @@ def quick_practice(user):
     return render_react("quick-practice", {"name": user.get_name()}, "Quick Practice | Mentics")
 
 
+@app.route('/api/quick-practice', methods=['POST'])
+@login_required
+@rate_limit('60/hour', name='quick_practice')
+def save_quick_practice(user):
+    data = request.get_json(silent=True) or {}
+    track = data.get('track')
+    answers = data.get('answers')
+    if track not in prep_tracks.TRACKS or not isinstance(answers, list) or not 1 <= len(answers) <= 5:
+        return jsonify({'error': 'Invalid practice session'}), 400
+    exam, subject = track.split('_')
+    bank = prep_tracks.BANK[exam][subject]
+    results = []
+    for answer in answers:
+        if not isinstance(answer, dict) or type(answer.get('id')) is not int or not 0 <= answer['id'] < len(bank):
+            return jsonify({'error': 'Invalid practice question'}), 400
+        question = bank[answer['id']]
+        if answer.get('selected') not in question['options']:
+            return jsonify({'error': 'Invalid practice answer'}), 400
+        results.append({'skill': question['skill'], 'correct': answer['selected'] == question['options'][question['answer']],
+                        'question': question['prompt'], 'selected': answer['selected']})
+    log_activity(user.data['id'], 'quick_practice', {'track': track, 'results': results})
+    return jsonify({'saved': True})
+
+
 @app.route("/dashboard/test-path-view")
 @login_required
 def test_path_view(user):
-    prep = user.get_stats().get("test_path", {})
+    saved_prep = user.get_stats().get('test_path') or {}
+    if saved_prep.get('test_focus') not in {'sat', 'act', 'both'}:
+        return redirect(url_for('test_path_builder'))
+    prep = _ensure_prep_tracks(user)
     tracks = prep.get("tracks", {})
     active_track = request.args.get("track") if request.args.get("track") in tracks else prep.get("active_track")
     active_track = active_track or next(iter(tracks), None)
@@ -3782,7 +3882,9 @@ def api_tasks(user):
         if category not in {'Test Prep', 'College Planning'}:
             return jsonify({"error": "Invalid category"}), 400
         if category == 'Test Prep':
-            track_key = track_key or stats.get("test_path", {}).get("active_track")
+            prep = _ensure_prep_tracks(user)
+            stats = user.get_stats()
+            track_key = track_key or prep.get("active_track")
             if not track_key or track_key not in {"sat_math", "sat_ela", "act_math", "act_ela"}:
                 return jsonify({"error": "Choose a Math or ELA prep track first."}), 400
 
@@ -3800,7 +3902,7 @@ def api_tasks(user):
 
         if request.method == "POST" or not active_path:
             chat_record_list = db.select("chat_conversations", where={
-                "user_id": user_id, "category": category})
+                "user_id": user_id, "category": f'{category}:{track_key}' if track_key else category})
             chat_history = json.loads(
                 chat_record_list[0]['history']) if chat_record_list else []
             try:
@@ -3914,12 +4016,7 @@ def api_skip_task(user):
     if task_info['is_completed']:
         return jsonify({"success": True, "already_completed": True})
 
-    blocked = db.execute_for_one(
-        """SELECT id FROM paths
-           WHERE user_id=? AND category=? AND is_active=True
-             AND task_order<? AND is_completed=False LIMIT 1""",
-        (user_id, task_info['category'], task_info['task_order'])
-    )
+    blocked = _has_incomplete_earlier_task(user_id, task_info)
     if blocked:
         return jsonify({"success": False, "error": "Complete the earlier path step first."}), 409
 
@@ -3957,12 +4054,7 @@ def api_update_task_status(user):
         return jsonify({"success": False, "error": "Task not found."}), 404
     if task_info['is_completed']:
         return jsonify({"success": True, "already_completed": True})
-    blocked = db.execute_for_one(
-        """SELECT id FROM paths
-           WHERE user_id=? AND category=? AND is_active=True
-             AND task_order<? AND is_completed=False LIMIT 1""",
-        (user_id, task_info['category'], task_info['task_order'])
-    )
+    blocked = _has_incomplete_earlier_task(user_id, task_info)
     if blocked:
         return jsonify({"success": False, "error": "Complete the earlier path step first."}), 409
     if status == 'complete' and task_info.get('task_format') in {'lesson', 'quiz', 'practice_sprint'}:
@@ -4066,7 +4158,7 @@ def college_task_report(user):
     return jsonify({"success": True, "tasks": tasks})
 
 
-def _remember_path_focus(user, category, history):
+def _remember_path_focus(user, category, history, track_key=None):
     """Persist the focus a student asked for so it outlives one regeneration.
 
     Without this the request only shapes the unit generated in that moment; the
@@ -4081,8 +4173,13 @@ def _remember_path_focus(user, category, history):
     stats = user.get_stats()
     key = "college_path" if category == 'College Planning' else "test_path"
     section = dict(stats.get(key) or {})
-    section["focus_request"] = request_text[:600]
-    section["focus_set_at"] = date.today().isoformat()
+    target = section
+    if track_key:
+        section['tracks'] = dict(section.get('tracks') or {})
+        target = dict(section['tracks'].get(track_key) or {})
+        section['tracks'][track_key] = target
+    target["focus_request"] = request_text[:600]
+    target["focus_set_at"] = date.today().isoformat()
     stats[key] = section
     user.set_stats(stats)
 
@@ -4103,7 +4200,7 @@ def _describe_standing_focus(section):
     return f'"{focus}"'
 
 
-def _regenerate_path_from_chat(user_id, stats, category, history):
+def _regenerate_path_from_chat(user_id, stats, category, history, track_key=None):
     """Generate, persist, and return a path without leaking control messages."""
     try:
         if category == 'College Planning':
@@ -4113,7 +4210,7 @@ def _regenerate_path_from_chat(user_id, stats, category, history):
         else:
             test_path_info = stats.get("test_path", {})
             new_tasks = _generate_and_save_new_test_path(
-                user_id, test_path_info, chat_history=history)
+                user_id, test_path_info, chat_history=history, **({'track_key': track_key} if track_key else {}))
         expected = len(learning.COLLEGE_SHAPE) if category == 'College Planning' else 5
         if len(new_tasks) != expected:
             raise ValueError("Regeneration did not save the expected path steps.")
@@ -4132,7 +4229,7 @@ def _regenerate_path_from_chat(user_id, stats, category, history):
     try:
         db.upsert("chat_conversations", {
             "user_id": user_id,
-            "category": category,
+            "category": f'{category}:{track_key}' if track_key else category,
             "history": json.dumps(history)
         }, conflict_target=["user_id", "category"])
     except Exception:
@@ -4232,6 +4329,11 @@ def api_chat(user):
     data = request.get_json(silent=True) or {}
     history = data.get("history", [])
     category = request.args.get('category', 'Test Prep')
+    track_key = request.args.get('track') if category == 'Test Prep' else None
+    if track_key and track_key not in prep_tracks.TRACKS:
+        return jsonify({'error': 'Invalid prep track'}), 400
+    if track_key:
+        stats = {**stats, 'test_path': _track_path_info(stats.get('test_path'), track_key)}
 
     if category not in {'Test Prep', 'College Planning'} or not isinstance(history, list):
         return jsonify({"error": "Invalid chat request"}), 400
@@ -4256,8 +4358,8 @@ def api_chat(user):
         if message['role'] == 'user'
     ), "")
     if _is_path_regeneration_request(user_message):
-        _remember_path_focus(user, category, history)
-        return _regenerate_path_from_chat(user_id, user.get_stats(), category, history)
+        _remember_path_focus(user, category, history, track_key)
+        return _regenerate_path_from_chat(user_id, user.get_stats(), category, history, track_key)
 
     # Fetch tracker data only for regular coaching replies. Regeneration already
     # gathers the richer task, assessment, and tracker context it needs.
@@ -4271,14 +4373,14 @@ def api_chat(user):
             history, stats, stat_history, user_id)
 
     if _is_path_regeneration_control(reply):
-        _remember_path_focus(user, category, history)
-        return _regenerate_path_from_chat(user_id, user.get_stats(), category, history)
+        _remember_path_focus(user, category, history, track_key)
+        return _regenerate_path_from_chat(user_id, user.get_stats(), category, history, track_key)
 
     history.append({"role": "assistant", "content": reply})
 
     db.upsert("chat_conversations", {
         "user_id": user_id,
-        "category": category,
+        "category": f'{category}:{track_key}' if track_key else category,
         "history": json.dumps(history)
     }, conflict_target=["user_id", "category"])
 
@@ -4292,6 +4394,11 @@ def get_chat_history(user):
     category = request.args.get('category')
     if category not in {'Test Prep', 'College Planning'}:
         return jsonify({"error": "Invalid category"}), 400
+    track_key = request.args.get('track') if category == 'Test Prep' else None
+    if track_key and track_key not in prep_tracks.TRACKS:
+        return jsonify({'error': 'Invalid prep track'}), 400
+    if track_key:
+        category = f'{category}:{track_key}'
     chat_record_list = db.select("chat_conversations", where={
         "user_id": user_id, "category": category})
     if chat_record_list:
@@ -4309,6 +4416,11 @@ def reset_chat_history(user):
     category = data.get('category')
     if category not in {'Test Prep', 'College Planning'}:
         return jsonify({"success": False, "error": "Invalid category"}), 400
+    track_key = data.get('track') if category == 'Test Prep' else None
+    if track_key and track_key not in prep_tracks.TRACKS:
+        return jsonify({'error': 'Invalid prep track'}), 400
+    if track_key:
+        category = f'{category}:{track_key}'
     try:
         db.delete("chat_conversations", where={
                   "user_id": user_id, "category": category})
@@ -4385,6 +4497,11 @@ def add_task(user):
     description = data.get('description')
     category = data.get('category')
     due_date = data.get('due_date')
+    track_key = data.get('track') if category == 'Test Prep' else None
+    if category == 'Test Prep':
+        track_key = track_key or (user.get_stats().get('test_path') or {}).get('active_track')
+        if track_key not in prep_tracks.TRACKS:
+            return jsonify({'error': 'Choose a prep track first.'}), 400
 
     if not description or category not in {'Test Prep', 'College Planning'}:
         return jsonify({"success": False, "error": "Description and category are required"}), 400
@@ -4399,8 +4516,9 @@ def add_task(user):
 
     personal_task_count = db.execute_for_one(
         """SELECT COUNT(*) AS task_count FROM paths
-           WHERE user_id=? AND category=? AND is_active=True AND is_user_added=True""",
-        (user_id, category)
+           WHERE user_id=? AND category=? AND is_active=True AND is_user_added=True
+             AND COALESCE(track_key, '')=COALESCE(?, '')""",
+        (user_id, category, track_key)
     )
     if personal_task_count and personal_task_count['task_count'] >= 20:
         return jsonify({
@@ -4408,8 +4526,8 @@ def add_task(user):
             "error": "This path already has 20 personal steps. Complete or regenerate it before adding more."
         }), 429
 
-    latest_task_query = "SELECT MAX(task_order) as max_order FROM paths WHERE user_id=? AND category=? AND is_active=True"
-    max_order_result = db.execute(latest_task_query, (user_id, category))
+    latest_task_query = "SELECT MAX(task_order) as max_order FROM paths WHERE user_id=? AND category=? AND is_active=True AND COALESCE(track_key, '')=COALESCE(?, '')"
+    max_order_result = db.execute(latest_task_query, (user_id, category, track_key))
     new_order = (max_order_result[0]['max_order'] or 0) + 1
 
     task_id = db.insert("paths", {
@@ -4421,6 +4539,7 @@ def add_task(user):
         "type": "standard",
         "category": category,
         "due_date": due_date,
+        "track_key": track_key,
         "is_user_added": True
     })
 

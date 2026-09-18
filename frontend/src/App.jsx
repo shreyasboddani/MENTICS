@@ -5,7 +5,7 @@ import { marked } from 'marked'
 import { Toaster, toast } from 'sonner'
 import {
   AlertTriangle, ArrowLeft, ArrowRight, Award, BarChart3, BookOpen, Brain, CalendarDays,
-  Check, Clock3, Flame,
+  Check, Clock3, Flame, Calculator,
   GraduationCap, Hand, Headphones, House, LineChart,
   LockKeyhole, Mail, MessageCircle, PenLine, Plus, RotateCcw, SkipForward,
   Search, Send, ShieldCheck, Sparkles, Swords, Target, Trophy, UserRound,
@@ -22,6 +22,7 @@ import './lesson-player.css'
 import './mentics-ui.css'  // last: owns chat guide, task modal, and map performance
 import './exam-landing.css'
 import './quick-practice.css'
+import './prep-paths.css'
 
 import { HomeHero } from './home-hero'
 import { boot } from './boot'
@@ -507,6 +508,8 @@ function PathPage() {
   const [essayOpen, setEssayOpen] = useState(false)
   const tracks = isTest ? (boot.data.tracks || []) : []
   const [activeTrack, setActiveTrack] = useState(boot.data.activeTrack || tracks[0]?.key || '')
+  const activeTrackRef = useRef(activeTrack)
+  const switchTrack = key => { if (key === activeTrack) return; activeTrackRef.current = key; pathRequest.current++; setSelected(null); setAdding(false); setTasks([]); setLoading(true); setRegenerating(false); setError(''); setActiveTrack(key); window.history.replaceState(null, '', `?track=${key}`) }
   const pathRequest = useRef(0)
   const builder = isTest ? `/dashboard/test-path-builder?test_focus=${activeTrack.split('_')[0] || 'sat'}&subject_focus=${activeTrack.split('_')[1] || 'math'}` : '/dashboard/college-path-builder'
   const loadTasks = async (regenerate = false) => {
@@ -567,8 +570,8 @@ function PathPage() {
   }
   return <AppShell name={boot.data.name}><main className={`app-main path-page ${chatOpen ? 'chat-docked' : ''}`}>
     <div className="path-header"><div><div className="eyebrow"><span /> {activeTrack ? activeTrack.replace('_', ' ').toUpperCase() : category.toUpperCase()}</div><h1>Your five-step path.</h1><p>Finish what is in front of you. The path adapts from there.</p></div><div className="path-header-actions">{!isTest && <button className="button button--quiet" onClick={() => setEssayOpen(true)}><PenLine size={17} /> Essay feedback</button>}{!chatOpen && <button className="button button--quiet" onClick={() => setChatOpen(true)}><MessageCircle size={17} /> Ask Mentics</button>}<a className="button button--dark" href={builder}>Edit goals <ArrowRight size={16} /></a></div></div>
-    {isTest && <nav className="path-track-switcher" aria-label="Active prep track">{tracks.map(track => <button type="button" key={track.key} className={activeTrack === track.key ? 'selected' : ''} onClick={() => setActiveTrack(track.key)}><small>{track.exam.toUpperCase()}</small><b>{track.subject === 'ela' ? 'ELA' : 'Math'}</b></button>)}<a href="/dashboard/test-path-builder?test_focus=sat&subject_focus=math">+ New track</a></nav>}
-    {isTest && <a className="prep-shortcut" href="/dashboard/quick-practice"><span><Zap /><b>Short on time? Make it a quick round.</b><small>SAT or ACT ? Math or ELA ? Strategies, streaks, and mistake review</small></span><ArrowRight /></a>}
+    {isTest && <section className="prep-lanes" aria-label="Your prep paths"><div className="prep-exams" aria-label="Exam">{['sat', 'act'].map(exam => <button type="button" key={exam} aria-pressed={activeTrack.startsWith(exam)} onClick={() => switchTrack(`${exam}_${activeTrack.split('_')[1] || 'math'}`)}>{exam.toUpperCase()}<small>2 saved paths</small></button>)}</div><div className="prep-subjects" aria-label="Section">{['math', 'ela'].map(subject => <button type="button" key={subject} aria-pressed={activeTrack.endsWith(subject)} onClick={() => switchTrack(`${activeTrack.split('_')[0]}_${subject}`)}>{subject === 'math' ? <Calculator size={18} /> : <BookOpen size={18} />}<span><b>{subject === 'math' ? 'Math' : 'ELA'}</b><small>{subject === 'math' ? 'Problem solving & reasoning' : activeTrack.startsWith('act') ? 'English & Reading' : 'Reading & Writing'}</small></span>{activeTrack.endsWith(subject) && <Check size={17} />}</button>)}</div><p>Pick up where you left off. Each path saves its own progress.</p></section>}
+    {isTest && <a className="prep-shortcut" href={`/dashboard/quick-practice?exam=${activeTrack.split('_')[0]}&subject=${activeTrack.split('_')[1]}`}><span><Zap /><b>Test soon? Train the moves that save time.</b><small>Short drills, practical strategies, and mistake review.</small></span><ArrowRight /></a>}
     <div className="path-progress"><span style={{ width: `${completed / progressTotal * 100}%` }} /><p><b><span>{completed}</span><i>/</i><span>{progressTotal}</span></b><span>core steps complete</span></p></div>
     {error && <div className="error-banner">{error}<button onClick={() => loadTasks()}>Try again</button></div>}
     {loading && !tasks.length ? <PathSkeleton /> : <section className={`journey-map ${regenerating ? 'journey-map--regenerating' : ''}`} style={{ height: journeyHeight }} aria-label={`${category} learning journey`} aria-busy={regenerating}>
@@ -585,9 +588,9 @@ function PathPage() {
     </section>}
     <div className="path-footer-actions"><button className="button button--quiet" onClick={() => setAdding(true)} disabled={regenerating}><Plus /> Add your own step</button><button className="text-button" onClick={() => loadTasks(true)} disabled={regenerating}><RotateCcw /> {regenerating ? 'Rebuilding your path…' : isTest ? 'Regenerate five steps' : 'Start next coaching loop'}</button></div>
     {selected && <TaskModal task={selected} category={category} onClose={() => setSelected(null)} onUpdate={(next) => { setTasks(items => items.map(t => t.id === next.id ? next : t)); setSelected(next) }} onCompleted={finishTask} onReported={tasks => finishTask(null, tasks)} />}
-    {adding && <AddTask category={category} onClose={() => setAdding(false)} onAdded={t => { setTasks(items => [...items, normalizeTask(t)]); setAdding(false) }} />}
+    {adding && <AddTask category={category} track={activeTrack} onClose={() => setAdding(false)} onAdded={t => { if (activeTrackRef.current === activeTrack) { setTasks(items => [...items, normalizeTask(t)]); setAdding(false) } }} />}
     {essayOpen && <EssayCoach onClose={() => setEssayOpen(false)} />}
-    <ChatPanel open={chatOpen} onClose={() => setChatOpen(false)} category={category} onNewPath={items => setTasks(items.map(normalizeTask))} />
+    <ChatPanel key={activeTrack || category} track={activeTrack} open={chatOpen} onClose={() => setChatOpen(false)} category={category} onNewPath={items => { if (activeTrackRef.current === activeTrack) setTasks(items.map(normalizeTask)) }} />
     {!chatOpen && <button className="floating-chat" onClick={() => setChatOpen(true)} aria-label="Ask Mentics"><MessageCircle /><span>Ask Mentics</span></button>}
   </main></AppShell>
 }
@@ -914,7 +917,7 @@ function TaskModal({ task, category, onClose, onUpdate, onCompleted, onReported 
   </Modal>
 }
 
-function AddTask({ category, onClose, onAdded }) { const [description, setDescription] = useState(''); const [date, setDate] = useState(''); const [error, setError] = useState(''); const [busy, setBusy] = useState(false); const submit = async e => { e.preventDefault(); if (busy) return; setBusy(true); setError(''); try { const r = await api('/api/add_task', { method: 'POST', body: JSON.stringify({ description, category, due_date: date || null }) }); onAdded(r.task) } catch (x) { setError(x.message) } finally { setBusy(false) } }; return <Modal onClose={onClose} label="Add a personal step"><div className="modal-kicker">ADD A PERSONAL STEP</div><h2>Make the path yours.</h2><form className="modal-form" onSubmit={submit}><label>What do you want to do?<textarea autoFocus value={description} onChange={e => setDescription(e.target.value)} placeholder="Write a clear, finishable action" maxLength={500} disabled={busy} /></label><label>Due date <span>optional</span><input type="date" value={date} onChange={e => setDate(e.target.value)} disabled={busy} /></label>{error && <p className="form-error" role="alert">{error}</p>}<button className="button button--primary" disabled={busy || !description.trim()}>{busy ? 'Adding…' : 'Add to path'} <ArrowRight /></button></form></Modal> }
+function AddTask({ category, track, onClose, onAdded }) { const [description, setDescription] = useState(''); const [date, setDate] = useState(''); const [error, setError] = useState(''); const [busy, setBusy] = useState(false); const submit = async e => { e.preventDefault(); if (busy) return; setBusy(true); setError(''); try { const r = await api('/api/add_task', { method: 'POST', body: JSON.stringify({ description, category, track, due_date: date || null }) }); onAdded(r.task) } catch (x) { setError(x.message) } finally { setBusy(false) } }; return <Modal onClose={onClose} label="Add a personal step"><div className="modal-kicker">ADD A PERSONAL STEP</div><h2>Make the path yours.</h2><form className="modal-form" onSubmit={submit}><label>What do you want to do?<textarea autoFocus value={description} onChange={e => setDescription(e.target.value)} placeholder="Write a clear, finishable action" maxLength={500} disabled={busy} /></label><label>Due date <span>optional</span><input type="date" value={date} onChange={e => setDate(e.target.value)} disabled={busy} /></label>{error && <p className="form-error" role="alert">{error}</p>}<button className="button button--primary" disabled={busy || !description.trim()}>{busy ? 'Adding…' : 'Add to path'} <ArrowRight /></button></form></Modal> }
 
 // --- Duolingo-style player -------------------------------------------------
 // One step on screen at a time, an answer graded the moment it is given, and a
@@ -1266,12 +1269,14 @@ const chatStarters = {
   ],
 }
 
-function ChatPanel({ open, onClose, category, onNewPath }) {
+function ChatPanel({ open, onClose, category, track, onNewPath }) {
+  const chatQuery = `category=${encodeURIComponent(category)}${track ? `&track=${track}` : ''}`
   const [messages, setMessages] = useState([]); const [input, setInput] = useState(''); const [busy, setBusy] = useState(false); const [historyError, setHistoryError] = useState(''); const scroller = useRef(null); const composer = useRef(null)
-  const starters = chatStarters[category] || chatStarters['Test Prep']
+  const pathLabel = track ? track.replace('_', ' ').toUpperCase() : category.toLowerCase()
+  const starters = (chatStarters[category] || chatStarters['Test Prep']).map(item => track && item.label === 'Rebuild my path around math' ? { ...item, label: 'Refine this section for my next steps' } : item)
   const conversationStarted = messages.some(m => m.role === 'user')
 
-  useEffect(() => { if (open && messages.length === 0) { api(`/api/chat_history?category=${encodeURIComponent(category)}`).then(h => setMessages(Array.isArray(h) && h.length ? h : [{ role: 'assistant', content: `I'm here with your ${category.toLowerCase()} path. Ask about any step, concept, or roadblock — I can see exactly where you are.` }])).catch(() => { setHistoryError('I could not restore the earlier conversation, but you can start a new one here.'); setMessages([{ role: 'assistant', content: `I'm ready to help with your ${category.toLowerCase()} path.` }]) }) } }, [open, category, messages.length])
+  useEffect(() => { if (open && messages.length === 0) { api(`/api/chat_history?${chatQuery}`).then(h => setMessages(Array.isArray(h) && h.length ? h : [{ role: 'assistant', content: `I'm here with your ${pathLabel} path. Ask about any step, concept, or roadblock — I can see exactly where you are.` }])).catch(() => { setHistoryError('I could not restore the earlier conversation, but you can start a new one here.'); setMessages([{ role: 'assistant', content: `I'm ready to help with your ${pathLabel} path.` }]) }) } }, [open, category, messages.length, chatQuery, pathLabel])
   useEffect(() => { const node = scroller.current; if (node) node.scrollTo({ top: node.scrollHeight, behavior: 'smooth' }) }, [messages, busy])
 
   // The composer grows with the draft instead of scrolling a one-line box.
@@ -1287,7 +1292,7 @@ function ChatPanel({ open, onClose, category, onNewPath }) {
     const next = [...messages, { role: 'user', content: text.trim() }]
     setMessages(next); setInput(''); setBusy(true)
     try {
-      const r = await api(`/api/chat?category=${encodeURIComponent(category)}`, { method: 'POST', body: JSON.stringify({ history: next }) })
+      const r = await api(`/api/chat?${chatQuery}`, { method: 'POST', body: JSON.stringify({ history: next }) })
       if (Object.prototype.hasOwnProperty.call(r, 'new_path')) {
         if (!Array.isArray(r.new_path) || r.new_path.length !== 5) throw new Error('Mentics could not build a complete five-step path. Your current path is unchanged.')
         onNewPath(r.new_path)
@@ -1297,7 +1302,7 @@ function ChatPanel({ open, onClose, category, onNewPath }) {
   }
 
   const send = e => { e.preventDefault(); ask(input) }
-  const reset = async () => { try { await api('/api/reset_chat', { method: 'POST', body: JSON.stringify({ category }) }); setHistoryError(''); setMessages([{ role: 'assistant', content: `Fresh start. What would you like help with on your ${category.toLowerCase()} path?` }]) } catch (error) { setHistoryError(error.message) } }
+  const reset = async () => { try { await api('/api/reset_chat', { method: 'POST', body: JSON.stringify({ category, track }) }); setHistoryError(''); setMessages([{ role: 'assistant', content: `Fresh start. What would you like help with on your ${pathLabel} path?` }]) } catch (error) { setHistoryError(error.message) } }
 
   return <aside className={`chat-panel ${open ? 'chat-panel--open' : ''}`} aria-hidden={!open} inert={!open || undefined}>
     <header className="chat-head">
@@ -1305,7 +1310,7 @@ function ChatPanel({ open, onClose, category, onNewPath }) {
         <span className="chat-wordmark">MENTICS</span>
         <span>
           <b>Path guide</b>
-          <small><em className="chat-live" /> Here with your {category.toLowerCase()} path</small>
+          <small><em className="chat-live" /> Here with your {pathLabel} path</small>
         </span>
       </span>
       <div className="chat-head-actions">
@@ -1330,7 +1335,7 @@ function ChatPanel({ open, onClose, category, onNewPath }) {
 
     <form className="chat-composer" onSubmit={send}>
       <div className="chat-composer-field">
-        <textarea ref={composer} name="message" aria-label={`Ask Mentics about your ${category.toLowerCase()} path`} value={input} onChange={e => setInput(e.target.value)} onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(e) } }} placeholder="Ask about your path…" rows={1} maxLength={4000} />
+        <textarea ref={composer} name="message" aria-label={`Ask Mentics about your ${pathLabel} path`} value={input} onChange={e => setInput(e.target.value)} onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(e) } }} placeholder="Ask about your path…" rows={1} maxLength={4000} />
         <button disabled={!input.trim() || busy} aria-label="Send message"><Send /></button>
       </div>
       <p>Mentics can make mistakes. Check important information.</p>
@@ -1678,26 +1683,25 @@ function CollegePicker({ value = '' }) {
 }
 
 function BuilderPage({ kind }) {
-  const d = boot.data
   const test = kind === 'test'
-  const [focus, setFocus] = useState(['sat', 'act'].includes(d.test_focus) ? d.test_focus : '')
-  const [subject, setSubject] = useState(d.subject_focus || 'all')
+  const [focus, setFocus] = useState(['sat', 'act'].includes(boot.data.test_focus) ? boot.data.test_focus : '')
+  const d = test ? { ...boot.data, ...boot.data.tracks?.[`${focus}_math`] } : boot.data
   const [stage, setStage] = useState(d.planning_stage || '')
   const showsSat = focus === 'sat' || focus === 'both'
   const showsAct = focus === 'act' || focus === 'both'
-  const testChoices = [['sat', 'SAT', 'Math + Reading & Writing'], ['act', 'ACT', 'Math + English & Reading; optional Science in a full plan']]
+  const testChoices = [['sat', 'SAT', 'Math + Reading & Writing'], ['act', 'ACT', 'Math + English & Reading']]
   const stages = [['exploring', 'Explore', 'Clarify what matters before building a list'], ['researching', 'Research', 'Turn possible schools into informed choices'], ['applying', 'Apply', 'Move essays and applications forward']]
   return <AppShell name={d.name}><main className="app-main form-page">
-    <PageIntro kicker={test ? 'TEST PREPARATION' : 'COLLEGE PLANNING'} title={test ? 'Build a plan for the test you are taking.' : 'Build a college plan with a point of view.'} copy={test ? 'Choose one exam, then your subject. Keep your lessons, strategies, and score goals focused on the test you are taking.' : 'Your grade, current stage, priorities, and school list become the context behind every lesson and assignment.'} />
+    <PageIntro kicker={test ? 'TEST PREPARATION' : 'COLLEGE PLANNING'} title={test ? 'Build a plan for the test you are taking.' : 'Build a college plan with a point of view.'} copy={test ? 'Start with your exam. Math and ELA each have a saved path; your scores and goals help Mentics shape what comes next.' : 'Your grade, current stage, priorities, and school list become the context behind every lesson and assignment.'} />
     {test && <a className="prep-shortcut" href="/dashboard/quick-practice"><span><Zap /><b>Test coming up? Jump into Quick Practice.</b><small>Choose your exam and subject. Drill strategies in a five-question round.</small></span><ArrowRight /></a>}
     {d.error && <p className="form-error" role="alert">{d.error}</p>}
-    <form method="POST" className="settings-form builder-form">
+    <form method="POST" className="settings-form builder-form"><CsrfField />
       {test ? <>
         <fieldset><legend>What are you preparing for?</legend><p className="builder-help">Switching focus immediately reshapes the score fields below.</p><div className="choice-grid choice-grid--two">{testChoices.map(([value, label, copy]) => <label className={focus === value ? 'selected' : ''} key={value}><input type="radio" name="test_focus" value={value} required checked={focus === value} onChange={() => setFocus(value)} /><BookOpen /><b>{label}</b><small>{copy}</small></label>)}</div></fieldset>
-        {focus && <fieldset><legend>Choose your subject</legend><p className="builder-help">Lessons and drills stay within this focus; the final checkpoint is a full practice test. ELA means Reading &amp; Writing for SAT, and English &amp; Reading for ACT.</p><div className="choice-grid choice-grid--three">{[['math', 'Math', 'Equations, problem solving, and quantitative reasoning'], ['ela', 'ELA', 'Reading, grammar, and writing skills'], ['all', 'All subjects', 'A broader study plan across your selected exam']].map(([value, label, copy]) => <label className={subject === value ? 'selected' : ''} key={value}><input type="radio" name="subject_focus" value={value} checked={subject === value} onChange={() => setSubject(value)} /><BookOpen /><b>{label}</b><small>{copy}</small></label>)}</div></fieldset>}
-        {focus && <div className="builder-score-groups">
+        {focus && <div className="prep-ready"><Check size={20} /><div><b>Math and ELA are ready for you.</b><p>Your answers refine both paths. Switch sections any time without starting over.</p></div></div>}
+        {focus && <div className="builder-score-groups" key={focus}>
           {showsSat && <fieldset className="builder-score-group"><legend>SAT goals and baseline</legend><p>Use your latest official or full-length practice scores if you have them.</p><div className="form-field-grid"><Field name="desired_sat" label="Goal SAT score" type="number" min="400" max="1600" step="10" value={d.desired_sat} /><Field name="current_sat_ebrw" label="Current Reading & Writing" type="number" min="200" max="800" value={d.current_sat_ebrw} /><Field name="current_sat_math" label="Current Math" type="number" min="200" max="800" value={d.current_sat_math} /></div></fieldset>}
-          {showsAct && <fieldset className="builder-score-group"><legend>ACT goals and baseline</legend><p>Use your latest composite and section scores if you have them.</p><div className="form-field-grid"><Field name="desired_act" label="Goal ACT score" type="number" min="1" max="36" value={d.desired_act} /><Field name="current_act_composite" label="Current composite" type="number" min="1" max="36" value={d.current_act_composite} /><Field name="current_act_math" label="Current Math" type="number" min="1" max="36" value={d.current_act_math} /><Field name="current_act_reading" label="Current Reading" type="number" min="1" max="36" value={d.current_act_reading} /><Field name="current_act_science" label="Current Science" type="number" min="1" max="36" value={d.current_act_science} /></div></fieldset>}
+          {showsAct && <fieldset className="builder-score-group"><legend>ACT goals and baseline</legend><p>Use your latest composite and section scores if you have them.</p><div className="form-field-grid"><Field name="desired_act" label="Goal ACT score" type="number" min="1" max="36" value={d.desired_act} /><Field name="current_act_composite" label="Current composite" type="number" min="1" max="36" value={d.current_act_composite} /><Field name="current_act_math" label="Current Math" type="number" min="1" max="36" value={d.current_act_math} /><Field name="current_act_english" label="Current English" type="number" min="1" max="36" value={d.current_act_english} /><Field name="current_act_reading" label="Current Reading" type="number" min="1" max="36" value={d.current_act_reading} /><Field name="current_act_science" label="Current Science" type="number" min="1" max="36" value={d.current_act_science} /></div></fieldset>}
           <fieldset className="builder-score-group builder-score-group--shared"><legend>Your study reality</legend><div className="form-field-grid"><Field name="hours_per_week" label="Hours available each week" type="number" min="1" max="40" value={d.hours_per_week} /><Field name="test_date" label="Test date" type="date" value={d.test_date} /></div><Field name="strengths" label="Your strengths" textarea value={d.strengths} /><Field name="weaknesses" label="Where you need the most help" textarea required value={d.weaknesses} /></fieldset>
         </div>}
       </> : <>
@@ -1707,7 +1711,7 @@ function BuilderPage({ kind }) {
         <fieldset className="builder-score-group"><legend>What matters to you?</legend><p>Tell Mentics what should lead your decisions, not just what looks impressive.</p><Field name="interested_majors" label="Possible majors or interests" textarea value={d.majors} /><Field name="college_priorities" label="Your college priorities" textarea value={d.priorities} placeholder="Examples: engineering opportunities, an active campus, affordability, being close to home, strong arts programs" /></fieldset>
         <CollegePicker value={d.target_colleges} />
       </>}
-      <div className="form-actions"><a className="button button--quiet" href="/dashboard">Cancel</a><button className="button button--primary" type="submit">Build my path <ArrowRight /></button></div>
+      <div className="form-actions"><a className="button button--quiet" href="/dashboard">Cancel</a><button className="button button--primary" type="submit">{test ? 'Save goals & open my paths' : 'Build my path'} <ArrowRight /></button></div>
     </form>
   </main></AppShell>
 }
