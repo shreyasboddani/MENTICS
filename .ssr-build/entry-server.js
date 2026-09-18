@@ -4,7 +4,7 @@ import { createPortal } from "react-dom";
 import DOMPurify from "dompurify";
 import { marked } from "marked";
 import { Toaster, toast } from "sonner";
-import { AlertTriangle, ArrowLeft, ArrowRight, Award, BarChart3, BookOpen, Brain, Calculator, CalendarDays, Check, Clock3, Flag, Flame, GraduationCap, Hand, Headphones, House, LayoutDashboard, LineChart, LockKeyhole, LogOut, Mail, Menu, MessageCircle, PenLine, Plus, RotateCcw, Search, Send, Settings, ShieldCheck, SkipForward, Sparkles, Swords, Target, Trophy, UserRound, UsersRound, X, Zap } from "lucide-react";
+import { AlertTriangle, ArrowLeft, ArrowRight, Award, BarChart3, BookOpen, Brain, Calculator, CalendarDays, Check, Clock3, Flag, Flame, GraduationCap, Hand, Headphones, House, LayoutDashboard, Lightbulb, LineChart, LockKeyhole, LogOut, Mail, Menu, MessageCircle, PenLine, Plus, RotateCcw, Search, Send, Settings, ShieldCheck, SkipForward, Sparkles, Swords, Target, Trophy, UserRound, UsersRound, X, Zap } from "lucide-react";
 import { Fragment, jsx, jsxs } from "react/jsx-runtime";
 //#region frontend/src/boot.js
 var initial = typeof window !== "undefined" && window.__MENTICS__ ? window.__MENTICS__ : {
@@ -1061,955 +1061,568 @@ async function api(url, options = {}) {
 	return data;
 }
 //#endregion
-//#region frontend/src/quick-practice-data.js
-var item = (skill, tip, prompt, options, answer, explanation) => ({
-	skill,
-	tip,
-	prompt,
-	options,
-	answer,
-	explanation
+//#region frontend/src/adaptive-practice.jsx
+var label = (track) => `${track.startsWith("act") ? "ACT" : "SAT"} · ${track.endsWith("math") ? "Math" : track.startsWith("act") ? "English & Reading" : "Reading & Writing"}`;
+var requestId = () => crypto.randomUUID();
+var post = (url, data) => api(url, {
+	method: "POST",
+	body: JSON.stringify(data)
 });
-var satEla = [
-	item("Transitions", "Name the relationship before reading the choices: contrast, cause, or continuation.", "The first prototype used less energy than expected. Its battery life, _____, exceeded the team’s target. Which transition best completes the text?", [
-		"however",
-		"therefore",
-		"instead",
-		"nevertheless"
-	], 1, "Lower energy use causes longer battery life. “Therefore” signals that result; the other choices suggest a contrast."),
-	item("Sentence boundaries", "Check both sides of a punctuation mark for complete sentences.", "The archive opened in June _____ researchers can now consult its letters online. Which choice creates a complete, correctly punctuated sentence?", [
-		",",
-		";",
-		"and",
-		"with"
-	], 1, "Both sides can stand alone. A semicolon joins two independent clauses. A comma alone creates a comma splice, and “and” would need a comma here."),
-	item("Words in context", "Predict a simple replacement, then check it against the whole sentence.", "Although early observations seemed to support the hypothesis, later trials undermined it. As used here, “undermined” most nearly means:", [
-		"concealed",
-		"expanded",
-		"weakened",
-		"established"
-	], 2, "“Although” sets up a contrast with support. The later trials weakened the hypothesis."),
-	item("Evidence", "Reject answers that go beyond the evidence, even if they sound plausible.", "In a study of 120 seedlings, plants receiving six hours of light grew taller on average than plants receiving two hours. Which conclusion is best supported?", [
-		"All plants need six hours of light.",
-		"More light always causes faster growth.",
-		"Two hours of light prevents growth.",
-		"The six-hour group was taller on average in this study."
-	], 3, "The finding applies to these groups. It does not establish a universal rule or show that the two-hour group did not grow."),
-	item("Subject–verb agreement", "Find the grammatical subject; ignore nouns inside interrupting phrases.", "The collection of letters from several explorers _____ a detailed record of the voyage. Which choice completes the sentence correctly?", [
-		"provides",
-		"provide",
-		"have provided",
-		"are providing"
-	], 0, "The subject is the singular “collection,” not the plural “letters” or “explorers,” so “provides” agrees."),
-	item("Rhetorical synthesis", "Read the requested goal first; use only notes that serve it.", "Notes: Lake A is 40 meters deep. Lake B is 65 meters deep. Both lakes contain freshwater. The student wants to emphasize a difference in depth. Which sentence best achieves that goal?", [
-		"Both lakes contain freshwater.",
-		"Lake B is 25 meters deeper than Lake A.",
-		"Lake A and Lake B are both lakes.",
-		"Lake B is a freshwater lake 65 meters deep."
-	], 1, "65 − 40 = 25. Only this choice directly compares the lakes’ depths."),
-	item("Inference", "Prefer the narrow conclusion the text supports over an absolute claim.", "A museum moved a fragile manuscript into a dimmer gallery after conservators observed fading on its pages. What does the text most strongly suggest?", [
-		"The manuscript will never fade again.",
-		"All other galleries were closed.",
-		"The move was intended to limit further damage.",
-		"The museum planned to stop displaying manuscripts."
-	], 2, "The sequence connects observed fading with a protective change. It supports the intention to reduce damage, not a guarantee or a broader museum policy.")
-];
-var actEla = [
-	item("English · Concision", "Choose the shortest option that preserves the full meaning and correct grammar.", "Choose the most concise replacement for “returned back again” in: After lunch, Maya returned back again to the laboratory.", [
-		"returned",
-		"returned back",
-		"went and returned back",
-		"returned again back"
-	], 0, "“Returned” already expresses going back. The other choices repeat the same idea."),
-	item("English · Agreement", "Cross out the phrase between the subject and verb in your head.", "Choose the correct verb: The results of the experiment _____ consistent across three trials.", [
-		"was",
-		"is",
-		"were",
-		"has been"
-	], 2, "“Results” is plural. “Of the experiment” does not change the subject, so “were” is correct."),
-	item("Reading · Detail", "Locate the exact evidence before relying on what you remember.", "Lena had planned to photograph the harbor at dawn. Thick fog concealed the boats, so she spent the morning sketching the nearby market instead. Why did Lena change her plan?", [
-		"The market opened early.",
-		"Fog blocked her view of the boats.",
-		"Her camera was broken.",
-		"The harbor was closed."
-	], 1, "The passage explicitly states that thick fog concealed the boats. The other explanations are not given."),
-	item("English · Organization", "Use pronouns and time markers to find the sentence’s anchor.", "A paragraph begins: (1) Noor collected water samples from three ponds. (2) She then compared their acidity. (3) The results revealed a clear difference. Where should “Each sample was placed in a labeled container” go?", [
-		"Before sentence 1",
-		"After sentence 3",
-		"After sentence 2",
-		"After sentence 1"
-	], 3, "The samples must first be collected; labeling them logically precedes comparing their acidity. “Each sample” refers back to sentence 1."),
-	item("Reading · Purpose", "Ask what a detail does for the passage, not just what it says.", "The old station once handled hundreds of travelers each day. Now, weeds push through its platform, and the ticket windows stand empty. The details about weeds and empty windows primarily:", [
-		"explain train schedules",
-		"suggest the station’s decline",
-		"describe a recent renovation",
-		"criticize travelers"
-	], 1, "The details contrast former activity with present disuse and emphasize decline."),
-	item("English · Punctuation", "An introductory dependent clause needs a comma before the main clause.", "Choose the correct punctuation: Although the trail was steep _____ the hikers reached the summit before noon.", [
-		",",
-		";",
-		":",
-		"."
-	], 0, "“Although the trail was steep” is a dependent clause. A comma separates it from the independent main clause."),
-	item("Reading · Inference", "Separate a reasonable inference from a claim the passage cannot prove.", "At rehearsal, Eli paused before a difficult passage. After practicing it slowly several times, he played the entire piece without stopping. What is best supported?", [
-		"Eli had never played the instrument.",
-		"The piece had no difficult passages.",
-		"Focused practice helped Eli perform more fluently.",
-		"Eli will never make another mistake."
-	], 2, "His performance became continuous after targeted practice. The passage supports that improvement without sweeping claims.")
-];
-satEla.push(item("Sentence boundaries", "Check for a complete clause on each side.", "The telescope captured a faint signal _____ the team repeated the observation. Which punctuation correctly joins the clauses?", [
-	";",
-	",",
-	": because",
-	"without"
-], 0, "Both clauses are complete. A semicolon joins them; a comma alone cannot."), item("Sentence boundaries", "A colon follows a complete clause and introduces an explanation, example, or list.", "The team needed three supplies _____ paper, tape, and string. Which punctuation best completes the sentence?", [
-	",",
-	":",
-	";",
-	"."
-], 1, "The complete clause introduces a list of the three supplies, so a colon fits. The list cannot stand alone after a semicolon or period."), item("Transitions", "Decide whether the second statement supports, contrasts with, or results from the first.", "The route was longer than expected. _____, the hikers arrived before sunset. Which transition fits?", [
-	"For example",
-	"Therefore",
-	"Nevertheless",
-	"Similarly"
-], 2, "Arriving early despite a longer route is a contrast. Nevertheless expresses that contrast."), item("Transitions", "Name the logical connection before choosing a transition.", "The city added protected bike lanes. _____, the share of commuters cycling to work increased. Which transition most clearly presents the increase as a result?", [
-	"Consequently",
-	"Instead",
-	"Nevertheless",
-	"For instance"
-], 0, "Consequently explicitly presents the increase as a result, as the question requests."), item("Evidence", "Choose the narrow claim directly supported by the text.", "A survey found that 36 of 60 students in one class preferred morning study sessions. Which statement is supported?", [
-	"All students study best in the morning.",
-	"A majority of the surveyed class preferred morning sessions.",
-	"Morning study improves every student’s score.",
-	"Exactly 36 students in the entire school study in the morning."
-], 1, "36 of 60 is a majority of this surveyed class. The survey establishes preference, not effectiveness or school-wide behavior."), item("Evidence", "Separate measured results from claims about their cause.", "A library recorded 400 visits in April and 500 in May. Which claim do these records support?", [
-	"A new advertising campaign caused the change.",
-	"Visits will continue to rise every month.",
-	"May had 100 more visits than April.",
-	"Every visitor borrowed a book."
-], 2, "500 minus 400 is 100. The records do not explain causes, future trends, or borrowing."));
-actEla.push(item("English · Concision", "Remove repeated meaning without removing necessary information.", "Choose the most concise replacement for “cooperated together” in: The two teams cooperated together on the mural.", [
-	"cooperated",
-	"jointly cooperated together",
-	"together cooperated jointly",
-	"cooperated with one another together"
-], 0, "Cooperated already conveys working together. The added words are redundant."), item("English · Concision", "Keep the action and remove duplicate time markers.", "Choose the most concise replacement for “at this current point in time”: At this current point in time, the bridge is closed.", [
-	"At this moment in the current time",
-	"Now",
-	"At this time currently",
-	"In the present current moment"
-], 1, "Now expresses the same present-time meaning clearly and concisely."), item("English · Agreement", "Ignore the phrase between the subject and verb.", "The box of old maps _____ on the top shelf. Which verb completes the sentence?", [
-	"are",
-	"were",
-	"is",
-	"have been"
-], 2, "The singular subject is box, not maps. Is agrees with box."), item("English · Agreement", "Identify the subject before choosing the verb.", "The musicians in the final row _____ ready to perform. Which choice is correct?", [
-	"is",
-	"was",
-	"has been",
-	"are"
-], 3, "Musicians is plural, so are agrees. The phrase in the final row does not change the subject."), item("Reading · Detail", "Find the explicit cause in the passage.", "Omar usually walked to school. On Tuesday, a broken sidewalk blocked his usual route, so he took the bus. Why did Omar take the bus?", [
-	"His usual route was blocked.",
-	"He woke up late.",
-	"He disliked walking.",
-	"The weather was cold."
-], 0, "The passage names the blocked sidewalk as the reason. The other explanations are not stated."), item("Reading · Detail", "Return to the exact sentence rather than guessing from context.", "The volunteers sorted books in the morning and repaired shelves after lunch. Before leaving, they swept the floor. What did they do immediately after lunch?", [
-	"Swept the floor",
-	"Sorted books",
-	"Repaired shelves",
-	"Bought new books"
-], 2, "The passage explicitly says they repaired shelves after lunch."));
-function mathBank(exam) {
-	const offset = exam === "act" ? 3 : 0;
-	return Array.from({ length: 4 }, (_, index) => {
-		const n = index + offset + 2;
-		return [
-			item("Backsolve", "Substitute a promising answer into the original equation; check both sides.", `If 3x + ${n} = ${7 * n}, what is x?`, [
-				String(n),
-				String(2 * n),
-				String(3 * n),
-				String(6 * n)
-			], 1, `Subtract ${n}: 3x = ${6 * n}. Divide by 3: x = ${2 * n}. Substitution gives ${6 * n} + ${n} = ${7 * n}.`),
-			item("Percent multipliers", "A percent decrease multiplies by 1 minus the decimal rate. Do not subtract the rate itself.", `A jacket costs $${20 * n}. Its price is reduced by 25%. What is the sale price?`, [
-				`$${5 * n}`,
-				`$${19 * n}`,
-				`$${25 * n}`,
-				`$${15 * n}`
-			], 3, `Keep 75% of the price: 0.75 × ${20 * n} = ${15 * n}. The discount itself is $${5 * n}.`),
-			item("Read the target", "Circle what the question actually asks. You may not need to solve for the variable.", `If 4x + ${n} = ${9 * n}, what is the value of 8x?`, [
-				String(16 * n),
-				String(2 * n),
-				String(8 * n),
-				String(18 * n)
-			], 0, `Subtract ${n} to get 4x = ${8 * n}. Double both sides: 8x = ${16 * n}. You do not need to calculate x.`),
-			item("Rate setup", "Write the units with the numbers so they cancel in the right direction.", `A machine produces ${12 * n} parts in 3 minutes at a constant rate. How many parts does it produce in 5 minutes?`, [
-				String(12 * n + 2),
-				String(4 * n),
-				String(20 * n),
-				String(60 * n)
-			], 2, `${12 * n} ÷ 3 = ${4 * n} parts per minute. Multiply by 5 minutes to get ${20 * n} parts.`),
-			item(exam === "sat" ? "Equivalent expressions" : "Math · Distribution", "Distribute to every term, then combine like terms. Check with a simple input if uncertain.", `Which expression is equivalent to ${n}(x + 3) − 2x?`, [
-				`${n - 2}x + 3`,
-				`${n + 2}x + ${3 * n}`,
-				`${n - 2}x + ${3 * n}`,
-				`${n}x + ${3 * n - 2}`
-			], 2, `Distribute ${n}: ${n}x + ${3 * n} − 2x. Combining the x terms gives ${n - 2}x + ${3 * n}.`),
-			item("Average shortcut", "Convert an average to a total before finding the missing value.", `Four numbers have an average of ${5 * n}. Three of the numbers are ${2 * n}, ${4 * n}, and ${6 * n}. What is the fourth?`, [
-				String(5 * n),
-				String(8 * n),
-				String(12 * n),
-				String(20 * n)
-			], 1, `The total is 4 × ${5 * n} = ${20 * n}. The three known numbers total ${12 * n}, leaving ${8 * n}.`)
-		];
-	}).flat();
-}
-var graphDrills = Array.from({ length: 5 }, (_, i) => {
-	const x = i + 2, intercept = i + 3, y = 2 * x + intercept;
-	return item("Desmos intersections", "Graph the two sides as y-expressions. Read the requested coordinate and verify it in the equation.", `The graphs y = 2x + ${intercept} and y = ${y} intersect. What is the x-coordinate of their intersection?`, [
-		String(y),
-		String(x),
-		String(x + 1),
-		String(intercept + y)
-	], 1, `At an intersection, 2x + ${intercept} = ${y}. So 2x = ${2 * x} and x = ${x}. In Desmos the point is (${x}, ${y}); use the x-coordinate, not ${y}.`);
-});
-var drillBanks = {
-	sat: {
-		math: [...mathBank("sat"), ...graphDrills],
-		ela: satEla
-	},
-	act: {
-		math: mathBank("act"),
-		ela: actEla
-	}
-};
-function makeRound(exam, subject, skill = null) {
-	const pool = drillBanks[exam][subject].map((q, id) => ({
-		...q,
-		id
-	})).filter((q) => !skill || q.skill === skill);
-	for (let i = pool.length - 1; i > 0; i--) {
-		const j = Math.floor(Math.random() * (i + 1));
-		[pool[i], pool[j]] = [pool[j], pool[i]];
-	}
-	return (skill ? pool : pool.filter((question, index) => pool.findIndex((other) => other.skill === question.skill) === index)).slice(0, 5).map((question) => {
-		const choices = question.options.map((text, index) => ({
-			text,
-			correct: index === question.answer
-		}));
-		for (let i = choices.length - 1; i > 0; i--) {
-			const j = Math.floor(Math.random() * (i + 1));
-			[choices[i], choices[j]] = [choices[j], choices[i]];
-		}
-		return {
-			...question,
-			options: choices.map((choice) => choice.text),
-			answer: choices.findIndex((choice) => choice.correct)
-		};
-	});
-}
-//#endregion
-//#region frontend/src/prep-strategies.js
-var strategyGuides = {
-	sat: {
-		math: [
-			{
-				title: "Graph both sides",
-				skill: "Desmos intersections",
-				cue: "An equation or a system asks for a solution.",
-				move: "Enter each side as a separate y-expression in the test-version graphing calculator. Inspect the intersection and use the coordinate the question asks for.",
-				example: "For 2x + 3 = 11, graph y = 2x + 3 and y = 11. The intersection is (4, 11), so x = 4.",
-				trap: "The y-coordinate is not x. Adjust the window and check for additional solutions."
-			},
-			{
-				title: "Work backward",
-				skill: "Backsolve",
-				cue: "Numeric answer choices and a short equation.",
-				move: "Try a middle answer in the original equation. Use whether it is too high or too low to choose the next candidate when the expression is monotonic.",
-				example: "For 3x + 2 = 14, testing x = 4 gives 14 immediately.",
-				trap: "Check the original equation and any restrictions. Backsolving can be slower than one clean algebra step."
-			},
-			{
-				title: "Solve for the target",
-				skill: "Read the target",
-				cue: "The question asks for an expression such as 8x.",
-				move: "Look for a multiple of the expression you already know before isolating the variable.",
-				example: "If 4x + 3 = 19, then 4x = 16 and 8x = 32.",
-				trap: "Answer the requested expression, not the value of x."
-			}
-		],
-		ela: [
-			{
-				title: "Read the punctuation pattern",
-				skill: "Sentence boundaries",
-				cue: "The choices keep the words but change punctuation.",
-				move: "Check whether each side can stand alone. Two complete clauses can use a period or semicolon; a comma alone cannot join them.",
-				example: "The archive opened; researchers arrived. Both sides contain a subject and a complete verb.",
-				trap: "A colon needs a complete clause before it and an explanation, example, or list after it. A pause is not a grammar rule."
-			},
-			{
-				title: "Name the relationship",
-				skill: "Transitions",
-				cue: "The choices are linking words.",
-				move: "Label the connection first: contrast, result, example, or continuation. Then match the meaning.",
-				example: "Lower energy use leads to longer battery life: therefore signals the result.",
-				trap: "A transition can sound smooth and still express the wrong logical relationship."
-			},
-			{
-				title: "Make the answer prove itself",
-				skill: "Evidence",
-				cue: "A question asks what the text supports.",
-				move: "Find the exact detail supporting each part of the answer. Eliminate choices that add a claim the text never establishes.",
-				example: "One study showing taller seedlings supports a statement about that study, not all plants in every setting.",
-				trap: "Plausible outside knowledge is not passage evidence."
-			}
+function Credit({ value }) {
+	return value ? /* @__PURE__ */ jsxs("p", {
+		className: "adaptive-credit",
+		children: [
+			/* @__PURE__ */ jsx("a", {
+				href: value.url,
+				target: "_blank",
+				rel: "noreferrer",
+				children: value.name
+			}),
+			" · ",
+			value.note
 		]
-	},
-	act: {
-		math: [
-			{
-				title: "Use the choices",
-				skill: "Backsolve",
-				cue: "The answer options give possible values.",
-				move: "Substitute a candidate into the original equation and compare both sides.",
-				example: "For 3x + 5 = 35, x = 10 makes both sides 35.",
-				trap: "Check restrictions and the exact requested quantity. Use the tools available in your ACT testing format."
-			},
-			{
-				title: "Keep the units visible",
-				skill: "Rate setup",
-				cue: "A rate, distance, time, or production question.",
-				move: "Write the rate with its units. Multiply or divide so the unwanted units cancel.",
-				example: "60 parts in 3 minutes is 20 parts/minute; in 5 minutes, 100 parts.",
-				trap: "Convert hours and minutes before substituting."
-			},
-			{
-				title: "Turn averages into totals",
-				skill: "Average shortcut",
-				cue: "An average and a missing value.",
-				move: "Multiply average by count, then subtract the known values.",
-				example: "Four values averaging 10 total 40. If three total 27, the missing value is 13.",
-				trap: "Use the full count of values, including the missing one."
-			}
-		],
-		ela: [
-			{
-				title: "Cut repetition, keep meaning",
-				skill: "English · Concision",
-				cue: "English choices express the same idea at different lengths.",
-				move: "Remove redundant words while preserving meaning, grammar, and the passage voice.",
-				example: "Returned already means went back; returned back is redundant.",
-				trap: "The shortest answer only wins if it is complete and correct."
-			},
-			{
-				title: "Find the real subject",
-				skill: "English · Agreement",
-				cue: "The choices change the verb.",
-				move: "Ignore intervening phrases and match the verb to the grammatical subject.",
-				example: "The results of the experiment were consistent. Results is plural.",
-				trap: "The noun closest to the verb may not be the subject."
-			},
-			{
-				title: "Return to the evidence",
-				skill: "Reading · Detail",
-				cue: "Reading asks why something happened or what was stated.",
-				move: "Locate the sentence that answers the question before relying on memory.",
-				example: "If fog concealed the boats, that explains why the photographer changed plans.",
-				trap: "Reject attractive explanations the passage never gives."
-			}
-		]
-	}
-};
-//#endregion
-//#region frontend/src/quick-practice.jsx
-var labels = {
-	sat: {
-		math: "Math",
-		ela: "Reading & Writing"
-	},
-	act: {
-		math: "Math",
-		ela: "English & Reading"
-	}
-};
-var formatTime = (seconds) => `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`;
-function QuickPractice() {
-	const [exam, setExam] = useState(() => typeof window !== "undefined" && new URLSearchParams(window.location.search).get("exam") === "act" ? "act" : "sat");
-	const [subject, setSubject] = useState(() => typeof window !== "undefined" && new URLSearchParams(window.location.search).get("subject") === "ela" ? "ela" : "math");
-	const [mode, setMode] = useState("sprint");
-	const [round, setRound] = useState(null);
-	const [answers, setAnswers] = useState([]);
-	const [selected, setSelected] = useState(null);
-	const [revealed, setRevealed] = useState(false);
-	const [hint, setHint] = useState(false);
-	const [seconds, setSeconds] = useState(0);
-	const [finished, setFinished] = useState(false);
-	const [review, setReview] = useState(false);
-	const [saveStatus, setSaveStatus] = useState("");
-	const started = useRef(0);
-	const questionHeading = useRef(null);
-	const index = answers.length - (revealed ? 1 : 0);
-	const question = round?.[index];
-	const correct = answers.filter((answer) => answer.correct).length;
-	const streak = answers.reduce((run, answer) => answer.correct ? run + 1 : 0, 0);
-	const bestStreak = answers.reduce((state, answer) => {
-		const current = answer.correct ? state.current + 1 : 0;
-		return {
-			current,
-			best: Math.max(state.best, current)
-		};
-	}, {
-		current: 0,
-		best: 0
-	}).best;
-	const points = answers.reduce((sum, answer) => sum + (answer.correct ? answer.hint ? 50 : 100 : 0), 0);
-	useEffect(() => {
-		if (!round || finished) return;
-		const timer = window.setInterval(() => setSeconds(Math.floor((Date.now() - started.current) / 1e3)), 500);
-		return () => window.clearInterval(timer);
-	}, [round, finished]);
-	useEffect(() => {
-		if (round) questionHeading.current?.focus();
-	}, [
-		round,
-		index,
-		finished,
-		review
-	]);
-	const start = (questions = makeRound(exam, subject)) => {
-		setSaveStatus("");
-		setRound(questions);
-		setAnswers([]);
-		setSelected(null);
-		setRevealed(false);
-		setHint(false);
-		setFinished(false);
-		setReview(false);
-		setSeconds(0);
-		started.current = Date.now();
-	};
-	const check = () => {
-		if (selected === null || revealed) return;
-		setAnswers((previous) => [...previous, {
-			question,
-			selected,
-			correct: selected === question.answer,
-			hint
-		}]);
-		setRevealed(true);
-	};
-	const next = () => {
-		if (answers.length === round.length) {
-			setSeconds(Math.floor((Date.now() - started.current) / 1e3));
-			setFinished(true);
-			setSaveStatus("Saving this round for your path guide…");
-			api("/api/quick-practice", {
-				method: "POST",
-				body: JSON.stringify({
-					track: `${exam}_${subject}`,
-					answers: answers.map((a) => ({
-						id: a.question.id,
-						selected: a.question.options[a.selected]
-					}))
-				})
-			}).then(() => setSaveStatus("Saved. Your path guide can use this round to focus your next steps.")).catch(() => setSaveStatus("This round could not be saved to your guide. You can still review your answers here."));
-		} else {
-			setSelected(null);
-			setRevealed(false);
-			setHint(false);
-		}
-	};
-	const reset = () => {
-		setRound(null);
-		setFinished(false);
-		setReview(false);
-	};
-	const missed = answers.filter((answer) => !answer.correct);
+	}) : null;
+}
+function AdaptiveAssessment() {
 	return /* @__PURE__ */ jsx(AppShell, {
 		name: boot.data.name,
-		children: /* @__PURE__ */ jsxs("main", {
-			className: `app-main quick-prep ${round ? "prep-in-round" : ""}`,
-			children: [
-				finished && saveStatus && /* @__PURE__ */ jsx("p", {
-					className: "prep-save-status",
-					role: "status",
-					children: saveStatus
-				}),
+		children: /* @__PURE__ */ jsx("main", {
+			className: "app-main adaptive-page",
+			children: /* @__PURE__ */ jsx(AdaptiveSession, { id: boot.data.sessionId })
+		})
+	});
+}
+function AdaptivePractice() {
+	const [track, setTrack] = useState(() => {
+		const query = new URLSearchParams(window.location.search);
+		return `${query.get("exam") === "act" ? "act" : "sat"}_${query.get("subject") === "ela" ? "ela" : "math"}`;
+	});
+	const [profile, setProfile] = useState(null);
+	const [session, setSession] = useState(null);
+	const [busy, setBusy] = useState(false);
+	const [error, setError] = useState("");
+	const attempt = useRef(null);
+	useEffect(() => {
+		let active = true;
+		api(`/api/adaptive/profile?track=${track}`).then((data) => {
+			if (active) setProfile(data);
+		}).catch((e) => {
+			if (active) setError(e.message);
+		});
+		window.history.replaceState(null, "", `?exam=${track.split("_")[0]}&subject=${track.split("_")[1]}`);
+		return () => {
+			active = false;
+		};
+	}, [track, session]);
+	const switchTrack = (next) => {
+		if (next === track) return;
+		setProfile(null);
+		setError("");
+		attempt.current = null;
+		setTrack(next);
+	};
+	const start = async () => {
+		setBusy(true);
+		setError("");
+		attempt.current ||= requestId();
+		try {
+			const data = await post("/api/adaptive/practice", {
+				track,
+				request_id: attempt.current
+			});
+			setSession(data.id);
+		} catch (e) {
+			setError(e.message);
+		} finally {
+			setBusy(false);
+		}
+	};
+	return /* @__PURE__ */ jsx(AppShell, {
+		name: boot.data.name,
+		children: /* @__PURE__ */ jsx("main", {
+			className: "app-main adaptive-page",
+			children: session ? /* @__PURE__ */ jsx(AdaptiveSession, {
+				id: session,
+				onLeave: () => {
+					setSession(null);
+					attempt.current = null;
+				}
+			}, session) : /* @__PURE__ */ jsxs(Fragment, { children: [
 				/* @__PURE__ */ jsxs("header", {
-					className: "prep-heading",
-					children: [/* @__PURE__ */ jsxs("div", { children: [
-						/* @__PURE__ */ jsxs("div", {
+					className: "adaptive-heading",
+					children: [
+						/* @__PURE__ */ jsx("div", {
 							className: "eyebrow",
-							children: [/* @__PURE__ */ jsx("span", {}), " TEST PREP / QUICK PRACTICE"]
+							children: "MENTICS / QUICK PRACTICE"
 						}),
-						/* @__PURE__ */ jsx("h1", { children: round ? "Make your move." : "Get into your rhythm." }),
-						/* @__PURE__ */ jsx("p", { children: round ? "One question. One strategy. A sharper next attempt." : "A little focus today. A little more confidence on test day." })
-					] }), /* @__PURE__ */ jsxs("a", {
-						href: `/dashboard/test-path-view?track=${exam}_${subject}`,
-						className: "prep-path-link",
-						children: ["My study path ", /* @__PURE__ */ jsx(ArrowRight, { size: 16 })]
+						/* @__PURE__ */ jsx("h1", { children: "Make the next rep count." }),
+						/* @__PURE__ */ jsx("p", { children: "Five questions chosen from your progress. A useful strategy when you need it. Every answer shapes what comes next." })
+					]
+				}),
+				/* @__PURE__ */ jsxs("section", {
+					className: "prep-lanes",
+					"aria-label": "Practice section",
+					children: [/* @__PURE__ */ jsx("div", {
+						className: "prep-exams",
+						children: ["sat", "act"].map((exam) => /* @__PURE__ */ jsxs("button", {
+							disabled: busy,
+							"aria-pressed": track.startsWith(exam),
+							onClick: () => switchTrack(`${exam}_${track.split("_")[1]}`),
+							children: [exam.toUpperCase(), /* @__PURE__ */ jsx("small", { children: "Your progress stays separate" })]
+						}, exam))
+					}), /* @__PURE__ */ jsx("div", {
+						className: "prep-subjects",
+						children: ["math", "ela"].map((section) => /* @__PURE__ */ jsxs("button", {
+							disabled: busy,
+							"aria-pressed": track.endsWith(section),
+							onClick: () => switchTrack(`${track.split("_")[0]}_${section}`),
+							children: [
+								section === "math" ? /* @__PURE__ */ jsx(Target, { size: 20 }) : /* @__PURE__ */ jsx(BookOpen, { size: 20 }),
+								/* @__PURE__ */ jsxs("span", { children: [/* @__PURE__ */ jsx("b", { children: section === "math" ? "Math" : "ELA" }), /* @__PURE__ */ jsx("small", { children: section === "math" ? "Reasoning & problem solving" : track.startsWith("act") ? "English & Reading" : "Reading & Writing" })] }),
+								track.endsWith(section) && /* @__PURE__ */ jsx(Check, { size: 18 })
+							]
+						}, section))
 					})]
 				}),
-				!round ? /* @__PURE__ */ jsxs(Fragment, { children: [
-					/* @__PURE__ */ jsxs("section", {
-						className: "prep-config",
-						"aria-label": "Choose your practice",
+				/* @__PURE__ */ jsxs("div", {
+					className: "adaptive-start-grid",
+					children: [/* @__PURE__ */ jsxs("section", {
+						className: "adaptive-card",
 						children: [
-							/* @__PURE__ */ jsxs("div", {
-								className: "prep-config-title",
-								children: [/* @__PURE__ */ jsx("span", {
-									className: "prep-step-tag",
-									children: "01"
-								}), /* @__PURE__ */ jsxs("div", { children: [/* @__PURE__ */ jsx("h2", { children: "Make it your session." }), /* @__PURE__ */ jsx("p", { children: "Pick your exam, your focus, and your pace." })] })]
-							}),
 							/* @__PURE__ */ jsx("div", {
-								className: "prep-section-heading",
-								children: /* @__PURE__ */ jsx("span", { children: "EXAM" })
+								className: "eyebrow",
+								children: "YOUR NEXT FOCUS"
 							}),
-							/* @__PURE__ */ jsx("div", {
-								className: "prep-exams",
-								role: "group",
-								"aria-label": "Exam",
-								children: ["sat", "act"].map((value) => /* @__PURE__ */ jsxs("button", {
-									type: "button",
-									"aria-pressed": exam === value,
-									onClick: () => setExam(value),
-									className: exam === value ? "is-selected" : "",
-									children: [/* @__PURE__ */ jsxs("span", { children: [/* @__PURE__ */ jsx("b", { children: value.toUpperCase() }), /* @__PURE__ */ jsx("small", { children: value === "sat" ? "Math · Reading & Writing" : "Math · English & Reading" })] }), /* @__PURE__ */ jsx("span", {
-										className: "prep-selection-dot",
-										children: exam === value && /* @__PURE__ */ jsx(Check, { size: 15 })
-									})]
-								}, value))
+							/* @__PURE__ */ jsx("h2", { children: label(track) }),
+							/* @__PURE__ */ jsx("p", { children: profile?.benchmark_completed ? "Your diagnostic and recent answers guide this session." : "Your goals and any recorded practice guide this session. Take the benchmark in Learning Paths for a clearer starting point." }),
+							profile ? /* @__PURE__ */ jsx("ul", {
+								className: "adaptive-focus",
+								children: [...new Set(profile.targets || [])].map((key) => {
+									const s = profile.skills[key];
+									return /* @__PURE__ */ jsxs("li", { children: [/* @__PURE__ */ jsx("span", { children: s.label }), /* @__PURE__ */ jsxs("small", { children: [
+										s.accuracy == null ? "Build evidence" : `${Math.round(s.accuracy * 100)}% across ${s.attempts} answers`,
+										" · ",
+										s.readiness
+									] })] }, key);
+								})
+							}) : /* @__PURE__ */ jsx("p", {
+								role: "status",
+								children: "Reading your learning history…"
 							}),
-							/* @__PURE__ */ jsx("div", {
-								className: "prep-section-heading",
-								children: /* @__PURE__ */ jsx("span", { children: "FOCUS" })
-							}),
-							/* @__PURE__ */ jsx("div", {
-								className: "prep-subjects",
-								role: "group",
-								"aria-label": "Subject",
-								children: [[
-									"math",
-									"Math",
-									Target
-								], [
-									"ela",
-									"ELA",
-									BookOpen
-								]].map(([value, label, Icon]) => /* @__PURE__ */ jsxs("button", {
-									type: "button",
-									"aria-pressed": subject === value,
-									onClick: () => setSubject(value),
-									className: subject === value ? "is-selected" : "",
-									children: [
-										/* @__PURE__ */ jsx(Icon, {}),
-										/* @__PURE__ */ jsxs("span", { children: [/* @__PURE__ */ jsx("b", { children: label }), /* @__PURE__ */ jsx("small", { children: value === "math" ? "Numbers & problem solving" : labels[exam][value] })] }),
-										subject === value && /* @__PURE__ */ jsx(Check, { size: 17 })
-									]
-								}, value))
-							}),
-							/* @__PURE__ */ jsx("div", {
-								className: "prep-section-heading",
-								children: /* @__PURE__ */ jsx("span", { children: "PACE" })
-							}),
-							/* @__PURE__ */ jsx("div", {
-								className: "prep-modes",
-								role: "group",
-								"aria-label": "Practice mode",
-								children: [[
-									"sprint",
-									"Speed round",
-									"Aim for five minutes. Keep going if you need more.",
-									Zap
-								], [
-									"learn",
-									"Strategy practice",
-									"No clock on screen. Work through each tactic.",
-									BookOpen
-								]].map(([value, title, copy, Icon]) => /* @__PURE__ */ jsxs("button", {
-									type: "button",
-									"aria-pressed": mode === value,
-									onClick: () => setMode(value),
-									className: mode === value ? "is-selected" : "",
-									children: [
-										/* @__PURE__ */ jsx(Icon, {}),
-										/* @__PURE__ */ jsx("b", { children: title }),
-										/* @__PURE__ */ jsx("small", { children: copy })
-									]
-								}, value))
+							/* @__PURE__ */ jsxs("a", {
+								className: "text-button",
+								href: `/dashboard/test-path-view?track=${track}`,
+								children: ["Continue your learning path ", /* @__PURE__ */ jsx(ArrowRight, { size: 16 })]
 							})
 						]
-					}),
-					/* @__PURE__ */ jsxs("aside", {
-						className: "prep-launch",
+					}), /* @__PURE__ */ jsxs("aside", {
+						className: "adaptive-launch",
 						children: [
-							/* @__PURE__ */ jsxs("div", {
-								className: "prep-launch-top",
-								children: [/* @__PURE__ */ jsxs("span", { children: [/* @__PURE__ */ jsx("i", {}), " READY WHEN YOU ARE"] }), /* @__PURE__ */ jsx(Zap, { size: 20 })]
+							/* @__PURE__ */ jsx("span", {
+								className: "eyebrow",
+								children: "A SMALL SESSION. A CLEAR PURPOSE."
 							}),
+							/* @__PURE__ */ jsxs("h2", { children: [
+								"Find the move.",
+								/* @__PURE__ */ jsx("br", {}),
+								"Make it stick."
+							] }),
+							/* @__PURE__ */ jsx("p", { children: "Work through a targeted set with three levels of hints, explanations, and faster test-day approaches." }),
 							/* @__PURE__ */ jsxs("div", {
-								className: "prep-orbit",
-								"aria-hidden": "true",
-								children: [
-									/* @__PURE__ */ jsx("i", {}),
-									/* @__PURE__ */ jsx("i", {}),
-									/* @__PURE__ */ jsxs("span", { children: ["05", /* @__PURE__ */ jsx("small", { children: "QUESTIONS" })] }),
-									/* @__PURE__ */ jsx("b", { children: /* @__PURE__ */ jsx(Zap, { size: 19 }) })
-								]
-							}),
-							/* @__PURE__ */ jsxs("div", {
-								className: "prep-launch-copy",
-								children: [
-									/* @__PURE__ */ jsxs("span", {
-										className: "prep-exam-chip",
-										children: [
-											exam.toUpperCase(),
-											" / ",
-											labels[exam][subject]
-										]
-									}),
-									/* @__PURE__ */ jsx("h2", { children: mode === "sprint" ? "Find your fast." : "Learn the move." }),
-									/* @__PURE__ */ jsx("p", { children: mode === "sprint" ? "Beat the trap. Build your streak. Turn five focused minutes into real practice." : "Slow it down. Learn a useful shortcut, then put it to work on the next question." })
-								]
-							}),
-							/* @__PURE__ */ jsxs("div", {
-								className: "prep-launch-metrics",
-								children: [/* @__PURE__ */ jsxs("span", { children: [/* @__PURE__ */ jsx(Clock3, { size: 15 }), mode === "sprint" ? "5-minute target" : "No timer pressure"] }), /* @__PURE__ */ jsxs("span", { children: [/* @__PURE__ */ jsx(Flame, { size: 15 }), "Streaks + points"] })]
+								className: "adaptive-launch-facts",
+								children: [/* @__PURE__ */ jsxs("span", { children: [/* @__PURE__ */ jsx("b", { children: "05" }), " questions"] }), /* @__PURE__ */ jsxs("span", { children: [/* @__PURE__ */ jsx("b", { children: "03" }), " hint levels"] })]
 							}),
 							/* @__PURE__ */ jsxs("button", {
 								className: "button button--primary",
-								onClick: () => start(),
+								disabled: busy || !profile,
+								onClick: profile?.resume_session ? () => setSession(profile.resume_session) : start,
 								children: [
-									"Start ",
-									mode === "sprint" ? "speed round" : "practicing",
+									busy ? "Preparing and checking your questions…" : profile?.resume_session ? "Resume saved practice" : "Start personalized practice",
 									" ",
-									/* @__PURE__ */ jsx(ArrowRight, {})
+									!busy && /* @__PURE__ */ jsx(ArrowRight, { size: 18 })
 								]
 							}),
-							/* @__PURE__ */ jsx("small", { children: "Original strategy drills / Instant explanations" })
+							/* @__PURE__ */ jsx("small", { children: "Answers save as you go. Accuracy comes before speed." })
 						]
-					}),
-					/* @__PURE__ */ jsxs("section", {
-						className: "prep-bottom",
-						"aria-label": "Keep building",
-						children: [/* @__PURE__ */ jsxs("a", {
-							className: "prep-long-path",
-							href: `/dashboard/test-path-builder?test_focus=${exam}&subject_focus=${subject}`,
-							children: [
-								/* @__PURE__ */ jsx("span", {
-									className: "prep-path-icon",
-									children: /* @__PURE__ */ jsx(BookOpen, {})
-								}),
-								/* @__PURE__ */ jsxs("span", { children: [
-									/* @__PURE__ */ jsx("small", { children: "THE LONG GAME" }),
-									/* @__PURE__ */ jsx("b", { children: "Build a stronger foundation." }),
-									/* @__PURE__ */ jsx("p", { children: "Lessons and a study plan shaped around you." })
-								] }),
-								/* @__PURE__ */ jsx(ArrowRight, {})
-							]
-						}), /* @__PURE__ */ jsxs("div", {
-							className: "prep-how",
-							children: [
-								/* @__PURE__ */ jsxs("span", { children: [/* @__PURE__ */ jsx("b", { children: "01" }), " Try a tactic"] }),
-								/* @__PURE__ */ jsxs("span", { children: [/* @__PURE__ */ jsx("b", { children: "02" }), " Get feedback"] }),
-								/* @__PURE__ */ jsxs("span", { children: [/* @__PURE__ */ jsx("b", { children: "03" }), " Retry the miss"] })
-							]
-						})]
-					}),
-					/* @__PURE__ */ jsxs("section", {
-						className: "prep-playbook",
-						"aria-label": "Test-day strategies",
-						children: [
-							/* @__PURE__ */ jsxs("header", { children: [
-								/* @__PURE__ */ jsxs("div", {
-									className: "eyebrow",
-									children: [
-										exam.toUpperCase(),
-										" / ",
-										labels[exam][subject]
-									]
-								}),
-								/* @__PURE__ */ jsx("h2", { children: "Learn the move. Then drill it." }),
-								/* @__PURE__ */ jsx("p", { children: "Have 10 minutes? Pick one strategy, practise it, and review every miss." })
-							] }),
-							/* @__PURE__ */ jsx("div", {
-								className: "prep-strategy-grid",
-								children: strategyGuides[exam][subject].map((guide, i) => /* @__PURE__ */ jsxs("article", { children: [
-									/* @__PURE__ */ jsxs("small", { children: [
-										"0",
-										i + 1,
-										" / ",
-										guide.cue
-									] }),
-									/* @__PURE__ */ jsx("h3", { children: guide.title }),
-									/* @__PURE__ */ jsx("p", { children: guide.move }),
-									/* @__PURE__ */ jsx("blockquote", { children: guide.example }),
-									/* @__PURE__ */ jsxs("p", {
-										className: "prep-strategy-trap",
-										children: [
-											/* @__PURE__ */ jsx("b", { children: "Watch for:" }),
-											" ",
-											guide.trap
-										]
-									}),
-									/* @__PURE__ */ jsxs("button", {
-										className: "text-button",
-										onClick: () => {
-											setMode("learn");
-											start(makeRound(exam, subject, guide.skill));
-										},
-										children: ["Practise this move ", /* @__PURE__ */ jsx(ArrowRight, { size: 16 })]
-									})
-								] }, guide.title))
-							}),
-							/* @__PURE__ */ jsx("p", {
-								className: "prep-strategy-source",
-								children: exam === "sat" ? /* @__PURE__ */ jsxs(Fragment, { children: [
-									"Inspired by the Desmos and grammar emphasis in ",
-									/* @__PURE__ */ jsx("a", {
-										href: "https://www.skool.com/sat/about",
-										target: "_blank",
-										rel: "noreferrer",
-										children: "James Lu’s public SAT prep"
-									}),
-									". Original Mentics examples; not affiliated. ",
-									/* @__PURE__ */ jsx("a", {
-										href: "https://satsuite.collegeboard.org/in-school-assessments/calculator-policy",
-										target: "_blank",
-										rel: "noreferrer",
-										children: "SAT calculator rules"
-									}),
-									"."
-								] }) : /* @__PURE__ */ jsxs(Fragment, { children: [
-									"These drills target ACT Math, English, and Reading. Online ACT includes a built-in Desmos calculator; paper testing uses an approved handheld. ",
-									/* @__PURE__ */ jsx("a", {
-										href: "https://www.act.org/content/act/en/products-and-services/the-act/test-day/calculator-policy.html",
-										target: "_blank",
-										rel: "noreferrer",
-										children: "Check ACT calculator rules"
-									}),
-									"."
-								] })
-							})
-						]
-					}),
-					/* @__PURE__ */ jsx("p", {
-						className: "prep-fine-print",
-						children: "Round points: 100 per correct answer, or 50 with a hint. Separate from account points. These short drills are not full test simulations."
-					})
-				] }) : /* @__PURE__ */ jsxs("section", {
-					className: "prep-session",
-					"aria-label": `${exam.toUpperCase()} ${labels[exam][subject]} practice`,
-					children: [/* @__PURE__ */ jsxs("div", {
-						className: "prep-session-bar",
-						children: [/* @__PURE__ */ jsxs("div", { children: [/* @__PURE__ */ jsxs("span", {
-							className: "prep-session-kicker",
-							children: ["MENTICS PRACTICE / ", mode === "sprint" ? "SPEED" : "STRATEGY"]
-						}), /* @__PURE__ */ jsxs("strong", { children: [
-							/* @__PURE__ */ jsx("b", { children: exam.toUpperCase() }),
-							" ",
-							labels[exam][subject]
-						] })] }), /* @__PURE__ */ jsx("button", {
-							className: "text-button",
-							onClick: reset,
-							children: finished ? "Change practice" : "End round"
-						})]
-					}), finished ? /* @__PURE__ */ jsxs("div", {
-						className: "prep-results",
-						children: [
-							/* @__PURE__ */ jsxs("div", {
-								className: "prep-result-mark",
-								children: [/* @__PURE__ */ jsx(Trophy, { className: "prep-trophy" }), /* @__PURE__ */ jsxs("span", { children: [
-									"ROUND",
-									/* @__PURE__ */ jsx("br", {}),
-									"COMPLETE"
-								] })]
-							}),
-							/* @__PURE__ */ jsx("div", {
-								className: "eyebrow",
-								children: "YOUR PRACTICE RECEIPT"
-							}),
-							/* @__PURE__ */ jsx("h2", {
-								ref: questionHeading,
-								tabIndex: -1,
-								children: correct === round.length ? "Clean sweep." : "The next move is clear."
-							}),
-							/* @__PURE__ */ jsxs("p", { children: [
-								correct,
-								" of ",
-								round.length,
-								" correct",
-								mode === "sprint" ? ` in ${formatTime(seconds)}` : "",
-								". ",
-								missed.length ? "Bring the misses back for another rep." : "Keep the momentum with another set."
-							] }),
-							/* @__PURE__ */ jsxs("div", {
-								className: "prep-result-stats",
-								children: [
-									/* @__PURE__ */ jsxs("span", { children: [/* @__PURE__ */ jsx("small", { children: "ROUND POINTS" }), /* @__PURE__ */ jsx("b", { children: points })] }),
-									/* @__PURE__ */ jsxs("span", { children: [/* @__PURE__ */ jsx("small", { children: "ACCURACY" }), /* @__PURE__ */ jsxs("b", { children: [Math.round(correct / round.length * 100), "%"] })] }),
-									/* @__PURE__ */ jsxs("span", { children: [/* @__PURE__ */ jsx("small", { children: "BEST STREAK" }), /* @__PURE__ */ jsx("b", { children: bestStreak })] })
-								]
-							}),
-							/* @__PURE__ */ jsxs("div", {
-								className: "prep-result-actions",
-								children: [
-									/* @__PURE__ */ jsxs("button", {
-										className: "button button--primary",
-										onClick: () => start(),
-										children: ["New round ", /* @__PURE__ */ jsx(ArrowRight, {})]
-									}),
-									missed.length > 0 && /* @__PURE__ */ jsxs("button", {
-										className: "button button--quiet",
-										onClick: () => start(missed.map((answer) => answer.question)),
-										children: [
-											/* @__PURE__ */ jsx(RotateCcw, {}),
-											" Retry ",
-											missed.length,
-											" missed"
-										]
-									}),
-									/* @__PURE__ */ jsxs("button", {
-										className: "text-button",
-										"aria-expanded": review,
-										onClick: () => setReview(!review),
-										children: [review ? "Hide" : "Review", " answers"]
-									})
-								]
-							}),
-							review && /* @__PURE__ */ jsx("div", {
-								className: "prep-review",
-								children: answers.map((answer, i) => /* @__PURE__ */ jsxs("article", { children: [
-									/* @__PURE__ */ jsxs("small", { children: [
-										answer.correct ? "CORRECT" : "PRACTICE AGAIN",
-										" · ",
-										answer.question.skill
-									] }),
-									/* @__PURE__ */ jsx("h3", { children: answer.question.prompt }),
-									/* @__PURE__ */ jsxs("p", { children: ["Your answer: ", answer.question.options[answer.selected]] }),
-									/* @__PURE__ */ jsxs("b", { children: ["Correct answer: ", answer.question.options[answer.question.answer]] }),
-									/* @__PURE__ */ jsx("p", { children: answer.question.explanation })
-								] }, i))
-							})
-						]
-					}) : /* @__PURE__ */ jsxs(Fragment, { children: [
-						/* @__PURE__ */ jsxs("div", {
-							className: "prep-hud",
-							children: [
-								/* @__PURE__ */ jsxs("span", {
-									className: "prep-round-count",
-									children: [/* @__PURE__ */ jsx("small", { children: "QUESTION" }), /* @__PURE__ */ jsxs("b", { children: [String(index + 1).padStart(2, "0"), /* @__PURE__ */ jsxs("i", { children: ["/ ", String(round.length).padStart(2, "0")] })] })]
-								}),
-								/* @__PURE__ */ jsxs("span", { children: [
-									/* @__PURE__ */ jsx(Flame, {}),
-									" ",
-									streak,
-									" streak"
-								] }),
-								/* @__PURE__ */ jsxs("span", { children: [
-									/* @__PURE__ */ jsx(Zap, {}),
-									" ",
-									points,
-									" pts"
-								] }),
-								mode === "sprint" && /* @__PURE__ */ jsxs("span", { children: [
-									/* @__PURE__ */ jsx(Clock3, {}),
-									" ",
-									formatTime(seconds),
-									" ",
-									/* @__PURE__ */ jsx("small", { children: "/ 5:00 target" })
-								] })
-							]
+					})]
+				}),
+				error && /* @__PURE__ */ jsxs("div", {
+					role: "alert",
+					className: "error-banner",
+					children: [error, /* @__PURE__ */ jsx("button", {
+						onClick: () => profile ? start() : window.location.reload(),
+						children: "Try again"
+					})]
+				}),
+				/* @__PURE__ */ jsxs("p", {
+					className: "adaptive-credit",
+					children: [
+						"SAT Desmos and grammar emphasis informed by ",
+						/* @__PURE__ */ jsx("a", {
+							href: "https://www.skool.com/sat/about",
+							target: "_blank",
+							rel: "noreferrer",
+							children: "James Lu’s public SAT prep"
 						}),
-						/* @__PURE__ */ jsx("div", {
-							className: "prep-progress",
-							role: "progressbar",
-							"aria-label": "Questions answered",
-							"aria-valuenow": answers.length,
-							"aria-valuemin": 0,
-							"aria-valuemax": round.length,
-							children: /* @__PURE__ */ jsx("i", { style: { width: `${answers.length / round.length * 100}%` } })
-						}),
-						/* @__PURE__ */ jsxs("div", {
-							className: "prep-question",
-							children: [
-								/* @__PURE__ */ jsxs("div", {
-									className: "prep-question-meta",
-									children: [/* @__PURE__ */ jsx("div", {
-										className: "eyebrow",
-										children: question.skill
-									}), /* @__PURE__ */ jsx("span", { children: mode === "sprint" ? "MAKE THE CALL" : "WORK THE MOVE" })]
-								}),
-								/* @__PURE__ */ jsx("h2", {
-									ref: questionHeading,
-									tabIndex: -1,
-									children: question.prompt
-								}),
-								/* @__PURE__ */ jsx("div", {
-									className: "prep-answers",
-									role: "group",
-									"aria-label": "Answer choices",
-									children: question.options.map((option, i) => /* @__PURE__ */ jsxs("button", {
-										type: "button",
-										disabled: revealed,
-										"aria-pressed": selected === i,
-										onClick: () => setSelected(i),
-										className: `${selected === i ? "is-selected" : ""} ${revealed && i === question.answer ? "is-correct" : ""} ${revealed && selected === i && i !== question.answer ? "is-wrong" : ""}`,
-										children: [
-											/* @__PURE__ */ jsx("span", { children: "ABCD"[i] }),
-											/* @__PURE__ */ jsx("b", { children: option }),
-											revealed && i === question.answer && /* @__PURE__ */ jsx(Check, { "aria-label": "Correct answer" })
-										]
-									}, i))
-								}),
-								!revealed && /* @__PURE__ */ jsxs("button", {
-									className: "text-button prep-hint-button",
-									"aria-expanded": hint,
-									onClick: () => setHint(true),
-									disabled: hint,
-									children: [/* @__PURE__ */ jsx(Zap, { size: 16 }), " Show strategy hint · correct answer earns 50 pts"]
-								}),
-								hint && !revealed && /* @__PURE__ */ jsxs("div", {
-									className: "prep-feedback",
-									children: [/* @__PURE__ */ jsx("b", { children: "The move" }), /* @__PURE__ */ jsx("p", { children: question.tip })]
-								}),
-								revealed && /* @__PURE__ */ jsxs("div", {
-									className: `prep-feedback ${selected === question.answer ? "is-correct" : ""}`,
-									role: "status",
-									children: [
-										/* @__PURE__ */ jsx("b", { children: selected === question.answer ? "Correct. Keep that move." : `The answer is ${"ABCD"[question.answer]}. Here’s why.` }),
-										/* @__PURE__ */ jsx("p", { children: question.explanation }),
-										/* @__PURE__ */ jsxs("small", { children: [
-											/* @__PURE__ */ jsx("strong", { children: "Test-day tactic:" }),
-											" ",
-											question.tip
-										] })
-									]
-								}),
-								/* @__PURE__ */ jsxs("div", {
-									className: "prep-question-actions",
-									children: [/* @__PURE__ */ jsx("span", { children: mode === "sprint" ? "Accuracy first. Speed follows." : "Understand the move before moving on." }), revealed ? /* @__PURE__ */ jsxs("button", {
-										className: "button button--primary",
-										onClick: next,
-										children: [
-											answers.length === round.length ? "See results" : "Next question",
-											" ",
-											/* @__PURE__ */ jsx(ArrowRight, {})
-										]
-									}) : /* @__PURE__ */ jsxs("button", {
-										className: "button button--primary",
-										disabled: selected === null,
-										onClick: check,
-										children: ["Check answer ", /* @__PURE__ */ jsx(Check, {})]
-									})]
-								})
-							]
-						})
-					] })]
+						". Original Mentics questions; not affiliated. Specific influences are credited alongside practice."
+					]
 				})
-			]
+			] })
 		})
+	});
+}
+function AdaptiveSession({ id, onLeave }) {
+	const [session, setSession] = useState(null);
+	const [activeId, setActiveId] = useState(id);
+	const [index, setIndex] = useState(0);
+	const [selected, setSelected] = useState(null);
+	const [confidence, setConfidence] = useState(null);
+	const [busy, setBusy] = useState(false);
+	const [error, setError] = useState("");
+	const [pathReady, setPathReady] = useState(false);
+	const [building, setBuilding] = useState(false);
+	const [review, setReview] = useState(false);
+	const clock = useRef({
+		start: 0,
+		elapsed: 0
+	});
+	const analysisStarted = useRef(false);
+	const question = session?.questions[index];
+	const answered = !!question?.answer;
+	const benchmark = session?.kind === "benchmark";
+	const load = async () => {
+		try {
+			const data = await api(`/api/adaptive/session/${activeId}`);
+			setSession(data);
+			const next = data.questions.findIndex((q) => !q.answer);
+			setIndex(next < 0 ? Math.max(0, data.total - 1) : next);
+		} catch (e) {
+			setError(e.message);
+		}
+	};
+	useEffect(() => {
+		load();
+	}, [activeId]);
+	useEffect(() => {
+		if (session?.status !== "generating") return;
+		const timer = setInterval(load, 3e3);
+		return () => clearInterval(timer);
+	}, [session?.status]);
+	useEffect(() => {
+		clock.current = {
+			start: performance.now(),
+			elapsed: 0
+		};
+		const visibility = () => {
+			if (document.hidden) {
+				clock.current.elapsed += performance.now() - clock.current.start;
+				clock.current.start = 0;
+			} else clock.current.start = performance.now();
+		};
+		document.addEventListener("visibilitychange", visibility);
+		return () => document.removeEventListener("visibilitychange", visibility);
+	}, [id, index]);
+	const act = async (action, data = {}) => {
+		setBusy(true);
+		setError("");
+		try {
+			const next = await post(`/api/adaptive/session/${activeId}`, {
+				action,
+				...data
+			});
+			setSession(next);
+			return next;
+		} catch (e) {
+			setError(e.message);
+			return null;
+		} finally {
+			setBusy(false);
+		}
+	};
+	const buildPath = async () => {
+		setBuilding(true);
+		setError("");
+		try {
+			await post(`/api/adaptive/session/${activeId}`, { action: "next_path" });
+			setPathReady(true);
+		} catch (e) {
+			setError(e.message);
+		} finally {
+			setBuilding(false);
+		}
+	};
+	useEffect(() => {
+		if (benchmark && session?.status === "completed" && !analysisStarted.current) {
+			analysisStarted.current = true;
+			buildPath();
+		}
+	}, [benchmark, session?.status]);
+	const submit = () => act("answer", {
+		index,
+		selected_option: selected,
+		confidence,
+		response_ms: Math.min(36e5, Math.round(clock.current.elapsed + (clock.current.start ? performance.now() - clock.current.start : 0)))
+	});
+	const retryGeneration = async () => {
+		setBusy(true);
+		setError("");
+		try {
+			const data = await post("/api/adaptive/practice", {
+				track: session.track,
+				request_id: requestId()
+			});
+			setSession(data);
+			setActiveId(data.id);
+		} catch (e) {
+			setError(e.message);
+		} finally {
+			setBusy(false);
+		}
+	};
+	const leave = onLeave || (() => {
+		window.location.href = `/dashboard/test-path-view?track=${session?.track || "sat_math"}`;
+	});
+	return /* @__PURE__ */ jsxs("section", {
+		className: "adaptive-session",
+		children: [
+			/* @__PURE__ */ jsxs("div", {
+				className: "adaptive-session-nav",
+				children: [/* @__PURE__ */ jsxs("button", {
+					className: "text-button",
+					onClick: leave,
+					children: [/* @__PURE__ */ jsx(ArrowLeft, { size: 16 }), " Save & leave"]
+				}), /* @__PURE__ */ jsx("span", { children: session ? label(session.track) : "MENTICS" })]
+			}),
+			error && /* @__PURE__ */ jsxs("div", {
+				className: "error-banner",
+				role: "alert",
+				children: [error, !session && /* @__PURE__ */ jsx("button", {
+					onClick: load,
+					children: "Retry loading"
+				})]
+			}),
+			!session ? /* @__PURE__ */ jsx("div", {
+				className: "adaptive-card",
+				role: "status",
+				children: "Loading your saved session…"
+			}) : session.status === "generating" || session.status === "failed" ? /* @__PURE__ */ jsxs("div", {
+				className: "adaptive-card",
+				children: [
+					/* @__PURE__ */ jsx("h1", { children: "Preparing your next questions." }),
+					/* @__PURE__ */ jsx("p", { children: "Mentics is reading your progress and checking each question before practice." }),
+					session.can_retry && /* @__PURE__ */ jsx("button", {
+						className: "button button--primary",
+						disabled: busy,
+						onClick: retryGeneration,
+						children: "Retry preparation"
+					})
+				]
+			}) : session.status === "completed" ? /* @__PURE__ */ jsxs(Fragment, { children: [
+				/* @__PURE__ */ jsxs("header", {
+					className: "adaptive-heading",
+					children: [
+						/* @__PURE__ */ jsx("div", {
+							className: "eyebrow",
+							children: benchmark ? "YOUR STARTING POINT, SAVED" : "PRACTICE COMPLETE"
+						}),
+						/* @__PURE__ */ jsx("h1", { children: benchmark ? "Now we have a direction." : "One session smarter." }),
+						/* @__PURE__ */ jsxs("p", { children: [
+							session.summary.correct,
+							" of ",
+							session.summary.total,
+							" correct. ",
+							benchmark ? session.summary.message : "These answers now inform your next practice and learning path."
+						] })
+					]
+				}),
+				/* @__PURE__ */ jsxs("section", {
+					className: "adaptive-card",
+					children: [
+						!benchmark && /* @__PURE__ */ jsxs("p", { children: [
+							session.points || 0,
+							" session points. Best streak: ",
+							session.best_streak || 0,
+							". Practice points are separate from account XP."
+						] }),
+						/* @__PURE__ */ jsxs("div", {
+							className: "adaptive-score",
+							children: [/* @__PURE__ */ jsxs("b", { children: [Math.round(session.summary.accuracy * 100), /* @__PURE__ */ jsx("small", { children: "%" })] }), /* @__PURE__ */ jsxs("span", { children: [
+								"accuracy",
+								/* @__PURE__ */ jsx("br", {}),
+								"in this session"
+							] })]
+						}),
+						/* @__PURE__ */ jsx("ul", {
+							className: "adaptive-focus",
+							children: Object.entries(session.summary.domains || {}).map(([domain, result]) => /* @__PURE__ */ jsxs("li", { children: [/* @__PURE__ */ jsx("span", { children: domain }), /* @__PURE__ */ jsxs("small", { children: [
+								result.correct,
+								" / ",
+								result.total,
+								" correct"
+							] })] }, domain))
+						}),
+						session.summary.rapid_responses > 0 && /* @__PURE__ */ jsx("p", { children: "Very fast responses carry less weight in your mastery estimate. Future practice will check that evidence." }),
+						benchmark ? /* @__PURE__ */ jsxs(Fragment, { children: [/* @__PURE__ */ jsx("p", {
+							role: "status",
+							children: building ? "Analyzing your answers and preparing five focused steps…" : pathReady ? "Your personalized five-step path is ready." : "Your benchmark is saved. Continue preparing your path below."
+						}), pathReady ? /* @__PURE__ */ jsxs("a", {
+							className: "button button--primary",
+							href: `/dashboard/test-path-view?track=${session.track}`,
+							children: ["Open my path ", /* @__PURE__ */ jsx(ArrowRight, { size: 18 })]
+						}) : /* @__PURE__ */ jsx("button", {
+							className: "button button--primary",
+							disabled: building,
+							onClick: buildPath,
+							children: building ? "Building your path…" : "Prepare my path"
+						})] }) : /* @__PURE__ */ jsxs("button", {
+							className: "button button--primary",
+							onClick: leave,
+							children: ["Choose the next session ", /* @__PURE__ */ jsx(ArrowRight, { size: 18 })]
+						}),
+						/* @__PURE__ */ jsxs("button", {
+							className: "text-button adaptive-review-toggle",
+							onClick: () => setReview(!review),
+							"aria-expanded": review,
+							children: [review ? "Hide" : "Review", " answers"]
+						})
+					]
+				}),
+				review && session.questions.map((q) => /* @__PURE__ */ jsxs("article", {
+					className: "adaptive-card",
+					children: [
+						/* @__PURE__ */ jsxs("div", {
+							className: "eyebrow",
+							children: [
+								"QUESTION ",
+								q.index + 1,
+								" · ",
+								q.answer.selected_option === q.correct_option ? "CORRECT" : "KEEP PRACTICING"
+							]
+						}),
+						q.source_or_prompt && /* @__PURE__ */ jsx("p", {
+							className: "adaptive-passage",
+							children: q.source_or_prompt
+						}),
+						/* @__PURE__ */ jsx("h3", { children: q.question_text }),
+						/* @__PURE__ */ jsxs("p", { children: ["Your answer: ", q.options[q.answer.selected_option]] }),
+						/* @__PURE__ */ jsxs("b", { children: ["Correct answer: ", q.options[q.correct_option]] }),
+						/* @__PURE__ */ jsx("p", { children: q.explanation }),
+						/* @__PURE__ */ jsx("p", { children: q.fastest_method }),
+						/* @__PURE__ */ jsx(Credit, { value: q.attribution })
+					]
+				}, q.index))
+			] }) : question && /* @__PURE__ */ jsxs(Fragment, { children: [
+				/* @__PURE__ */ jsxs("header", {
+					className: "adaptive-heading",
+					children: [
+						/* @__PURE__ */ jsx("div", {
+							className: "eyebrow",
+							children: benchmark ? "ONE-TIME SECTION BENCHMARK" : "YOUR TARGETED SESSION"
+						}),
+						/* @__PURE__ */ jsx("h1", { children: benchmark ? "Show us where you are." : "Work the question. Learn the move." }),
+						/* @__PURE__ */ jsx("p", { children: benchmark ? "12 original diagnostic questions across this section. Work independently; hints and solutions come after submission. Every answer is saved." : session.note })
+					]
+				}),
+				/* @__PURE__ */ jsxs("div", {
+					className: "adaptive-progress",
+					children: [
+						/* @__PURE__ */ jsxs("span", { children: [
+							"Question ",
+							index + 1,
+							" of ",
+							session.total
+						] }),
+						/* @__PURE__ */ jsxs("span", { children: [
+							session.answered,
+							" saved",
+							!benchmark && ` / ${session.points || 0} session points / ${session.streak || 0} streak`
+						] }),
+						/* @__PURE__ */ jsx("progress", {
+							"aria-label": "Saved answers",
+							max: session.total,
+							value: session.answered
+						})
+					]
+				}),
+				/* @__PURE__ */ jsxs("article", {
+					className: "adaptive-card adaptive-question",
+					children: [
+						/* @__PURE__ */ jsxs("div", {
+							className: "eyebrow",
+							children: [
+								question.domain,
+								" · ",
+								question.difficulty
+							]
+						}),
+						question.source_or_prompt && /* @__PURE__ */ jsx("div", {
+							className: "adaptive-passage",
+							children: question.source_or_prompt
+						}),
+						/* @__PURE__ */ jsx("h2", { children: question.question_text }),
+						/* @__PURE__ */ jsx("div", {
+							className: "prep-answers",
+							role: "group",
+							"aria-label": "Answer choices",
+							children: question.options.map((option, choice) => /* @__PURE__ */ jsxs("button", {
+								disabled: answered || busy,
+								"aria-pressed": (answered ? question.answer.selected_option : selected) === choice,
+								className: `${(answered ? question.answer.selected_option : selected) === choice ? "is-selected" : ""} ${answered && !benchmark && choice === question.correct_option ? "is-correct" : ""}`,
+								onClick: () => setSelected(choice),
+								children: [/* @__PURE__ */ jsx("span", { children: "ABCD"[choice] }), /* @__PURE__ */ jsx("b", { children: option })]
+							}, choice))
+						}),
+						!answered && /* @__PURE__ */ jsxs("fieldset", {
+							className: "adaptive-confidence",
+							children: [/* @__PURE__ */ jsxs("legend", { children: ["How confident are you? ", /* @__PURE__ */ jsx("small", { children: "Optional" })] }), [
+								"Guessing",
+								"Somewhat sure",
+								"Confident"
+							].map((text, i) => /* @__PURE__ */ jsx("button", {
+								disabled: busy,
+								"aria-pressed": confidence === i + 1,
+								onClick: () => setConfidence(confidence === i + 1 ? null : i + 1),
+								children: text
+							}, text))]
+						}),
+						!benchmark && !answered && /* @__PURE__ */ jsxs("button", {
+							className: "text-button",
+							disabled: busy || question.hints.length >= 3,
+							onClick: () => act("hint", { index }),
+							children: [/* @__PURE__ */ jsx(Lightbulb, { size: 17 }), question.hints.length >= 3 ? "All hints shown" : `Hint ${question.hints.length + 1} of 3`]
+						}),
+						question.hints.map((hint, i) => /* @__PURE__ */ jsxs("div", {
+							className: "adaptive-hint",
+							children: [/* @__PURE__ */ jsxs("b", { children: ["Hint ", i + 1] }), /* @__PURE__ */ jsx("p", { children: hint })]
+						}, i)),
+						/* @__PURE__ */ jsx(Credit, { value: question.attribution }),
+						answered && /* @__PURE__ */ jsxs("div", {
+							className: "adaptive-feedback",
+							role: "status",
+							children: [/* @__PURE__ */ jsx("b", { children: benchmark ? "Answer saved." : question.answer.selected_option === question.correct_option ? "Correct. Keep that approach." : `The answer is ${"ABCD"[question.correct_option]}. Here’s why.` }), !benchmark && /* @__PURE__ */ jsxs(Fragment, { children: [/* @__PURE__ */ jsx("p", { children: question.explanation }), question.fastest_method && /* @__PURE__ */ jsxs("p", { children: [
+								/* @__PURE__ */ jsx("b", { children: "Test-day approach:" }),
+								" ",
+								question.fastest_method
+							] })] })]
+						}),
+						/* @__PURE__ */ jsxs("div", {
+							className: "adaptive-actions",
+							children: [/* @__PURE__ */ jsx("span", { children: benchmark ? "Unsure? Choose your best answer." : "Accuracy first. Speed follows." }), answered ? /* @__PURE__ */ jsxs("button", {
+								className: "button button--primary",
+								disabled: busy,
+								onClick: () => index + 1 < session.total ? (setSelected(null), setConfidence(null), setIndex(index + 1)) : act("finish"),
+								children: [busy ? "Saving…" : index + 1 < session.total ? "Next question" : benchmark ? "Submit benchmark" : "Finish session", /* @__PURE__ */ jsx(ArrowRight, { size: 18 })]
+							}) : /* @__PURE__ */ jsxs("button", {
+								className: "button button--primary",
+								disabled: busy || selected === null,
+								onClick: submit,
+								children: [busy ? "Saving…" : benchmark ? "Save answer" : "Check answer", /* @__PURE__ */ jsx(Check, { size: 18 })]
+							})]
+						})
+					]
+				})
+			] })
+		]
 	});
 }
 //#endregion
@@ -3860,6 +3473,11 @@ function Markdown({ children }) {
 	});
 }
 var nodeKinds = {
+	benchmark: {
+		label: "Benchmark",
+		icon: Target,
+		cta: "Start benchmark"
+	},
 	lesson: {
 		label: "Lesson",
 		icon: BookOpen,
@@ -3941,7 +3559,10 @@ function PathPage() {
 		setRegenerating(regenerate);
 		setError("");
 		try {
-			const data = await api(`/api/tasks?category=${encodeURIComponent(category)}${isTest ? `&track=${activeTrack}` : ""}`, regenerate ? { method: "POST" } : {});
+			const data = await api(`/api/tasks?category=${encodeURIComponent(category)}${isTest ? `&track=${activeTrack}` : ""}`, regenerate ? {
+				method: "POST",
+				body: JSON.stringify({ request_id: crypto.randomUUID() })
+			} : {});
 			if (!Array.isArray(data)) throw new Error("Your path could not be loaded.");
 			if (requestId === pathRequest.current) setTasks(data.map(normalizeTask));
 		} catch (e) {
@@ -3983,9 +3604,10 @@ function PathPage() {
 	}, []);
 	const coreTasks = tasks.filter((t) => !t.is_user_added);
 	const completed = coreTasks.filter((t) => t.is_completed).length;
+	const isBenchmark = coreTasks.some((t) => t.task_format === "benchmark");
 	const progressTotal = coreTasks.length || 5;
 	const activeIndex = tasks.findIndex((t) => !t.is_completed);
-	const journeyHeight = Math.max(790, 180 + (tasks.length - 1) * 155);
+	const journeyHeight = Math.max(isBenchmark ? 300 : 790, 180 + (tasks.length - 1) * 155);
 	const journeyXs = [
 		320,
 		170,
@@ -4034,8 +3656,8 @@ function PathPage() {
 								activeTrack ? activeTrack.replace("_", " ").toUpperCase() : category.toUpperCase()
 							]
 						}),
-						/* @__PURE__ */ jsx("h1", { children: "Your five-step path." }),
-						/* @__PURE__ */ jsx("p", { children: "Finish what is in front of you. The path adapts from there." })
+						/* @__PURE__ */ jsx("h1", { children: isBenchmark ? "First, find your starting point." : "Your five-step path." }),
+						/* @__PURE__ */ jsx("p", { children: isBenchmark ? "One diagnostic for this section. Then five steps shaped around your answers." : "Finish what is in front of you. The path adapts from there." })
 					] }), /* @__PURE__ */ jsxs("div", {
 						className: "path-header-actions",
 						children: [
@@ -4165,8 +3787,8 @@ function PathPage() {
 									top: point.y
 								},
 								className: `journey-step ${task.is_completed ? "done" : index === activeIndex ? "current" : "locked"} ${task.is_skipped ? "skipped" : ""} ${milestone ? "milestone" : ""} ${kind ? `journey-step--${kind}` : ""}`,
-								onClick: () => setSelected(task),
-								"aria-haspopup": "dialog",
+								onClick: () => task.task_format === "benchmark" ? window.location.assign(`/dashboard/assessment/${task.task_content_id}`) : setSelected(task),
+								"aria-haspopup": task.task_format === "benchmark" ? void 0 : "dialog",
 								"aria-current": index === activeIndex ? "step" : void 0,
 								children: [
 									/* @__PURE__ */ jsxs("span", {
@@ -4218,7 +3840,7 @@ function PathPage() {
 						})
 					]
 				}),
-				/* @__PURE__ */ jsxs("div", {
+				!isBenchmark && /* @__PURE__ */ jsxs("div", {
 					className: "path-footer-actions",
 					children: [/* @__PURE__ */ jsxs("button", {
 						className: "button button--quiet",
@@ -5529,6 +5151,25 @@ function CheckStep({ step, coachKind, feedback, selected, onSelect, onCheck, onC
 		"E",
 		"F"
 	];
+	const [hints, setHints] = useState(step.hints || []);
+	const [hintBusy, setHintBusy] = useState(false);
+	const getHint = async () => {
+		setHintBusy(true);
+		try {
+			const data = await api("/api/activity-hint", {
+				method: "POST",
+				body: JSON.stringify({
+					kind: coachKind,
+					question_id: step.id
+				})
+			});
+			setHints(data.hints);
+		} catch (e) {
+			toast.error(e.message);
+		} finally {
+			setHintBusy(false);
+		}
+	};
 	return /* @__PURE__ */ jsxs("div", {
 		className: `check-step ${feedback ? feedback.is_correct ? "is-right" : "is-wrong" : ""}`,
 		children: [
@@ -5555,6 +5196,29 @@ function CheckStep({ step, coachKind, feedback, selected, onSelect, onCheck, onC
 						children: [/* @__PURE__ */ jsx("i", { children: letters[index] }), /* @__PURE__ */ jsx("span", { children: option })]
 					}, index);
 				})
+			}),
+			!feedback && step.has_hints && /* @__PURE__ */ jsxs("button", {
+				className: "text-button",
+				disabled: busy || hintBusy || hints.length >= 3,
+				onClick: getHint,
+				children: [/* @__PURE__ */ jsx(Sparkles, { size: 16 }), hints.length >= 3 ? "All hints shown" : `Hint ${hints.length + 1} of 3`]
+			}),
+			hints.map((hint, i) => /* @__PURE__ */ jsxs("div", {
+				className: "adaptive-hint",
+				children: [/* @__PURE__ */ jsxs("b", { children: ["Hint ", i + 1] }), /* @__PURE__ */ jsx("p", { children: hint })]
+			}, i)),
+			step.attribution && /* @__PURE__ */ jsxs("p", {
+				className: "adaptive-credit",
+				children: [
+					/* @__PURE__ */ jsx("a", {
+						href: step.attribution.url,
+						target: "_blank",
+						rel: "noreferrer",
+						children: step.attribution.name
+					}),
+					" · ",
+					step.attribution.note
+				]
 			}),
 			feedback && /* @__PURE__ */ jsxs("div", {
 				className: "check-feedback",
@@ -5763,11 +5427,33 @@ function LessonPlayer({ task, onClose, onCompleted }) {
 		onCompleted
 	}, data.lesson_id);
 }
+function useQuestionClock(key) {
+	const clock = useRef({
+		start: 0,
+		elapsed: 0
+	});
+	useEffect(() => {
+		clock.current = {
+			start: document.hidden ? 0 : performance.now(),
+			elapsed: 0
+		};
+		const change = () => {
+			if (document.hidden && clock.current.start) {
+				clock.current.elapsed += performance.now() - clock.current.start;
+				clock.current.start = 0;
+			} else if (!document.hidden) clock.current.start = performance.now();
+		};
+		document.addEventListener("visibilitychange", change);
+		return () => document.removeEventListener("visibilitychange", change);
+	}, [key]);
+	return () => Math.min(36e5, Math.round(clock.current.elapsed + (clock.current.start ? performance.now() - clock.current.start : 0)));
+}
 function LessonRun({ lesson, task, onClose, onCompleted }) {
 	const steps = lesson.steps || [];
 	const run = useRunState();
 	const [summary, setSummary] = useState(null);
 	const { queue, cursor, requeue, advance, progress, done } = useStepQueue(steps.length);
+	const elapsed = useQuestionClock(cursor);
 	useEffect(() => {
 		if (done) return;
 		api(`/api/lesson/${task.id}/progress`, {
@@ -5804,6 +5490,24 @@ function LessonRun({ lesson, task, onClose, onCompleted }) {
 		summary,
 		task.id
 	]);
+	if (summary?.error) return /* @__PURE__ */ jsx(PlayerShell, {
+		progress: 1,
+		hearts: run.hearts,
+		xp: run.xp,
+		onClose,
+		children: /* @__PURE__ */ jsxs("div", {
+			role: "alert",
+			children: [
+				/* @__PURE__ */ jsx("h2", { children: "Your completion has not saved yet." }),
+				/* @__PURE__ */ jsx("p", { children: summary.error }),
+				/* @__PURE__ */ jsx("button", {
+					className: "button button--primary",
+					onClick: () => setSummary(null),
+					children: "Retry saving"
+				})
+			]
+		})
+	});
 	if (summary) return /* @__PURE__ */ jsx(PlayerShell, {
 		progress: 1,
 		hearts: run.hearts,
@@ -5841,7 +5545,8 @@ function LessonRun({ lesson, task, onClose, onCompleted }) {
 				method: "POST",
 				body: JSON.stringify({
 					step_id: step.id,
-					selected_option: run.selected
+					selected_option: run.selected,
+					response_ms: elapsed()
 				})
 			});
 			run.setFeedback(r);
@@ -5891,7 +5596,7 @@ function LessonRun({ lesson, task, onClose, onCompleted }) {
 			onSelect: run.setSelected,
 			onCheck: checkAnswer,
 			onContinue: next
-		}) : /* @__PURE__ */ jsx(TeachStep, {
+		}, step.id) : /* @__PURE__ */ jsx(TeachStep, {
 			step,
 			isLast: cursor === queue.length - 1,
 			onNext: next
@@ -5924,6 +5629,7 @@ function AssessmentRun({ data, kind, task, onClose, onCompleted }) {
 	});
 	const [summary, setSummary] = useState(null);
 	const { queue, cursor, requeue, advance, progress, done } = useStepQueue(questions.length);
+	const elapsed = useQuestionClock(cursor);
 	useEffect(() => {
 		if (!done || summary) return;
 		let live = true;
@@ -5932,8 +5638,8 @@ function AssessmentRun({ data, kind, task, onClose, onCompleted }) {
 			body: JSON.stringify({ task_id: task.id })
 		}).then((r) => {
 			if (live) setSummary(r);
-		}).catch(() => {
-			if (live) setSummary({ xp_earned: 0 });
+		}).catch((e) => {
+			if (live) setSummary({ error: e.message });
 		});
 		return () => {
 			live = false;
@@ -5943,6 +5649,24 @@ function AssessmentRun({ data, kind, task, onClose, onCompleted }) {
 		summary,
 		task.id
 	]);
+	if (summary?.error) return /* @__PURE__ */ jsx(PlayerShell, {
+		progress: 1,
+		hearts: run.hearts,
+		xp: run.xp,
+		onClose,
+		children: /* @__PURE__ */ jsxs("div", {
+			role: "alert",
+			children: [
+				/* @__PURE__ */ jsx("h2", { children: "Your completion has not saved yet." }),
+				/* @__PURE__ */ jsx("p", { children: summary.error }),
+				/* @__PURE__ */ jsx("button", {
+					className: "button button--primary",
+					onClick: () => setSummary(null),
+					children: "Retry saving"
+				})
+			]
+		})
+	});
 	if (summary) return /* @__PURE__ */ jsx(PlayerShell, {
 		progress: 1,
 		hearts: run.hearts,
@@ -5981,7 +5705,8 @@ function AssessmentRun({ data, kind, task, onClose, onCompleted }) {
 				body: JSON.stringify({
 					kind,
 					question_id: question.id,
-					selected_option: run.selected
+					selected_option: run.selected,
+					response_ms: elapsed()
 				})
 			});
 			run.setFeedback(r);
@@ -6025,7 +5750,7 @@ function AssessmentRun({ data, kind, task, onClose, onCompleted }) {
 			onSelect: run.setSelected,
 			onCheck: checkAnswer,
 			onContinue: next
-		})
+		}, question.id)
 	});
 }
 function EssayCoach({ onClose }) {
@@ -7622,7 +7347,7 @@ function BuilderPage({ kind }) {
 							] }),
 							focus && /* @__PURE__ */ jsxs("div", {
 								className: "prep-ready",
-								children: [/* @__PURE__ */ jsx(Check, { size: 20 }), /* @__PURE__ */ jsxs("div", { children: [/* @__PURE__ */ jsx("b", { children: "Math and ELA are ready for you." }), /* @__PURE__ */ jsx("p", { children: "Your answers refine both paths. Switch sections any time without starting over." })] })]
+								children: [/* @__PURE__ */ jsx(Check, { size: 20 }), /* @__PURE__ */ jsxs("div", { children: [/* @__PURE__ */ jsx("b", { children: "Math and ELA are ready for you." }), /* @__PURE__ */ jsx("p", { children: "Each section starts with a one-time benchmark. Your answers and goals shape its first five steps." })] })]
 							}),
 							focus && /* @__PURE__ */ jsxs("div", {
 								className: "builder-score-groups",
@@ -7743,6 +7468,41 @@ function BuilderPage({ kind }) {
 													type: "date",
 													value: d.test_date
 												})]
+											}),
+											/* @__PURE__ */ jsx("div", {
+												className: "form-field-grid",
+												children: ["math", "ela"].map((section) => /* @__PURE__ */ jsxs("label", { children: [
+													section === "math" ? "Math" : "ELA",
+													" confidence",
+													/* @__PURE__ */ jsxs("select", {
+														name: `${section}_confidence`,
+														defaultValue: d[`${section}_confidence`] || "",
+														children: [
+															/* @__PURE__ */ jsx("option", {
+																value: "",
+																children: "Not sure yet"
+															}),
+															/* @__PURE__ */ jsx("option", {
+																value: "1",
+																children: "Need the foundations"
+															}),
+															/* @__PURE__ */ jsx("option", {
+																value: "2",
+																children: "Comfortable with some skills"
+															}),
+															/* @__PURE__ */ jsx("option", {
+																value: "3",
+																children: "Ready for harder work"
+															})
+														]
+													})
+												] }, section))
+											}),
+											/* @__PURE__ */ jsx(Field, {
+												name: "goals",
+												label: "What would progress look like for you?",
+												textarea: true,
+												value: d.goals
 											}),
 											/* @__PURE__ */ jsx(Field, {
 												name: "strengths",
@@ -8446,7 +8206,10 @@ function App() {
 			page = /* @__PURE__ */ jsx(Dashboard, {});
 			break;
 		case "quick-practice":
-			page = /* @__PURE__ */ jsx(QuickPractice, {});
+			page = /* @__PURE__ */ jsx(AdaptivePractice, {});
+			break;
+		case "adaptive-assessment":
+			page = /* @__PURE__ */ jsx(AdaptiveAssessment, {});
 			break;
 		case "path":
 			page = /* @__PURE__ */ jsx(PathPage, {});

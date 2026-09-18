@@ -27,7 +27,7 @@ import './prep-paths.css'
 import { HomeHero } from './home-hero'
 import { boot } from './boot'
 import { ArenaRouteBoundary, AppShell, Starfield, Brand, CsrfField, useClientOnly, api } from './app-runtime'
-import QuickPractice from './quick-practice'
+import QuickPractice, { AdaptiveAssessment } from './adaptive-practice'
 const BattleArena = lazy(() => import('./arena-page'))
 
 // The CSRF token is per-session, so it cannot be baked into prerendered HTML.
@@ -479,6 +479,7 @@ function Markdown({ children }) {
 // What each node type is and what pressing the button will actually do. The
 // student should never have to guess what a step is asking of them.
 const nodeKinds = {
+  benchmark: { label: 'Benchmark', icon: Target, cta: 'Start benchmark' },
   lesson: { label: 'Lesson', icon: BookOpen, cta: 'Start lesson', resume: 'Continue lesson', blurb: 'Mentics teaches this skill step by step, checking your understanding as you go.' },
   practice_sprint: { label: 'Practice', icon: Zap, cta: 'Start practice', resume: 'Keep practicing', blurb: 'Short drill on what you just learned. Instant feedback on every answer.' },
   quiz: { label: 'Review', icon: Brain, cta: 'Start review', resume: 'Keep reviewing', blurb: 'A mixed review of everything this unit covered.' },
@@ -516,7 +517,7 @@ function PathPage() {
     const requestId = ++pathRequest.current
     setLoading(true); setRegenerating(regenerate); setError('')
     try {
-      const data = await api(`/api/tasks?category=${encodeURIComponent(category)}${isTest ? `&track=${activeTrack}` : ''}`, regenerate ? { method: 'POST' } : {})
+      const data = await api(`/api/tasks?category=${encodeURIComponent(category)}${isTest ? `&track=${activeTrack}` : ''}`, regenerate ? { method: 'POST', body: JSON.stringify({ request_id: crypto.randomUUID() }) } : {})
       if (!Array.isArray(data)) throw new Error('Your path could not be loaded.')
       if (requestId === pathRequest.current) setTasks(data.map(normalizeTask))
     } catch (e) { if (requestId === pathRequest.current) setError(e.message) } finally { if (requestId === pathRequest.current) { setLoading(false); setRegenerating(false) } }
@@ -545,9 +546,10 @@ function PathPage() {
   }, [])
   const coreTasks = tasks.filter(t => !t.is_user_added)
   const completed = coreTasks.filter(t => t.is_completed).length
+  const isBenchmark = coreTasks.some(t => t.task_format === 'benchmark')
   const progressTotal = coreTasks.length || 5
   const activeIndex = tasks.findIndex(t => !t.is_completed)
-  const journeyHeight = Math.max(790, 180 + (tasks.length - 1) * 155)
+  const journeyHeight = Math.max(isBenchmark ? 300 : 790, 180 + (tasks.length - 1) * 155)
   const journeyXs = [320, 170, 320, 470, 320]
   const journeyPoints = tasks.map((_, index) => ({ x: journeyXs[index % journeyXs.length], y: 90 + index * 155 }))
   const journeyCurve = journeyPoints.reduce((path, point, index) => { if (index === 0) return `M ${point.x} ${point.y}`; const previous = journeyPoints[index - 1]; const mid = (previous.y + point.y) / 2; return `${path} C ${previous.x} ${mid}, ${point.x} ${mid}, ${point.x} ${point.y}` }, '')
@@ -569,7 +571,7 @@ function PathPage() {
     }
   }
   return <AppShell name={boot.data.name}><main className={`app-main path-page ${chatOpen ? 'chat-docked' : ''}`}>
-    <div className="path-header"><div><div className="eyebrow"><span /> {activeTrack ? activeTrack.replace('_', ' ').toUpperCase() : category.toUpperCase()}</div><h1>Your five-step path.</h1><p>Finish what is in front of you. The path adapts from there.</p></div><div className="path-header-actions">{!isTest && <button className="button button--quiet" onClick={() => setEssayOpen(true)}><PenLine size={17} /> Essay feedback</button>}{!chatOpen && <button className="button button--quiet" onClick={() => setChatOpen(true)}><MessageCircle size={17} /> Ask Mentics</button>}<a className="button button--dark" href={builder}>Edit goals <ArrowRight size={16} /></a></div></div>
+    <div className="path-header"><div><div className="eyebrow"><span /> {activeTrack ? activeTrack.replace('_', ' ').toUpperCase() : category.toUpperCase()}</div><h1>{isBenchmark ? 'First, find your starting point.' : 'Your five-step path.'}</h1><p>{isBenchmark ? 'One diagnostic for this section. Then five steps shaped around your answers.' : 'Finish what is in front of you. The path adapts from there.'}</p></div><div className="path-header-actions">{!isTest && <button className="button button--quiet" onClick={() => setEssayOpen(true)}><PenLine size={17} /> Essay feedback</button>}{!chatOpen && <button className="button button--quiet" onClick={() => setChatOpen(true)}><MessageCircle size={17} /> Ask Mentics</button>}<a className="button button--dark" href={builder}>Edit goals <ArrowRight size={16} /></a></div></div>
     {isTest && <section className="prep-lanes" aria-label="Your prep paths"><div className="prep-exams" aria-label="Exam">{['sat', 'act'].map(exam => <button type="button" key={exam} aria-pressed={activeTrack.startsWith(exam)} onClick={() => switchTrack(`${exam}_${activeTrack.split('_')[1] || 'math'}`)}>{exam.toUpperCase()}<small>2 saved paths</small></button>)}</div><div className="prep-subjects" aria-label="Section">{['math', 'ela'].map(subject => <button type="button" key={subject} aria-pressed={activeTrack.endsWith(subject)} onClick={() => switchTrack(`${activeTrack.split('_')[0]}_${subject}`)}>{subject === 'math' ? <Calculator size={18} /> : <BookOpen size={18} />}<span><b>{subject === 'math' ? 'Math' : 'ELA'}</b><small>{subject === 'math' ? 'Problem solving & reasoning' : activeTrack.startsWith('act') ? 'English & Reading' : 'Reading & Writing'}</small></span>{activeTrack.endsWith(subject) && <Check size={17} />}</button>)}</div><p>Pick up where you left off. Each path saves its own progress.</p></section>}
     {isTest && <a className="prep-shortcut" href={`/dashboard/quick-practice?exam=${activeTrack.split('_')[0]}&subject=${activeTrack.split('_')[1]}`}><span><Zap /><b>Test soon? Train the moves that save time.</b><small>Short drills, practical strategies, and mistake review.</small></span><ArrowRight /></a>}
     <div className="path-progress"><span style={{ width: `${completed / progressTotal * 100}%` }} /><p><b><span>{completed}</span><i>/</i><span>{progressTotal}</span></b><span>core steps complete</span></p></div>
@@ -577,7 +579,7 @@ function PathPage() {
     {loading && !tasks.length ? <PathSkeleton /> : <section className={`journey-map ${regenerating ? 'journey-map--regenerating' : ''}`} style={{ height: journeyHeight }} aria-label={`${category} learning journey`} aria-busy={regenerating}>
       <svg className="journey-route" viewBox={`0 0 640 ${journeyHeight}`} preserveAspectRatio="none" aria-hidden="true"><defs><linearGradient id="journey-gradient" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#8b5cf6" /><stop offset="1" stopColor="#4f46e5" /></linearGradient></defs><path className="journey-route-shadow" d={journeyCurve} /><path className="journey-route-progress" d={journeyCurve} pathLength="100" style={{ strokeDasharray: `${tasks.length ? Math.min(100, completed / tasks.length * 100) : 0} 100` }} /></svg>
       {tasks.map((task, index) => {
-        const locked = index > activeIndex && activeIndex !== -1; const kind = taskKind(task); const meta = kind ? nodeKinds[kind] : null; const milestone = kind === 'boss_battle'; const NodeIcon = meta?.icon; const point = journeyPoints[index]; const status = task.is_skipped ? 'skipped' : task.is_completed ? 'completed' : index === activeIndex ? 'current' : 'locked'; return <button key={task.id || index} disabled={locked} style={{ left: `${point.x / 640 * 100}%`, top: point.y }} className={`journey-step ${task.is_completed ? 'done' : index === activeIndex ? 'current' : 'locked'} ${task.is_skipped ? 'skipped' : ''} ${milestone ? 'milestone' : ''} ${kind ? `journey-step--${kind}` : ''}`} onClick={() => setSelected(task)} aria-haspopup="dialog" aria-current={index === activeIndex ? 'step' : undefined}>
+        const locked = index > activeIndex && activeIndex !== -1; const kind = taskKind(task); const meta = kind ? nodeKinds[kind] : null; const milestone = kind === 'boss_battle'; const NodeIcon = meta?.icon; const point = journeyPoints[index]; const status = task.is_skipped ? 'skipped' : task.is_completed ? 'completed' : index === activeIndex ? 'current' : 'locked'; return <button key={task.id || index} disabled={locked} style={{ left: `${point.x / 640 * 100}%`, top: point.y }} className={`journey-step ${task.is_completed ? 'done' : index === activeIndex ? 'current' : 'locked'} ${task.is_skipped ? 'skipped' : ''} ${milestone ? 'milestone' : ''} ${kind ? `journey-step--${kind}` : ''}`} onClick={() => task.task_format === 'benchmark' ? window.location.assign(`/dashboard/assessment/${task.task_content_id}`) : setSelected(task)} aria-haspopup={task.task_format === 'benchmark' ? undefined : 'dialog'} aria-current={index === activeIndex ? 'step' : undefined}>
           <span className="sr-only">Step {index + 1}, {status}{locked ? `: ${task.description}` : '.'} </span>
           {index === activeIndex && !task.is_completed && <span className="journey-next">START</span>}
           <span className="journey-node"><i>{task.is_skipped ? <SkipForward /> : task.is_completed ? <Check /> : locked ? <LockKeyhole /> : NodeIcon ? <NodeIcon /> : index + 1}</i></span>
@@ -586,7 +588,7 @@ function PathPage() {
       })}
       {regenerating && <div className="path-regenerating-overlay" role="status" aria-live="polite"><span className="path-regenerating-orbit"><Sparkles /></span><div><b>Rebuilding your path</b><small>Mentics is shaping your next five steps.</small></div></div>}
     </section>}
-    <div className="path-footer-actions"><button className="button button--quiet" onClick={() => setAdding(true)} disabled={regenerating}><Plus /> Add your own step</button><button className="text-button" onClick={() => loadTasks(true)} disabled={regenerating}><RotateCcw /> {regenerating ? 'Rebuilding your path…' : isTest ? 'Regenerate five steps' : 'Start next coaching loop'}</button></div>
+    {!isBenchmark && <div className="path-footer-actions"><button className="button button--quiet" onClick={() => setAdding(true)} disabled={regenerating}><Plus /> Add your own step</button><button className="text-button" onClick={() => loadTasks(true)} disabled={regenerating}><RotateCcw /> {regenerating ? 'Rebuilding your path…' : isTest ? 'Regenerate five steps' : 'Start next coaching loop'}</button></div>}
     {selected && <TaskModal task={selected} category={category} onClose={() => setSelected(null)} onUpdate={(next) => { setTasks(items => items.map(t => t.id === next.id ? next : t)); setSelected(next) }} onCompleted={finishTask} onReported={tasks => finishTask(null, tasks)} />}
     {adding && <AddTask category={category} track={activeTrack} onClose={() => setAdding(false)} onAdded={t => { if (activeTrackRef.current === activeTrack) { setTasks(items => [...items, normalizeTask(t)]); setAdding(false) } }} />}
     {essayOpen && <EssayCoach onClose={() => setEssayOpen(false)} />}
@@ -993,6 +995,13 @@ function TeachStep({ step, onNext, isLast }) {
 
 function CheckStep({ step, coachKind, feedback, selected, onSelect, onCheck, onContinue, busy, replay }) {
   const letters = ['A', 'B', 'C', 'D', 'E', 'F']
+  const [hints, setHints] = useState(step.hints || [])
+  const [hintBusy, setHintBusy] = useState(false)
+  const getHint = async () => {
+    setHintBusy(true)
+    try { const data = await api('/api/activity-hint', { method: 'POST', body: JSON.stringify({ kind: coachKind, question_id: step.id }) }); setHints(data.hints) }
+    catch (e) { toast.error(e.message) } finally { setHintBusy(false) }
+  }
   return <div className={`check-step ${feedback ? (feedback.is_correct ? 'is-right' : 'is-wrong') : ''}`}>
     {replay && <div className="check-replay"><RotateCcw /> Second look — you missed this one earlier.</div>}
     {step.source_or_prompt && <div className="check-source"><small>PASSAGE / SETUP</small><Markdown>{step.source_or_prompt}</Markdown></div>}
@@ -1007,6 +1016,9 @@ function CheckStep({ step, coachKind, feedback, selected, onSelect, onCheck, onC
         </button>
       })}
     </div>
+    {!feedback && step.has_hints && <button className="text-button" disabled={busy || hintBusy || hints.length >= 3} onClick={getHint}><Sparkles size={16} />{hints.length >= 3 ? 'All hints shown' : `Hint ${hints.length + 1} of 3`}</button>}
+    {hints.map((hint, i) => <div className="adaptive-hint" key={i}><b>Hint {i + 1}</b><p>{hint}</p></div>)}
+    {step.attribution && <p className="adaptive-credit"><a href={step.attribution.url} target="_blank" rel="noreferrer">{step.attribution.name}</a> · {step.attribution.note}</p>}
     {feedback && <div className="check-feedback">
       <h4>{feedback.is_correct ? 'Correct.' : 'Not quite.'}</h4>
       <Markdown>{feedback.explanation}</Markdown>
@@ -1116,11 +1128,26 @@ function LessonPlayer({ task, onClose, onCompleted }) {
   return <LessonRun key={data.lesson_id} lesson={data} task={task} onClose={onClose} onCompleted={onCompleted} />
 }
 
+function useQuestionClock(key) {
+  const clock = useRef({ start: 0, elapsed: 0 })
+  useEffect(() => {
+    clock.current = { start: document.hidden ? 0 : performance.now(), elapsed: 0 }
+    const change = () => {
+      if (document.hidden && clock.current.start) { clock.current.elapsed += performance.now() - clock.current.start; clock.current.start = 0 }
+      else if (!document.hidden) clock.current.start = performance.now()
+    }
+    document.addEventListener('visibilitychange', change)
+    return () => document.removeEventListener('visibilitychange', change)
+  }, [key])
+  return () => Math.min(3600000, Math.round(clock.current.elapsed + (clock.current.start ? performance.now() - clock.current.start : 0)))
+}
+
 function LessonRun({ lesson, task, onClose, onCompleted }) {
   const steps = lesson.steps || []
   const run = useRunState()
   const [summary, setSummary] = useState(null)
   const { queue, cursor, requeue, advance, progress, done } = useStepQueue(steps.length)
+  const elapsed = useQuestionClock(cursor)
 
   useEffect(() => {
     if (done) return
@@ -1136,6 +1163,7 @@ function LessonRun({ lesson, task, onClose, onCompleted }) {
     return () => { live = false }
   }, [done, summary, task.id])
 
+  if (summary?.error) return <PlayerShell progress={1} hearts={run.hearts} xp={run.xp} onClose={onClose}><div role="alert"><h2>Your completion has not saved yet.</h2><p>{summary.error}</p><button className="button button--primary" onClick={() => setSummary(null)}>Retry saving</button></div></PlayerShell>
   if (summary) return <PlayerShell progress={1} hearts={run.hearts} xp={run.xp} onClose={onClose}>
     <PlayerDone title="Lesson complete." correct={summary.correct} total={summary.total}
       xp={summary.xp_earned || 0} note={summary.recap} onClose={() => onCompleted(summary)} />
@@ -1153,7 +1181,7 @@ function LessonRun({ lesson, task, onClose, onCompleted }) {
     run.setBusy(true)
     try {
       const r = await api(`/api/lesson/${task.id}/answer`, {
-        method: 'POST', body: JSON.stringify({ step_id: step.id, selected_option: run.selected })
+        method: 'POST', body: JSON.stringify({ step_id: step.id, selected_option: run.selected, response_ms: elapsed() })
       })
       run.setFeedback(r)
       if (r.is_correct) run.setXp(x => x + 5)
@@ -1174,7 +1202,7 @@ function LessonRun({ lesson, task, onClose, onCompleted }) {
       <Markdown>{lesson.intro}</Markdown>
     </div>}
     {step.step_type === 'check'
-      ? <CheckStep step={step} coachKind="lesson_step" feedback={run.feedback} selected={run.selected}
+      ? <CheckStep key={step.id} step={step} coachKind="lesson_step" feedback={run.feedback} selected={run.selected}
         busy={run.busy} replay={cursor >= steps.length} onSelect={run.setSelected}
         onCheck={checkAnswer} onContinue={next} />
       : <TeachStep step={step} isLast={cursor === queue.length - 1} onNext={next} />}
@@ -1196,16 +1224,18 @@ function AssessmentRun({ data, kind, task, onClose, onCompleted }) {
   const [tally, setTally] = useState({ correct: 0, total: 0 })
   const [summary, setSummary] = useState(null)
   const { queue, cursor, requeue, advance, progress, done } = useStepQueue(questions.length)
+  const elapsed = useQuestionClock(cursor)
 
   useEffect(() => {
     if (!done || summary) return
     let live = true
     api('/api/assessment/finish', { method: 'POST', body: JSON.stringify({ task_id: task.id }) })
       .then(r => { if (live) setSummary(r) })
-      .catch(() => { if (live) setSummary({ xp_earned: 0 }) })
+      .catch(e => { if (live) setSummary({ error: e.message }) })
     return () => { live = false }
   }, [done, summary, task.id])
 
+  if (summary?.error) return <PlayerShell progress={1} hearts={run.hearts} xp={run.xp} onClose={onClose}><div role="alert"><h2>Your completion has not saved yet.</h2><p>{summary.error}</p><button className="button button--primary" onClick={() => setSummary(null)}>Retry saving</button></div></PlayerShell>
   if (summary) return <PlayerShell progress={1} hearts={run.hearts} xp={run.xp} onClose={onClose}>
     <PlayerDone title={kind === 'quiz' ? 'Review complete.' : 'Practice complete.'}
       correct={tally.correct} total={tally.total} xp={summary.xp_earned || 0}
@@ -1227,7 +1257,7 @@ function AssessmentRun({ data, kind, task, onClose, onCompleted }) {
     run.setBusy(true)
     try {
       const r = await api('/api/assessment/answer', {
-        method: 'POST', body: JSON.stringify({ kind, question_id: question.id, selected_option: run.selected })
+        method: 'POST', body: JSON.stringify({ kind, question_id: question.id, selected_option: run.selected, response_ms: elapsed() })
       })
       run.setFeedback(r)
       setTally(t => ({ correct: t.correct + (r.is_correct ? 1 : 0), total: t.total + 1 }))
@@ -1244,7 +1274,7 @@ function AssessmentRun({ data, kind, task, onClose, onCompleted }) {
 
   return <PlayerShell kicker={`${data.title} · ${kind === 'quiz' ? 'Review' : 'Practice'}`} progress={progress}
     hearts={run.hearts} xp={run.xp} onClose={onClose}>
-    <CheckStep step={question} coachKind={kind} feedback={run.feedback} selected={run.selected}
+    <CheckStep key={question.id} step={question} coachKind={kind} feedback={run.feedback} selected={run.selected}
       busy={run.busy} replay={cursor >= questions.length} onSelect={run.setSelected}
       onCheck={checkAnswer} onContinue={next} />
   </PlayerShell>
@@ -1698,11 +1728,11 @@ function BuilderPage({ kind }) {
     <form method="POST" className="settings-form builder-form"><CsrfField />
       {test ? <>
         <fieldset><legend>What are you preparing for?</legend><p className="builder-help">Switching focus immediately reshapes the score fields below.</p><div className="choice-grid choice-grid--two">{testChoices.map(([value, label, copy]) => <label className={focus === value ? 'selected' : ''} key={value}><input type="radio" name="test_focus" value={value} required checked={focus === value} onChange={() => setFocus(value)} /><BookOpen /><b>{label}</b><small>{copy}</small></label>)}</div></fieldset>
-        {focus && <div className="prep-ready"><Check size={20} /><div><b>Math and ELA are ready for you.</b><p>Your answers refine both paths. Switch sections any time without starting over.</p></div></div>}
+        {focus && <div className="prep-ready"><Check size={20} /><div><b>Math and ELA are ready for you.</b><p>Each section starts with a one-time benchmark. Your answers and goals shape its first five steps.</p></div></div>}
         {focus && <div className="builder-score-groups" key={focus}>
           {showsSat && <fieldset className="builder-score-group"><legend>SAT goals and baseline</legend><p>Use your latest official or full-length practice scores if you have them.</p><div className="form-field-grid"><Field name="desired_sat" label="Goal SAT score" type="number" min="400" max="1600" step="10" value={d.desired_sat} /><Field name="current_sat_ebrw" label="Current Reading & Writing" type="number" min="200" max="800" value={d.current_sat_ebrw} /><Field name="current_sat_math" label="Current Math" type="number" min="200" max="800" value={d.current_sat_math} /></div></fieldset>}
           {showsAct && <fieldset className="builder-score-group"><legend>ACT goals and baseline</legend><p>Use your latest composite and section scores if you have them.</p><div className="form-field-grid"><Field name="desired_act" label="Goal ACT score" type="number" min="1" max="36" value={d.desired_act} /><Field name="current_act_composite" label="Current composite" type="number" min="1" max="36" value={d.current_act_composite} /><Field name="current_act_math" label="Current Math" type="number" min="1" max="36" value={d.current_act_math} /><Field name="current_act_english" label="Current English" type="number" min="1" max="36" value={d.current_act_english} /><Field name="current_act_reading" label="Current Reading" type="number" min="1" max="36" value={d.current_act_reading} /><Field name="current_act_science" label="Current Science" type="number" min="1" max="36" value={d.current_act_science} /></div></fieldset>}
-          <fieldset className="builder-score-group builder-score-group--shared"><legend>Your study reality</legend><div className="form-field-grid"><Field name="hours_per_week" label="Hours available each week" type="number" min="1" max="40" value={d.hours_per_week} /><Field name="test_date" label="Test date" type="date" value={d.test_date} /></div><Field name="strengths" label="Your strengths" textarea value={d.strengths} /><Field name="weaknesses" label="Where you need the most help" textarea required value={d.weaknesses} /></fieldset>
+          <fieldset className="builder-score-group builder-score-group--shared"><legend>Your study reality</legend><div className="form-field-grid"><Field name="hours_per_week" label="Hours available each week" type="number" min="1" max="40" value={d.hours_per_week} /><Field name="test_date" label="Test date" type="date" value={d.test_date} /></div><div className="form-field-grid">{['math', 'ela'].map(section => <label key={section}>{section === 'math' ? 'Math' : 'ELA'} confidence<select name={`${section}_confidence`} defaultValue={d[`${section}_confidence`] || ''}><option value="">Not sure yet</option><option value="1">Need the foundations</option><option value="2">Comfortable with some skills</option><option value="3">Ready for harder work</option></select></label>)}</div><Field name="goals" label="What would progress look like for you?" textarea value={d.goals} /><Field name="strengths" label="Your strengths" textarea value={d.strengths} /><Field name="weaknesses" label="Where you need the most help" textarea required value={d.weaknesses} /></fieldset>
         </div>}
       </> : <>
         <div className="college-plan-steps" aria-label="College plan setup"><span><b>01</b> Your starting point</span><i /><span><b>02</b> Your direction</span><i /><span><b>03</b> Your list</span></div>
@@ -1823,6 +1853,7 @@ function App() {
   switch (boot.page) {
     case 'dashboard': page = <Dashboard />; break
     case 'quick-practice': page = <QuickPractice />; break
+    case 'adaptive-assessment': page = <AdaptiveAssessment />; break
     case 'path': page = <PathPage />; break
     case 'battles': page = <ArenaRouteBoundary><Suspense fallback={<AppShell name={boot.data.name}><main className="app-main" role="status"><h1>Entering the Arena</h1><p>Preparing your lobby and loadout…</p></main></AppShell>}><BattleArena /></Suspense></ArenaRouteBoundary>; break
     case 'login': page = <AuthPage mode="login" />; break

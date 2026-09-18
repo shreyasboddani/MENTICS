@@ -55,6 +55,9 @@ def test_matchmaking_never_pairs_different_exams(arena):
     assert len(result['answerKey']) == 5
     assert len(result['questionReview']) == 5
     assert database.select_one('sat_battle_stats', where={'user_id': act.data['id']})['battles_played'] == 1
+    evidence=database.select('learning_events',where={'user_id':act.data['id'],'source':'battle'})
+    assert len(evidence)==5
+    assert all(row['track_key'].startswith('act_') for row in evidence)
 
 
 def test_act_bot_drop_in_keeps_exam_and_clock(arena):

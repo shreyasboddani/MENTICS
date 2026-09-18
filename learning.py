@@ -468,7 +468,7 @@ _DSAT_FACTS = (
 
 _ACT_FACTS = (
     "ACT format facts you must respect: English uses a passage with underlined portions; Math is "
-    "1-36 with 5 answer choices on the real test, but for this drill use exactly 4 choices; "
+    "scored 1-36 and the enhanced ACT uses four answer choices; use exactly four choices. "
     "Reading uses long passages; Science uses figures, tables, and experiment summaries."
 )
 
@@ -1101,6 +1101,7 @@ def _interleave_lesson(teaching, checks):
                 "options": check["options"],
                 "correct_option": check["correct_option"],
                 "explanation": check["explanation"],
+                "adaptive_meta": check,
             })
     # Any checks past the last card become a short closing drill.
     for check in checks[len(cards):]:
@@ -1112,6 +1113,7 @@ def _interleave_lesson(teaching, checks):
             "options": check["options"],
             "correct_option": check["correct_option"],
             "explanation": check["explanation"],
+            "adaptive_meta": check,
         })
     if teaching.get("recap"):
         steps.append({

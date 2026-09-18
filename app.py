@@ -7,6 +7,8 @@ from userhelper import User
 import act_arena
 import learning
 import prep_tracks
+import adaptive
+import adaptive_schema
 import ratelimit
 import seo
 from ratelimit import rate_limit
@@ -527,6 +529,7 @@ def init_db():
     }
     for index_name, index_target in indexes.items():
         db.execute(f"CREATE INDEX IF NOT EXISTS {index_name} ON {index_target}")
+    adaptive_schema.init(db)
 
 
 # --- HELPER FUNCTIONS ---
@@ -1252,8 +1255,7 @@ def get_practice_sprint(user, task_id):
         "source_or_prompt": q.get('source_or_prompt'),
         "question_text": q['question_text'],
         "options": json.loads(q['options']),
-        "correct_option": q.get('correct_option', 0),
-        "explanation": q.get('explanation', '')
+        **_activity_hints(user.data['id'], 'sprint_results', q)
     } for q in questions_raw]
 
     return jsonify({"title": sprint_details['title'], "questions": questions})
@@ -1274,7 +1276,7 @@ def submit_sprint_results(user):
 _ASSESSMENT_SOURCES = {
     'quiz': (
         """SELECT qq.id, qq.correct_option, qq.options, qq.explanation, qq.question_text,
-                  qq.skill_key, p.id AS task_id, p.category, p.task_order, p.track_key,
+                  qq.skill_key, qq.difficulty, qq.adaptive_meta, p.id AS task_id, p.category, p.task_order, p.track_key,
                   p.skill_label, p.subject, p.xp_reward
            FROM quiz_questions qq
            JOIN quizzes q ON q.id=qq.quiz_id
@@ -1284,7 +1286,7 @@ _ASSESSMENT_SOURCES = {
     ),
     'sprint': (
         """SELECT sq.id, sq.correct_option, sq.options, sq.explanation, sq.question_text,
-                  sq.skill_key, p.id AS task_id, p.category, p.task_order, p.track_key,
+                  sq.skill_key, sq.difficulty, sq.adaptive_meta, p.id AS task_id, p.category, p.task_order, p.track_key,
                   p.skill_label, p.subject, p.xp_reward
            FROM sprint_questions sq
            JOIN practice_sprints ps ON ps.id=sq.sprint_id
@@ -1295,7 +1297,7 @@ _ASSESSMENT_SOURCES = {
 }
 
 
-def _grade_one_answer(user_id, question, selected_option, result_table):
+def _grade_one_answer(user_id, question, selected_option, result_table, telemetry=None):
     """Grade a single answer, persist it, and fold the first attempt into mastery."""
     options = json.loads(question['options'])
     if not 0 <= selected_option < len(options):
@@ -1310,11 +1312,16 @@ def _grade_one_answer(user_id, question, selected_option, result_table):
         'quiz_results': "SELECT id FROM quiz_results WHERE user_id=? AND question_id=? LIMIT 1",
         'sprint_results': "SELECT id FROM sprint_results WHERE user_id=? AND question_id=? LIMIT 1",
     }[result_table]
-    first_attempt = not db.execute_for_one(prior_attempt_query, (user_id, question['id']))
-
-    db.insert(result_table, {
-        'user_id': user_id, 'question_id': question['id'], 'is_correct': is_correct
-    })
+    with db.transaction() as tx:
+        adaptive.lock(tx, user_id)
+        first_attempt = not adaptive.rows(tx, prior_attempt_query, (user_id, question['id']))
+        tx.insert(result_table, {'user_id':user_id, 'question_id':question['id'], 'is_correct':is_correct})
+        if first_attempt and question.get('track_key') in adaptive.TRACKS:
+            measured = {**question, **adaptive.unpack(question.get('adaptive_meta'), {})}
+            elapsed = (telemetry or {}).get('response_ms')
+            used = adaptive.rows(tx,'SELECT hint_count FROM learning_hints WHERE user_id=? AND source=? AND source_id=?',(user_id,result_table,str(question['id'])))
+            adaptive.record_event_tx(tx,user_id,question['track_key'],result_table,str(question['id']),measured,is_correct,
+                response_ms=elapsed if type(elapsed) is int and 0<=elapsed<=3600000 else None,chosen=selected_option,hints=used[0]['hint_count'] if used else 0)
     if not first_attempt:
         return {
             'question_id': question['id'], 'is_correct': is_correct,
@@ -1331,7 +1338,8 @@ def _grade_one_answer(user_id, question, selected_option, result_table):
         skill_key = question.get('skill_key')
         skill_label, subject = question.get('skill_label'), question.get('subject')
 
-    _record_skill_result(user_id, skill_key, skill_label, subject, is_correct)
+    if question.get('track_key') not in adaptive.TRACKS:
+        _record_skill_result(user_id, skill_key, skill_label, subject, is_correct)
     if not is_correct:
         _record_mistake(
             user_id, skill_key, skill_label,
@@ -1397,7 +1405,7 @@ def assessment_answer(user):
     if _has_incomplete_earlier_task(user.data['id'], question):
         return jsonify({"error": "Complete the earlier path step first."}), 409
     try:
-        return jsonify(_grade_one_answer(user.data['id'], question, selected_option, result_table))
+        return jsonify(_grade_one_answer(user.data['id'], question, selected_option, result_table, data))
     except ValueError as error:
         return jsonify({"error": str(error)}), 400
 
@@ -1525,6 +1533,7 @@ def get_lesson(user, task_id):
                 "source_or_prompt": step.get('source_or_prompt') or "",
                 "question_text": step.get('question_text') or "",
                 "options": json.loads(step['options']) if step.get('options') else [],
+                **_activity_hints(user_id, 'lesson', step),
             })
         else:
             payload.update({
@@ -1583,18 +1592,19 @@ def lesson_answer(user, task_id):
 
     # As with drills, a repeated attempt at the same check is for learning, not
     # for measurement, so only the first one moves mastery.
-    first_attempt = not db.execute_for_one(
-        "SELECT id FROM lesson_answers WHERE user_id=? AND step_id=? LIMIT 1",
-        (user_id, step_id),
-    )
-    db.insert("lesson_answers", {
-        "user_id": user_id, "step_id": step_id, "is_correct": is_correct,
-    })
+    with db.transaction() as tx:
+        adaptive.lock(tx, user_id)
+        first_attempt = not adaptive.rows(tx, 'SELECT id FROM lesson_answers WHERE user_id=? AND step_id=? LIMIT 1', (user_id, step_id))
+        tx.insert('lesson_answers', {'user_id':user_id, 'step_id':step_id, 'is_correct':is_correct})
+        if first_attempt and task.get('track_key') in adaptive.TRACKS:
+            measured = {'skill_key':lesson.get('skill_key'), 'question_text':step.get('question_text'), **adaptive.unpack(step.get('adaptive_meta'),{})}
+            elapsed = data.get('response_ms')
+            used = adaptive.rows(tx,'SELECT hint_count FROM learning_hints WHERE user_id=? AND source=? AND source_id=?',(user_id,'lesson',str(step_id)))
+            adaptive.record_event_tx(tx,user_id,task['track_key'],'lesson',str(step_id),measured,is_correct,
+                response_ms=elapsed if type(elapsed) is int and 0<=elapsed<=3600000 else None,chosen=selected_option,hints=used[0]['hint_count'] if used else 0)
     if first_attempt:
-        _record_skill_result(
-            user_id, lesson.get('skill_key'), lesson.get('skill_label'),
-            lesson.get('subject'), is_correct,
-        )
+        if task.get('track_key') not in adaptive.TRACKS:
+            _record_skill_result(user_id, lesson.get('skill_key'), lesson.get('skill_label'), lesson.get('subject'), is_correct)
         if not is_correct:
             _record_mistake(
                 user_id, lesson.get('skill_key'), lesson.get('skill_label'),
@@ -2194,7 +2204,10 @@ def _prep_context(user_id, prep):
         chats[row['category']] = [{**message, 'content': str(message.get('content', ''))[:800]} for message in history[-4:]]
     quick = db.execute("""SELECT details FROM activity_log WHERE user_id=?
         AND activity_type='quick_practice' ORDER BY id DESC LIMIT 8""", (user_id,))
-    return json.dumps({'profiles': prep.get('tracks', {}), 'active_paths': paths,
+    owner = db.select_one('users', where={'id':user_id})
+    learner = User(db,owner['email']) if owner else None
+    evidence = {track: adaptive.profile(db,learner,track) for track in adaptive.TRACKS} if learner else {}
+    return json.dumps({'learning_profiles':evidence, 'profiles': prep.get('tracks', {}), 'active_paths': paths,
                        'recent_conversations': chats, 'quick_practice': [json.loads(r['details']) for r in quick]})
 
 
@@ -2222,20 +2235,22 @@ def _ensure_prep_tracks(user):
     if stats.get('test_path') != prep:
         stats['test_path'] = prep
         user.set_stats(stats)
-    existing = {row['track_key'] for row in db.execute("SELECT DISTINCT track_key FROM paths WHERE user_id=? AND category='Test Prep' AND is_active=True AND is_user_added=False", (user.data['id'],))}
     for key in prep_tracks.TRACKS:
-        if key not in existing:
-            _persist_unit(user.data['id'], prep_tracks.starter_unit(key), track_key=key, only_if_missing=True)
+        adaptive.ensure_track(db, user.data['id'], key)
     return prep
 
 
-def _persist_unit(user_id, unit, category="Test Prep", track_key=None, only_if_missing=False):
+def _persist_unit(user_id, unit, category="Test Prep", track_key=None, only_if_missing=False, generation_token=None, generation_request_key=None):
     """Write a generated unit to the database as the student's active path."""
     saved = []
     with db.transaction() as transaction:
         # Serializing persistence also prevents overlapping regeneration requests
         # from leaving two active units in the same lane.
         transaction.execute_write('UPDATE users SET stats=stats WHERE id=?', (user_id,))
+        if generation_token:
+            current = adaptive.rows(transaction, 'SELECT generation_token FROM adaptive_tracks WHERE user_id=? AND track_key=?', (user_id, track_key))
+            if not current or current[0]['generation_token'] != generation_token:
+                raise ValueError('A newer generation has already replaced this request.')
         if only_if_missing:
             cursor = transaction.connection.cursor()
             cursor.execute(db._query("SELECT * FROM paths WHERE user_id=? AND category=? AND track_key=? AND is_active=True AND is_user_added=False ORDER BY task_order"), (user_id, category, track_key))
@@ -2275,6 +2290,7 @@ def _persist_unit(user_id, unit, category="Test Prep", track_key=None, only_if_m
                 "stat_to_update": node.get("stat_to_update"),
                 "category": category, "is_active": True, "is_completed": False,
                 "track_key": track_key,
+                "learning_version": adaptive.VERSION if category == 'Test Prep' else 1,
                 "task_format": task_format,
                 "skill_key": skill["skill_key"], "skill_label": skill["skill_label"],
                 "subject": skill["subject"], "node_type": node_type,
@@ -2304,6 +2320,7 @@ def _persist_unit(user_id, unit, category="Test Prep", track_key=None, only_if_m
                         "options": json.dumps(step.get("options")) if step.get("options") else None,
                         "correct_option": step.get("correct_option"),
                         "explanation": step.get("explanation", ""),
+                        "adaptive_meta": json.dumps(step.get('adaptive_meta', {})),
                     })
                 transaction.update("paths", {"task_content_id": lesson_id}, where={"id": task_id})
 
@@ -2321,6 +2338,7 @@ def _persist_unit(user_id, unit, category="Test Prep", track_key=None, only_if_m
                         "explanation": question["explanation"],
                         "skill_key": question.get("skill_key") or skill["skill_key"],
                         "difficulty": question.get("difficulty", "medium"),
+                        "adaptive_meta": json.dumps(question),
                     })
                 transaction.update("paths", {"task_content_id": sprint_id}, where={"id": task_id})
 
@@ -2338,6 +2356,7 @@ def _persist_unit(user_id, unit, category="Test Prep", track_key=None, only_if_m
                         "explanation": question["explanation"],
                         "skill_key": question.get("skill_key") or skill["skill_key"],
                         "difficulty": question.get("difficulty", "medium"),
+                        "adaptive_meta": json.dumps(question),
                     })
                 transaction.update("paths", {"task_content_id": quiz_id}, where={"id": task_id})
 
@@ -2347,61 +2366,53 @@ def _persist_unit(user_id, unit, category="Test Prep", track_key=None, only_if_m
             "user_id": user_id, "activity_type": "path_generated",
             "details": json.dumps({"category": category, "unit": unit["unit_title"]}),
         })
+        if generation_token:
+            transaction.update('adaptive_tracks', {'generation_token': None, 'generation_error': None}, where={'user_id': user_id, 'track_key': track_key})
+            transaction.update('path_generations', {'status': 'completed', 'task_ids': json.dumps([task['id'] for task in saved])}, where={'user_id': user_id, 'request_key': generation_request_key or generation_token})
     return saved
 
 
-def _generate_and_save_new_test_path(user_id, test_path_info, chat_history=None, track_key=None):
-    """Build the next adaptive unit: plan once, then generate every node's content.
-
-    Content generation is fanned out across several small Gemini calls rather
-    than one large one. A node whose content call fails is downgraded to a
-    format that still works instead of poisoning the whole path.
-    """
-    track_key = track_key or _test_track_key(test_path_info.get("test_focus", "sat"), test_path_info.get("subject_focus", "math"))
-    profile = _build_learner_profile(user_id, _track_path_info(test_path_info, track_key), chat_history or [])
-    shape = learning.choose_shape(profile["_mastery_rows"], profile["_completed_lessons"])
-    shape = ['quiz' if kind == 'boss_battle' else kind for kind in shape]
-
-    unit = learning.build_unit(
-        profile, shape=shape, official_examples_fn=_official_examples_for_skill,
-    )
-
-    # A drill node with no questions is worse than useless, so fall back to
-    # whatever official questions exist before giving up on the node.
-    for node in unit["nodes"]:
-        if node["node_type"] in ("practice_sprint", "quiz") and not node.get("questions"):
-            skill = node["skill"]
-            test_type = "ACT" if skill.get("test") == "ACT" else "SAT"
-            wanted = learning.EXERCISE_COUNT[node["node_type"]]
-            official = _get_official_questions_for_topic(
-                test_type, skill["subject"], skill["skill_label"], limit=wanted
-            )
-            node["questions"] = [{
-                "source_or_prompt": q.get("source_or_prompt") or "Official practice question.",
-                "question_text": q["question_text"], "options": q["options"],
-                "correct_option": q["correct_option"],
-                "explanation": q.get("explanation") or "Review the concept and retry a similar question.",
-                "difficulty": "medium",
-            } for q in official]
-
-    # Any drill still empty becomes a lesson on the same skill, so the student
-    # always receives teaching rather than an empty node.
-    for node in unit["nodes"]:
-        if node["node_type"] in ("practice_sprint", "quiz") and not node.get("questions"):
-            app.logger.warning(
-                "No questions available for %s node on %s; converting to a lesson.",
-                node["node_type"], node["skill"]["skill_key"],
-            )
-            node["node_type"] = "lesson"
-            node["xp_reward"] = learning.XP_BY_NODE["lesson"]
-            teaching = learning._fallback_teaching(node)
-            node["teaching"] = teaching
-            node["steps"] = learning._interleave_lesson(teaching, [])
-
-    saved = _persist_unit(user_id, unit, "Test Prep", track_key=track_key)
-    if len(saved) != 5:
-        raise ValueError("Path generation must produce exactly five usable steps.")
-    return saved
+def _generate_and_save_new_test_path(user_id, test_path_info, chat_history=None, track_key=None, request_key=None, initial=False):
+    track_key = track_key or test_path_info.get('active_track') or _test_track_key(test_path_info.get('test_focus', 'sat'), test_path_info.get('subject_focus', 'math'))
+    state = adaptive.ensure_track(db, user_id, track_key)
+    if not state.get('benchmark_completed_at'):
+        raise ValueError('Complete this section benchmark before generating a learning path.')
+    user_row = db.select_one('users', where={'id': user_id})
+    user = User(db, user_row['email'])
+    snapshot = adaptive.profile(db, user, track_key)
+    request_key = request_key or secrets.token_urlsafe(18)
+    if not isinstance(request_key,str) or not re.fullmatch(r'[a-zA-Z0-9_:-]{8,100}',request_key):
+        raise ValueError('A valid path request ID is required.')
+    token = secrets.token_urlsafe(24)
+    now = time.time()
+    with db.transaction() as tx:
+        adaptive.lock(tx, user_id)
+        current = adaptive.rows(tx, 'SELECT * FROM adaptive_tracks WHERE user_id=? AND track_key=?', (user_id, track_key))[0]
+        existing = adaptive.rows(tx, "SELECT * FROM paths WHERE user_id=? AND track_key=? AND is_active=True AND is_user_added=False AND task_format!='benchmark' AND learning_version=? ORDER BY task_order", (user_id, track_key, adaptive.VERSION))
+        prior = adaptive.rows(tx, 'SELECT * FROM path_generations WHERE user_id=? AND request_key=?', (user_id, request_key))
+        if prior and prior[0]['track_key'] != track_key:
+            raise ValueError('This request ID belongs to another section.')
+        if initial and existing or prior and prior[0]['status']=='completed':
+            return existing
+        if current.get('generation_token') and now-(current.get('generation_started') or 0)<adaptive.LEASE_SECONDS:
+            raise ValueError('Your path is already being prepared. It is safe to return in a moment.')
+        tx.update('adaptive_tracks', {'generation_token': token, 'generation_started': now, 'generation_error': None}, where={'id': current['id']})
+        if prior:
+            tx.update('path_generations', {'status':'generating', 'profile_snapshot':json.dumps(snapshot)}, where={'id':prior[0]['id']})
+        else:
+            tx.insert('path_generations', {'user_id':user_id,'track_key':track_key,'request_key':request_key,'status':'generating','profile_snapshot':json.dumps(snapshot),'created_at':now})
+    try:
+        unit, note = adaptive.build_unit(snapshot, _generate_text, seed=int(now)%10000)
+        if len(unit['nodes']) != 5:
+            raise ValueError('A complete five-step unit is required.')
+        saved = _persist_unit(user_id, unit, 'Test Prep', track_key=track_key, generation_token=token, generation_request_key=request_key)
+        db.update('path_generations', {'note':note}, where={'user_id':user_id,'request_key':request_key})
+        return saved
+    except Exception:
+        claimed = db.execute_write('UPDATE adaptive_tracks SET generation_token=NULL, generation_error=? WHERE user_id=? AND track_key=? AND generation_token=?', ('Could not prepare the next unit. Your benchmark and answers are saved; retry safely.',user_id,track_key,token))
+        if claimed:
+            db.update('path_generations', {'status':'failed'}, where={'user_id':user_id,'request_key':request_key})
+        raise
 
 
 def _get_test_prep_ai_chat_response(history, user_stats, stat_history="", user_id=None):
@@ -3423,6 +3434,7 @@ def _delete_user_data(user_id):
             'gamification_stats', 'sat_battle_stats', 'quiz_results',
             'sprint_results', 'lesson_progress', 'lesson_answers',
             'skill_mastery', 'mistake_bank',
+            'learning_events', 'adaptive_sessions', 'adaptive_tracks', 'path_generations', 'learning_hints',
         ):
             tx.delete(table, {'user_id': user_id})
         tx.execute_write(
@@ -3541,6 +3553,9 @@ def test_path_builder(user):
                 "current_act_english": _optional_number(request.form.get("current_act_english"), 1, 36, "Current ACT English"),
                 "current_act_science": _optional_number(request.form.get("current_act_science"), 1, 36, "Current ACT science"),
                 "strengths": request.form.get("strengths", "").strip()[:2000],
+                "goals": request.form.get("goals", "").strip()[:2000],
+                "math_confidence": _optional_number(request.form.get("math_confidence"), 1, 3, "Math confidence"),
+                "ela_confidence": _optional_number(request.form.get("ela_confidence"), 1, 3, "ELA confidence"),
                 "weaknesses": weaknesses,
                 "test_date": test_date,
                 "hours_per_week": _optional_number(request.form.get("hours_per_week"), 1, 40, "Hours per week"),
@@ -3575,6 +3590,113 @@ def quick_practice(user):
     return render_react("quick-practice", {"name": user.get_name()}, "Quick Practice | Mentics")
 
 
+@app.get('/dashboard/assessment/<int:session_id>')
+@login_required
+def adaptive_assessment(user, session_id):
+    if not db.select_one('adaptive_sessions', where={'id': session_id, 'user_id': user.data['id']}):
+        return redirect(url_for('test_path_view'))
+    return render_react('adaptive-assessment', {'name':user.get_name(), 'sessionId':session_id}, 'Assessment | Mentics')
+
+
+@app.route('/api/adaptive/profile')
+@login_required
+def adaptive_profile(user):
+    track = request.args.get('track','sat_math')
+    if track not in adaptive.TRACKS:
+        return jsonify({'error':'Invalid section.'}),400
+    state = adaptive.profile(db,user,track)
+    state['targets'] = adaptive.targets(state)
+    sessions = db.execute("SELECT id,status FROM adaptive_sessions WHERE user_id=? AND track_key=? AND kind='quick' AND status IN ('active','generating') ORDER BY id DESC LIMIT 1",(user.data['id'],track))
+    state['resume_session'] = sessions[0]['id'] if sessions else None
+    return jsonify(state)
+
+
+def _activity_hints(user_id, source, question):
+    metadata = adaptive.unpack(question.get('adaptive_meta'), {})
+    saved = db.select_one('learning_hints', where={'user_id':user_id,'source':source,'source_id':str(question['id'])})
+    hints = metadata.get('hints') or []
+    return {'hints':hints[:(saved or {}).get('hint_count',0)],'has_hints':len(hints)==3,'attribution':metadata.get('attribution')}
+
+
+@app.post('/api/activity-hint')
+@login_required
+@rate_limit('200/hour',name='activity_hint')
+def activity_hint(user):
+    data=request.get_json(silent=True) or {}
+    kind=data.get('kind');ref=data.get('question_id');uid=user.data['id']
+    if type(ref) is not int or kind not in {'lesson_step','quiz','sprint'}:
+        return jsonify({'error':'Choose a valid activity question.'}),400
+    if kind=='lesson_step':
+        question=db.execute_for_one('''SELECT s.*,p.id AS task_id,p.category,p.track_key,p.task_order
+            FROM lesson_steps s JOIN lessons l ON l.id=s.lesson_id JOIN paths p ON p.id=l.task_id
+            WHERE s.id=? AND p.user_id=? AND p.is_active=True AND s.step_type='check' ''',(ref,uid))
+        source='lesson'
+    else:
+        query,source=_ASSESSMENT_SOURCES[kind]
+        question=db.execute_for_one(query,(ref,uid))
+    if not question:
+        return jsonify({'error':'This activity is unavailable.'}),404
+    if _has_incomplete_earlier_task(uid,question):
+        return jsonify({'error':'Complete the earlier step first.'}),409
+    hints=adaptive.unpack(question.get('adaptive_meta'),{}).get('hints') or []
+    if len(hints)!=3:
+        return jsonify({'error':'This older activity has no saved hints. Ask Mentics for help.'}),409
+    with db.transaction() as tx:
+        adaptive.lock(tx,uid)
+        saved=adaptive.rows(tx,'SELECT * FROM learning_hints WHERE user_id=? AND source=? AND source_id=?',(uid,source,str(ref)))
+        count=min(3,(saved[0]['hint_count'] if saved else 0)+1)
+        if saved:
+            tx.update('learning_hints',{'hint_count':count},where={'id':saved[0]['id']})
+        else:
+            tx.insert('learning_hints',{'user_id':uid,'source':source,'source_id':str(ref),'hint_count':count})
+    return jsonify(_activity_hints(uid,source,question))
+
+
+@app.post('/api/adaptive/practice')
+@login_required
+@rate_limit('30/hour', name='adaptive_practice')
+def adaptive_practice(user):
+    data=request.get_json(silent=True) or {}
+    try:
+        session_id=adaptive.start_practice(db,user,data.get('track'),data.get('request_id'),_generate_text)
+        return jsonify(adaptive.session_view(db,user.data['id'],session_id))
+    except ValueError as error:
+        return jsonify({'error':str(error)}),400
+    except Exception:
+        app.logger.exception('Adaptive practice preparation failed')
+        return jsonify({'error':'Practice could not be prepared. Your saved work is safe; try again.'}),503
+
+
+@app.route('/api/adaptive/session/<int:session_id>', methods=['GET','POST'])
+@login_required
+@rate_limit('500/hour',name='adaptive_session')
+def adaptive_session(user,session_id):
+    try:
+        if request.method=='POST':
+            data=request.get_json(silent=True) or {}
+            action=data.get('action')
+            if action=='hint':
+                return jsonify(adaptive.hint(db,user.data['id'],session_id,data.get('index')))
+            if action=='answer':
+                adaptive.answer(db,user.data['id'],session_id,data)
+            elif action=='finish':
+                adaptive.finish(db,user.data['id'],session_id)
+            elif action=='next_path':
+                saved=db.select_one('adaptive_sessions',where={'id':session_id,'user_id':user.data['id']})
+                if not saved or saved['kind']!='benchmark' or saved['status']!='completed':
+                    raise ValueError('Submit your benchmark first.')
+                tasks=_generate_and_save_new_test_path(user.data['id'],user.get_stats().get('test_path') or {},track_key=saved['track_key'],request_key=f'initial:{session_id}',initial=True)
+                return jsonify({'path_ready':True,'track':saved['track_key'],'tasks':tasks})
+            else:
+                raise ValueError('Unknown assessment action.')
+        return jsonify(adaptive.session_view(db,user.data['id'],session_id))
+    except ValueError as error:
+        return jsonify({'error':str(error)}),400
+    except Exception:
+        app.logger.exception('Adaptive session failed for user %s',user.data['id'])
+        return jsonify({'error':'The request could not finish. Saved answers are safe. Retry to continue.'}),503
+
+
 @app.route('/api/quick-practice', methods=['POST'])
 @login_required
 @rate_limit('60/hour', name='quick_practice')
@@ -3595,6 +3717,14 @@ def save_quick_practice(user):
             return jsonify({'error': 'Invalid practice answer'}), 400
         results.append({'skill': question['skill'], 'correct': answer['selected'] == question['options'][question['answer']],
                         'question': question['prompt'], 'selected': answer['selected']})
+    with db.transaction() as tx:
+        adaptive.lock(tx,user.data['id'])
+        for answer in answers:
+            question=bank[answer['id']]
+            _,measured=adaptive.arena_question({'skill':question['skill'],'section':'Math' if subject=='math' else 'Reading',
+                'question_text':question['prompt'],'difficulty':'easy'},exam)
+            adaptive.record_event_tx(tx,user.data['id'],track,'legacy_quick',f"{track}:{answer['id']}",measured,
+                answer['selected']==question['options'][question['answer']],chosen=question['options'].index(answer['selected']))
     log_activity(user.data['id'], 'quick_practice', {'track': track, 'results': results})
     return jsonify({'saved': True})
 
@@ -3706,6 +3836,11 @@ def _practice_totals(user_id):
     ) or {}
     total = sum(rows.get(k) or 0 for k in ("quiz_total", "sprint_total", "lesson_total"))
     correct = sum(rows.get(k) or 0 for k in ("quiz_correct", "sprint_correct", "lesson_correct"))
+    extra = db.execute_for_one("""SELECT COUNT(*) AS total,
+        SUM(CASE WHEN is_correct THEN 1 ELSE 0 END) AS correct
+        FROM learning_events WHERE user_id=? AND source IN ('quick','benchmark','battle','legacy_quick')""",(user_id,)) or {}
+    total += extra.get('total') or 0
+    correct += extra.get('correct') or 0
     return {
         "answered": total,
         "correct": correct,
@@ -3900,6 +4035,13 @@ def api_tasks(user):
             order_by="task_order ASC"
         )
 
+        if track_key:
+            state = db.select_one('adaptive_tracks', where={'user_id': user_id, 'track_key': track_key})
+            if not state.get('benchmark_completed_at'):
+                active_path = [p for p in active_path if p.get('task_format') == 'benchmark']
+                if request.method == 'POST':
+                    return jsonify({'error': 'Complete this section’s benchmark first. Your progress is saved.'}), 409
+
         if request.method == "POST" or not active_path:
             chat_record_list = db.select("chat_conversations", where={
                 "user_id": user_id, "category": f'{category}:{track_key}' if track_key else category})
@@ -3913,7 +4055,8 @@ def api_tasks(user):
                 else:
                     test_path_info = stats.get("test_path", {})
                     tasks = _generate_and_save_new_test_path(
-                        user_id, test_path_info, chat_history, track_key=track_key)
+                        user_id, test_path_info, chat_history, track_key=track_key,
+                        request_key=(request.get_json(silent=True) or {}).get('request_id'))
             except Exception:
                 app.logger.exception("Path generation failed for user %s", user_id)
                 return jsonify({
@@ -3988,8 +4131,7 @@ def get_quiz(user, task_id):
             "source_or_prompt": q.get('source_or_prompt'),
             "question_text": q['question_text'],
             "options": json.loads(q['options']),
-            "correct_option": q.get('correct_option', 0),
-            "explanation": q.get('explanation', '')
+            **_activity_hints(user.data['id'], 'quiz_results', q)
         })
 
     return jsonify({
@@ -4013,6 +4155,8 @@ def api_skip_task(user):
     })
     if not task_info:
         return jsonify({"success": False, "error": "Task not found."}), 404
+    if task_info.get('task_format') == 'benchmark':
+        return jsonify({'error': 'Submit the benchmark assessment to continue.'}), 409
     if task_info['is_completed']:
         return jsonify({"success": True, "already_completed": True})
 
@@ -4052,6 +4196,8 @@ def api_update_task_status(user):
     })
     if not task_info:
         return jsonify({"success": False, "error": "Task not found."}), 404
+    if task_info.get('task_format') == 'benchmark':
+        return jsonify({'error': 'Submit the benchmark assessment to continue.'}), 409
     if task_info['is_completed']:
         return jsonify({"success": True, "already_completed": True})
     blocked = _has_incomplete_earlier_task(user_id, task_info)
@@ -6417,7 +6563,18 @@ def submit_sat_battle(user, battle_id):
         if question_index in seen or not 0 <= question_index < SAT_BATTLE_QUESTION_COUNT or not 0 <= selected_option < 4:
             return jsonify({'error': 'One of your answers is invalid.'}), 400
         seen.add(question_index); cleaned.append({'question_index': question_index, 'selected_option': selected_option})
-    db.update('sat_battles', {answer_column: json.dumps(cleaned), finished_column: _utc_now().isoformat()}, where={'id': battle_id})
+    with db.transaction() as tx:
+        adaptive.lock(tx,user.data['id'])
+        current=adaptive.rows(tx,'SELECT * FROM sat_battles WHERE id=?',(battle_id,))[0]
+        if current.get(answer_column):
+            return jsonify({'error':'Your answers are already locked'}),409
+        tx.update('sat_battles', {answer_column: json.dumps(cleaned), finished_column: _utc_now().isoformat()}, where={'id': battle_id})
+        questions=json.loads(current['questions'])
+        for answer in cleaned:
+            index=answer['question_index'];question=questions[index]
+            track,measured=adaptive.arena_question(question,str(current.get('exam_type') or 'SAT').lower())
+            adaptive.record_event_tx(tx,user.data['id'],track,'battle',f'{battle_id}:{index}',measured,
+                answer['selected_option']==question['correct_option'],chosen=answer['selected_option'])
     return jsonify(_battle_payload(db.select_one('sat_battles', where={'id': battle_id}), user.data['id']))
 
 

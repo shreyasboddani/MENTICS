@@ -4,6 +4,7 @@ import json
 import pytest
 import app as app_module
 import prep_tracks
+import adaptive
 from dbhelper import DatabaseHandler
 from userhelper import User
 
@@ -25,7 +26,7 @@ def test_all_tracks_exist_and_setup_preserves_completed_work(learner):
     prep = app_module._ensure_prep_tracks(user)
     assert set(prep['tracks']) == set(prep_tracks.TRACKS)
     initial = db.select('paths', where={'user_id': user.data['id']})
-    assert len(initial) == 20
+    assert len(initial) == 4
     first = initial[0]
     db.update('paths', {'is_completed': True}, where={'id': first['id']})
     with app_module.app.test_request_context('/dashboard/test-path-builder', method='POST', data={
@@ -42,9 +43,9 @@ def test_all_tracks_exist_and_setup_preserves_completed_work(learner):
         with app_module.app.test_request_context(f'/api/tasks?category=Test%20Prep&track={key}'):
             result = inspect.unwrap(app_module.api_tasks)(user)
             tasks = result.get_json()
-            assert len(tasks) == 5
+            assert len(tasks) == 1
             assert all(t['track_key'] == key for t in tasks)
-    assert len(db.select('paths', where={'is_active': True})) == 20
+    assert len(db.select('paths', where={'is_active': True})) == 4
 
 
 def test_legacy_content_and_results_remain_in_their_lane(learner):
@@ -63,7 +64,8 @@ def test_legacy_content_and_results_remain_in_their_lane(learner):
 def test_progress_checks_and_regeneration_are_track_scoped(learner):
     user, db = learner
     app_module._ensure_prep_tracks(user)
-    math = db.select('paths', where={'track_key': 'sat_math'}, order_by='task_order')
+    app_module._persist_unit(user.data['id'], prep_tracks.starter_unit('sat_math'), track_key='sat_math')
+    math = db.select('paths', where={'track_key': 'sat_math', 'is_active':True}, order_by='task_order')
     db.update('paths', {'is_completed': True}, where={'id': math[0]['id']})
     assert not app_module._has_incomplete_earlier_task(user.data['id'], math[1])
     assert app_module._has_incomplete_earlier_task(user.data['id'], math[2])
@@ -126,14 +128,12 @@ def test_quick_practice_is_graded_on_server_and_available_to_coach(learner):
 def test_planner_context_focus_and_shape_are_limited_to_selected_section(learner, monkeypatch):
     user, db = learner
     app_module._ensure_prep_tracks(user)
-    def build(profile, **kwargs):
-        assert profile['focus'] == 'act'
-        assert profile['subject_focus'] == 'ela'
-        assert all(key.startswith('act_english') or key.startswith('act_reading') for key in profile['skill_options'])
-        assert 'boss_battle' not in kwargs['shape']
-        assert 'sat_math' in profile['cross_track_context']
-        return prep_tracks.starter_unit('act_ela')
-    monkeypatch.setattr(app_module.learning, 'build_unit', build)
+    db.update('adaptive_tracks', {'benchmark_completed_at':'tested'}, where={'user_id':user.data['id'],'track_key':'act_ela'})
+    def build(profile, generate, **kwargs):
+        assert profile['track'] == 'act_ela'
+        assert all(key.startswith('act_english') or key.startswith('act_reading') for key in profile['skills'])
+        return prep_tracks.starter_unit('act_ela'), 'Test fixture'
+    monkeypatch.setattr(adaptive, 'build_unit', build)
     with app_module.app.test_request_context('/'):
         tasks = app_module._generate_and_save_new_test_path(user.data['id'], user.get_stats()['test_path'], track_key='act_ela')
     assert len(tasks) == 5
@@ -143,7 +143,8 @@ def test_planner_context_focus_and_shape_are_limited_to_selected_section(learner
 def test_persisted_assessment_uses_its_own_track_for_order(learner):
     user, db = learner
     app_module._ensure_prep_tracks(user)
-    first = db.select_one('paths', where={'track_key': 'act_math', 'task_order': 1})
+    app_module._persist_unit(user.data['id'], prep_tracks.starter_unit('act_math'), track_key='act_math')
+    first = db.select_one('paths', where={'track_key': 'act_math', 'task_order': 1, 'is_active':True})
     db.update('paths', {'is_completed': True}, where={'id': first['id']})
     second = db.select_one('paths', where={'track_key': 'act_math', 'task_order': 2})
     question = db.select_one('sprint_questions', where={'sprint_id': second['task_content_id']})
