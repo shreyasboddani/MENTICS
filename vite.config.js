@@ -8,7 +8,10 @@ export default defineConfig({
   root: resolve(import.meta.dirname, 'frontend'),
   build: {
     outDir: resolve(import.meta.dirname, 'static/react'),
-    emptyOutDir: true,
+    // Keep the preceding hashed route chunks available during a deployment.
+    // A browser can retain the prior app shell briefly and still need its
+    // lazy route chunk while the new release is already live.
+    emptyOutDir: false,
     rollupOptions: {
       input: resolve(import.meta.dirname, 'frontend/index.html'),
       output: {
