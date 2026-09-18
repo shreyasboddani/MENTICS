@@ -4,7 +4,7 @@ import { createPortal } from "react-dom";
 import DOMPurify from "dompurify";
 import { marked } from "marked";
 import { Toaster, toast } from "sonner";
-import { AlertTriangle, ArrowLeft, ArrowRight, Award, BarChart3, BookOpen, Brain, Calculator, CalendarDays, Check, Clock3, Flag, Flame, GraduationCap, Hand, Headphones, House, LayoutDashboard, Lightbulb, LineChart, LockKeyhole, LogOut, Mail, Menu, MessageCircle, PenLine, Plus, RotateCcw, Search, Send, Settings, ShieldCheck, SkipForward, Sparkles, Swords, Target, Trophy, UserRound, UsersRound, X, Zap } from "lucide-react";
+import { AlertTriangle, ArrowLeft, ArrowRight, Award, BarChart3, BookOpen, Brain, Calculator, CalendarDays, Check, Clock3, Flag, Flame, GraduationCap, GripHorizontal, Hand, Headphones, House, LayoutDashboard, Lightbulb, LineChart, LockKeyhole, LogOut, Mail, Maximize2, Menu, MessageCircle, Minimize2, PenLine, Plus, RotateCcw, Search, Send, Settings, ShieldCheck, SkipForward, Sparkles, Swords, Target, Trophy, UserRound, UsersRound, X, Zap } from "lucide-react";
 import { Fragment, jsx, jsxs } from "react/jsx-runtime";
 //#region frontend/src/boot.js
 var initial = typeof window !== "undefined" && window.__MENTICS__ ? window.__MENTICS__ : {
@@ -1061,6 +1061,265 @@ async function api(url, options = {}) {
 	return data;
 }
 //#endregion
+//#region frontend/src/arena-calculator.jsx
+var DESMOS_EMBED = "https://www.desmos.com/calculator";
+var DEFAULT_SIZE = {
+	width: 680,
+	height: 560
+};
+var MIN_SIZE = {
+	width: 440,
+	height: 320
+};
+var EDGE = 8;
+function viewport() {
+	if (typeof window === "undefined") return {
+		width: 1280,
+		height: 800
+	};
+	return {
+		width: window.innerWidth,
+		height: window.innerHeight
+	};
+}
+function clampSize(size) {
+	const view = viewport();
+	return {
+		width: Math.min(Math.max(size.width, MIN_SIZE.width), view.width - 16),
+		height: Math.min(Math.max(size.height, MIN_SIZE.height), view.height - 16)
+	};
+}
+/** Keep the panel on screen, after a drag, a resize, or a window resize. */
+function clampPosition(position, size) {
+	const view = viewport();
+	return {
+		x: Math.min(Math.max(position.x, EDGE), Math.max(EDGE, view.width - size.width - EDGE)),
+		y: Math.min(Math.max(position.y, EDGE), Math.max(EDGE, view.height - size.height - EDGE))
+	};
+}
+function defaultSize() {
+	if (viewport().width <= 620) return DEFAULT_SIZE;
+	try {
+		const saved = JSON.parse(sessionStorage.getItem("mentics:calculator-size"));
+		if (Number.isFinite(saved?.width) && Number.isFinite(saved?.height)) return clampSize(saved);
+	} catch {}
+	return clampSize(DEFAULT_SIZE);
+}
+function defaultPosition() {
+	const size = defaultSize();
+	const view = viewport();
+	return clampPosition({
+		x: view.width - size.width - 24,
+		y: view.height - size.height - 24
+	}, size);
+}
+function DesmosCalculator({ open, onClose }) {
+	const [position, setPosition] = useState(defaultPosition);
+	const [size, setSize] = useState(defaultSize);
+	const [everOpened, setEverOpened] = useState(open);
+	const [loaded, setLoaded] = useState(false);
+	const [interacting, setInteracting] = useState(false);
+	const [maximized, setMaximized] = useState(false);
+	const gesture = useRef(null);
+	const panelRef = useRef(null);
+	if (open && !everOpened) setEverOpened(true);
+	useEffect(() => {
+		if (!open) return void 0;
+		const previous = document.activeElement;
+		panelRef.current?.querySelector("button")?.focus();
+		return () => {
+			if (previous?.isConnected) previous.focus();
+		};
+	}, [open]);
+	useEffect(() => {
+		if (interacting || viewport().width <= 620) return;
+		try {
+			sessionStorage.setItem("mentics:calculator-size", JSON.stringify(size));
+		} catch {}
+	}, [size, interacting]);
+	useEffect(() => {
+		if (!open) return void 0;
+		const onKeyDown = (event) => {
+			if (event.key === "Escape") onClose();
+		};
+		const onWindowResize = () => {
+			if (viewport().width <= 620 || maximized) return;
+			const bounds = panelRef.current?.getBoundingClientRect();
+			if (!bounds) return;
+			const next = clampSize({
+				width: bounds.width,
+				height: bounds.height
+			});
+			setSize(next);
+			setPosition((current) => clampPosition(current, next));
+		};
+		window.addEventListener("keydown", onKeyDown);
+		window.addEventListener("resize", onWindowResize);
+		return () => {
+			window.removeEventListener("keydown", onKeyDown);
+			window.removeEventListener("resize", onWindowResize);
+		};
+	}, [
+		open,
+		onClose,
+		maximized
+	]);
+	const beginGesture = (event, mode) => {
+		if (event.button !== 0 || maximized) return;
+		if (mode === "move" && event.target.closest("button")) return;
+		const bounds = panelRef.current.getBoundingClientRect();
+		gesture.current = {
+			mode,
+			pointerX: event.clientX,
+			pointerY: event.clientY,
+			offsetX: event.clientX - bounds.left,
+			offsetY: event.clientY - bounds.top,
+			width: bounds.width,
+			height: bounds.height
+		};
+		setInteracting(true);
+		event.currentTarget.setPointerCapture(event.pointerId);
+		if (event.pointerType !== "mouse") event.preventDefault();
+	};
+	const onGestureMove = (event) => {
+		const active = gesture.current;
+		if (!active) return;
+		if (active.mode === "move") {
+			setPosition(clampPosition({
+				x: event.clientX - active.offsetX,
+				y: event.clientY - active.offsetY
+			}, {
+				width: active.width,
+				height: active.height
+			}));
+			return;
+		}
+		const next = clampSize({
+			width: active.width + (event.clientX - active.pointerX),
+			height: active.height + (event.clientY - active.pointerY)
+		});
+		setSize(next);
+		setPosition((current) => clampPosition(current, next));
+	};
+	const endGesture = () => {
+		gesture.current = null;
+		setInteracting(false);
+	};
+	const nudge = (event, mode) => {
+		const step = event.shiftKey ? 48 : 12;
+		const move = {
+			ArrowLeft: [-step, 0],
+			ArrowRight: [step, 0],
+			ArrowUp: [0, -step],
+			ArrowDown: [0, step]
+		}[event.key];
+		if (!move) return;
+		event.preventDefault();
+		if (mode === "move") {
+			setPosition((current) => clampPosition({
+				x: current.x + move[0],
+				y: current.y + move[1]
+			}, size));
+			return;
+		}
+		const next = clampSize({
+			width: size.width + move[0],
+			height: size.height + move[1]
+		});
+		setSize(next);
+		setPosition((current) => clampPosition(current, next));
+	};
+	if (!everOpened) return null;
+	return createPortal(/* @__PURE__ */ jsxs("aside", {
+		ref: panelRef,
+		className: "desmos-calculator arena-calculator",
+		hidden: !open,
+		role: "dialog",
+		"aria-modal": "false",
+		"data-maximized": maximized,
+		"data-interacting": interacting ? "true" : void 0,
+		style: {
+			left: `${position.x}px`,
+			top: `${position.y}px`,
+			width: `${size.width}px`,
+			height: `${size.height}px`
+		},
+		"aria-label": "Desmos graphing calculator",
+		children: [
+			/* @__PURE__ */ jsxs("header", {
+				className: "desmos-calculator-bar arena-calculator-bar",
+				onPointerDown: (event) => beginGesture(event, "move"),
+				onPointerMove: onGestureMove,
+				onPointerUp: endGesture,
+				onPointerCancel: endGesture,
+				children: [
+					/* @__PURE__ */ jsx("span", {
+						className: "desmos-calculator-grip arena-calculator-grip",
+						tabIndex: 0,
+						role: "button",
+						"aria-label": "Move the calculator. Use the arrow keys to reposition it.",
+						onKeyDown: (event) => nudge(event, "move"),
+						children: /* @__PURE__ */ jsx(GripHorizontal, { "aria-hidden": "true" })
+					}),
+					/* @__PURE__ */ jsx("b", { children: "DESMOS" }),
+					/* @__PURE__ */ jsx("button", {
+						type: "button",
+						onClick: () => setMaximized((value) => !value),
+						"aria-label": maximized ? "Restore calculator size" : "Maximize calculator",
+						children: maximized ? /* @__PURE__ */ jsx(Minimize2, {}) : /* @__PURE__ */ jsx(Maximize2, {})
+					}),
+					/* @__PURE__ */ jsx("button", {
+						type: "button",
+						onClick: onClose,
+						"aria-label": "Close the calculator",
+						children: /* @__PURE__ */ jsx(X, {})
+					})
+				]
+			}),
+			/* @__PURE__ */ jsxs("div", {
+				className: "desmos-calculator-frame arena-calculator-frame",
+				children: [!loaded && /* @__PURE__ */ jsx("p", {
+					className: "desmos-calculator-loading arena-calculator-loading",
+					role: "status",
+					children: "Opening your graphing workspace…"
+				}), /* @__PURE__ */ jsx("iframe", {
+					src: DESMOS_EMBED,
+					title: "Desmos graphing calculator",
+					onLoad: () => setLoaded(true),
+					referrerPolicy: "no-referrer",
+					sandbox: "allow-scripts allow-same-origin allow-popups allow-forms"
+				})]
+			}),
+			/* @__PURE__ */ jsx("span", {
+				className: "desmos-calculator-resize arena-calculator-resize",
+				onPointerDown: (event) => beginGesture(event, "resize"),
+				onPointerMove: onGestureMove,
+				onPointerUp: endGesture,
+				onPointerCancel: endGesture,
+				onKeyDown: (event) => nudge(event, "resize"),
+				tabIndex: 0,
+				role: "button",
+				"aria-label": "Resize the calculator. Use the arrow keys to change its size."
+			})
+		]
+	}), document.body);
+}
+function DesmosCalculatorToggle({ open, onToggle }) {
+	return /* @__PURE__ */ jsxs("button", {
+		type: "button",
+		className: `desmos-calculator-toggle arena-calculator-toggle ${open ? "selected" : ""}`,
+		onClick: onToggle,
+		"aria-pressed": open,
+		children: [
+			/* @__PURE__ */ jsx(Calculator, { "aria-hidden": "true" }),
+			" ",
+			open ? "Hide calculator" : "Calculator"
+		]
+	});
+}
+var ArenaCalculator = DesmosCalculator;
+var ArenaCalculatorToggle = DesmosCalculatorToggle;
+//#endregion
 //#region frontend/src/adaptive-practice.jsx
 var label = (track) => `${track.startsWith("act") ? "ACT" : "SAT"} · ${track.endsWith("math") ? "Math" : track.startsWith("act") ? "English & Reading" : "Reading & Writing"}`;
 var requestId = () => crypto.randomUUID();
@@ -1282,6 +1541,7 @@ function AdaptiveSession({ id, onLeave }) {
 	const [pathReady, setPathReady] = useState(false);
 	const [building, setBuilding] = useState(false);
 	const [review, setReview] = useState(false);
+	const [calculatorOpen, setCalculatorOpen] = useState(false);
 	const clock = useRef({
 		start: 0,
 		elapsed: 0
@@ -1555,6 +1815,13 @@ function AdaptiveSession({ id, onLeave }) {
 								question.difficulty
 							]
 						}),
+						session.track.endsWith("math") && /* @__PURE__ */ jsxs("div", {
+							className: "math-tool-row",
+							children: [/* @__PURE__ */ jsx(DesmosCalculatorToggle, {
+								open: calculatorOpen,
+								onToggle: () => setCalculatorOpen((value) => !value)
+							}), /* @__PURE__ */ jsx("span", { children: "Embedded graphing calculator" })]
+						}),
 						question.source_or_prompt && /* @__PURE__ */ jsx("div", {
 							className: "adaptive-passage",
 							children: question.source_or_prompt
@@ -1620,6 +1887,10 @@ function AdaptiveSession({ id, onLeave }) {
 							})]
 						})
 					]
+				}),
+				session.track.endsWith("math") && /* @__PURE__ */ jsx(DesmosCalculator, {
+					open: calculatorOpen,
+					onClose: () => setCalculatorOpen(false)
 				})
 			] })
 		]
@@ -1627,7 +1898,7 @@ function AdaptiveSession({ id, onLeave }) {
 }
 //#endregion
 //#region frontend/src/App.jsx
-var BattleArena = lazy(() => import("./assets/arena-page-R-9DY_b2.js").then((n) => n.t));
+var BattleArena = lazy(() => import("./assets/arena-page-CONkNbM5.js").then((n) => n.t));
 var productPages = {
 	"ai-sat-prep": {
 		eyebrow: "PERSONALIZED AI SAT PREP",
@@ -5142,7 +5413,7 @@ function TeachStep({ step, onNext, isLast }) {
 		]
 	});
 }
-function CheckStep({ step, coachKind, feedback, selected, onSelect, onCheck, onContinue, busy, replay }) {
+function CheckStep({ step, coachKind, feedback, selected, onSelect, onCheck, onContinue, busy, replay, isMath = false }) {
 	const letters = [
 		"A",
 		"B",
@@ -5153,6 +5424,7 @@ function CheckStep({ step, coachKind, feedback, selected, onSelect, onCheck, onC
 	];
 	const [hints, setHints] = useState(step.hints || []);
 	const [hintBusy, setHintBusy] = useState(false);
+	const [calculatorOpen, setCalculatorOpen] = useState(false);
 	const getHint = async () => {
 		setHintBusy(true);
 		try {
@@ -5180,6 +5452,13 @@ function CheckStep({ step, coachKind, feedback, selected, onSelect, onCheck, onC
 			step.source_or_prompt && /* @__PURE__ */ jsxs("div", {
 				className: "check-source",
 				children: [/* @__PURE__ */ jsx("small", { children: "PASSAGE / SETUP" }), /* @__PURE__ */ jsx(Markdown, { children: step.source_or_prompt })]
+			}),
+			isMath && /* @__PURE__ */ jsxs("div", {
+				className: "math-tool-row",
+				children: [/* @__PURE__ */ jsx(DesmosCalculatorToggle, {
+					open: calculatorOpen,
+					onToggle: () => setCalculatorOpen((value) => !value)
+				}), /* @__PURE__ */ jsx("span", { children: "Embedded graphing calculator" })]
 			}),
 			/* @__PURE__ */ jsx("p", {
 				className: "check-question",
@@ -5244,6 +5523,10 @@ function CheckStep({ step, coachKind, feedback, selected, onSelect, onCheck, onC
 					onClick: onCheck,
 					children: busy ? "Checking…" : "Check"
 				})
+			}),
+			isMath && /* @__PURE__ */ jsx(DesmosCalculator, {
+				open: calculatorOpen,
+				onClose: () => setCalculatorOpen(false)
 			})
 		]
 	});
@@ -5593,6 +5876,7 @@ function LessonRun({ lesson, task, onClose, onCompleted }) {
 			selected: run.selected,
 			busy: run.busy,
 			replay: cursor >= steps.length,
+			isMath: lesson.is_math,
 			onSelect: run.setSelected,
 			onCheck: checkAnswer,
 			onContinue: next
@@ -5747,6 +6031,7 @@ function AssessmentRun({ data, kind, task, onClose, onCompleted }) {
 			selected: run.selected,
 			busy: run.busy,
 			replay: cursor >= questions.length,
+			isMath: data.is_math,
 			onSelect: run.setSelected,
 			onCheck: checkAnswer,
 			onContinue: next
@@ -8302,4 +8587,4 @@ function render(page, data = {}) {
 	return renderToString(/* @__PURE__ */ jsx(App, {}));
 }
 //#endregion
-export { boot as i, Starfield as n, api as r, render, AppShell as t };
+export { api as a, Starfield as i, ArenaCalculatorToggle as n, boot as o, AppShell as r, render, ArenaCalculator as t };

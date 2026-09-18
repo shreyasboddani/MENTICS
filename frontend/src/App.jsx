@@ -28,6 +28,7 @@ import { HomeHero } from './home-hero'
 import { boot } from './boot'
 import { ArenaRouteBoundary, AppShell, Starfield, Brand, CsrfField, useClientOnly, api } from './app-runtime'
 import QuickPractice, { AdaptiveAssessment } from './adaptive-practice'
+import { DesmosCalculator, DesmosCalculatorToggle } from './arena-calculator'
 const BattleArena = lazy(() => import('./arena-page'))
 
 // The CSRF token is per-session, so it cannot be baked into prerendered HTML.
@@ -993,10 +994,11 @@ function TeachStep({ step, onNext, isLast }) {
   </div>
 }
 
-function CheckStep({ step, coachKind, feedback, selected, onSelect, onCheck, onContinue, busy, replay }) {
+function CheckStep({ step, coachKind, feedback, selected, onSelect, onCheck, onContinue, busy, replay, isMath = false }) {
   const letters = ['A', 'B', 'C', 'D', 'E', 'F']
   const [hints, setHints] = useState(step.hints || [])
   const [hintBusy, setHintBusy] = useState(false)
+  const [calculatorOpen, setCalculatorOpen] = useState(false)
   const getHint = async () => {
     setHintBusy(true)
     try { const data = await api('/api/activity-hint', { method: 'POST', body: JSON.stringify({ kind: coachKind, question_id: step.id }) }); setHints(data.hints) }
@@ -1005,6 +1007,7 @@ function CheckStep({ step, coachKind, feedback, selected, onSelect, onCheck, onC
   return <div className={`check-step ${feedback ? (feedback.is_correct ? 'is-right' : 'is-wrong') : ''}`}>
     {replay && <div className="check-replay"><RotateCcw /> Second look — you missed this one earlier.</div>}
     {step.source_or_prompt && <div className="check-source"><small>PASSAGE / SETUP</small><Markdown>{step.source_or_prompt}</Markdown></div>}
+    {isMath && <div className="math-tool-row"><DesmosCalculatorToggle open={calculatorOpen} onToggle={() => setCalculatorOpen(value => !value)} /><span>Embedded graphing calculator</span></div>}
     <p className="check-question">{step.question_text}</p>
     <div className="check-options">
       {(step.options || []).map((option, index) => {
@@ -1029,6 +1032,7 @@ function CheckStep({ step, coachKind, feedback, selected, onSelect, onCheck, onC
         ? <button className="button button--primary player-cta" onClick={onContinue}>Continue <ArrowRight /></button>
         : <button className="button button--primary player-cta" disabled={selected == null || busy} onClick={onCheck}>{busy ? 'Checking…' : 'Check'}</button>}
     </div>
+    {isMath && <DesmosCalculator open={calculatorOpen} onClose={() => setCalculatorOpen(false)} />}
   </div>
 }
 
@@ -1203,7 +1207,7 @@ function LessonRun({ lesson, task, onClose, onCompleted }) {
     </div>}
     {step.step_type === 'check'
       ? <CheckStep key={step.id} step={step} coachKind="lesson_step" feedback={run.feedback} selected={run.selected}
-        busy={run.busy} replay={cursor >= steps.length} onSelect={run.setSelected}
+        busy={run.busy} replay={cursor >= steps.length} isMath={lesson.is_math} onSelect={run.setSelected}
         onCheck={checkAnswer} onContinue={next} />
       : <TeachStep step={step} isLast={cursor === queue.length - 1} onNext={next} />}
   </PlayerShell>
@@ -1275,7 +1279,7 @@ function AssessmentRun({ data, kind, task, onClose, onCompleted }) {
   return <PlayerShell kicker={`${data.title} · ${kind === 'quiz' ? 'Review' : 'Practice'}`} progress={progress}
     hearts={run.hearts} xp={run.xp} onClose={onClose}>
     <CheckStep key={question.id} step={question} coachKind={kind} feedback={run.feedback} selected={run.selected}
-      busy={run.busy} replay={cursor >= questions.length} onSelect={run.setSelected}
+      busy={run.busy} replay={cursor >= questions.length} isMath={data.is_math} onSelect={run.setSelected}
       onCheck={checkAnswer} onContinue={next} />
   </PlayerShell>
 }

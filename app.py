@@ -1258,7 +1258,9 @@ def get_practice_sprint(user, task_id):
         **_activity_hints(user.data['id'], 'sprint_results', q)
     } for q in questions_raw]
 
-    return jsonify({"title": sprint_details['title'], "questions": questions})
+    return jsonify({"title": sprint_details['title'], "questions": questions,
+                    "is_math": (str(task_info.get('track_key') or '').endswith('_math')
+                                or str(task_info.get('subject') or '').lower() == 'math')})
 
 
 @app.route('/api/submit_sprint_results', methods=['POST'])
@@ -1555,6 +1557,8 @@ def get_lesson(user, task_id):
         "intro": lesson.get('intro') or "",
         "recap": lesson.get('recap') or "",
         "xp_reward": lesson.get('xp_reward') or 30,
+        "is_math": (str(task.get('track_key') or '').endswith('_math')
+                    or str(task.get('subject') or lesson.get('subject') or '').lower() == 'math'),
         "steps": steps,
         "progress": {
             "current_step": (progress or {}).get('current_step') or 0,
@@ -4136,7 +4140,9 @@ def get_quiz(user, task_id):
 
     return jsonify({
         "title": quiz_details[0]['title'],
-        "questions": questions
+        "questions": questions,
+        "is_math": (str(task_info[0].get('track_key') or '').endswith('_math')
+                    or str(task_info[0].get('subject') or '').lower() == 'math'),
     })
 
 

@@ -10,6 +10,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { Calculator, GripHorizontal, Maximize2, Minimize2, X } from 'lucide-react'
+import './desmos-calculator.css'
 
 // `?embed` strips Desmos down to bare graph paper with no expression list, which
 // is useless for entering an equation, so the standard calculator URL is used and
@@ -57,7 +58,7 @@ function defaultPosition() {
   return clampPosition({ x: view.width - size.width - 24, y: view.height - size.height - 24 }, size)
 }
 
-export function ArenaCalculator({ open, onClose }) {
+export function DesmosCalculator({ open, onClose }) {
   const [position, setPosition] = useState(defaultPosition)
   const [size, setSize] = useState(defaultSize)
   // The frame is created on first open and then kept mounted, so a graph the
@@ -166,7 +167,7 @@ export function ArenaCalculator({ open, onClose }) {
   if (!everOpened) return null
   return createPortal(<aside
     ref={panelRef}
-    className="arena-calculator"
+    className="desmos-calculator arena-calculator"
     hidden={!open}
     role="dialog"
     aria-modal="false"
@@ -176,14 +177,14 @@ export function ArenaCalculator({ open, onClose }) {
     aria-label="Desmos graphing calculator"
   >
     <header
-      className="arena-calculator-bar"
+      className="desmos-calculator-bar arena-calculator-bar"
       onPointerDown={event => beginGesture(event, 'move')}
       onPointerMove={onGestureMove}
       onPointerUp={endGesture}
       onPointerCancel={endGesture}
     >
       <span
-        className="arena-calculator-grip"
+        className="desmos-calculator-grip arena-calculator-grip"
         tabIndex={0}
         role="button"
         aria-label="Move the calculator. Use the arrow keys to reposition it."
@@ -195,8 +196,8 @@ export function ArenaCalculator({ open, onClose }) {
       <button type="button" onClick={() => setMaximized(value => !value)} aria-label={maximized ? 'Restore calculator size' : 'Maximize calculator'}>{maximized ? <Minimize2 /> : <Maximize2 />}</button>
       <button type="button" onClick={onClose} aria-label="Close the calculator"><X /></button>
     </header>
-    <div className="arena-calculator-frame">
-      {!loaded && <p className="arena-calculator-loading" role="status">Opening your graphing workspace…</p>}
+    <div className="desmos-calculator-frame arena-calculator-frame">
+      {!loaded && <p className="desmos-calculator-loading arena-calculator-loading" role="status">Opening your graphing workspace…</p>}
       <iframe
         src={DESMOS_EMBED}
         title="Desmos graphing calculator"
@@ -206,7 +207,7 @@ export function ArenaCalculator({ open, onClose }) {
       />
     </div>
     <span
-      className="arena-calculator-resize"
+      className="desmos-calculator-resize arena-calculator-resize"
       onPointerDown={event => beginGesture(event, 'resize')}
       onPointerMove={onGestureMove}
       onPointerUp={endGesture}
@@ -219,10 +220,10 @@ export function ArenaCalculator({ open, onClose }) {
   </aside>, document.body)
 }
 
-export function ArenaCalculatorToggle({ open, onToggle }) {
+export function DesmosCalculatorToggle({ open, onToggle }) {
   return <button
     type="button"
-    className={`arena-calculator-toggle ${open ? 'selected' : ''}`}
+    className={`desmos-calculator-toggle arena-calculator-toggle ${open ? 'selected' : ''}`}
     onClick={onToggle}
     aria-pressed={open}
   >
@@ -230,4 +231,8 @@ export function ArenaCalculatorToggle({ open, onToggle }) {
   </button>
 }
 
-export default ArenaCalculator
+// Battle names remain as compatibility aliases. The same isolated Desmos frame
+// is shared by every Math assessment surface in the product.
+export const ArenaCalculator = DesmosCalculator
+export const ArenaCalculatorToggle = DesmosCalculatorToggle
+export default DesmosCalculator

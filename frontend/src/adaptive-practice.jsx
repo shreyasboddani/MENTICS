@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { ArrowLeft, ArrowRight, BookOpen, Check, Lightbulb, Target } from 'lucide-react'
 import { AppShell, api } from './app-runtime'
 import { boot } from './boot'
+import { DesmosCalculator, DesmosCalculatorToggle } from './arena-calculator'
 import './adaptive-practice.css'
 
 const label = track => `${track.startsWith('act') ? 'ACT' : 'SAT'} · ${track.endsWith('math') ? 'Math' : track.startsWith('act') ? 'English & Reading' : 'Reading & Writing'}`
@@ -66,6 +67,7 @@ function AdaptiveSession({ id, onLeave }) {
   const [pathReady, setPathReady] = useState(false)
   const [building, setBuilding] = useState(false)
   const [review, setReview] = useState(false)
+  const [calculatorOpen, setCalculatorOpen] = useState(false)
   const clock = useRef({ start: 0, elapsed: 0 })
   const analysisStarted = useRef(false)
   const question = session?.questions[index]
@@ -130,7 +132,7 @@ function AdaptiveSession({ id, onLeave }) {
     </> : question && <>
       <header className="adaptive-heading"><div className="eyebrow">{benchmark ? 'ONE-TIME SECTION BENCHMARK' : 'YOUR TARGETED SESSION'}</div><h1>{benchmark ? 'Show us where you are.' : 'Work the question. Learn the move.'}</h1><p>{benchmark ? '12 original diagnostic questions across this section. Work independently; hints and solutions come after submission. Every answer is saved.' : session.note}</p></header>
       <div className="adaptive-progress"><span>Question {index + 1} of {session.total}</span><span>{session.answered} saved{!benchmark && ` / ${session.points || 0} session points / ${session.streak || 0} streak`}</span><progress aria-label="Saved answers" max={session.total} value={session.answered} /></div>
-      <article className="adaptive-card adaptive-question"><div className="eyebrow">{question.domain} · {question.difficulty}</div>{question.source_or_prompt && <div className="adaptive-passage">{question.source_or_prompt}</div>}<h2>{question.question_text}</h2><div className="prep-answers" role="group" aria-label="Answer choices">{question.options.map((option, choice) => <button key={choice} disabled={answered || busy} aria-pressed={(answered ? question.answer.selected_option : selected) === choice} className={`${(answered ? question.answer.selected_option : selected) === choice ? 'is-selected' : ''} ${answered && !benchmark && choice === question.correct_option ? 'is-correct' : ''}`} onClick={() => setSelected(choice)}><span>{'ABCD'[choice]}</span><b>{option}</b></button>)}</div>
+      <article className="adaptive-card adaptive-question"><div className="eyebrow">{question.domain} · {question.difficulty}</div>{session.track.endsWith('math') && <div className="math-tool-row"><DesmosCalculatorToggle open={calculatorOpen} onToggle={() => setCalculatorOpen(value => !value)} /><span>Embedded graphing calculator</span></div>}{question.source_or_prompt && <div className="adaptive-passage">{question.source_or_prompt}</div>}<h2>{question.question_text}</h2><div className="prep-answers" role="group" aria-label="Answer choices">{question.options.map((option, choice) => <button key={choice} disabled={answered || busy} aria-pressed={(answered ? question.answer.selected_option : selected) === choice} className={`${(answered ? question.answer.selected_option : selected) === choice ? 'is-selected' : ''} ${answered && !benchmark && choice === question.correct_option ? 'is-correct' : ''}`} onClick={() => setSelected(choice)}><span>{'ABCD'[choice]}</span><b>{option}</b></button>)}</div>
         {!answered && <fieldset className="adaptive-confidence"><legend>How confident are you? <small>Optional</small></legend>{['Guessing', 'Somewhat sure', 'Confident'].map((text, i) => <button key={text} disabled={busy} aria-pressed={confidence === i + 1} onClick={() => setConfidence(confidence === i + 1 ? null : i + 1)}>{text}</button>)}</fieldset>}
         {!benchmark && !answered && <button className="text-button" disabled={busy || question.hints.length >= 3} onClick={() => act('hint', { index })}><Lightbulb size={17} />{question.hints.length >= 3 ? 'All hints shown' : `Hint ${question.hints.length + 1} of 3`}</button>}
         {question.hints.map((hint, i) => <div className="adaptive-hint" key={i}><b>Hint {i + 1}</b><p>{hint}</p></div>)}
@@ -138,6 +140,7 @@ function AdaptiveSession({ id, onLeave }) {
         {answered && <div className="adaptive-feedback" role="status"><b>{benchmark ? 'Answer saved.' : question.answer.selected_option === question.correct_option ? 'Correct. Keep that approach.' : `The answer is ${'ABCD'[question.correct_option]}. Here’s why.`}</b>{!benchmark && <><p>{question.explanation}</p>{question.fastest_method && <p><b>Test-day approach:</b> {question.fastest_method}</p>}</>}</div>}
         <div className="adaptive-actions"><span>{benchmark ? 'Unsure? Choose your best answer.' : 'Accuracy first. Speed follows.'}</span>{answered ? <button className="button button--primary" disabled={busy} onClick={() => index + 1 < session.total ? (setSelected(null), setConfidence(null), setIndex(index + 1)) : act('finish')}>{busy ? 'Saving…' : index + 1 < session.total ? 'Next question' : benchmark ? 'Submit benchmark' : 'Finish session'}<ArrowRight size={18} /></button> : <button className="button button--primary" disabled={busy || selected === null} onClick={submit}>{busy ? 'Saving…' : benchmark ? 'Save answer' : 'Check answer'}<Check size={18} /></button>}</div>
       </article>
+      {session.track.endsWith('math') && <DesmosCalculator open={calculatorOpen} onClose={() => setCalculatorOpen(false)} />}
     </>}
   </section>
 }

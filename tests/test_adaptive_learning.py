@@ -202,6 +202,7 @@ def test_authenticated_end_to_end_and_path_hints(learner):
     assert len(generated)==5
     lesson_id=generated[0]['id']
     lesson=client.get(f'/api/lesson/{lesson_id}').json
+    assert lesson['is_math'] is True
     check=next(s for s in lesson['steps'] if s['step_type']=='check')
     assert 'correct_option' not in check
     hint=post('/api/activity-hint',{'kind':'lesson_step','question_id':check['id']})
