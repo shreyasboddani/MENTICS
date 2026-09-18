@@ -26,7 +26,7 @@ import './quick-practice.css'
 import { HomeHero } from './home-hero'
 import { boot } from './boot'
 import { ArenaRouteBoundary, AppShell, Starfield, Brand, CsrfField, useClientOnly, api } from './app-runtime'
-const QuickPractice = lazy(() => import('./quick-practice'))
+import QuickPractice from './quick-practice'
 const BattleArena = lazy(() => import('./arena-page'))
 
 // The CSRF token is per-session, so it cannot be baked into prerendered HTML.
