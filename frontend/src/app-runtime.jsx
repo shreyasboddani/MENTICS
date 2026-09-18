@@ -90,7 +90,7 @@ export function Starfield({ warp = false, tone = 'violet' }) {
   return <canvas ref={ref} className={warp ? 'warp-field' : 'star-field'} aria-hidden="true" />
 }
 
-export function AppShell({ children, name }) {
+export function AppShell({ children, name, immersive = false }) {
   const [menu, setMenu] = useState(false)
   const [navWarp, setNavWarp] = useState(null)
   const current = typeof window === 'undefined' ? '' : window.location.pathname
@@ -103,6 +103,19 @@ export function AppShell({ children, name }) {
     const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches
     window.setTimeout(() => { window.location.href = href }, reduced ? 60 : 420)
   }
+  if (immersive) return <div className="app-shell app-shell--arena">
+    <Starfield />
+    <header className="arena-product-bar">
+      <Brand inverse />
+      <span className="arena-product-title">MENTICS <i /> ARENA</span>
+      <div className="arena-product-actions">
+        <a href="/dashboard" className="arena-exit">Exit Arena</a>
+        <a href="/account" className="arena-player-chip" aria-label="Open account settings"><i>{(name || 'M').slice(0, 1).toUpperCase()}</i><span>{name || 'Mentics student'}</span></a>
+        <form method="POST" action="/logout"><CsrfField /><button type="submit" aria-label="Log out"><LogOut size={17} /></button></form>
+      </div>
+    </header>
+    <div className="app-stage">{children}</div>
+  </div>
   return <div className="app-shell app-shell--tabs">
     <Starfield />
     <header className="product-nav">
@@ -127,4 +140,3 @@ export async function api(url, options = {}) {
   if (!response.ok) throw new Error(data.error || 'Something went wrong. Please try again.')
   return data
 }
-

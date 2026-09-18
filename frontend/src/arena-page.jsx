@@ -374,7 +374,7 @@ export default function BattleArena() {
   const remainingCount = questionCount - answeredCount
   const selectedTrainingTier = BATTLE_TRAINING_RANKS.find(([key]) => key === trainingRank) || BATTLE_TRAINING_RANKS[0]
   const advanceQuestion = () => setActiveQuestion(index => Math.min(index + 1, Math.max(0, questionCount - 1)))
-  return <AppShell name={d.name}><main className={`app-main battle-page ${active ? 'battle-page--in-match' : waiting ? 'battle-page--queue' : complete ? 'battle-page--complete' : ''}`}>
+  return <AppShell name={d.name} immersive><main className={`app-main battle-page ${active ? 'battle-page--in-match' : waiting ? 'battle-page--queue' : complete ? 'battle-page--complete' : ''}`}>
     {idle && !busy && <ArenaGameLobby exam={exam} setExam={setExam} paused={customizing} name={d.name} rank={rank} rankProgress={rankProgress} avatar={avatar} openCustomizer={() => setCustomizing(true)} mode={lobbyMode} setMode={setLobbyMode} trainingRank={trainingRank} setTrainingRank={setTrainingRank} selectedTier={selectedTrainingTier} clocks={d.battleClocksByExam?.[exam] || d.battleClocks} busy={busy} join={join} train={train} winStreak={winStreak} bestWinStreak={bestWinStreak} />}
     {idle && busy && <BattleLoadingScreen exam={exam} rank={selectedTrainingTier[1]} matchmaking={lobbyMode === 'ranked'} />}
     {idle && customizing && typeof document !== 'undefined' && createPortal(<ArenaCustomizer avatar={avatar} onChange={setAvatar} onSave={saveAvatar} onClose={closeCustomizer} saving={savingAvatar} />, document.body)}

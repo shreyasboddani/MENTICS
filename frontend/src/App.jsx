@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import DOMPurify from 'dompurify'
 import { marked } from 'marked'
@@ -26,10 +26,10 @@ import './prep-paths.css'
 
 import { HomeHero } from './home-hero'
 import { boot } from './boot'
-import { ArenaRouteBoundary, AppShell, Starfield, Brand, CsrfField, useClientOnly, api } from './app-runtime'
+import { AppShell, Starfield, Brand, CsrfField, useClientOnly, api } from './app-runtime'
 import QuickPractice, { AdaptiveAssessment } from './adaptive-practice'
 import { DesmosCalculator, DesmosCalculatorToggle } from './arena-calculator'
-const BattleArena = lazy(() => import('./arena-page'))
+import BattleArena from './arena-page'
 
 // The CSRF token is per-session, so it cannot be baked into prerendered HTML.
 // Rendering empty on the server and filling in after mount keeps the server and
@@ -1859,7 +1859,7 @@ function App() {
     case 'quick-practice': page = <QuickPractice />; break
     case 'adaptive-assessment': page = <AdaptiveAssessment />; break
     case 'path': page = <PathPage />; break
-    case 'battles': page = <ArenaRouteBoundary><Suspense fallback={<AppShell name={boot.data.name}><main className="app-main" role="status"><h1>Entering the Arena</h1><p>Preparing your lobby and loadout…</p></main></AppShell>}><BattleArena /></Suspense></ArenaRouteBoundary>; break
+    case 'battles': page = <BattleArena />; break
     case 'login': page = <AuthPage mode="login" />; break
     case 'signup': page = <AuthPage mode="signup" />; break
     case 'onboarding': page = <Onboarding />; break

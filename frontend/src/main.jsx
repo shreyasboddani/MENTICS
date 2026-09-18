@@ -10,9 +10,11 @@ const tree = (
   </React.StrictMode>
 )
 
-// Public pages ship with prerendered markup for crawlers and first paint, so
-// they hydrate. Signed-in pages have an empty root and mount normally.
-if (container.hasChildNodes()) {
+// Only public pages are prerendered. Explicitly selecting those pages avoids
+// accidentally hydrating a signed-in game route when a proxy, extension, or
+// template whitespace leaves a node in the root.
+const prerenderedPages = new Set(['landing', 'ai-sat-prep', 'sat-prep', 'act-prep', 'college-planning', 'login', 'signup', 'privacy', 'terms'])
+if (prerenderedPages.has(window.__MENTICS__?.page) && container.hasChildNodes()) {
   hydrateRoot(container, tree)
 } else {
   createRoot(container).render(tree)
