@@ -1021,7 +1021,7 @@ def _is_path_regeneration_request(message):
     ):
         return True
 
-    path_noun = r"(?:path|plan|roadmap|tasks?|steps?)"
+    path_noun = r"(?:paths?|plans?|roadmaps?|tasks?|steps?)"
     patterns = (
         rf"\b(?:regen|regenerate|rebuild|redo|remake|recreate|refresh|replace|refocus|tailor)\b.{{0,50}}\b{path_noun}\b",
         rf"\b{path_noun}\b.{{0,40}}\b(?:regenerated|rebuilt|redone|remade|recreated|refreshed|replaced)\b",
@@ -2211,7 +2211,7 @@ def _prep_context(user_id, prep):
         FROM paths WHERE user_id=? AND category='Test Prep' AND is_active=True
         ORDER BY track_key, task_order""", (user_id,))
     conversations = db.execute("""SELECT category, history FROM chat_conversations
-        WHERE user_id=? AND (category='Test Prep' OR category LIKE 'Test Prep:%')""", (user_id,))
+        WHERE user_id=? AND (category='Test Prep' OR category LIKE ?)""", (user_id, 'Test Prep:%'))
     chats = {}
     for row in conversations:
         history = json.loads(row['history'] or '[]')

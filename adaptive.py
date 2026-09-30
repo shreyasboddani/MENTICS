@@ -336,10 +336,16 @@ def profile(db, user, track):
 
 
 def coach_view(state):
-    """The profile without bulky per-question text, for the coach and the browser."""
-    slim = {k: v for k, v in state.items() if k not in {'recent_questions', 'recent_mistakes'}}
-    slim['recent_mistakes'] = [{k: str(v)[:200] for k, v in m.items() if k in ('question', 'strategy')} for m in state['recent_mistakes'][-5:]]
-    return slim
+    """A compact profile for the coach and the browser: results and plan, without bulky detail."""
+    skills = {}
+    for key, s in state['skills'].items():
+        skills[key] = {k: s[k] for k in ('label', 'domain', 'attempts', 'accuracy', 'mastery_estimate', 'readiness', 'benchmark', 'recent_accuracy', 'trend', 'misconceptions')}
+        skills[key]['weakest_subskills'] = {k: v['accuracy'] for k, v in sorted(s['subskills'].items(), key=lambda kv: kv[1]['accuracy'])[:3] if v['accuracy'] < 1}
+    benchmark = state.get('benchmark') or {}
+    return {'track': state['track'], 'benchmark_completed': state['benchmark_completed'], 'goal_gap': state.get('goal_gap'),
+        'benchmark_summary': {k: benchmark[k] for k in ('correct', 'total', 'accuracy', 'domains', 'weakest', 'strongest') if k in benchmark},
+        'skills': skills, 'plan': [{k: e[k] for k in ('key', 'label', 'priority', 'reasons', 'focus_subskills')} for e in state['plan'][:6]],
+        'targets': state.get('targets')}
 
 
 def plan(state):
