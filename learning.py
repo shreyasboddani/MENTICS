@@ -410,7 +410,7 @@ def _valid_question(item, *, needs_prompt, requires_blank=False):
     if len(explanation) < 25:
         return None
     source = _clean(
-        item.get("source_or_prompt") or item.get("passage") or item.get("stimulus"), 3000
+        item.get("source_or_prompt") or item.get("passage") or item.get("stimulus"), 6000
     )
     if needs_prompt and len(source) < 40:
         return None

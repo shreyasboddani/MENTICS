@@ -2220,7 +2220,7 @@ def _prep_context(user_id, prep):
         AND activity_type='quick_practice' ORDER BY id DESC LIMIT 8""", (user_id,))
     owner = db.select_one('users', where={'id':user_id})
     learner = User(db,owner['email']) if owner else None
-    evidence = {track: adaptive.profile(db,learner,track) for track in adaptive.TRACKS} if learner else {}
+    evidence = {track: adaptive.coach_view(adaptive.profile(db,learner,track)) for track in adaptive.TRACKS} if learner else {}
     return json.dumps({'learning_profiles':evidence, 'profiles': prep.get('tracks', {}), 'active_paths': paths,
                        'recent_conversations': chats, 'quick_practice': [json.loads(r['details']) for r in quick]})
 
@@ -3680,6 +3680,7 @@ def adaptive_profile(user):
         return jsonify({'error':'Invalid section.'}),400
     state = adaptive.profile(db,user,track)
     state['targets'] = adaptive.targets(state)
+    state = adaptive.coach_view(state)
     sessions = db.execute("SELECT id,status FROM adaptive_sessions WHERE user_id=? AND track_key=? AND kind='quick' AND status IN ('active','generating') ORDER BY id DESC LIMIT 1",(user.data['id'],track))
     state['resume_session'] = sessions[0]['id'] if sessions else None
     return jsonify(state)

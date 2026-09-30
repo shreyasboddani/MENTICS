@@ -25,6 +25,7 @@ import './quick-practice.css'
 import './prep-paths.css'
 
 import { HomeHero } from './home-hero'
+import { Passage } from './passage'
 import { boot } from './boot'
 import { AppShell, Starfield, Brand, CsrfField, useClientOnly, api } from './app-runtime'
 import QuickPractice, { AdaptiveAssessment } from './adaptive-practice'
@@ -1012,7 +1013,7 @@ function CheckStep({ step, coachKind, feedback, selected, onSelect, onCheck, onC
   }
   return <div className={`check-step ${feedback ? (feedback.is_correct ? 'is-right' : 'is-wrong') : ''}`}>
     {replay && <div className="check-replay"><RotateCcw /> Second look — you missed this one earlier.</div>}
-    {step.source_or_prompt && <div className="check-source"><small>PASSAGE / SETUP</small><Markdown>{step.source_or_prompt}</Markdown></div>}
+    {step.source_or_prompt && <div className="check-source"><small>PASSAGE / SETUP</small><Passage text={step.source_or_prompt} className="markdown" label="Passage" /></div>}
     {isMath && <div className="math-tool-row"><DesmosCalculatorToggle open={calculatorOpen} onToggle={() => setCalculatorOpen(value => !value)} /><span>Embedded graphing calculator</span></div>}
     <p className="check-question">{step.question_text}</p>
     <div className="check-options">

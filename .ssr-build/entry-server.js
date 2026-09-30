@@ -739,6 +739,29 @@ function HomeHero({ loggedIn }) {
 	});
 }
 //#endregion
+//#region frontend/src/passage-text.js
+var escapeHtml = (text) => text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+var decorate = (text) => text.replace(/\[underlined(?: (\d+))?:\s*([^\]]+)\]/gi, (_, number, words) => `${number ? `<sup>${number}</sup>` : ""}<u>${words}</u>`).replace(/_{3,}/g, "<span class=\"blank\" role=\"img\" aria-label=\"blank\"></span>");
+var hasTable = (text) => /^\s*\|.*\|\s*\n\s*\|[\s:|-]+\|/m.test(text);
+function passageHtml(text) {
+	const source = String(text || "");
+	const html = hasTable(source) ? marked.parse(decorate(source), { breaks: true }) : decorate(escapeHtml(source)).replace(/\n/g, "<br>");
+	return DOMPurify.sanitize(html);
+}
+//#endregion
+//#region frontend/src/passage.jsx
+function Passage({ text, className = "adaptive-passage", label = "Passage" }) {
+	const html = useMemo(() => passageHtml(text), [text]);
+	const long = String(text || "").length > 900;
+	return /* @__PURE__ */ jsx("div", {
+		className: `${className}${long ? " is-long" : ""}`,
+		role: long ? "region" : void 0,
+		"aria-label": long ? label : void 0,
+		tabIndex: long ? 0 : void 0,
+		dangerouslySetInnerHTML: { __html: html }
+	});
+}
+//#endregion
 //#region frontend/src/app-runtime.jsx
 var noopSubscribe = () => () => {};
 function useClientOnly(value, fallback = "") {
@@ -1482,7 +1505,11 @@ function AdaptivePractice() {
 								className: "adaptive-focus",
 								children: [...new Set(profile.targets || [])].map((key) => {
 									const s = profile.skills[key];
-									return /* @__PURE__ */ jsxs("li", { children: [/* @__PURE__ */ jsx("span", { children: s.label }), /* @__PURE__ */ jsxs("small", { children: [
+									const why = profile.plan?.find((item) => item.key === key)?.reasons?.[0];
+									return /* @__PURE__ */ jsxs("li", { children: [/* @__PURE__ */ jsxs("span", { children: [s.label, why && /* @__PURE__ */ jsx("em", {
+										className: "adaptive-why",
+										children: why
+									})] }), /* @__PURE__ */ jsxs("small", { children: [
 										s.accuracy == null ? "Build evidence" : `${Math.round(s.accuracy * 100)}% across ${s.attempts} answers`,
 										" · ",
 										s.readiness
@@ -1663,11 +1690,18 @@ function AdaptiveSession({ id, onLeave }) {
 			setBusy(false);
 		}
 	};
+	const passageFor = (q) => (q.passage_id ? session?.passages?.[q.passage_id] : q.source_or_prompt) || "";
+	const module = benchmark ? session?.modules?.find((m) => index >= m.start && index <= m.end) : null;
+	const modulePosition = module ? `${module.label} · Question ${index - module.start + 1} of ${module.end - module.start + 1}` : `Question ${index + 1} of ${session?.total}`;
+	const longPassage = !!question && passageFor(question).length > 900;
+	const startsModule = !!module && module.id > 1 && index === module.start && !answered;
+	const summary = session?.summary || {};
+	const skillRows = Object.entries(summary.skills || {}).sort((a, b) => a[1].correct / a[1].total - b[1].correct / b[1].total);
 	const leave = onLeave || (() => {
 		window.location.href = `/dashboard/test-path-view?track=${session?.track || "sat_math"}`;
 	});
 	return /* @__PURE__ */ jsxs("section", {
-		className: "adaptive-session",
+		className: `adaptive-session${longPassage ? " is-wide" : ""}`,
 		children: [
 			/* @__PURE__ */ jsxs("div", {
 				className: "adaptive-session-nav",
@@ -1711,11 +1745,13 @@ function AdaptiveSession({ id, onLeave }) {
 						}),
 						/* @__PURE__ */ jsx("h1", { children: benchmark ? "Now we have a direction." : "One session smarter." }),
 						/* @__PURE__ */ jsxs("p", { children: [
-							session.summary.correct,
+							summary.correct,
 							" of ",
-							session.summary.total,
-							" correct. ",
-							benchmark ? session.summary.message : "These answers now inform your next practice and learning path."
+							summary.total,
+							" correct",
+							summary.minutes ? ` in about ${summary.minutes} minutes` : "",
+							". ",
+							benchmark ? summary.message : "These answers now inform your next practice and learning path."
 						] })
 					]
 				}),
@@ -1730,25 +1766,52 @@ function AdaptiveSession({ id, onLeave }) {
 						] }),
 						/* @__PURE__ */ jsxs("div", {
 							className: "adaptive-score",
-							children: [/* @__PURE__ */ jsxs("b", { children: [Math.round(session.summary.accuracy * 100), /* @__PURE__ */ jsx("small", { children: "%" })] }), /* @__PURE__ */ jsxs("span", { children: [
+							children: [/* @__PURE__ */ jsxs("b", { children: [Math.round(summary.accuracy * 100), /* @__PURE__ */ jsx("small", { children: "%" })] }), /* @__PURE__ */ jsxs("span", { children: [
 								"accuracy",
 								/* @__PURE__ */ jsx("br", {}),
 								"in this session"
 							] })]
 						}),
+						Object.keys(summary.modules || {}).length > 1 && /* @__PURE__ */ jsx("ul", {
+							className: "adaptive-focus",
+							"aria-label": "Results by module",
+							children: Object.entries(summary.modules).map(([name, result]) => /* @__PURE__ */ jsxs("li", { children: [/* @__PURE__ */ jsx("span", { children: name }), /* @__PURE__ */ jsxs("small", { children: [
+								result.correct,
+								" / ",
+								result.total,
+								" correct"
+							] })] }, name))
+						}),
+						/* @__PURE__ */ jsx("h3", {
+							className: "adaptive-subhead",
+							children: "By content area"
+						}),
 						/* @__PURE__ */ jsx("ul", {
 							className: "adaptive-focus",
-							children: Object.entries(session.summary.domains || {}).map(([domain, result]) => /* @__PURE__ */ jsxs("li", { children: [/* @__PURE__ */ jsx("span", { children: domain }), /* @__PURE__ */ jsxs("small", { children: [
+							children: Object.entries(summary.domains || {}).map(([domain, result]) => /* @__PURE__ */ jsxs("li", { children: [/* @__PURE__ */ jsx("span", { children: domain }), /* @__PURE__ */ jsxs("small", { children: [
 								result.correct,
 								" / ",
 								result.total,
 								" correct"
 							] })] }, domain))
 						}),
-						session.summary.rapid_responses > 0 && /* @__PURE__ */ jsx("p", { children: "Very fast responses carry less weight in your mastery estimate. Future practice will check that evidence." }),
+						skillRows.length > 1 && /* @__PURE__ */ jsxs(Fragment, { children: [/* @__PURE__ */ jsx("h3", {
+							className: "adaptive-subhead",
+							children: "By skill, weakest first"
+						}), /* @__PURE__ */ jsx("ul", {
+							className: "adaptive-focus",
+							children: skillRows.map(([key, result]) => /* @__PURE__ */ jsxs("li", { children: [/* @__PURE__ */ jsx("span", { children: result.label }), /* @__PURE__ */ jsxs("small", { children: [
+								result.correct,
+								" / ",
+								result.total,
+								" correct",
+								result.hard_total ? ` · hard ${result.hard_correct}/${result.hard_total}` : ""
+							] })] }, key))
+						})] }),
+						summary.rapid_responses > 0 && /* @__PURE__ */ jsx("p", { children: "Very fast responses carry less weight in your mastery estimate. Future practice will check that evidence." }),
 						benchmark ? /* @__PURE__ */ jsxs(Fragment, { children: [/* @__PURE__ */ jsx("p", {
 							role: "status",
-							children: building ? "Analyzing your answers and preparing five focused steps…" : pathReady ? "Your personalized five-step path is ready." : "Your benchmark is saved. Continue preparing your path below."
+							children: building ? "Building your path from these results and from what you told us you need help with…" : pathReady ? "Your personalized five-step path is ready." : "Your benchmark is saved. Continue preparing your path below."
 						}), pathReady ? /* @__PURE__ */ jsxs("a", {
 							className: "button button--primary",
 							href: `/dashboard/test-path-view?track=${session.track}`,
@@ -1783,10 +1846,7 @@ function AdaptiveSession({ id, onLeave }) {
 								q.answer.selected_option === q.correct_option ? "CORRECT" : "KEEP PRACTICING"
 							]
 						}),
-						q.source_or_prompt && /* @__PURE__ */ jsx("p", {
-							className: "adaptive-passage",
-							children: q.source_or_prompt
-						}),
+						passageFor(q) && /* @__PURE__ */ jsx(Passage, { text: passageFor(q) }),
 						/* @__PURE__ */ jsx("h3", { children: q.question_text }),
 						/* @__PURE__ */ jsxs("p", { children: ["Your answer: ", q.options[q.answer.selected_option]] }),
 						/* @__PURE__ */ jsxs("b", { children: ["Correct answer: ", q.options[q.correct_option]] }),
@@ -1804,20 +1864,17 @@ function AdaptiveSession({ id, onLeave }) {
 							children: benchmark ? "ONE-TIME SECTION BENCHMARK" : "YOUR TARGETED SESSION"
 						}),
 						/* @__PURE__ */ jsx("h1", { children: benchmark ? "Show us where you are." : "Work the question. Learn the move." }),
-						/* @__PURE__ */ jsx("p", { children: benchmark ? "12 original diagnostic questions across this section. Work independently; hints and solutions come after submission. Every answer is saved." : session.note })
+						/* @__PURE__ */ jsx("p", { children: benchmark ? `${session.total} original questions with the structure and difficulty of the real test${session.modules?.length > 1 ? `, in ${session.modules.length} parts` : ""}. Work independently: hints and solutions come after you submit. Every answer is saved, so you can leave and pick up where you stopped.` : session.note })
 					]
 				}),
 				/* @__PURE__ */ jsxs("div", {
 					className: "adaptive-progress",
 					children: [
-						/* @__PURE__ */ jsxs("span", { children: [
-							"Question ",
-							index + 1,
-							" of ",
-							session.total
-						] }),
+						/* @__PURE__ */ jsxs("span", { children: [modulePosition, module?.minutes ? ` · about ${module.minutes} min suggested` : ""] }),
 						/* @__PURE__ */ jsxs("span", { children: [
 							session.answered,
+							" of ",
+							session.total,
 							" saved",
 							!benchmark && ` / ${session.points || 0} session points / ${session.streak || 0} streak`
 						] }),
@@ -1828,89 +1885,105 @@ function AdaptiveSession({ id, onLeave }) {
 						})
 					]
 				}),
-				/* @__PURE__ */ jsxs("article", {
-					className: "adaptive-card adaptive-question",
-					children: [
-						/* @__PURE__ */ jsxs("div", {
-							className: "eyebrow",
-							children: [
-								question.domain,
-								" · ",
-								question.difficulty
-							]
-						}),
-						session.track.endsWith("math") && /* @__PURE__ */ jsxs("div", {
-							className: "math-tool-row",
-							children: [/* @__PURE__ */ jsx(DesmosCalculatorToggle, {
-								open: calculatorOpen,
-								onToggle: () => setCalculatorOpen((value) => !value)
-							}), /* @__PURE__ */ jsx("span", { children: "Embedded graphing calculator" })]
-						}),
-						question.source_or_prompt && /* @__PURE__ */ jsx("div", {
-							className: "adaptive-passage",
-							children: question.source_or_prompt
-						}),
-						/* @__PURE__ */ jsx("h2", { children: question.question_text }),
-						/* @__PURE__ */ jsx("div", {
-							className: "prep-answers",
-							role: "group",
-							"aria-label": "Answer choices",
-							children: question.options.map((option, choice) => /* @__PURE__ */ jsxs("button", {
-								disabled: answered || busy,
-								"aria-pressed": (answered ? question.answer.selected_option : selected) === choice,
-								className: `${(answered ? question.answer.selected_option : selected) === choice ? "is-selected" : ""} ${answered && !benchmark && choice === question.correct_option ? "is-correct" : ""}`,
-								onClick: () => setSelected(choice),
-								children: [/* @__PURE__ */ jsx("span", { children: "ABCD"[choice] }), /* @__PURE__ */ jsx("b", { children: option })]
-							}, choice))
-						}),
-						!answered && /* @__PURE__ */ jsxs("fieldset", {
-							className: "adaptive-confidence",
-							children: [/* @__PURE__ */ jsxs("legend", { children: ["How confident are you? ", /* @__PURE__ */ jsx("small", { children: "Optional" })] }), [
-								"Guessing",
-								"Somewhat sure",
-								"Confident"
-							].map((text, i) => /* @__PURE__ */ jsx("button", {
-								disabled: busy,
-								"aria-pressed": confidence === i + 1,
-								onClick: () => setConfidence(confidence === i + 1 ? null : i + 1),
-								children: text
-							}, text))]
-						}),
-						!benchmark && !answered && /* @__PURE__ */ jsxs("button", {
-							className: "text-button",
-							disabled: busy || question.hints.length >= 3,
-							onClick: () => act("hint", { index }),
-							children: [/* @__PURE__ */ jsx(Lightbulb, { size: 17 }), question.hints.length >= 3 ? "All hints shown" : `Hint ${question.hints.length + 1} of 3`]
-						}),
-						question.hints.map((hint, i) => /* @__PURE__ */ jsxs("div", {
-							className: "adaptive-hint",
-							children: [/* @__PURE__ */ jsxs("b", { children: ["Hint ", i + 1] }), /* @__PURE__ */ jsx("p", { children: hint })]
-						}, i)),
-						/* @__PURE__ */ jsx(Credit, { value: question.attribution }),
-						answered && /* @__PURE__ */ jsxs("div", {
-							className: "adaptive-feedback",
-							role: "status",
-							children: [/* @__PURE__ */ jsx("b", { children: benchmark ? "Answer saved." : question.answer.selected_option === question.correct_option ? "Correct. Keep that approach." : `The answer is ${"ABCD"[question.correct_option]}. Here’s why.` }), !benchmark && /* @__PURE__ */ jsxs(Fragment, { children: [/* @__PURE__ */ jsx("p", { children: question.explanation }), question.fastest_method && /* @__PURE__ */ jsxs("p", { children: [
-								/* @__PURE__ */ jsx("b", { children: "Test-day approach:" }),
-								" ",
-								question.fastest_method
-							] })] })]
-						}),
-						/* @__PURE__ */ jsxs("div", {
-							className: "adaptive-actions",
-							children: [/* @__PURE__ */ jsx("span", { children: benchmark ? "Unsure? Choose your best answer." : "Accuracy first. Speed follows." }), answered ? /* @__PURE__ */ jsxs("button", {
-								className: "button button--primary",
-								disabled: busy,
-								onClick: () => index + 1 < session.total ? (setSelected(null), setConfidence(null), setIndex(index + 1)) : act("finish"),
-								children: [busy ? "Saving…" : index + 1 < session.total ? "Next question" : benchmark ? "Submit benchmark" : "Finish session", /* @__PURE__ */ jsx(ArrowRight, { size: 18 })]
-							}) : /* @__PURE__ */ jsxs("button", {
-								className: "button button--primary",
-								disabled: busy || selected === null,
-								onClick: submit,
-								children: [busy ? "Saving…" : benchmark ? "Save answer" : "Check answer", /* @__PURE__ */ jsx(Check, { size: 18 })]
-							})]
-						})
-					]
+				benchmark && session.total > 12 && /* @__PURE__ */ jsx("ol", {
+					className: "adaptive-map",
+					"aria-label": "Question map",
+					children: session.questions.map((q) => /* @__PURE__ */ jsx("li", {
+						className: `${q.answer ? "is-done" : ""} ${q.index === index ? "is-current" : ""}`,
+						"aria-label": `Question ${q.index + 1}${q.answer ? ", saved" : ""}`,
+						children: /* @__PURE__ */ jsx("span", { children: q.index + 1 })
+					}, q.index))
+				}),
+				startsModule && /* @__PURE__ */ jsxs("div", {
+					className: "adaptive-card adaptive-module-note",
+					role: "status",
+					children: [/* @__PURE__ */ jsxs("b", { children: [module.label, " begins."] }), " This part is deliberately harder, like the second part of the real test. Take a short break first if you need one; your earlier answers are saved."]
+				}),
+				/* @__PURE__ */ jsxs("div", {
+					className: longPassage ? "adaptive-split" : void 0,
+					children: [passageFor(question) && /* @__PURE__ */ jsx(Passage, {
+						text: passageFor(question),
+						label: `Passage for question ${index + 1}`
+					}), /* @__PURE__ */ jsxs("article", {
+						className: "adaptive-card adaptive-question",
+						children: [
+							/* @__PURE__ */ jsxs("div", {
+								className: "eyebrow",
+								children: [
+									question.domain,
+									" · ",
+									question.difficulty
+								]
+							}),
+							session.track.endsWith("math") && /* @__PURE__ */ jsxs("div", {
+								className: "math-tool-row",
+								children: [/* @__PURE__ */ jsx(DesmosCalculatorToggle, {
+									open: calculatorOpen,
+									onToggle: () => setCalculatorOpen((value) => !value)
+								}), /* @__PURE__ */ jsx("span", { children: "Embedded graphing calculator" })]
+							}),
+							/* @__PURE__ */ jsx("h2", { children: question.question_text }),
+							/* @__PURE__ */ jsx("div", {
+								className: "prep-answers",
+								role: "group",
+								"aria-label": "Answer choices",
+								children: question.options.map((option, choice) => /* @__PURE__ */ jsxs("button", {
+									disabled: answered || busy,
+									"aria-pressed": (answered ? question.answer.selected_option : selected) === choice,
+									className: `${(answered ? question.answer.selected_option : selected) === choice ? "is-selected" : ""} ${answered && !benchmark && choice === question.correct_option ? "is-correct" : ""}`,
+									onClick: () => setSelected(choice),
+									children: [/* @__PURE__ */ jsx("span", { children: "ABCD"[choice] }), /* @__PURE__ */ jsx("b", { children: option })]
+								}, choice))
+							}),
+							!answered && /* @__PURE__ */ jsxs("fieldset", {
+								className: "adaptive-confidence",
+								children: [/* @__PURE__ */ jsxs("legend", { children: ["How confident are you? ", /* @__PURE__ */ jsx("small", { children: "Optional" })] }), [
+									"Guessing",
+									"Somewhat sure",
+									"Confident"
+								].map((text, i) => /* @__PURE__ */ jsx("button", {
+									disabled: busy,
+									"aria-pressed": confidence === i + 1,
+									onClick: () => setConfidence(confidence === i + 1 ? null : i + 1),
+									children: text
+								}, text))]
+							}),
+							!benchmark && !answered && /* @__PURE__ */ jsxs("button", {
+								className: "text-button",
+								disabled: busy || question.hints.length >= 3,
+								onClick: () => act("hint", { index }),
+								children: [/* @__PURE__ */ jsx(Lightbulb, { size: 17 }), question.hints.length >= 3 ? "All hints shown" : `Hint ${question.hints.length + 1} of 3`]
+							}),
+							question.hints.map((hint, i) => /* @__PURE__ */ jsxs("div", {
+								className: "adaptive-hint",
+								children: [/* @__PURE__ */ jsxs("b", { children: ["Hint ", i + 1] }), /* @__PURE__ */ jsx("p", { children: hint })]
+							}, i)),
+							/* @__PURE__ */ jsx(Credit, { value: question.attribution }),
+							answered && /* @__PURE__ */ jsxs("div", {
+								className: "adaptive-feedback",
+								role: "status",
+								children: [/* @__PURE__ */ jsx("b", { children: benchmark ? "Answer saved." : question.answer.selected_option === question.correct_option ? "Correct. Keep that approach." : `The answer is ${"ABCD"[question.correct_option]}. Here’s why.` }), !benchmark && /* @__PURE__ */ jsxs(Fragment, { children: [/* @__PURE__ */ jsx("p", { children: question.explanation }), question.fastest_method && /* @__PURE__ */ jsxs("p", { children: [
+									/* @__PURE__ */ jsx("b", { children: "Test-day approach:" }),
+									" ",
+									question.fastest_method
+								] })] })]
+							}),
+							/* @__PURE__ */ jsxs("div", {
+								className: "adaptive-actions",
+								children: [/* @__PURE__ */ jsx("span", { children: benchmark ? "Unsure? Choose your best answer." : "Accuracy first. Speed follows." }), answered ? /* @__PURE__ */ jsxs("button", {
+									className: "button button--primary",
+									disabled: busy,
+									onClick: () => index + 1 < session.total ? (setSelected(null), setConfidence(null), setIndex(index + 1)) : act("finish"),
+									children: [busy ? "Saving…" : index + 1 < session.total ? "Next question" : benchmark ? "Submit benchmark" : "Finish session", /* @__PURE__ */ jsx(ArrowRight, { size: 18 })]
+								}) : /* @__PURE__ */ jsxs("button", {
+									className: "button button--primary",
+									disabled: busy || selected === null,
+									onClick: submit,
+									children: [busy ? "Saving…" : benchmark ? "Save answer" : "Check answer", /* @__PURE__ */ jsx(Check, { size: 18 })]
+								})]
+							})
+						]
+					})]
 				}),
 				session.track.endsWith("math") && /* @__PURE__ */ jsx(DesmosCalculator, {
 					open: calculatorOpen,
@@ -10049,7 +10122,11 @@ function CheckStep({ step, coachKind, feedback, selected, onSelect, onCheck, onC
 			}),
 			step.source_or_prompt && /* @__PURE__ */ jsxs("div", {
 				className: "check-source",
-				children: [/* @__PURE__ */ jsx("small", { children: "PASSAGE / SETUP" }), /* @__PURE__ */ jsx(Markdown, { children: step.source_or_prompt })]
+				children: [/* @__PURE__ */ jsx("small", { children: "PASSAGE / SETUP" }), /* @__PURE__ */ jsx(Passage, {
+					text: step.source_or_prompt,
+					className: "markdown",
+					label: "Passage"
+				})]
 			}),
 			isMath && /* @__PURE__ */ jsxs("div", {
 				className: "math-tool-row",
