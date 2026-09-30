@@ -47,6 +47,13 @@ def ensure_track(db, user_id, track):
         tx.execute_write("UPDATE paths SET is_active=False WHERE user_id=? AND category='Test Prep' AND is_user_added=False AND learning_version<2", (user_id,))
         saved = rows(tx, 'SELECT * FROM adaptive_tracks WHERE user_id=? AND track_key=?', (user_id, track))
         if saved:
+            # An unfinished benchmark from before the full-length version is
+            # swapped for the current one. Finished benchmarks are never touched.
+            if not saved[0].get('benchmark_completed_at'):
+                old = rows(tx, "SELECT * FROM adaptive_sessions WHERE id=? AND kind='benchmark' AND status='active'", (saved[0]['benchmark_session_id'],))
+                fresh = content.benchmark(track, seed=user_id) if old else None
+                if old and len(unpack(old[0]['questions'], [])) != len(fresh):
+                    tx.update('adaptive_sessions', {'questions': json.dumps(fresh), 'answers': json.dumps({}), 'updated_at': time.time()}, where={'id': old[0]['id']})
             return saved[0]
         now = time.time()
         session_id = tx.insert('adaptive_sessions', {

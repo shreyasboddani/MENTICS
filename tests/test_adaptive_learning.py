@@ -145,6 +145,15 @@ def test_migration_archives_only_old_generated_prep(learner):
             assert result.json[0]['task_format']=='benchmark'
 
 
+def test_unfinished_old_benchmark_is_replaced_with_full_length(learner):
+    user,db=learner;uid=user.data['id']
+    sid=adaptive.ensure_track(db,uid,'sat_math')['benchmark_session_id']
+    db.update('adaptive_sessions',{'questions':json.dumps([{'x':1}]*12),'answers':json.dumps({'0':{'selected_option':1}})},where={'id':sid})
+    adaptive.ensure_track(db,uid,'sat_math')
+    saved=db.select_one('adaptive_sessions',where={'id':sid})
+    assert len(json.loads(saved['questions']))==44 and json.loads(saved['answers'])=={}
+
+
 def test_benchmark_resume_is_unaided_atomic_and_only_once(learner):
     user,db=learner;uid=user.data['id']
     state=adaptive.ensure_track(db,uid,'sat_math');sid=state['benchmark_session_id']
