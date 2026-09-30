@@ -4433,6 +4433,15 @@ def _describe_standing_focus(section):
 
 def _regenerate_path_from_chat(user_id, stats, category, history, track_key=None):
     """Generate, persist, and return a path without leaking control messages."""
+    if category != 'College Planning':
+        track = track_key or (stats.get('test_path') or {}).get('active_track')
+        if track in adaptive.TRACKS and not adaptive.ensure_track(db, user_id, track).get('benchmark_completed_at'):
+            reply = ("I can build your new path as soon as you finish this section's benchmark, because the path is built from those results "
+                     "and from what you told me you need help with. Open the benchmark from your Path page, finish it, and ask me again.")
+            history.append({"role": "assistant", "content": reply})
+            db.upsert("chat_conversations", {"user_id": user_id, "category": f'{category}:{track_key}' if track_key else category,
+                                             "history": json.dumps(history)}, conflict_target=["user_id", "category"])
+            return jsonify({"reply": reply})
     try:
         if category == 'College Planning':
             college_context = stats.get("college_path", {})
