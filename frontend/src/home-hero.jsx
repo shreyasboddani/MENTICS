@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { ArrowRight, BookOpen, Check, GraduationCap, Sparkles, Target, LockKeyhole, Flag } from 'lucide-react'
 import Magnet from './react-bits/Magnet'
+import GlareHover from './react-bits/GlareHover'
 import './home-hero.css'
 import './react-bits/mentics-effects.css'
 import './hero-scroll-story.css'
@@ -157,14 +158,14 @@ export function HomeHero({ loggedIn }) {
       <div className="home-hero-eyebrow"><span /> SMALL STEPS. BIG POSSIBILITIES.</div>
       <h1 id="home-hero-title" aria-label="MENTICS">MENTICS<span className="wordmark-sweep" aria-hidden="true">MENTICS</span></h1>
       <p>From your next test to your next chapter.<br className="home-hero-break" /> Personalized SAT, ACT, and college planning that turns <strong>“where do I start?”</strong> into <strong>“I’ve got this.”</strong></p>
-      <div className="home-hero-actions"><Magnet padding={24} magnetStrength={8} maxOffset={5} wrapperClassName="mentics-magnet"><a className="button home-hero-primary" href={loggedIn ? '/dashboard' : '/signup'}>{loggedIn ? 'Continue your path' : 'Find my starting point'} <ArrowRight size={18} /></a></Magnet><a className="home-hero-secondary" href="#how-it-works">See how it works <ArrowRight size={16} /></a></div>
+      <div className="home-hero-actions"><Magnet padding={24} magnetStrength={8} maxOffset={5} wrapperClassName="mentics-magnet"><GlareHover as="a" glareOpacity={0.32} rimGlint={false} transitionDuration={550} className="button home-hero-primary" href={loggedIn ? '/dashboard' : '/signup'}>{loggedIn ? 'Continue your path' : 'Find my starting point'} <ArrowRight size={18} /></GlareHover></Magnet><a className="home-hero-secondary" href="#how-it-works">See how it works <ArrowRight size={16} /></a></div>
       <div className="home-hero-assurance"><span><Check size={14} /> Free to get started</span><span><Check size={14} /> Built around you</span></div>
     </div>
     <div className="hero-story-panel hero-story-panel--chapter" ref={node => { panelsRef.current[1] = node }} aria-hidden={chapter !== 1 && chapter !== -1} inert={chapter !== 1 && chapter !== -1}>
       <div className="home-hero-eyebrow"><span /> 01 / FIND YOUR SIGNAL</div><h2>It starts<br />with <em>you.</em></h2><p>Your goals. Your starting point. The things that feel hard right now. Mentics turns that context into a direction.</p><div className="story-context"><span><Target size={16} /> Your target</span><span><BookOpen size={16} /> Your strengths</span><span><Sparkles size={16} /> Your next opportunity</span></div>
     </div>
     <div className="hero-story-panel hero-story-panel--chapter" ref={node => { panelsRef.current[2] = node }} aria-hidden={chapter !== 2 && chapter !== -1} inert={chapter !== 2 && chapter !== -1}>
-      <div className="home-hero-eyebrow"><span /> 02 / TURN CLARITY INTO ACTION</div><h2>One move.<br /><em>Real momentum.</em></h2><p>Five focused steps. One clear place to begin. Learn, practice, and bring back the result. Your next path gets smarter with you.</p><Magnet padding={24} magnetStrength={8} maxOffset={5} wrapperClassName="mentics-magnet"><a className="button home-hero-primary" href={loggedIn ? '/dashboard' : '/signup'}>{loggedIn ? 'Continue your path' : 'Build my free path'} <ArrowRight size={18} /></a></Magnet><a className="story-continue" href="#how-it-works">Keep going. See the method. <ArrowRight size={16} /></a>
+      <div className="home-hero-eyebrow"><span /> 02 / TURN CLARITY INTO ACTION</div><h2>One move.<br /><em>Real momentum.</em></h2><p>Five focused steps. One clear place to begin. Learn, practice, and bring back the result. Your next path gets smarter with you.</p><Magnet padding={24} magnetStrength={8} maxOffset={5} wrapperClassName="mentics-magnet"><GlareHover as="a" glareOpacity={0.32} rimGlint={false} transitionDuration={550} className="button home-hero-primary" href={loggedIn ? '/dashboard' : '/signup'}>{loggedIn ? 'Continue your path' : 'Build my free path'} <ArrowRight size={18} /></GlareHover></Magnet><a className="story-continue" href="#how-it-works">Keep going. See the method. <ArrowRight size={16} /></a>
     </div>
     </div>
     <div className="hero-story-visual" ref={visualRef}>

@@ -29,6 +29,9 @@ import SpotlightCard from './react-bits/SpotlightCard'
 import ClickSpark from './react-bits/ClickSpark'
 import Magnet from './react-bits/Magnet'
 import AnimatedContent from './react-bits/AnimatedContent'
+import GlareHover from './react-bits/GlareHover'
+import SplitText from './react-bits/SplitText'
+import ShinyText from './react-bits/ShinyText'
 import { useFluidExperience } from './react-bits/useFluidExperience'
 import './react-bits/fluid-experience.css'
 import { Passage } from './passage'
@@ -187,7 +190,7 @@ function ProductPage({ kind }) {
     <header className="product-story-nav">
       <Brand />
       <nav aria-label="Product navigation">{productLinks.map(([href, label]) => <a key={href} href={href} aria-current={kind === href.slice(1) ? 'page' : undefined}>{label}</a>)}</nav>
-      <div><a href="/login">Log in</a><a className="button button--small button--dark" href="/signup">Start free <ArrowRight size={15} /></a></div>
+      <div><a href="/login">Log in</a><GlareHover as="a" glareOpacity={0.25} rimGlint={false} transitionDuration={500} className="button button--small button--dark" href="/signup">Start free <ArrowRight size={15} /></GlareHover></div>
     </header>
     <main>
       <section className="product-story-hero">
@@ -223,7 +226,7 @@ function ExamLanding({ kind }) {
     <header className="public-nav">
       <Brand />
       <nav aria-label="Main navigation"><a href="#how-it-works">How it works</a><a href="/sat-prep" aria-current={exam === 'SAT' ? 'page' : undefined}>SAT prep</a><a href="/act-prep" aria-current={exam === 'ACT' ? 'page' : undefined}>ACT prep</a><a href="/college-planning">College planning</a></nav>
-      <a className="button button--small button--dark" href={loggedIn ? '/dashboard' : '/login'}>{loggedIn ? 'Open dashboard' : 'Log in'} <ArrowRight size={15} /></a>
+      <GlareHover as="a" glareOpacity={0.25} rimGlint={false} transitionDuration={500} className="button button--small button--dark" href={loggedIn ? '/dashboard' : '/login'}>{loggedIn ? 'Open dashboard' : 'Log in'} <ArrowRight size={15} /></GlareHover>
     </header>
     <main>
       <section className="hero exam-hero">
@@ -276,9 +279,9 @@ function Landing() {
         <Magnet padding={12} magnetStrength={10} maxOffset={3} wrapperClassName="mentics-nav-magnet"><a href="#suite">Suite</a></Magnet>
         <Magnet padding={12} magnetStrength={10} maxOffset={3} wrapperClassName="mentics-nav-magnet"><a href="/sat-prep">SAT prep</a></Magnet>
       </nav>
-      <a className="button button--small button--dark" href={loggedIn ? '/dashboard' : '/login'}>
+      <GlareHover as="a" glareOpacity={0.25} rimGlint={false} transitionDuration={500} className="button button--small button--dark" href={loggedIn ? '/dashboard' : '/login'}>
         {loggedIn ? 'Open dashboard' : 'Log in'} <ArrowRight size={15} />
-      </a>
+      </GlareHover>
     </header>
 
     <main>
@@ -293,7 +296,7 @@ function Landing() {
       </section>
 
       <section className="section process story-chapter" data-chapter="01" id="how-it-works">
-        <div className="section-heading"><div className="eyebrow"><span /> THE MENTICS METHOD</div><h2>Clarity changes everything.</h2><p>Mentics turns a distant goal into the next right move—then learns from what happens.</p></div>
+        <div className="section-heading"><div className="eyebrow"><span /> THE MENTICS METHOD</div><SplitText text="Clarity changes everything." tag="h2" textAlign="left" splitType="words" delay={55} duration={0.55} from={{opacity: 0, y: 18}} to={{opacity: 1, y: 0}} rootMargin="0px" /><p>Mentics turns a distant goal into the next right move—then learns from what happens.</p></div>
         <div className="process-grid">
           <article><b>01</b><Target /><h3>Tell us where you are</h3><p>Share your goals, timing, strengths, and the areas that need attention.</p></article>
           <article><b>02</b><Sparkles /><h3>Get a five-step path</h3><p>Receive a focused roadmap built around your actual priorities—not a generic checklist.</p></article>
@@ -401,7 +404,7 @@ function Landing() {
         {[['Is Mentics free to use?', 'Yes. The current early-access product is free and does not require a credit card.'], ['Does it support both SAT and ACT?', 'Yes. Your test-prep path can focus on the SAT, ACT, or both.'], ['Can my plan change as I improve?', 'Yes. Regenerate a path after new scores, completed work, or a change in goals. Mentics uses that context to plan the next five steps.']].map(([q, a]) => <details key={q}><summary>{q}<Plus size={18} /></summary><p>{a}</p></details>)}
       </section>
 
-      <section className="closing"><div><Brand inverse /><h2>Know what to do next.</h2><p>Build a path that makes your ambition feel possible.</p><a className="button button--light" href={loggedIn ? '/dashboard' : '/signup'}>{loggedIn ? 'Open dashboard' : 'Get started free'} <ArrowRight size={18} /></a></div></section>
+      <section className="closing"><div><Brand inverse /><h2><ShinyText text="Know what to do next." color="#ffffff" shineColor="#c4b5fd" trigger="view" speed={1.2} shineWidth={25} /></h2><p>Build a path that makes your ambition feel possible.</p><a className="button button--light" href={loggedIn ? '/dashboard' : '/signup'}>{loggedIn ? 'Open dashboard' : 'Get started free'} <ArrowRight size={18} /></a></div></section>
     </main>
     <footer><Brand /><span>© 2026 Mentics. All rights reserved.</span><div><a href="/ai-sat-prep">AI SAT Prep</a><a href="/sat-prep">SAT Prep</a><a href="/act-prep">ACT Prep</a><a href="/college-planning">College Planning</a><a href="/terms">Terms</a><a href="/privacy">Privacy</a><a href="mailto:thementicsapp@gmail.com">Contact</a></div></footer>
   </div>
@@ -1384,12 +1387,12 @@ function ChatPanel({ open, onClose, category, track, onNewPath }) {
 }
 
 function PageIntro({ kicker, title, copy, actions }) {
-  return <div className="page-intro page-intro--color"><div><div className="eyebrow"><span /> {kicker}</div><h1>{title}</h1>{copy && <p>{copy}</p>}</div>{actions && <div className="page-actions">{actions}</div>}</div>
+  return <div className="page-intro page-intro--color"><div><div className="eyebrow"><span /> {kicker}</div><SplitText text={title} tag="h1" textAlign="left" splitType="words" delay={35} duration={0.5} from={{opacity: 0, y: 16}} to={{opacity: 1, y: 0}} rootMargin="0px" />{copy && <p>{copy}</p>}</div>{actions && <div className="page-actions">{actions}</div>}</div>
 }
 
 function AuthPage({ mode }) {
   const signup = mode === 'signup'
-  return <div className="auth-page"><div className="auth-brand"><Brand /></div><AnimatedContent as="div" className="auth-art" trigger="mount" distance={0} duration={.65}><span className="shape shape--peach" /><span className="shape shape--mint" /><div><small>YOUR NEXT CHAPTER</small><h1>Ambition feels better with a plan.</h1><p>Build momentum across test prep, college planning, and every goal between.</p></div></AnimatedContent><main className="auth-panel"><div className="auth-copy"><small>{signup ? 'START YOUR PATH' : 'WELCOME BACK'}</small><h2>{signup ? 'Join Mentics.' : 'Continue building.'}</h2><p>{signup ? 'Your focused workspace is a minute away.' : 'Your goals and progress are waiting.'}</p></div>{boot.data.error && <div className="form-error" role="alert">{boot.data.error}</div>}<form method="POST" className="react-form"><CsrfField />{signup && <label>Full name<input name="name" autoComplete="name" required maxLength="100" placeholder="Your name" /></label>}<label>Email address<input type="email" name="email" autoComplete="email" required placeholder="you@example.com" /></label><label>Password<input type="password" name="password" autoComplete={signup ? 'new-password' : 'current-password'} minLength={signup ? 8 : undefined} maxLength="128" required placeholder={signup ? 'At least 8 characters' : 'Your password'} /></label>{signup && <label className="legal-consent"><input type="checkbox" name="legal_acceptance" value="accepted" required /> <span>I agree to the <a href="/terms" target="_blank" rel="noreferrer">Terms of Service</a> and <a href="/privacy" target="_blank" rel="noreferrer">Privacy Policy</a>.</span></label>}<button className="button button--primary" type="submit">{signup ? 'Create my account' : 'Sign in'} <ArrowRight /></button></form><div className="form-divider"><span>or</span></div><a className="google-button" href="/google-login"><span>G</span> Continue with Google</a><p className="oauth-legal-notice">By continuing with Google, you agree to the <a href="/terms" target="_blank" rel="noreferrer">Terms of Service</a> and acknowledge the <a href="/privacy" target="_blank" rel="noreferrer">Privacy Policy</a>.</p><p className="auth-switch">{signup ? 'Already have an account?' : 'New to Mentics?'} <a href={signup ? '/login' : '/signup'}>{signup ? 'Sign in' : 'Create an account'}</a></p></main></div>
+  return <div className="auth-page"><div className="auth-brand"><Brand /></div><AnimatedContent as="div" className="auth-art" trigger="mount" distance={0} duration={.65}><span className="shape shape--peach" /><span className="shape shape--mint" /><div><small>YOUR NEXT CHAPTER</small><h1>Ambition feels better with a plan.</h1><p>Build momentum across test prep, college planning, and every goal between.</p></div></AnimatedContent><main className="auth-panel"><div className="auth-copy"><small>{signup ? 'START YOUR PATH' : 'WELCOME BACK'}</small><SplitText text={signup ? 'Join Mentics.' : 'Continue building.'} tag="h2" textAlign="left" splitType="words" delay={50} duration={0.5} from={{opacity: 0, y: 14}} to={{opacity: 1, y: 0}} rootMargin="0px" /><p>{signup ? 'Your focused workspace is a minute away.' : 'Your goals and progress are waiting.'}</p></div>{boot.data.error && <div className="form-error" role="alert">{boot.data.error}</div>}<form method="POST" className="react-form"><CsrfField />{signup && <label>Full name<input name="name" autoComplete="name" required maxLength="100" placeholder="Your name" /></label>}<label>Email address<input type="email" name="email" autoComplete="email" required placeholder="you@example.com" /></label><label>Password<input type="password" name="password" autoComplete={signup ? 'new-password' : 'current-password'} minLength={signup ? 8 : undefined} maxLength="128" required placeholder={signup ? 'At least 8 characters' : 'Your password'} /></label>{signup && <label className="legal-consent"><input type="checkbox" name="legal_acceptance" value="accepted" required /> <span>I agree to the <a href="/terms" target="_blank" rel="noreferrer">Terms of Service</a> and <a href="/privacy" target="_blank" rel="noreferrer">Privacy Policy</a>.</span></label>}<GlareHover as="button" glareOpacity={0.35} rimGlint={false} className="button button--primary" type="submit">{signup ? 'Create my account' : 'Sign in'} <ArrowRight /></GlareHover></form><div className="form-divider"><span>or</span></div><GlareHover as="a" glareColor="#7c3aed" glareOpacity={0.14} rimGlint={false} blendMode="normal" className="google-button" href="/google-login"><span>G</span> Continue with Google</GlareHover><p className="oauth-legal-notice">By continuing with Google, you agree to the <a href="/terms" target="_blank" rel="noreferrer">Terms of Service</a> and acknowledge the <a href="/privacy" target="_blank" rel="noreferrer">Privacy Policy</a>.</p><p className="auth-switch">{signup ? 'Already have an account?' : 'New to Mentics?'} <a href={signup ? '/login' : '/signup'}>{signup ? 'Sign in' : 'Create an account'}</a></p></main></div>
 }
 
 const learningOptions = [['visual', 'Visual', Sparkles, 'I learn by seeing'], ['auditory', 'Auditory', Headphones, 'I learn by hearing'], ['reading_writing', 'Reading / writing', PenLine, 'I learn through words'], ['kinesthetic', 'Hands-on', Hand, 'I learn by doing']]

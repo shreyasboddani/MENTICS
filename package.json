@@ -12,6 +12,7 @@
     "prerender": "node prerender.mjs"
   },
   "dependencies": {
+    "@gsap/react": "^2.1.2",
     "@vitejs/plugin-react": "6.0.5",
     "canvas-confetti": "^1.9.4",
     "dompurify": "3.4.13",

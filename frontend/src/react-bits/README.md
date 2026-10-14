@@ -10,7 +10,7 @@ and a fixed, non-interactive effect layer so existing layout stays intact.
 Magnet adds a small spring movement to homepage actions and public/product
 navigation anchors. SpotlightCard decorates the five existing suite articles.
 Original copy, controls, routes, colors, and article semantics are preserved.
-No npm dependencies are added.
+These three interactions do not add npm dependencies.
 
 Local adaptations update settings after commit, respond to live reduced-motion
 preferences, disable click bursts for reduced motion, ignore touch magnet and
@@ -25,9 +25,27 @@ in place of ScrollTrigger. It preserves visible server-rendered content and
 existing inline styles, respects live reduced-motion changes, and supports an
 `as` tag and mount trigger. `useFluidExperience` applies the same reveal to existing
 page blocks and auth fields without inserting layout wrappers. The auth artwork
-uses the component directly. GSAP is the only additional dependency.
+uses the component directly. AnimatedContent adds only the GSAP dependency.
 
 The mobile menu keeps its backdrop mounted so both entrance and exit complete,
 staggers existing links, morphs its toggle icon, and supports Escape with focus
 return. Closed navigation remains hidden and non-interactive. CSS feedback for
 forms, buttons, and icons uses the existing palette.
+
+GlareHover is vendored from `src/content/Animations/GlareHover/GlareHover.jsx`
+and `.css`; it provides directional light sweeps on homepage actions and login
+buttons. Its root supports `as` and native anchor/button props. Mentics keeps
+control of button geometry and backgrounds; overlays do not intercept clicks.
+Live reduced-motion changes stop the sweep, and touch hover is ignored.
+
+SplitText is vendored from `src/content/TextAnimations/SplitText/SplitText.jsx`.
+It uses GSAP SplitText, ScrollTrigger, and the `@gsap/react` hook for word reveals
+on the method heading, auth heading, and shared page introductions. Text remains
+visible in server markup, semantic heading tags are kept, splitting waits for
+fonts, and reduced-motion users receive ordinary text. The original text and
+palette are preserved. `@gsap/react` is added alongside the existing GSAP dependency.
+
+ShinyText is vendored from `src/content/TextAnimations/ShinyText/ShinyText.jsx`
+and `.css`. It sweeps a lavender highlight over the existing white closing
+heading once when it enters view, then restores the original white. Settings
+are synchronized after commit and live reduced-motion changes cancel the shine.

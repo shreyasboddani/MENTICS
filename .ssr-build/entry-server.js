@@ -7,6 +7,9 @@ import { Toaster, toast } from "sonner";
 import { AlertTriangle, ArrowLeft, ArrowRight, Award, BarChart3, BookOpen, Brain, Calculator, CalendarDays, Check, ChevronRight, CircleCheck, Clock3, Dices, Flag, Flame, GraduationCap, GripHorizontal, Hand, Headphones, House, LayoutDashboard, Lightbulb, LineChart, LockKeyhole, LogOut, Mail, Maximize2, MessageCircle, Minimize2, PenLine, Plus, RotateCcw, RotateCw, Search, Send, Settings, ShieldCheck, SkipForward, Sparkles, Swords, Target, TrendingUp, Trophy, UserRound, UsersRound, Volume2, VolumeX, X, Zap } from "lucide-react";
 import { Fragment, jsx, jsxs } from "react/jsx-runtime";
 import { gsap } from "gsap";
+import { ScrollTrigger } from "gsap/ScrollTrigger";
+import { SplitText } from "gsap/SplitText";
+import { useGSAP } from "@gsap/react";
 //#region frontend/src/boot.js
 var initial = typeof window !== "undefined" && window.__MENTICS__ ? window.__MENTICS__ : {
 	page: "landing",
@@ -287,6 +290,278 @@ var Magnet = ({ children, padding = 100, disabled = false, magnetStrength = 2, m
 	});
 };
 //#endregion
+//#region frontend/src/react-bits/GlareHover.jsx
+var smootherstep = (t) => t * t * t * (t * (t * 6 - 15) + 10);
+var bump = (t, center, half) => {
+	const distance = Math.abs(t - center);
+	return distance >= half ? 0 : smootherstep(1 - distance / half);
+};
+var PROFILES = {
+	streak: (t, softness) => bump(t, .5, .06 + .16 * softness) + .32 * bump(t, .5, .5),
+	twin: (t, softness) => bump(t, .36, .08 + .18 * softness) + .85 * bump(t, .7, .03 + .06 * softness) + .26 * bump(t, .5, .5),
+	sheen: (t, softness) => .55 * bump(t, .5, .25 + .25 * softness) + .3 * bump(t, .5, .5)
+};
+var gradient = (color, opacity, variant, softness) => {
+	const profile = PROFILES[variant] ?? PROFILES.streak;
+	return `linear-gradient(90deg, ${Array.from({ length: 33 }, (_, index) => {
+		const t = index / 32;
+		return `color-mix(in srgb, ${color} ${Math.round(Math.min(1, profile(t, softness) * opacity) * 1e3) / 10}%, transparent) ${(t * 100).toFixed(1)}%`;
+	}).join(", ")})`;
+};
+var ease = (t) => (1 - Math.cos(Math.PI * t)) / 2;
+var GlareHover = ({ as: Component = "div", width = "auto", height = "auto", background = "transparent", borderRadius = "10px", borderColor = "transparent", children, glareColor = "#ffffff", glareOpacity = .5, glareAngle = -45, glareSize = 30, softness = .6, variant = "streak", blendMode = "screen", rimGlint = true, mode = "hover", transitionDuration = 650, interval = 3, playOnce = false, intro = false, className = "", style = {}, ...rest }) => {
+	const rootRef = useRef(null);
+	const glareRef = useRef(null);
+	const bandRef = useRef(null);
+	const rimRef = useRef(null);
+	const engineRef = useRef(null);
+	const introRef = useRef(false);
+	const settings = {
+		glareAngle,
+		glareSize,
+		transitionDuration,
+		interval,
+		playOnce,
+		intro
+	};
+	const settingsRef = useRef(settings);
+	useEffect(() => {
+		settingsRef.current = settings;
+	});
+	useEffect(() => {
+		const root = rootRef.current;
+		const glare = glareRef.current;
+		if (!root || !glare) return;
+		const motion = window.matchMedia("(prefers-reduced-motion: reduce)");
+		let reduced = motion.matches;
+		const geometry = {
+			band: 0,
+			reach: 0,
+			ux: 0,
+			uy: -1,
+			angle: 0
+		};
+		const state = {
+			pos: 0,
+			velocity: 0,
+			target: 0,
+			presence: 0,
+			presenceTarget: 0,
+			sweep: null,
+			visible: true
+		};
+		let raf = 0;
+		let last = 0;
+		let timer = 0;
+		const bands = () => [bandRef.current, rimRef.current].filter(Boolean);
+		const write = () => {
+			const transform = `translate(-50%, -50%) rotate(${geometry.angle - 90}deg) translateX(${state.pos.toFixed(2)}px)`;
+			for (const band of bands()) band.style.transform = transform;
+			glare.style.opacity = state.presence.toFixed(3);
+		};
+		const measure = () => {
+			const { glareAngle: angle, glareSize: size } = settingsRef.current;
+			const width = root.clientWidth;
+			const height = root.clientHeight;
+			const radians = angle * Math.PI / 180;
+			const ux = Math.sin(radians);
+			const uy = -Math.cos(radians);
+			const diagonal = Math.hypot(width, height);
+			const band = Math.max(8, diagonal * size / 100);
+			const reach = (Math.abs(width * ux) + Math.abs(height * uy)) / 2 + band / 2 + 2;
+			const resting = !state.sweep && mode !== "follow";
+			Object.assign(geometry, {
+				band,
+				reach,
+				ux,
+				uy,
+				angle
+			});
+			for (const element of bands()) {
+				element.style.width = `${band}px`;
+				element.style.height = `${diagonal + band}px`;
+			}
+			if (resting) state.pos = state.pos > 0 ? reach : -reach;
+			write();
+		};
+		const frame = (now) => {
+			const dt = Math.min(.05, (now - last) / 1e3 || 0);
+			last = now;
+			let moving = false;
+			if (state.sweep) {
+				const sweep = state.sweep;
+				const t = Math.min(1, (now - sweep.start) / sweep.duration);
+				state.pos = sweep.from + (sweep.to - sweep.from) * ease(t);
+				if (t < 1) moving = true;
+				else state.sweep = null;
+			} else if (mode === "follow") {
+				const steps = Math.max(1, Math.ceil(dt / (1 / 120)));
+				const h = dt / steps;
+				for (let i = 0; i < steps; i++) {
+					state.velocity += (170 * (state.target - state.pos) - 24 * state.velocity) * h;
+					state.pos += state.velocity * h;
+				}
+				const tau = state.presenceTarget > state.presence ? .18 : .4;
+				state.presence += (state.presenceTarget - state.presence) * (1 - Math.exp(-dt / tau));
+				moving = Math.abs(state.target - state.pos) > .05 || Math.abs(state.velocity) > .05 || Math.abs(state.presenceTarget - state.presence) > .002;
+				if (!moving) state.presence = state.presenceTarget;
+			}
+			write();
+			raf = moving ? requestAnimationFrame(frame) : 0;
+		};
+		const wake = () => {
+			if (raf) return;
+			last = performance.now();
+			raf = requestAnimationFrame(frame);
+		};
+		const sweep = (sign) => {
+			if (reduced || !geometry.reach) return;
+			const end = sign * geometry.reach;
+			const from = state.sweep || Math.abs(state.pos) < geometry.reach ? state.pos : -end;
+			if (from === end) return;
+			const share = Math.abs(end - from) / (2 * geometry.reach);
+			state.sweep = {
+				from,
+				to: end,
+				start: performance.now(),
+				duration: Math.max(120, settingsRef.current.transitionDuration * share)
+			};
+			wake();
+		};
+		const along = (event) => {
+			const rect = root.getBoundingClientRect();
+			const dx = event.clientX - (rect.left + rect.width / 2);
+			const dy = event.clientY - (rect.top + rect.height / 2);
+			return dx * geometry.ux + dy * geometry.uy;
+		};
+		const follow = (event) => {
+			state.target = Math.max(-geometry.reach, Math.min(geometry.reach, along(event)));
+			wake();
+		};
+		const onEnter = (event) => {
+			if (event.pointerType === "touch") return;
+			if (mode === "hover") sweep(along(event) > 0 ? -1 : 1);
+			if (mode === "follow") {
+				if (state.presence < .02) {
+					state.pos = Math.max(-geometry.reach, Math.min(geometry.reach, along(event)));
+					state.velocity = 0;
+				}
+				state.presenceTarget = reduced ? 0 : 1;
+				follow(event);
+			}
+		};
+		const onMove = (event) => {
+			if (mode === "follow") follow(event);
+		};
+		const onLeave = (event) => {
+			if (mode === "hover" && !settingsRef.current.playOnce) sweep(along(event) > 0 ? 1 : -1);
+			if (mode === "follow") {
+				state.presenceTarget = 0;
+				wake();
+			}
+		};
+		const onDown = (event) => {
+			if (mode === "click") sweep(along(event) > 0 ? -1 : 1);
+		};
+		const onFocus = (event) => {
+			if (mode !== "follow" && event.target.matches?.(":focus-visible")) sweep(1);
+		};
+		const schedule = () => {
+			window.clearTimeout(timer);
+			if (mode !== "loop" || reduced) return;
+			timer = window.setTimeout(() => {
+				if (state.visible && !document.hidden) sweep(1);
+				schedule();
+			}, Math.max(.5, settingsRef.current.interval) * 1e3);
+		};
+		const onMotionChange = () => {
+			reduced = motion.matches;
+			if (reduced) {
+				cancelAnimationFrame(raf);
+				raf = 0;
+				window.clearTimeout(timer);
+				state.sweep = null;
+				glare.style.opacity = "0";
+			} else schedule();
+		};
+		motion.addEventListener("change", onMotionChange);
+		root.addEventListener("pointerenter", onEnter);
+		root.addEventListener("pointermove", onMove);
+		root.addEventListener("pointerleave", onLeave);
+		root.addEventListener("pointerdown", onDown);
+		root.addEventListener("focusin", onFocus);
+		const resizeObserver = new ResizeObserver(measure);
+		resizeObserver.observe(root);
+		const visibilityObserver = new IntersectionObserver(([entry]) => {
+			state.visible = entry.isIntersecting;
+			if (entry.isIntersecting && settingsRef.current.intro && !introRef.current) {
+				introRef.current = true;
+				sweep(1);
+			}
+		}, { threshold: .4 });
+		visibilityObserver.observe(root);
+		state.presence = mode === "follow" ? 0 : 1;
+		state.presenceTarget = state.presence;
+		state.pos = -1e4;
+		measure();
+		schedule();
+		engineRef.current = { measure };
+		return () => {
+			motion.removeEventListener("change", onMotionChange);
+			cancelAnimationFrame(raf);
+			window.clearTimeout(timer);
+			resizeObserver.disconnect();
+			visibilityObserver.disconnect();
+			root.removeEventListener("pointerenter", onEnter);
+			root.removeEventListener("pointermove", onMove);
+			root.removeEventListener("pointerleave", onLeave);
+			root.removeEventListener("pointerdown", onDown);
+			root.removeEventListener("focusin", onFocus);
+			engineRef.current = null;
+		};
+	}, [mode]);
+	useEffect(() => {
+		engineRef.current?.measure();
+	}, [
+		glareAngle,
+		glareSize,
+		rimGlint
+	]);
+	const glare = gradient(glareColor, glareOpacity, variant, softness);
+	const rim = gradient(glareColor, Math.min(1, glareOpacity * 1.8), variant, softness);
+	return /* @__PURE__ */ jsxs(Component, {
+		...rest,
+		ref: rootRef,
+		className: `glare-hover ${className}`.trim(),
+		style: {
+			"--gh-width": width,
+			"--gh-height": height,
+			"--gh-bg": background,
+			"--gh-br": borderRadius,
+			"--gh-border": borderColor,
+			"--gh-glare": glare,
+			"--gh-rim": rim,
+			"--gh-blend": blendMode,
+			...style
+		},
+		children: [children, /* @__PURE__ */ jsxs("span", {
+			ref: glareRef,
+			className: "glare-hover__glare",
+			"aria-hidden": "true",
+			children: [/* @__PURE__ */ jsx("span", {
+				ref: bandRef,
+				className: "glare-hover__band"
+			}), rimGlint && /* @__PURE__ */ jsx("span", {
+				className: "glare-hover__rim",
+				children: /* @__PURE__ */ jsx("span", {
+					ref: rimRef,
+					className: "glare-hover__band glare-hover__band--rim"
+				})
+			})]
+		})]
+	});
+};
+//#endregion
 //#region frontend/src/home-hero.jsx
 var previews = {
 	SAT: {
@@ -433,13 +708,13 @@ var STEP_STOPS = [
 	[.81, 3],
 	[2, 4]
 ];
-var clamp$2 = (value) => value < 0 ? 0 : value > 1 ? 1 : value;
+var clamp$3 = (value) => value < 0 ? 0 : value > 1 ? 1 : value;
 var smooth = (value) => value * value * (3 - 2 * value);
 var cameraAt = (progress) => {
 	let index = 1;
 	while (index < CAMERA.length - 1 && progress > CAMERA[index].p) index += 1;
 	const from = CAMERA[index - 1], to = CAMERA[index];
-	const eased = smooth(clamp$2((progress - from.p) / (to.p - from.p)));
+	const eased = smooth(clamp$3((progress - from.p) / (to.p - from.p)));
 	const frame = {};
 	for (const key in to) frame[key] = from[key] + (to[key] - from[key]) * eased;
 	return frame;
@@ -512,7 +787,7 @@ function HomeHero({ loggedIn }) {
 				return;
 			}
 			story.dataset.scroll = "active";
-			const progress = clamp$2(-story.getBoundingClientRect().top / range);
+			const progress = clamp$3(-story.getBoundingClientRect().top / range);
 			const current = progress < .17 ? 0 : progress < .58 ? 1 : 2;
 			if (current !== lastChapter) {
 				lastChapter = current;
@@ -526,8 +801,8 @@ function HomeHero({ loggedIn }) {
 			panelsRef.current.forEach((panel, index) => {
 				if (!panel) return;
 				const { enter, exit } = PANELS[index];
-				const arriving = enter[1] > enter[0] ? clamp$2((progress - enter[0]) / (enter[1] - enter[0])) : 1;
-				const leaving = clamp$2((progress - exit[0]) / (exit[1] - exit[0]));
+				const arriving = enter[1] > enter[0] ? clamp$3((progress - enter[0]) / (enter[1] - enter[0])) : 1;
+				const leaving = clamp$3((progress - exit[0]) / (exit[1] - exit[0]));
 				panel.style.opacity = smooth(arriving) * (1 - smooth(leaving));
 				panel.style.transform = `translate3d(0, ${(1 - arriving) * 46 - leaving * 54}px, 0) scale(${1 - (1 - arriving) * .045 - leaving * .035})`;
 			});
@@ -539,9 +814,9 @@ function HomeHero({ loggedIn }) {
 			parallax.forEach(([node, x, y]) => {
 				if (node) node.style.translate = `${(mobile ? 0 : x) * progress}px ${y * progress}px`;
 			});
-			if (prompt) prompt.style.opacity = String(1 - clamp$2(progress / .07));
+			if (prompt) prompt.style.opacity = String(1 - clamp$3(progress / .07));
 			progressRef.current.style.transform = `scaleX(${progress})`;
-			route.style.strokeDashoffset = String(100 - clamp$2((progress - .05) / .8) * 100);
+			route.style.strokeDashoffset = String(100 - clamp$3((progress - .05) / .8) * 100);
 		};
 		const schedule = () => {
 			if (!frame) frame = requestAnimationFrame(render);
@@ -738,7 +1013,11 @@ function HomeHero({ loggedIn }) {
 										magnetStrength: 8,
 										maxOffset: 5,
 										wrapperClassName: "mentics-magnet",
-										children: /* @__PURE__ */ jsxs("a", {
+										children: /* @__PURE__ */ jsxs(GlareHover, {
+											as: "a",
+											glareOpacity: .32,
+											rimGlint: false,
+											transitionDuration: 550,
 											className: "button home-hero-primary",
 											href: loggedIn ? "/dashboard" : "/signup",
 											children: [
@@ -811,7 +1090,11 @@ function HomeHero({ loggedIn }) {
 									magnetStrength: 8,
 									maxOffset: 5,
 									wrapperClassName: "mentics-magnet",
-									children: /* @__PURE__ */ jsxs("a", {
+									children: /* @__PURE__ */ jsxs(GlareHover, {
+										as: "a",
+										glareOpacity: .32,
+										rimGlint: false,
+										transitionDuration: 550,
 										className: "button home-hero-primary",
 										href: loggedIn ? "/dashboard" : "/signup",
 										children: [
@@ -1039,9 +1322,9 @@ var THEMES = {
 };
 var SHAPES$1 = ["circle", "beam"];
 var NOISE = "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E\")";
-var clamp$1 = (value, min, max) => Math.min(max, Math.max(min, value));
+var clamp$2 = (value, min, max) => Math.min(max, Math.max(min, value));
 var falloff = (color, softness) => {
-	const soft = clamp$1(softness, 0, 1);
+	const soft = clamp$2(softness, 0, 1);
 	const core = (1 - soft) ** 1.5 * .85;
 	const stop = (alpha, at) => `color-mix(in srgb, ${color} ${(alpha * 100).toFixed(2)}%, transparent) ${(at * 100).toFixed(2)}%`;
 	const list = [stop(1, 0)];
@@ -1067,13 +1350,13 @@ var SpotlightCard = ({ as: Component = "article", children, className = "", styl
 		fill: falloff(color, softness),
 		edge: falloff(color, 1),
 		size: Math.max(20, spotlightSize),
-		intensity: clamp$1(intensity, 0, 1) * palette.fill,
-		borderGlow: clamp$1(borderGlow, 0, 1) * palette.edge,
+		intensity: clamp$2(intensity, 0, 1) * palette.fill,
+		borderGlow: clamp$2(borderGlow, 0, 1) * palette.edge,
 		proximity: Math.max(0, proximity),
-		smoothing: clamp$1(smoothing, 0, 1),
+		smoothing: clamp$2(smoothing, 0, 1),
 		ambient,
 		flare,
-		grain: clamp$1(grain, 0, 1)
+		grain: clamp$2(grain, 0, 1)
 	};
 	const settingsRef = useRef(settings);
 	useEffect(() => {
@@ -1307,7 +1590,7 @@ var SpotlightCard = ({ as: Component = "article", children, className = "", styl
 };
 //#endregion
 //#region frontend/src/react-bits/ClickSpark.jsx
-var EASINGS = {
+var EASINGS$1 = {
 	linear: (t) => t,
 	"ease-in": (t) => t * t,
 	"ease-out": (t) => 1 - Math.pow(1 - t, 3),
@@ -1322,9 +1605,9 @@ var SHAPES = [
 ];
 var MAX_BURSTS = 32;
 var GRAVITY = 500;
-var clamp = (value, min, max) => Math.min(max, Math.max(min, value));
+var clamp$1 = (value, min, max) => Math.min(max, Math.max(min, value));
 var smoothstep = (a, b, x) => {
-	const t = clamp((x - a) / (b - a), 0, 1);
+	const t = clamp$1((x - a) / (b - a), 0, 1);
 	return t * t * (3 - 2 * t);
 };
 var toColors = (value) => {
@@ -1370,16 +1653,16 @@ var ClickSpark = forwardRef(({ sparkColor = "#fff", sparkSize = 14, sparkRadius 
 		colors: toColors(sparkColor),
 		size: Math.max(0, sparkSize),
 		radius: Math.max(0, sparkRadius) * Math.max(0, extraScale),
-		count: clamp(Math.round(sparkCount), 1, 64),
+		count: clamp$1(Math.round(sparkCount), 1, 64),
 		width: Math.max(.5, sparkWidth),
 		duration: Math.max(60, duration),
-		ease: EASINGS[easing] ?? EASINGS["ease-out"],
+		ease: EASINGS$1[easing] ?? EASINGS$1["ease-out"],
 		shape: SHAPES.includes(shape) ? shape : "line",
-		randomness: clamp(randomness, 0, 1),
+		randomness: clamp$1(randomness, 0, 1),
 		gravity: Math.max(0, gravity),
-		spread: clamp(spread, 0, 360),
+		spread: clamp$1(spread, 0, 360),
 		direction,
-		glow: clamp(glow, 0, 1),
+		glow: clamp$1(glow, 0, 1),
 		ring,
 		disabled
 	};
@@ -1406,7 +1689,7 @@ var ClickSpark = forwardRef(({ sparkColor = "#fff", sparkSize = 14, sparkRadius 
 			const life = s.duration * spark.life;
 			const p = elapsed / life;
 			if (p >= 1) return false;
-			const e = s.ease(clamp(p, 0, 1));
+			const e = s.ease(clamp$1(p, 0, 1));
 			const seconds = elapsed / 1e3;
 			const distance = s.radius * spark.reach * e;
 			const width = s.width * spark.scale;
@@ -1437,7 +1720,7 @@ var ClickSpark = forwardRef(({ sparkColor = "#fff", sparkSize = 14, sparkRadius 
 			}
 			if (s.shape === "streak") {
 				const lag = Math.min(elapsed, 70 + s.size * 4 * spark.scale);
-				const back = s.ease(clamp((elapsed - lag) / life, 0, 1));
+				const back = s.ease(clamp$1((elapsed - lag) / life, 0, 1));
 				const [hx, hy] = position(burst, spark, distance, seconds);
 				const [tx, ty] = position(burst, spark, s.radius * spark.reach * back, Math.max(0, seconds - lag / 1e3));
 				const dx = hx - tx;
@@ -1482,7 +1765,7 @@ var ClickSpark = forwardRef(({ sparkColor = "#fff", sparkSize = 14, sparkRadius 
 				return true;
 			}
 			const [x, y] = position(burst, spark, distance, seconds);
-			const twinkle = Math.pow(Math.sin(Math.PI * clamp(p * 1.1, 0, 1)), .7);
+			const twinkle = Math.pow(Math.sin(Math.PI * clamp$1(p * 1.1, 0, 1)), .7);
 			const radius = s.size * .6 * spark.scale * twinkle;
 			const rotation = spark.angle + spark.spin * p * Math.PI * .5;
 			if (radius <= .05) return true;
@@ -1501,7 +1784,7 @@ var ClickSpark = forwardRef(({ sparkColor = "#fff", sparkSize = 14, sparkRadius 
 			const s = burst.settings;
 			const p = elapsed / (s.duration * .8);
 			if (p >= 1) return false;
-			const radius = 2 + s.radius * .6 * EASINGS["ease-out"](p);
+			const radius = 2 + s.radius * .6 * EASINGS$1["ease-out"](p);
 			ctx.globalAlpha = Math.pow(1 - p, 2) * .7;
 			ctx.strokeStyle = burst.sparks[0]?.color ?? s.colors[0];
 			ctx.lineWidth = Math.max(.5, s.width * (1 - p) * .9);
@@ -1554,7 +1837,7 @@ var ClickSpark = forwardRef(({ sparkColor = "#fff", sparkSize = 14, sparkRadius 
 			});
 			const longest = s.duration * (1 + .25 * s.randomness);
 			const fall = drop(s, longest / 1e3);
-			const reach = s.radius * (1 + .35 * s.randomness) * (s.ease === EASINGS.spring ? 1.15 : 1) + s.size * (1 + .4 * s.randomness) + s.width * (s.glow > 0 ? 6 : 2) + 6;
+			const reach = s.radius * (1 + .35 * s.randomness) * (s.ease === EASINGS$1.spring ? 1.15 : 1) + s.size * (1 + .4 * s.randomness) + s.width * (s.glow > 0 ? 6 : 2) + 6;
 			const box = {
 				left: Math.max(clientX - reach, 0),
 				top: Math.max(clientY - reach, 0),
@@ -1735,6 +2018,483 @@ function AnimatedContent({ as: Component = "div", children, distance = 16, direc
 		children
 	});
 }
+//#endregion
+//#region frontend/src/react-bits/SplitText.jsx
+gsap.registerPlugin(ScrollTrigger, SplitText, useGSAP);
+var SplitText$1 = ({ text, className = "", delay = 50, duration = 1.25, ease = "power3.out", splitType = "chars", from = {
+	opacity: 0,
+	y: 40
+}, to = {
+	opacity: 1,
+	y: 0
+}, threshold = .1, rootMargin = "-100px", textAlign = "center", tag = "p", onLetterAnimationComplete }) => {
+	const ref = useRef(null);
+	const animationCompletedRef = useRef(false);
+	const onCompleteRef = useRef(onLetterAnimationComplete);
+	const [fontsLoaded, setFontsLoaded] = useState(false);
+	useEffect(() => {
+		onCompleteRef.current = onLetterAnimationComplete;
+	}, [onLetterAnimationComplete]);
+	useEffect(() => {
+		let active = true;
+		document.fonts.ready.then(() => {
+			if (active) setFontsLoaded(true);
+		});
+		return () => {
+			active = false;
+		};
+	}, []);
+	useGSAP(() => {
+		if (!ref.current || !text || !fontsLoaded) return;
+		if (animationCompletedRef.current) return;
+		const el = ref.current;
+		const motion = window.matchMedia("(prefers-reduced-motion: reduce)");
+		if (motion.matches) return;
+		if (el._rbsplitInstance) {
+			try {
+				el._rbsplitInstance.revert();
+			} catch {}
+			el._rbsplitInstance = null;
+		}
+		const startPct = (1 - threshold) * 100;
+		const marginMatch = /^(-?\d+(?:\.\d+)?)(px|em|rem|%)?$/.exec(rootMargin);
+		const marginValue = marginMatch ? parseFloat(marginMatch[1]) : 0;
+		const marginUnit = marginMatch ? marginMatch[2] || "px" : "px";
+		const start = `top ${startPct}%${marginValue === 0 ? "" : marginValue < 0 ? `-=${Math.abs(marginValue)}${marginUnit}` : `+=${marginValue}${marginUnit}`}`;
+		let targets;
+		const assignTargets = (self) => {
+			if (splitType.includes("chars") && self.chars.length) targets = self.chars;
+			if (!targets && splitType.includes("words") && self.words.length) targets = self.words;
+			if (!targets && splitType.includes("lines") && self.lines.length) targets = self.lines;
+			if (!targets) targets = self.chars || self.words || self.lines;
+		};
+		const splitInstance = new SplitText(el, {
+			type: splitType,
+			smartWrap: true,
+			autoSplit: splitType === "lines",
+			linesClass: "split-line",
+			wordsClass: "split-word",
+			charsClass: "split-char",
+			reduceWhiteSpace: false,
+			onSplit: (self) => {
+				assignTargets(self);
+				return gsap.fromTo(targets, { ...from }, {
+					...to,
+					duration,
+					ease,
+					stagger: delay / 1e3,
+					scrollTrigger: {
+						trigger: el,
+						start,
+						once: true,
+						fastScrollEnd: true,
+						anticipatePin: .4
+					},
+					onComplete: () => {
+						animationCompletedRef.current = true;
+						onCompleteRef.current?.();
+					},
+					willChange: "transform, opacity",
+					force3D: true
+				});
+			}
+		});
+		el._rbsplitInstance = splitInstance;
+		const preferenceChanged = () => {
+			if (motion.matches) {
+				ScrollTrigger.getAll().forEach((st) => {
+					if (st.trigger === el) st.kill();
+				});
+				gsap.killTweensOf(targets);
+				splitInstance.revert();
+				animationCompletedRef.current = true;
+			}
+		};
+		motion.addEventListener("change", preferenceChanged);
+		return () => {
+			motion.removeEventListener("change", preferenceChanged);
+			ScrollTrigger.getAll().forEach((st) => {
+				if (st.trigger === el) st.kill();
+			});
+			try {
+				splitInstance.revert();
+			} catch {}
+			el._rbsplitInstance = null;
+		};
+	}, {
+		dependencies: [
+			text,
+			delay,
+			duration,
+			ease,
+			splitType,
+			JSON.stringify(from),
+			JSON.stringify(to),
+			threshold,
+			rootMargin,
+			fontsLoaded
+		],
+		scope: ref
+	});
+	const renderTag = () => {
+		const style = {
+			textAlign,
+			display: "block",
+			whiteSpace: "normal",
+			wordWrap: "break-word"
+		};
+		const classes = `split-parent ${className}`;
+		return /* @__PURE__ */ jsx(tag || "p", {
+			ref,
+			style,
+			className: classes,
+			children: text
+		});
+	};
+	return renderTag();
+};
+//#endregion
+//#region frontend/src/react-bits/ShinyText.jsx
+var EASINGS = {
+	linear: (t) => t,
+	smooth: (t) => .5 - Math.cos(Math.PI * t) / 2,
+	snappy: (t) => t < .5 ? 16 * Math.pow(t, 5) : 1 - Math.pow(-2 * t + 2, 5) / 2
+};
+var TRIGGERS = [
+	"loop",
+	"hover",
+	"view"
+];
+var FALLOFF = [
+	0,
+	.2,
+	.4,
+	.6,
+	.8,
+	1
+];
+var clamp = (value, min, max) => Math.min(max, Math.max(min, value));
+var paint = null;
+var parseColor = (value) => {
+	if (typeof document === "undefined") return null;
+	if (!paint) paint = document.createElement("canvas").getContext("2d");
+	if (!paint) return null;
+	paint.fillStyle = "#000000";
+	paint.fillStyle = value;
+	const resolved = String(paint.fillStyle);
+	if (resolved.startsWith("#")) return [
+		1,
+		3,
+		5
+	].map((i) => parseInt(resolved.slice(i, i + 2), 16)).concat(1);
+	const parts = resolved.match(/[\d.]+/g);
+	if (!parts || parts.length < 3) return null;
+	return [
+		Number(parts[0]),
+		Number(parts[1]),
+		Number(parts[2]),
+		parts.length > 3 ? Number(parts[3]) : 1
+	];
+};
+var blend = (from, to, amount) => {
+	const channel = (a, b) => Math.round(Math.pow(Math.pow(a / 255, 2.2) * (1 - amount) + Math.pow(b / 255, 2.2) * amount, 1 / 2.2) * 255);
+	const alpha = from[3] * (1 - amount) + to[3] * amount;
+	if (alpha <= 0) return "rgba(0, 0, 0, 0)";
+	const weigh = (a, b) => (a * from[3] * (1 - amount) + b * to[3] * amount) / alpha;
+	return `rgba(${from[3] === to[3] ? channel(from[0], to[0]) : Math.round(weigh(from[0], to[0]))}, ${from[3] === to[3] ? channel(from[1], to[1]) : Math.round(weigh(from[1], to[1]))}, ${from[3] === to[3] ? channel(from[2], to[2]) : Math.round(weigh(from[2], to[2]))}, ${Math.round(alpha * 1e3) / 1e3})`;
+};
+var ShinyText = ({ text, children, color = "#b5b5b5", shineColor = "#ffffff", speed = 2, delay = 0, angle = 120, shineWidth = 40, softness = .8, bands = 1, glow = 0, direction = "left", easing = "smooth", trigger = "loop", yoyo = false, followPointer = false, pauseOnHover = false, disabled = false, className = "", style }) => {
+	const rootRef = useRef(null);
+	const glowRef = useRef(null);
+	const settingsRef = useRef(null);
+	const syncRef = useRef(null);
+	const content = children ?? text;
+	const settings = {
+		color,
+		shineColor,
+		speed: Math.max(.1, speed),
+		delay: Math.max(0, delay),
+		angle,
+		shineWidth: clamp(shineWidth, 2, 200),
+		softness: clamp(softness, 0, 1),
+		bands: clamp(Math.round(bands), 1, 3),
+		glow: clamp(glow, 0, 1),
+		sign: direction === "right" ? 1 : -1,
+		ease: EASINGS[easing] ?? EASINGS.smooth,
+		trigger: TRIGGERS.includes(trigger) ? trigger : "loop",
+		yoyo,
+		followPointer,
+		pauseOnHover,
+		disabled
+	};
+	useEffect(() => {
+		settingsRef.current = settings;
+	});
+	useEffect(() => {
+		syncRef.current?.();
+	});
+	useEffect(() => {
+		const root = rootRef.current;
+		if (!root) return void 0;
+		const motion = window.matchMedia("(prefers-reduced-motion: reduce)");
+		let reduce = motion.matches;
+		const state = {
+			pos: null,
+			vel: 0,
+			phase: "idle",
+			from: 0,
+			to: 0,
+			start: 0,
+			duration: 1,
+			resume: 0,
+			flip: false,
+			inside: false,
+			target: 0,
+			visible: true,
+			seen: false,
+			colors: ""
+		};
+		let base = null;
+		let shine = null;
+		let clear = null;
+		let raf = 0;
+		let timer = 0;
+		let last = 0;
+		let alive = true;
+		const extent = () => {
+			const s = settingsRef.current;
+			return s.shineWidth / 2 + (s.bands - 1) * s.shineWidth * 1.3 + 2;
+		};
+		const entry = () => settingsRef.current.sign > 0 ? -extent() : 100 + extent();
+		const exit = () => settingsRef.current.sign > 0 ? 100 + extent() : -extent();
+		const nearest = () => state.target < 50 ? -extent() : 100 + extent();
+		const gradient = (pos, fill) => {
+			const s = settingsRef.current;
+			const half = s.shineWidth / 2;
+			const core = half * (1 - s.softness);
+			const fade = half - core;
+			const stops = [];
+			for (let band = 0; band < s.bands; band++) {
+				const center = pos - s.sign * band * s.shineWidth * 1.3;
+				const strength = 1 - band * .28;
+				for (const side of [-1, 1]) for (const f of FALLOFF) {
+					const at = center + side * (core + fade * (1 - f));
+					const amount = f * f * (3 - 2 * f) * strength;
+					stops.push([at, amount]);
+				}
+			}
+			stops.sort((a, b) => a[0] - b[0]);
+			const list = stops.map(([at, amount]) => `${blend(fill, shine, amount)} ${at.toFixed(2)}%`);
+			return `linear-gradient(${s.angle}deg, ${blend(fill, shine, 0)} 0%, ${list.join(", ")}, ${blend(fill, shine, 0)} 100%)`;
+		};
+		const draw = () => {
+			const s = settingsRef.current;
+			const key = `${s.color}|${s.shineColor}`;
+			if (key !== state.colors) {
+				state.colors = key;
+				base = parseColor(s.color);
+				shine = parseColor(s.shineColor);
+				clear = shine ? [
+					shine[0],
+					shine[1],
+					shine[2],
+					0
+				] : null;
+			}
+			if (!base || !shine) {
+				root.style.backgroundImage = `linear-gradient(${s.color}, ${s.color})`;
+				return;
+			}
+			if (state.pos === null || s.disabled) {
+				root.style.backgroundImage = `linear-gradient(${s.color}, ${s.color})`;
+				if (glowRef.current) glowRef.current.style.backgroundImage = "none";
+				return;
+			}
+			root.style.backgroundImage = gradient(state.pos, base);
+			if (glowRef.current) {
+				glowRef.current.style.backgroundImage = gradient(state.pos, clear);
+				glowRef.current.style.opacity = String(s.glow);
+			}
+		};
+		const sweep = (from, to, now) => {
+			const s = settingsRef.current;
+			const span = Math.abs(exit() - entry()) || 1;
+			state.phase = "sweep";
+			state.from = from;
+			state.to = to;
+			state.start = now;
+			state.duration = s.speed * 1e3 * Math.max(.15, Math.abs(to - from) / span);
+		};
+		const wake = () => {
+			if (raf || !alive) return;
+			window.clearTimeout(timer);
+			timer = 0;
+			last = performance.now();
+			raf = requestAnimationFrame(tick);
+		};
+		const tick = (now) => {
+			raf = 0;
+			if (!alive) return;
+			const s = settingsRef.current;
+			const dt = Math.min(.05, Math.max(0, (now - last) / 1e3));
+			last = now;
+			if (s.disabled) {
+				state.pos = null;
+				state.phase = "idle";
+				draw();
+				return;
+			}
+			if (s.followPointer && state.inside) {
+				if (state.pos === null) state.pos = nearest();
+				const stiffness = 220;
+				state.vel += ((state.target - state.pos) * stiffness - state.vel * 2 * Math.sqrt(stiffness)) * dt;
+				state.pos += state.vel * dt;
+				state.phase = "follow";
+				draw();
+				raf = requestAnimationFrame(tick);
+				return;
+			}
+			if (state.phase === "follow") {
+				state.vel = 0;
+				sweep(state.pos ?? nearest(), nearest(), now);
+			}
+			if (state.phase === "sweep") {
+				if (s.pauseOnHover && state.inside) {
+					state.start += dt * 1e3;
+					raf = requestAnimationFrame(tick);
+					return;
+				}
+				const t = clamp((now - state.start) / state.duration, 0, 1);
+				state.pos = state.from + (state.to - state.from) * s.ease(t);
+				draw();
+				if (t < 1) {
+					raf = requestAnimationFrame(tick);
+					return;
+				}
+				if (s.trigger !== "loop" || reduce) {
+					state.phase = "idle";
+					state.pos = null;
+					draw();
+					return;
+				}
+				state.phase = "wait";
+				state.resume = now + s.delay * 1e3;
+			}
+			if (state.phase === "wait") {
+				if (!state.visible) return;
+				if (now < state.resume) {
+					window.clearTimeout(timer);
+					timer = window.setTimeout(wake, state.resume - now);
+					return;
+				}
+				if (s.yoyo) {
+					state.flip = !state.flip;
+					sweep(state.flip ? exit() : entry(), state.flip ? entry() : exit(), now);
+				} else sweep(entry(), exit(), now);
+				raf = requestAnimationFrame(tick);
+				return;
+			}
+			if (state.phase === "idle" && s.trigger === "loop" && !reduce && state.visible) {
+				state.flip = false;
+				sweep(entry(), exit(), now);
+				raf = requestAnimationFrame(tick);
+			}
+		};
+		const locate = (event) => {
+			const s = settingsRef.current;
+			const rect = root.getBoundingClientRect();
+			const radians = s.angle * Math.PI / 180;
+			const dx = Math.sin(radians);
+			const dy = -Math.cos(radians);
+			const length = Math.abs(rect.width * dx) + Math.abs(rect.height * dy) || 1;
+			return 50 + ((event.clientX - rect.left - rect.width / 2) * dx + (event.clientY - rect.top - rect.height / 2) * dy) / length * 100;
+		};
+		const onEnter = (event) => {
+			const s = settingsRef.current;
+			state.inside = true;
+			state.target = locate(event);
+			if (s.disabled) return;
+			if (s.followPointer) {
+				if (state.pos === null) state.pos = nearest();
+			} else if (s.trigger === "hover" && state.phase === "idle" && !reduce) sweep(entry(), exit(), performance.now());
+			wake();
+		};
+		const onMove = (event) => {
+			state.target = locate(event);
+			if (settingsRef.current.followPointer) wake();
+		};
+		const onLeave = () => {
+			state.inside = false;
+			wake();
+		};
+		const onMotionChange = () => {
+			reduce = motion.matches;
+			if (reduce) {
+				cancelAnimationFrame(raf);
+				raf = 0;
+				window.clearTimeout(timer);
+				state.pos = null;
+				state.phase = "idle";
+				draw();
+			} else wake();
+		};
+		motion.addEventListener("change", onMotionChange);
+		const observer = new IntersectionObserver((entries) => {
+			const visible = entries.some((item) => item.isIntersecting);
+			state.visible = visible;
+			const s = settingsRef.current;
+			if (!visible) return;
+			if (s.trigger === "view" && !state.seen && !reduce && !s.disabled) {
+				state.seen = true;
+				sweep(entry(), exit(), performance.now());
+			}
+			wake();
+		});
+		observer.observe(root);
+		root.addEventListener("pointerenter", onEnter);
+		root.addEventListener("pointermove", onMove);
+		root.addEventListener("pointerleave", onLeave);
+		syncRef.current = () => {
+			const s = settingsRef.current;
+			if (s.disabled) {
+				state.pos = null;
+				state.phase = "idle";
+			} else if (s.trigger !== "loop" && state.phase === "wait") {
+				state.phase = "idle";
+				state.pos = null;
+			}
+			draw();
+			wake();
+		};
+		draw();
+		wake();
+		return () => {
+			alive = false;
+			motion.removeEventListener("change", onMotionChange);
+			cancelAnimationFrame(raf);
+			window.clearTimeout(timer);
+			observer.disconnect();
+			root.removeEventListener("pointerenter", onEnter);
+			root.removeEventListener("pointermove", onMove);
+			root.removeEventListener("pointerleave", onLeave);
+			syncRef.current = null;
+		};
+	}, []);
+	return /* @__PURE__ */ jsxs("span", {
+		ref: rootRef,
+		className: `shiny-text${className ? ` ${className}` : ""}`,
+		style: {
+			backgroundImage: `linear-gradient(${color}, ${color})`,
+			...style
+		},
+		children: [content, glow > 0 ? /* @__PURE__ */ jsx("span", {
+			ref: glowRef,
+			className: "shiny-text__glow",
+			"aria-hidden": "true",
+			children: content
+		}) : null]
+	});
+};
 //#endregion
 //#region frontend/src/react-bits/useFluidExperience.js
 var contentTargets = [
@@ -7907,7 +8667,11 @@ function ProductPage({ kind }) {
 					/* @__PURE__ */ jsxs("div", { children: [/* @__PURE__ */ jsx("a", {
 						href: "/login",
 						children: "Log in"
-					}), /* @__PURE__ */ jsxs("a", {
+					}), /* @__PURE__ */ jsxs(GlareHover, {
+						as: "a",
+						glareOpacity: .25,
+						rimGlint: false,
+						transitionDuration: 500,
 						className: "button button--small button--dark",
 						href: "/signup",
 						children: ["Start free ", /* @__PURE__ */ jsx(ArrowRight, { size: 15 })]
@@ -8136,7 +8900,11 @@ function ExamLanding({ kind }) {
 							})
 						]
 					}),
-					/* @__PURE__ */ jsxs("a", {
+					/* @__PURE__ */ jsxs(GlareHover, {
+						as: "a",
+						glareOpacity: .25,
+						rimGlint: false,
+						transitionDuration: 500,
 						className: "button button--small button--dark",
 						href: loggedIn ? "/dashboard" : "/login",
 						children: [
@@ -8516,7 +9284,11 @@ function Landing() {
 							})
 						]
 					}),
-					/* @__PURE__ */ jsxs("a", {
+					/* @__PURE__ */ jsxs(GlareHover, {
+						as: "a",
+						glareOpacity: .25,
+						rimGlint: false,
+						transitionDuration: 500,
 						className: "button button--small button--dark",
 						href: loggedIn ? "/dashboard" : "/login",
 						children: [
@@ -8558,7 +9330,23 @@ function Landing() {
 								className: "eyebrow",
 								children: [/* @__PURE__ */ jsx("span", {}), " THE MENTICS METHOD"]
 							}),
-							/* @__PURE__ */ jsx("h2", { children: "Clarity changes everything." }),
+							/* @__PURE__ */ jsx(SplitText$1, {
+								text: "Clarity changes everything.",
+								tag: "h2",
+								textAlign: "left",
+								splitType: "words",
+								delay: 55,
+								duration: .55,
+								from: {
+									opacity: 0,
+									y: 18
+								},
+								to: {
+									opacity: 1,
+									y: 0
+								},
+								rootMargin: "0px"
+							}),
 							/* @__PURE__ */ jsx("p", { children: "Mentics turns a distant goal into the next right move—then learns from what happens." })
 						]
 					}), /* @__PURE__ */ jsxs("div", {
@@ -9050,7 +9838,14 @@ function Landing() {
 					className: "closing",
 					children: /* @__PURE__ */ jsxs("div", { children: [
 						/* @__PURE__ */ jsx(Brand, { inverse: true }),
-						/* @__PURE__ */ jsx("h2", { children: "Know what to do next." }),
+						/* @__PURE__ */ jsx("h2", { children: /* @__PURE__ */ jsx(ShinyText, {
+							text: "Know what to do next.",
+							color: "#ffffff",
+							shineColor: "#c4b5fd",
+							trigger: "view",
+							speed: 1.2,
+							shineWidth: 25
+						}) }),
 						/* @__PURE__ */ jsx("p", { children: "Build a path that makes your ambition feel possible." }),
 						/* @__PURE__ */ jsxs("a", {
 							className: "button button--light",
@@ -12171,7 +12966,23 @@ function PageIntro({ kicker, title, copy, actions }) {
 					kicker
 				]
 			}),
-			/* @__PURE__ */ jsx("h1", { children: title }),
+			/* @__PURE__ */ jsx(SplitText$1, {
+				text: title,
+				tag: "h1",
+				textAlign: "left",
+				splitType: "words",
+				delay: 35,
+				duration: .5,
+				from: {
+					opacity: 0,
+					y: 16
+				},
+				to: {
+					opacity: 1,
+					y: 0
+				},
+				rootMargin: "0px"
+			}),
 			copy && /* @__PURE__ */ jsx("p", { children: copy })
 		] }), actions && /* @__PURE__ */ jsx("div", {
 			className: "page-actions",
@@ -12211,7 +13022,23 @@ function AuthPage({ mode }) {
 						className: "auth-copy",
 						children: [
 							/* @__PURE__ */ jsx("small", { children: signup ? "START YOUR PATH" : "WELCOME BACK" }),
-							/* @__PURE__ */ jsx("h2", { children: signup ? "Join Mentics." : "Continue building." }),
+							/* @__PURE__ */ jsx(SplitText$1, {
+								text: signup ? "Join Mentics." : "Continue building.",
+								tag: "h2",
+								textAlign: "left",
+								splitType: "words",
+								delay: 50,
+								duration: .5,
+								from: {
+									opacity: 0,
+									y: 14
+								},
+								to: {
+									opacity: 1,
+									y: 0
+								},
+								rootMargin: "0px"
+							}),
 							/* @__PURE__ */ jsx("p", { children: signup ? "Your focused workspace is a minute away." : "Your goals and progress are waiting." })
 						]
 					}),
@@ -12277,7 +13104,10 @@ function AuthPage({ mode }) {
 									] })
 								]
 							}),
-							/* @__PURE__ */ jsxs("button", {
+							/* @__PURE__ */ jsxs(GlareHover, {
+								as: "button",
+								glareOpacity: .35,
+								rimGlint: false,
 								className: "button button--primary",
 								type: "submit",
 								children: [
@@ -12292,7 +13122,12 @@ function AuthPage({ mode }) {
 						className: "form-divider",
 						children: /* @__PURE__ */ jsx("span", { children: "or" })
 					}),
-					/* @__PURE__ */ jsxs("a", {
+					/* @__PURE__ */ jsxs(GlareHover, {
+						as: "a",
+						glareColor: "#7c3aed",
+						glareOpacity: .14,
+						rimGlint: false,
+						blendMode: "normal",
 						className: "google-button",
 						href: "/google-login",
 						children: [/* @__PURE__ */ jsx("span", { children: "G" }), " Continue with Google"]
