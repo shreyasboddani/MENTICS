@@ -2,6 +2,7 @@ import { Component, useEffect, useRef, useState, useSyncExternalStore } from 're
 import { createPortal } from 'react-dom'
 import { LayoutDashboard, Target, GraduationCap, BarChart3, LineChart, Swords, MessageCircle, Award, Settings, LogOut, Menu, X } from 'lucide-react'
 import { boot } from './boot'
+import Magnet from './react-bits/Magnet'
 
 export class ArenaRouteBoundary extends Component {
   state = { failed: false }
@@ -120,7 +121,7 @@ export function AppShell({ children, name, immersive = false }) {
     <Starfield />
     <header className="product-nav">
       <Brand />
-      <nav id="mobile-product-navigation" className={menu ? 'open' : ''} aria-label="Product navigation">{navItems.map(([href, Icon, label]) => <a key={href} className={active(href) ? 'active' : ''} href={href} aria-current={active(href) ? 'page' : undefined} title={label} onClick={event => travel(event, href, label)}><Icon size={17} /><span>{label}</span></a>)}</nav>
+      <nav id="mobile-product-navigation" className={menu ? 'open' : ''} aria-label="Product navigation">{navItems.map(([href, Icon, label]) => <Magnet key={href} padding={8} magnetStrength={12} maxOffset={3} wrapperClassName="mentics-nav-magnet"><a className={active(href) ? 'active' : ''} href={href} aria-current={active(href) ? 'page' : undefined} title={label} onClick={event => travel(event, href, label)}><Icon size={17} /><span>{label}</span></a></Magnet>)}</nav>
       <div className="product-account"><a href="/account" onClick={event => travel(event, '/account', 'Settings')}><i>{(name || 'M').slice(0, 1).toUpperCase()}</i><span>{name || 'Mentics student'}</span></a><form className="product-logout" method="POST" action="/logout"><CsrfField /><button type="submit" aria-label="Log out"><LogOut size={17} /></button></form></div>
       <button className="product-menu" type="button" onClick={() => setMenu(!menu)} aria-label={menu ? 'Close navigation' : 'Open navigation'} aria-controls="mobile-product-navigation" aria-expanded={menu}>{menu ? <X /> : <Menu />}</button>
     </header>

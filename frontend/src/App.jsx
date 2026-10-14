@@ -25,6 +25,9 @@ import './quick-practice.css'
 import './prep-paths.css'
 
 import { HomeHero } from './home-hero'
+import SpotlightCard from './react-bits/SpotlightCard'
+import ClickSpark from './react-bits/ClickSpark'
+import Magnet from './react-bits/Magnet'
 import { Passage } from './passage'
 import { boot } from './boot'
 import { AppShell, Starfield, Brand, CsrfField, useClientOnly, api } from './app-runtime'
@@ -272,10 +275,10 @@ function Landing() {
     <header className="public-nav">
       <Brand />
       <nav aria-label="Main navigation">
-        <a href="#how-it-works">How it works</a>
-        <a href="#platform">Platform</a>
-        <a href="#suite">Suite</a>
-        <a href="/sat-prep">SAT prep</a>
+        <Magnet padding={12} magnetStrength={10} maxOffset={3} wrapperClassName="mentics-nav-magnet"><a href="#how-it-works">How it works</a></Magnet>
+        <Magnet padding={12} magnetStrength={10} maxOffset={3} wrapperClassName="mentics-nav-magnet"><a href="#platform">Platform</a></Magnet>
+        <Magnet padding={12} magnetStrength={10} maxOffset={3} wrapperClassName="mentics-nav-magnet"><a href="#suite">Suite</a></Magnet>
+        <Magnet padding={12} magnetStrength={10} maxOffset={3} wrapperClassName="mentics-nav-magnet"><a href="/sat-prep">SAT prep</a></Magnet>
       </nav>
       <a className="button button--small button--dark" href={loggedIn ? '/dashboard' : '/login'}>
         {loggedIn ? 'Open dashboard' : 'Log in'} <ArrowRight size={15} />
@@ -377,11 +380,11 @@ function Landing() {
       <section className="suite-section story-chapter" data-chapter="05" id="suite">
         <div className="suite-heading"><div className="eyebrow"><span /> THE COMPLETE MENTICS SUITE</div><h2>Everything your ambition needs.<br />Nothing it doesn’t.</h2><p>The tools already inside Mentics, brought into one expressive workspace.</p></div>
         <div className="suite-grid">
-          <article className="suite-path"><Target /><small>ADAPTIVE PATHS</small><h3>Five steps. One clear direction.</h3><p>Personalized SAT, ACT, and college-planning roadmaps that respond to your progress.</p><div className="mini-road"><i>1</i><span /><i>2</i><span /><i>3</i><span /><i>4</i><span /><i>5</i></div></article>
-          <article className="suite-sprint"><Zap /><small>FOCUSED SPRINTS</small><h3>Practice with purpose.</h3><p>Short assessments, strategy articles, and immediate explanations make every session count.</p></article>
-          <article className="suite-essay"><PenLine /><small>ESSAY FEEDBACK</small><h3>Make every word stronger.</h3><p>Get structured feedback while keeping your voice, story, and ideas unmistakably yours.</p></article>
-          <article className="suite-progress"><LineChart /><small>VISIBLE PROGRESS</small><h3>See the work adding up.</h3><p>Scores, milestones, history, points, and streaks reveal the pattern behind improvement.</p></article>
-          <article className="suite-community"><UsersRound /><small>COMMUNITY</small><h3>Move forward together.</h3><p>Ask questions, share approaches, and keep your own progress private.</p></article>
+          <SpotlightCard theme="light" spotlightColor="#8953e8" intensity={0.45} borderGlow={0.55} proximity={0} flare={false} className="suite-path"><Target /><small>ADAPTIVE PATHS</small><h3>Five steps. One clear direction.</h3><p>Personalized SAT, ACT, and college-planning roadmaps that respond to your progress.</p><div className="mini-road"><i>1</i><span /><i>2</i><span /><i>3</i><span /><i>4</i><span /><i>5</i></div></SpotlightCard>
+          <SpotlightCard theme="light" spotlightColor="#8953e8" intensity={0.45} borderGlow={0.55} proximity={0} flare={false} className="suite-sprint"><Zap /><small>FOCUSED SPRINTS</small><h3>Practice with purpose.</h3><p>Short assessments, strategy articles, and immediate explanations make every session count.</p></SpotlightCard>
+          <SpotlightCard theme="light" spotlightColor="#8953e8" intensity={0.45} borderGlow={0.55} proximity={0} flare={false} className="suite-essay"><PenLine /><small>ESSAY FEEDBACK</small><h3>Make every word stronger.</h3><p>Get structured feedback while keeping your voice, story, and ideas unmistakably yours.</p></SpotlightCard>
+          <SpotlightCard theme="light" spotlightColor="#8953e8" intensity={0.45} borderGlow={0.55} proximity={0} flare={false} className="suite-progress"><LineChart /><small>VISIBLE PROGRESS</small><h3>See the work adding up.</h3><p>Scores, milestones, history, points, and streaks reveal the pattern behind improvement.</p></SpotlightCard>
+          <SpotlightCard theme="light" spotlightColor="#8953e8" intensity={0.45} borderGlow={0.55} proximity={0} flare={false} className="suite-community"><UsersRound /><small>COMMUNITY</small><h3>Move forward together.</h3><p>Ask questions, share approaches, and keep your own progress private.</p></SpotlightCard>
         </div>
       </section>
 
@@ -1887,7 +1890,7 @@ function App() {
     case 'article': page = <ArticlePage />; break
     default: page = <Landing />
   }
-  return <><Toaster position="bottom-right" mobileOffset={16} offset={24} closeButton theme="light" toastOptions={{ duration: 4200 }} />{page}</>
+  return <ClickSpark sparkColor={['#a78bfa', '#7c3aed', '#c4b5fd']} sparkSize={9} sparkRadius={24} sparkCount={7} duration={400} glow={0.1}><Toaster position="bottom-right" mobileOffset={16} offset={24} closeButton theme="light" toastOptions={{ duration: 4200 }} />{page}</ClickSpark>
 }
 
 export { App, CsrfBootstrap }

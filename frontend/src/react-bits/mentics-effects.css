@@ -1,0 +1,29 @@
+/* Interaction-only additions: keep the existing Mentics palette and layout. */
+.suite-grid .spotlight-card { background-color: transparent; box-shadow: none; }
+.mentics-magnet { flex-shrink: 0; }
+.product-nav nav .mentics-nav-magnet { flex-shrink: 0; }
+
+/* Press feedback also works on touch screens and keyboard activation. */
+.button:active:not(:disabled), .home-hero-track button:active,
+.product-menu:active, .icon-button:active:not(:disabled) { transform: translateY(1px) scale(.97); }
+
+/* Native same-origin page transitions do not delay or intercept navigation. */
+@view-transition { navigation: auto; }
+::view-transition-old(root) { animation: mentics-page-out 120ms ease-out both; }
+::view-transition-new(root) { animation: mentics-page-in 220ms ease-out both; }
+@keyframes mentics-page-out { to { opacity: 0; } }
+@keyframes mentics-page-in { from { opacity: 0; transform: translateY(6px); } }
+
+@media (max-width: 1180px) {
+  .product-nav nav .mentics-nav-magnet { width: 100%; }
+}
+@media (prefers-reduced-motion: reduce), (hover: none) {
+  .suite-grid .spotlight-card__light,
+  .suite-grid .spotlight-card__grain,
+  .suite-grid .spotlight-card__edge { display: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-old(root), ::view-transition-new(root) { animation: none; }
+  .button:active:not(:disabled), .home-hero-track button:active,
+  .product-menu:active, .icon-button:active:not(:disabled) { transform: none; }
+}

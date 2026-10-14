@@ -1,5 +1,5 @@
 import { renderToString } from "react-dom/server";
-import { memo, useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import { forwardRef, memo, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { createPortal } from "react-dom";
 import DOMPurify from "dompurify";
 import { marked } from "marked";
@@ -19,6 +19,272 @@ function setBoot(next) {
 	boot.page = next && next.page || "landing";
 	boot.data = next && next.data || {};
 }
+//#endregion
+//#region frontend/src/react-bits/Magnet.jsx
+var DEFAULT_SPRING = {
+	stiffness: 170,
+	damping: 16,
+	mass: 1
+};
+var smoothstep$1 = (edge0, edge1, value) => {
+	const t = Math.min(1, Math.max(0, (value - edge0) / (edge1 - edge0)));
+	return t * t * (3 - 2 * t);
+};
+var registry = /* @__PURE__ */ new Set();
+var field = {
+	pointer: null,
+	owner: null
+};
+var detach = null;
+var reach = (rect, pointer) => {
+	const dx = pointer.x - (rect.left + rect.width / 2);
+	const dy = pointer.y - (rect.top + rect.height / 2);
+	return {
+		dx,
+		dy,
+		outside: Math.hypot(Math.max(0, Math.abs(dx) - rect.width / 2), Math.max(0, Math.abs(dy) - rect.height / 2))
+	};
+};
+var arbitrate = () => {
+	let winner = null;
+	let nearest = Infinity;
+	let closest = Infinity;
+	for (const entry of registry) {
+		const s = entry.settings.current;
+		let near = null;
+		if (field.pointer && !s.disabled && !entry.reduce) {
+			near = reach(entry.wrapper.getBoundingClientRect(), field.pointer);
+			if (near.outside > s.padding) near = null;
+		}
+		if (!s.exclusive) {
+			if (near || entry.active) entry.wake();
+			continue;
+		}
+		if (!near) continue;
+		const center = Math.hypot(near.dx, near.dy);
+		if (near.outside < nearest || near.outside === nearest && center < closest) {
+			winner = entry;
+			nearest = near.outside;
+			closest = center;
+		}
+	}
+	const previous = field.owner;
+	field.owner = winner;
+	if (previous && previous !== winner) previous.wake();
+	if (winner) winner.wake();
+};
+var attach = () => {
+	const onPointerMove = (event) => {
+		if (event.pointerType === "touch") return;
+		field.pointer = {
+			x: event.clientX,
+			y: event.clientY
+		};
+		arbitrate();
+	};
+	const onLeave = () => {
+		field.pointer = null;
+		arbitrate();
+	};
+	window.addEventListener("pointermove", onPointerMove, { passive: true });
+	window.addEventListener("scroll", arbitrate, {
+		passive: true,
+		capture: true
+	});
+	document.documentElement.addEventListener("pointerleave", onLeave);
+	window.addEventListener("blur", onLeave);
+	return () => {
+		window.removeEventListener("pointermove", onPointerMove);
+		window.removeEventListener("scroll", arbitrate, { capture: true });
+		document.documentElement.removeEventListener("pointerleave", onLeave);
+		window.removeEventListener("blur", onLeave);
+	};
+};
+var Magnet = ({ children, padding = 100, disabled = false, magnetStrength = 2, maxOffset, exclusive = true, axis = "both", tilt = 0, scale = 1, spring, onActiveChange, wrapperClassName = "", innerClassName = "", style, ...props }) => {
+	const wrapperRef = useRef(null);
+	const innerRef = useRef(null);
+	const wakeRef = useRef(null);
+	const settings = {
+		padding: Math.max(0, padding),
+		disabled,
+		strength: Math.max(.1, magnetStrength),
+		maxOffset,
+		exclusive,
+		axis,
+		tilt,
+		scale,
+		stiffness: Math.max(1, spring?.stiffness ?? DEFAULT_SPRING.stiffness),
+		damping: Math.max(0, spring?.damping ?? DEFAULT_SPRING.damping),
+		mass: Math.max(.01, spring?.mass ?? DEFAULT_SPRING.mass),
+		onActiveChange
+	};
+	const settingsRef = useRef(settings);
+	useEffect(() => {
+		settingsRef.current = settings;
+	});
+	useEffect(() => {
+		const wrapper = wrapperRef.current;
+		const inner = innerRef.current;
+		if (!wrapper || !inner) return void 0;
+		const motion = window.matchMedia("(prefers-reduced-motion: reduce)");
+		let reduce = motion.matches;
+		const current = {
+			x: 0,
+			y: 0,
+			tiltX: 0,
+			tiltY: 0,
+			scale: 1
+		};
+		const velocity = {
+			x: 0,
+			y: 0,
+			tiltX: 0,
+			tiltY: 0,
+			scale: 0
+		};
+		let active = false;
+		let raf = 0;
+		let last = 0;
+		const solve = (target, dt) => {
+			const s = settingsRef.current;
+			let resting = true;
+			Object.keys(current).forEach((key) => {
+				const force = s.stiffness * (target[key] - current[key]) - s.damping * velocity[key];
+				velocity[key] += force / s.mass * dt;
+				current[key] += velocity[key] * dt;
+				const epsilon = key === "scale" ? .001 : .05;
+				if (Math.abs(target[key] - current[key]) > epsilon || Math.abs(velocity[key]) > epsilon) resting = false;
+			});
+			return resting;
+		};
+		const measure = () => {
+			const s = settingsRef.current;
+			const target = {
+				x: 0,
+				y: 0,
+				tiltX: 0,
+				tiltY: 0,
+				scale: 1
+			};
+			if (s.disabled || reduce || !field.pointer) return {
+				target,
+				engaged: false
+			};
+			if (s.exclusive && field.owner !== entry) return {
+				target,
+				engaged: false
+			};
+			const rect = wrapper.getBoundingClientRect();
+			const { dx, dy, outside } = reach(rect, field.pointer);
+			if (outside > s.padding) return {
+				target,
+				engaged: false
+			};
+			const pull = s.padding > 0 ? 1 - smoothstep$1(s.padding * .5, s.padding, outside) : 1;
+			let x = s.axis === "y" ? 0 : dx / s.strength * pull;
+			let y = s.axis === "x" ? 0 : dy / s.strength * pull;
+			if (s.maxOffset !== void 0 && s.maxOffset !== null) {
+				const length = Math.hypot(x, y);
+				if (length > s.maxOffset) {
+					x *= s.maxOffset / length;
+					y *= s.maxOffset / length;
+				}
+			}
+			const nx = Math.max(-1, Math.min(1, dx / Math.max(rect.width / 2, 1)));
+			const ny = Math.max(-1, Math.min(1, dy / Math.max(rect.height / 2, 1)));
+			target.x = x;
+			target.y = y;
+			target.tiltX = -ny * s.tilt * pull;
+			target.tiltY = nx * s.tilt * pull;
+			target.scale = 1 + (s.scale - 1) * pull;
+			return {
+				target,
+				engaged: true
+			};
+		};
+		const apply = () => {
+			const { x, y, tiltX, tiltY, scale } = current;
+			const turned = Math.abs(tiltX) > .01 || Math.abs(tiltY) > .01;
+			inner.style.transform = `translate3d(${x.toFixed(2)}px, ${y.toFixed(2)}px, 0)${turned ? ` perspective(800px) rotateX(${tiltX.toFixed(2)}deg) rotateY(${tiltY.toFixed(2)}deg)` : ""}${Math.abs(scale - 1) > 5e-4 ? ` scale(${scale.toFixed(4)})` : ""}`;
+		};
+		const frame = (now) => {
+			raf = 0;
+			const dt = last ? Math.min((now - last) / 1e3, 1 / 30) : 1 / 60;
+			last = now;
+			const { target, engaged } = measure();
+			if (engaged !== active) {
+				active = engaged;
+				entry.active = engaged;
+				if (engaged) wrapper.setAttribute("data-magnet-active", "");
+				else wrapper.removeAttribute("data-magnet-active");
+				settingsRef.current.onActiveChange?.(engaged);
+			}
+			const steps = Math.ceil(dt / (1 / 120));
+			let resting = true;
+			for (let i = 0; i < steps; i++) resting = solve(target, dt / steps);
+			if (resting) Object.keys(current).forEach((key) => {
+				current[key] = target[key];
+				velocity[key] = 0;
+			});
+			apply();
+			if (!resting) raf = requestAnimationFrame(frame);
+			else last = 0;
+		};
+		function wake() {
+			if (!raf) raf = requestAnimationFrame(frame);
+		}
+		const entry = {
+			wrapper,
+			settings: settingsRef,
+			reduce,
+			wake,
+			active: false
+		};
+		const onMotionChange = () => {
+			reduce = motion.matches;
+			entry.reduce = reduce;
+			arbitrate();
+			wake();
+		};
+		motion.addEventListener("change", onMotionChange);
+		registry.add(entry);
+		if (!detach) detach = attach();
+		wakeRef.current = () => {
+			arbitrate();
+			wake();
+		};
+		return () => {
+			motion.removeEventListener("change", onMotionChange);
+			cancelAnimationFrame(raf);
+			wakeRef.current = null;
+			registry.delete(entry);
+			if (field.owner === entry) field.owner = null;
+			if (!registry.size && detach) {
+				detach();
+				detach = null;
+			}
+		};
+	}, []);
+	useEffect(() => {
+		wakeRef.current?.();
+	});
+	return /* @__PURE__ */ jsx("div", {
+		ref: wrapperRef,
+		className: wrapperClassName,
+		style: {
+			position: "relative",
+			display: "inline-block",
+			...style
+		},
+		...props,
+		children: /* @__PURE__ */ jsx("div", {
+			ref: innerRef,
+			className: innerClassName,
+			style: { willChange: "transform" },
+			children
+		})
+	});
+};
 //#endregion
 //#region frontend/src/home-hero.jsx
 var previews = {
@@ -166,13 +432,13 @@ var STEP_STOPS = [
 	[.81, 3],
 	[2, 4]
 ];
-var clamp = (value) => value < 0 ? 0 : value > 1 ? 1 : value;
+var clamp$2 = (value) => value < 0 ? 0 : value > 1 ? 1 : value;
 var smooth = (value) => value * value * (3 - 2 * value);
 var cameraAt = (progress) => {
 	let index = 1;
 	while (index < CAMERA.length - 1 && progress > CAMERA[index].p) index += 1;
 	const from = CAMERA[index - 1], to = CAMERA[index];
-	const eased = smooth(clamp((progress - from.p) / (to.p - from.p)));
+	const eased = smooth(clamp$2((progress - from.p) / (to.p - from.p)));
 	const frame = {};
 	for (const key in to) frame[key] = from[key] + (to[key] - from[key]) * eased;
 	return frame;
@@ -245,7 +511,7 @@ function HomeHero({ loggedIn }) {
 				return;
 			}
 			story.dataset.scroll = "active";
-			const progress = clamp(-story.getBoundingClientRect().top / range);
+			const progress = clamp$2(-story.getBoundingClientRect().top / range);
 			const current = progress < .17 ? 0 : progress < .58 ? 1 : 2;
 			if (current !== lastChapter) {
 				lastChapter = current;
@@ -259,8 +525,8 @@ function HomeHero({ loggedIn }) {
 			panelsRef.current.forEach((panel, index) => {
 				if (!panel) return;
 				const { enter, exit } = PANELS[index];
-				const arriving = enter[1] > enter[0] ? clamp((progress - enter[0]) / (enter[1] - enter[0])) : 1;
-				const leaving = clamp((progress - exit[0]) / (exit[1] - exit[0]));
+				const arriving = enter[1] > enter[0] ? clamp$2((progress - enter[0]) / (enter[1] - enter[0])) : 1;
+				const leaving = clamp$2((progress - exit[0]) / (exit[1] - exit[0]));
 				panel.style.opacity = smooth(arriving) * (1 - smooth(leaving));
 				panel.style.transform = `translate3d(0, ${(1 - arriving) * 46 - leaving * 54}px, 0) scale(${1 - (1 - arriving) * .045 - leaving * .035})`;
 			});
@@ -272,9 +538,9 @@ function HomeHero({ loggedIn }) {
 			parallax.forEach(([node, x, y]) => {
 				if (node) node.style.translate = `${(mobile ? 0 : x) * progress}px ${y * progress}px`;
 			});
-			if (prompt) prompt.style.opacity = String(1 - clamp(progress / .07));
+			if (prompt) prompt.style.opacity = String(1 - clamp$2(progress / .07));
 			progressRef.current.style.transform = `scaleX(${progress})`;
-			route.style.strokeDashoffset = String(100 - clamp((progress - .05) / .8) * 100);
+			route.style.strokeDashoffset = String(100 - clamp$2((progress - .05) / .8) * 100);
 		};
 		const schedule = () => {
 			if (!frame) frame = requestAnimationFrame(render);
@@ -466,14 +732,20 @@ function HomeHero({ loggedIn }) {
 								] }),
 								/* @__PURE__ */ jsxs("div", {
 									className: "home-hero-actions",
-									children: [/* @__PURE__ */ jsxs("a", {
-										className: "button home-hero-primary",
-										href: loggedIn ? "/dashboard" : "/signup",
-										children: [
-											loggedIn ? "Continue your path" : "Find my starting point",
-											" ",
-											/* @__PURE__ */ jsx(ArrowRight, { size: 18 })
-										]
+									children: [/* @__PURE__ */ jsx(Magnet, {
+										padding: 24,
+										magnetStrength: 8,
+										maxOffset: 5,
+										wrapperClassName: "mentics-magnet",
+										children: /* @__PURE__ */ jsxs("a", {
+											className: "button home-hero-primary",
+											href: loggedIn ? "/dashboard" : "/signup",
+											children: [
+												loggedIn ? "Continue your path" : "Find my starting point",
+												" ",
+												/* @__PURE__ */ jsx(ArrowRight, { size: 18 })
+											]
+										})
 									}), /* @__PURE__ */ jsxs("a", {
 										className: "home-hero-secondary",
 										href: "#how-it-works",
@@ -533,14 +805,20 @@ function HomeHero({ loggedIn }) {
 									/* @__PURE__ */ jsx("em", { children: "Real momentum." })
 								] }),
 								/* @__PURE__ */ jsx("p", { children: "Five focused steps. One clear place to begin. Learn, practice, and bring back the result. Your next path gets smarter with you." }),
-								/* @__PURE__ */ jsxs("a", {
-									className: "button home-hero-primary",
-									href: loggedIn ? "/dashboard" : "/signup",
-									children: [
-										loggedIn ? "Continue your path" : "Build my free path",
-										" ",
-										/* @__PURE__ */ jsx(ArrowRight, { size: 18 })
-									]
+								/* @__PURE__ */ jsx(Magnet, {
+									padding: 24,
+									magnetStrength: 8,
+									maxOffset: 5,
+									wrapperClassName: "mentics-magnet",
+									children: /* @__PURE__ */ jsxs("a", {
+										className: "button home-hero-primary",
+										href: loggedIn ? "/dashboard" : "/signup",
+										children: [
+											loggedIn ? "Continue your path" : "Build my free path",
+											" ",
+											/* @__PURE__ */ jsx(ArrowRight, { size: 18 })
+										]
+									})
 								}),
 								/* @__PURE__ */ jsxs("a", {
 									className: "story-continue",
@@ -738,6 +1016,645 @@ function HomeHero({ loggedIn }) {
 		})
 	});
 }
+//#endregion
+//#region frontend/src/react-bits/SpotlightCard.jsx
+var THEMES = {
+	dark: {
+		surface: "#111111",
+		border: "rgba(255, 255, 255, 0.08)",
+		shadow: "0 24px 48px -24px rgba(0, 0, 0, 0.6)",
+		light: "#ffffff",
+		fill: 1,
+		edge: 1
+	},
+	light: {
+		surface: "#ffffff",
+		border: "rgba(24, 24, 27, 0.1)",
+		shadow: "0 1px 2px rgba(24, 24, 27, 0.04), 0 18px 40px -20px rgba(24, 24, 27, 0.16)",
+		light: "#18181b",
+		fill: .28,
+		edge: .7
+	}
+};
+var SHAPES$1 = ["circle", "beam"];
+var NOISE = "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E\")";
+var clamp$1 = (value, min, max) => Math.min(max, Math.max(min, value));
+var falloff = (color, softness) => {
+	const soft = clamp$1(softness, 0, 1);
+	const core = (1 - soft) ** 1.5 * .85;
+	const stop = (alpha, at) => `color-mix(in srgb, ${color} ${(alpha * 100).toFixed(2)}%, transparent) ${(at * 100).toFixed(2)}%`;
+	const list = [stop(1, 0)];
+	for (let i = 0; i <= 14; i++) {
+		const t = core + (1 - core) * i / 14;
+		const g = (t - core) / (1 - core);
+		const smooth = 1 - g * g * (3 - 2 * g);
+		const glow = Math.exp(-4.6 * g * g) * (1 - g ** 6);
+		list.push(stop(smooth + (glow - smooth) * soft, t));
+	}
+	return list.join(", ");
+};
+var SpotlightCard = ({ as: Component = "article", children, className = "", style, spotlightColor, intensity = .15, spotlightSize = 240, softness = .7, shape = "circle", borderGlow = .6, proximity = 80, smoothing = .3, ambient = false, flare = true, grain = 0, theme = "dark", ...rest }) => {
+	const rootRef = useRef(null);
+	const lightRef = useRef(null);
+	const grainRef = useRef(null);
+	const edgeRef = useRef(null);
+	const wakeRef = useRef(null);
+	const palette = THEMES[theme] ?? THEMES.dark;
+	const color = spotlightColor ?? palette.light;
+	const settings = {
+		shape: SHAPES$1.includes(shape) ? shape : "circle",
+		fill: falloff(color, softness),
+		edge: falloff(color, 1),
+		size: Math.max(20, spotlightSize),
+		intensity: clamp$1(intensity, 0, 1) * palette.fill,
+		borderGlow: clamp$1(borderGlow, 0, 1) * palette.edge,
+		proximity: Math.max(0, proximity),
+		smoothing: clamp$1(smoothing, 0, 1),
+		ambient,
+		flare,
+		grain: clamp$1(grain, 0, 1)
+	};
+	const settingsRef = useRef(settings);
+	useEffect(() => {
+		settingsRef.current = settings;
+	});
+	useEffect(() => {
+		wakeRef.current?.();
+	});
+	useEffect(() => {
+		const root = rootRef.current;
+		const light = lightRef.current;
+		const noise = grainRef.current;
+		const edge = edgeRef.current;
+		if (!root || !light || !noise || !edge) return void 0;
+		const motion = window.matchMedia("(prefers-reduced-motion: reduce)");
+		let reduce = motion.matches;
+		const state = {
+			x: 0,
+			y: 0,
+			presence: 0,
+			flare: 0,
+			time: Math.random() * 60,
+			pressed: false,
+			visible: true
+		};
+		const pointer = {
+			x: 0,
+			y: 0,
+			active: false
+		};
+		const drawn = {
+			light: "",
+			edge: "",
+			noise: ""
+		};
+		let focus = null;
+		let raf = 0;
+		let last = 0;
+		let alive = true;
+		const gradient = (s, size, x, y, stops) => {
+			if (s.shape === "beam") {
+				const reach = Math.max(size * .6, y + size * .55);
+				return `radial-gradient(${(size * .55).toFixed(1)}px ${reach.toFixed(1)}px at ${x.toFixed(1)}px 0px, ${stops})`;
+			}
+			return `radial-gradient(circle ${size.toFixed(1)}px at ${x.toFixed(1)}px ${y.toFixed(1)}px, ${stops})`;
+		};
+		const paint = (s) => {
+			const size = s.size * (1 + .2 * state.flare);
+			const boost = 1 + .7 * state.flare;
+			const fill = gradient(s, size, state.x, state.y, s.fill);
+			const rim = gradient(s, size * .6, state.x, s.shape === "beam" ? 0 : state.y, s.edge);
+			if (fill !== drawn.light) {
+				drawn.light = fill;
+				light.style.background = fill;
+			}
+			if (rim !== drawn.edge) {
+				drawn.edge = rim;
+				edge.style.background = rim;
+			}
+			light.style.opacity = String(Math.min(1, state.presence * s.intensity * boost));
+			edge.style.opacity = String(Math.min(1, state.presence * s.borderGlow * boost));
+			const grainy = s.grain > 0 ? gradient(s, size, state.x, state.y, "#000 0%, transparent 100%") : "none";
+			if (grainy !== drawn.noise) {
+				drawn.noise = grainy;
+				noise.style.webkitMaskImage = grainy;
+				noise.style.maskImage = grainy;
+			}
+			noise.style.opacity = String(state.presence * s.grain);
+		};
+		const tick = (now) => {
+			raf = 0;
+			if (!alive || document.hidden) return;
+			const s = settingsRef.current;
+			const dt = Math.min(.05, Math.max(.001, (now - last) / 1e3));
+			last = now;
+			const rect = root.getBoundingClientRect();
+			let tx = state.x;
+			let ty = state.y;
+			let target = 0;
+			if (focus && root.contains(focus)) {
+				const box = focus.getBoundingClientRect();
+				tx = box.left + box.width / 2 - rect.left;
+				ty = box.top + box.height / 2 - rect.top;
+				target = 1;
+			} else if (pointer.active) {
+				tx = pointer.x - rect.left;
+				ty = pointer.y - rect.top;
+				const gap = Math.hypot(Math.max(0, -tx, tx - rect.width), Math.max(0, -ty, ty - rect.height));
+				if (gap === 0) target = 1;
+				else if (s.proximity > 0) target = Math.max(0, 1 - gap / s.proximity) ** 2;
+			}
+			if (target < .6 && s.ambient && state.visible) {
+				if (!reduce) state.time += dt;
+				const drift = .6 - target;
+				tx += (rect.width * (.5 + .34 * Math.sin(state.time * .43)) - tx) * (drift / .6);
+				ty += (rect.height * (.5 + .3 * Math.sin(state.time * .61 + 1.3)) - ty) * (drift / .6);
+				target = .6;
+			}
+			if (state.presence < .02 && target > 0 && !s.ambient) {
+				state.x = tx;
+				state.y = ty;
+			}
+			const follow = reduce || s.smoothing === 0 ? 1 : 1 - Math.exp(-dt / (.015 + s.smoothing * .22));
+			state.x += (tx - state.x) * follow;
+			state.y += (ty - state.y) * follow;
+			const fade = reduce ? 1 : 1 - Math.exp(-dt / (target > state.presence ? .1 : .32));
+			state.presence += (target - state.presence) * fade;
+			if (Math.abs(target - state.presence) < .002) state.presence = target;
+			const press = state.pressed && s.flare && !reduce ? 1 : 0;
+			state.flare += (press - state.flare) * (1 - Math.exp(-dt / (press ? .05 : .28)));
+			if (Math.abs(press - state.flare) < .002) state.flare = press;
+			paint(s);
+			if (!(!(Math.abs(tx - state.x) > .1 || Math.abs(ty - state.y) > .1) && state.presence === target && state.flare === press) || s.ambient && state.visible && !reduce) raf = requestAnimationFrame(tick);
+		};
+		const wake = () => {
+			if (raf || !alive) return;
+			last = performance.now();
+			raf = requestAnimationFrame(tick);
+		};
+		wakeRef.current = wake;
+		const onMove = (event) => {
+			if (reduce || event.pointerType === "touch" || !state.visible) return;
+			pointer.x = event.clientX;
+			pointer.y = event.clientY;
+			pointer.active = true;
+			if (state.presence > 0 || settingsRef.current.proximity > 0 || root.contains(event.target)) wake();
+		};
+		const onOut = (event) => {
+			if (event.relatedTarget) return;
+			pointer.active = false;
+			wake();
+		};
+		const onDown = (event) => {
+			pointer.x = event.clientX;
+			pointer.y = event.clientY;
+			pointer.active = true;
+			state.pressed = true;
+			wake();
+		};
+		const onUp = (event) => {
+			if (event.pointerType !== "mouse") pointer.active = false;
+			if (!state.pressed && event.pointerType === "mouse") return;
+			state.pressed = false;
+			wake();
+		};
+		const onFocusIn = (event) => {
+			if (!(event.target instanceof Element) || !event.target.matches(":focus-visible")) return;
+			focus = event.target;
+			wake();
+		};
+		const onFocusOut = (event) => {
+			if (root.contains(event.relatedTarget)) return;
+			focus = null;
+			wake();
+		};
+		const onScroll = () => {
+			if (pointer.active || state.presence > 0) wake();
+		};
+		const onMotionChange = () => {
+			reduce = motion.matches;
+			wake();
+		};
+		motion.addEventListener("change", onMotionChange);
+		const observer = new IntersectionObserver((entries) => {
+			state.visible = entries.some((entry) => entry.isIntersecting);
+			if (state.visible) wake();
+		});
+		observer.observe(root);
+		window.addEventListener("pointermove", onMove);
+		window.addEventListener("pointerup", onUp);
+		window.addEventListener("pointercancel", onUp);
+		window.addEventListener("scroll", onScroll, {
+			capture: true,
+			passive: true
+		});
+		document.addEventListener("pointerout", onOut);
+		root.addEventListener("pointerdown", onDown);
+		root.addEventListener("focusin", onFocusIn);
+		root.addEventListener("focusout", onFocusOut);
+		wake();
+		return () => {
+			alive = false;
+			motion.removeEventListener("change", onMotionChange);
+			cancelAnimationFrame(raf);
+			observer.disconnect();
+			window.removeEventListener("pointermove", onMove);
+			window.removeEventListener("pointerup", onUp);
+			window.removeEventListener("pointercancel", onUp);
+			window.removeEventListener("scroll", onScroll, { capture: true });
+			document.removeEventListener("pointerout", onOut);
+			root.removeEventListener("pointerdown", onDown);
+			root.removeEventListener("focusin", onFocusIn);
+			root.removeEventListener("focusout", onFocusOut);
+			wakeRef.current = null;
+		};
+	}, []);
+	return /* @__PURE__ */ jsxs(Component, {
+		ref: rootRef,
+		className: `spotlight-card${className ? ` ${className}` : ""}`,
+		style: {
+			"--spotlight-card-surface": palette.surface,
+			"--spotlight-card-border": palette.border,
+			"--spotlight-card-shadow": palette.shadow,
+			...style
+		},
+		...rest,
+		children: [
+			/* @__PURE__ */ jsx("span", {
+				ref: lightRef,
+				className: "spotlight-card__light",
+				"aria-hidden": "true"
+			}),
+			/* @__PURE__ */ jsx("span", {
+				ref: grainRef,
+				className: "spotlight-card__grain",
+				style: { backgroundImage: NOISE },
+				"aria-hidden": "true"
+			}),
+			children,
+			/* @__PURE__ */ jsx("span", {
+				className: "spotlight-card__border",
+				"aria-hidden": "true"
+			}),
+			/* @__PURE__ */ jsx("span", {
+				ref: edgeRef,
+				className: "spotlight-card__edge",
+				"aria-hidden": "true"
+			})
+		]
+	});
+};
+//#endregion
+//#region frontend/src/react-bits/ClickSpark.jsx
+var EASINGS = {
+	linear: (t) => t,
+	"ease-in": (t) => t * t,
+	"ease-out": (t) => 1 - Math.pow(1 - t, 3),
+	"ease-in-out": (t) => t < .5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2,
+	spring: (t) => 1 + 2.4 * Math.pow(t - 1, 3) + 1.4 * Math.pow(t - 1, 2)
+};
+var SHAPES = [
+	"line",
+	"streak",
+	"dot",
+	"star"
+];
+var MAX_BURSTS = 32;
+var GRAVITY = 500;
+var clamp = (value, min, max) => Math.min(max, Math.max(min, value));
+var smoothstep = (a, b, x) => {
+	const t = clamp((x - a) / (b - a), 0, 1);
+	return t * t * (3 - 2 * t);
+};
+var toColors = (value) => {
+	const list = (Array.isArray(value) ? value : [value]).filter(Boolean);
+	return list.length ? list : ["#ffffff"];
+};
+var starPath = (ctx, x, y, radius, rotation) => {
+	const pinch = radius * .16;
+	ctx.beginPath();
+	ctx.moveTo(x + Math.cos(rotation) * radius, y + Math.sin(rotation) * radius);
+	for (let i = 1; i <= 4; i++) {
+		const a = rotation + i * Math.PI / 2;
+		const mid = a - Math.PI / 4;
+		ctx.quadraticCurveTo(x + Math.cos(mid) * pinch, y + Math.sin(mid) * pinch, x + Math.cos(a) * radius, y + Math.sin(a) * radius);
+	}
+	ctx.closePath();
+};
+var channels = (ctx, color) => {
+	ctx.fillStyle = color;
+	const normal = String(ctx.fillStyle);
+	const hex = /^#([0-9a-f]{6})$/i.exec(normal);
+	if (hex) {
+		const value = parseInt(hex[1], 16);
+		return [
+			value >> 16 & 255,
+			value >> 8 & 255,
+			value & 255
+		];
+	}
+	const rgb = /^rgba?\(([^)]+)\)$/i.exec(normal);
+	if (rgb) return rgb[1].split(",").slice(0, 3).map((part) => parseFloat(part));
+	return [
+		0,
+		0,
+		0
+	];
+};
+var ClickSpark = forwardRef(({ sparkColor = "#fff", sparkSize = 14, sparkRadius = 30, sparkCount = 8, sparkWidth = 2, duration = 500, easing = "ease-out", extraScale = 1, shape = "line", randomness = .2, gravity = 0, spread = 360, direction = 0, glow = 0, ring = false, layer = "front", disabled = false, className = "", style, children }, ref) => {
+	const rootRef = useRef(null);
+	const layerRef = useRef(null);
+	const engineRef = useRef(null);
+	const settings = {
+		colors: toColors(sparkColor),
+		size: Math.max(0, sparkSize),
+		radius: Math.max(0, sparkRadius) * Math.max(0, extraScale),
+		count: clamp(Math.round(sparkCount), 1, 64),
+		width: Math.max(.5, sparkWidth),
+		duration: Math.max(60, duration),
+		ease: EASINGS[easing] ?? EASINGS["ease-out"],
+		shape: SHAPES.includes(shape) ? shape : "line",
+		randomness: clamp(randomness, 0, 1),
+		gravity: Math.max(0, gravity),
+		spread: clamp(spread, 0, 360),
+		direction,
+		glow: clamp(glow, 0, 1),
+		ring,
+		disabled
+	};
+	const settingsRef = useRef(settings);
+	useEffect(() => {
+		settingsRef.current = settings;
+	});
+	useEffect(() => {
+		const root = rootRef.current;
+		const layer = layerRef.current;
+		if (!root || !layer) return;
+		const motion = window.matchMedia("(prefers-reduced-motion: reduce)");
+		const bursts = [];
+		let raf = 0;
+		let lastPress = {
+			time: -1e9,
+			x: 0,
+			y: 0
+		};
+		const drop = (s, seconds) => .5 * s.gravity * GRAVITY * seconds * seconds;
+		const position = (burst, spark, distance, seconds) => [burst.x + Math.cos(spark.angle) * distance, burst.y + Math.sin(spark.angle) * distance + drop(burst.settings, seconds)];
+		const drawSpark = (ctx, burst, spark, elapsed) => {
+			const s = burst.settings;
+			const life = s.duration * spark.life;
+			const p = elapsed / life;
+			if (p >= 1) return false;
+			const e = s.ease(clamp(p, 0, 1));
+			const seconds = elapsed / 1e3;
+			const distance = s.radius * spark.reach * e;
+			const width = s.width * spark.scale;
+			const fade = 1 - smoothstep(s.shape === "line" ? .55 : .7, 1, p);
+			if (fade <= 0) return true;
+			ctx.strokeStyle = spark.color;
+			ctx.fillStyle = spark.color;
+			if (s.shape === "line") {
+				const length = s.size * spark.scale * Math.pow(1 - p, 1.6);
+				const [x1, y1] = position(burst, spark, distance, seconds);
+				const [x2, y2] = position(burst, spark, distance + Math.max(.01, length), seconds);
+				ctx.lineCap = "round";
+				if (spark.glow > 0) {
+					ctx.globalAlpha = fade * .14 * spark.glow;
+					ctx.lineWidth = width * 4.5;
+					ctx.beginPath();
+					ctx.moveTo(x1, y1);
+					ctx.lineTo(x2, y2);
+					ctx.stroke();
+				}
+				ctx.globalAlpha = fade;
+				ctx.lineWidth = width;
+				ctx.beginPath();
+				ctx.moveTo(x1, y1);
+				ctx.lineTo(x2, y2);
+				ctx.stroke();
+				return true;
+			}
+			if (s.shape === "streak") {
+				const lag = Math.min(elapsed, 70 + s.size * 4 * spark.scale);
+				const back = s.ease(clamp((elapsed - lag) / life, 0, 1));
+				const [hx, hy] = position(burst, spark, distance, seconds);
+				const [tx, ty] = position(burst, spark, s.radius * spark.reach * back, Math.max(0, seconds - lag / 1e3));
+				const dx = hx - tx;
+				const dy = hy - ty;
+				const length = Math.hypot(dx, dy) || 1;
+				const nx = -dy / length * width * .5;
+				const ny = dx / length * width * .5;
+				const paint = (spreadWidth, alpha) => {
+					const gradient = ctx.createLinearGradient(tx, ty, hx, hy);
+					gradient.addColorStop(0, spark.clear);
+					gradient.addColorStop(1, spark.color);
+					ctx.globalAlpha = alpha;
+					ctx.fillStyle = gradient;
+					ctx.beginPath();
+					ctx.moveTo(tx, ty);
+					ctx.lineTo(hx + nx * spreadWidth, hy + ny * spreadWidth);
+					ctx.lineTo(hx - nx * spreadWidth, hy - ny * spreadWidth);
+					ctx.closePath();
+					ctx.fill();
+					ctx.fillStyle = spark.color;
+					ctx.beginPath();
+					ctx.arc(hx, hy, width * .5 * spreadWidth, 0, Math.PI * 2);
+					ctx.fill();
+				};
+				if (spark.glow > 0) paint(3.2, fade * .16 * spark.glow);
+				paint(1, fade);
+				return true;
+			}
+			if (s.shape === "dot") {
+				const [x, y] = position(burst, spark, distance, seconds);
+				const radius = width * 1.25 * (1 - .5 * e);
+				if (spark.glow > 0) {
+					ctx.globalAlpha = fade * .18 * spark.glow;
+					ctx.beginPath();
+					ctx.arc(x, y, radius * 2.6, 0, Math.PI * 2);
+					ctx.fill();
+				}
+				ctx.globalAlpha = fade;
+				ctx.beginPath();
+				ctx.arc(x, y, radius, 0, Math.PI * 2);
+				ctx.fill();
+				return true;
+			}
+			const [x, y] = position(burst, spark, distance, seconds);
+			const twinkle = Math.pow(Math.sin(Math.PI * clamp(p * 1.1, 0, 1)), .7);
+			const radius = s.size * .6 * spark.scale * twinkle;
+			const rotation = spark.angle + spark.spin * p * Math.PI * .5;
+			if (radius <= .05) return true;
+			if (spark.glow > 0) {
+				ctx.globalAlpha = fade * .2 * spark.glow;
+				ctx.beginPath();
+				ctx.arc(x, y, radius * 1.1, 0, Math.PI * 2);
+				ctx.fill();
+			}
+			ctx.globalAlpha = fade;
+			starPath(ctx, x, y, radius, rotation);
+			ctx.fill();
+			return true;
+		};
+		const drawRing = (ctx, burst, elapsed) => {
+			const s = burst.settings;
+			const p = elapsed / (s.duration * .8);
+			if (p >= 1) return false;
+			const radius = 2 + s.radius * .6 * EASINGS["ease-out"](p);
+			ctx.globalAlpha = Math.pow(1 - p, 2) * .7;
+			ctx.strokeStyle = burst.sparks[0]?.color ?? s.colors[0];
+			ctx.lineWidth = Math.max(.5, s.width * (1 - p) * .9);
+			ctx.beginPath();
+			ctx.arc(burst.x, burst.y, radius, 0, Math.PI * 2);
+			ctx.stroke();
+			return true;
+		};
+		const remove = (burst) => {
+			burst.canvas.remove();
+			const index = bursts.indexOf(burst);
+			if (index >= 0) bursts.splice(index, 1);
+		};
+		const frame = (now) => {
+			raf = 0;
+			for (const burst of [...bursts]) {
+				const elapsed = now - burst.start;
+				const ctx = burst.ctx;
+				ctx.setTransform(1, 0, 0, 1, 0, 0);
+				ctx.clearRect(0, 0, burst.canvas.width, burst.canvas.height);
+				ctx.setTransform(burst.ratio, 0, 0, burst.ratio, -burst.left * burst.ratio, -burst.top * burst.ratio);
+				let alive = false;
+				if (burst.settings.ring && drawRing(ctx, burst, elapsed)) alive = true;
+				for (const spark of burst.sparks) if (drawSpark(ctx, burst, spark, elapsed)) alive = true;
+				ctx.globalAlpha = 1;
+				if (!alive) remove(burst);
+			}
+			if (bursts.length) raf = requestAnimationFrame(frame);
+		};
+		const spawn = (clientX, clientY) => {
+			const s = settingsRef.current;
+			if (s.disabled || motion.matches) return;
+			const rect = root.getBoundingClientRect();
+			const offset = Math.floor(Math.random() * s.colors.length);
+			const full = s.spread >= 359.5;
+			const arc = s.spread * Math.PI / 180;
+			const heading = (s.direction - 90) * Math.PI / 180;
+			const step = full ? Math.PI * 2 / s.count : s.count > 1 ? arc / (s.count - 1) : 0;
+			const sparks = Array.from({ length: s.count }, (_, i) => {
+				return {
+					angle: (full ? heading + step * i : s.count > 1 ? heading - arc / 2 + step * i : heading) + (Math.random() - .5) * s.randomness * (step || arc || 1) * .9,
+					reach: 1 + (Math.random() - .5) * .7 * s.randomness,
+					scale: 1 + (Math.random() - .5) * .8 * s.randomness,
+					life: 1 + (Math.random() - .5) * .5 * s.randomness,
+					spin: Math.random() - .5,
+					color: s.colors[(i + offset) % s.colors.length],
+					clear: "",
+					glow: 0
+				};
+			});
+			const longest = s.duration * (1 + .25 * s.randomness);
+			const fall = drop(s, longest / 1e3);
+			const reach = s.radius * (1 + .35 * s.randomness) * (s.ease === EASINGS.spring ? 1.15 : 1) + s.size * (1 + .4 * s.randomness) + s.width * (s.glow > 0 ? 6 : 2) + 6;
+			const box = {
+				left: Math.max(clientX - reach, 0),
+				top: Math.max(clientY - reach, 0),
+				right: Math.min(clientX + reach, window.innerWidth),
+				bottom: Math.min(clientY + reach + fall, window.innerHeight)
+			};
+			if (box.right - box.left < 1 || box.bottom - box.top < 1) return;
+			const ratio = Math.min(window.devicePixelRatio || 1, 2);
+			const canvas = document.createElement("canvas");
+			canvas.width = Math.ceil((box.right - box.left) * ratio);
+			canvas.height = Math.ceil((box.bottom - box.top) * ratio);
+			Object.assign(canvas.style, {
+				position: "absolute",
+				left: `${box.left - rect.left}px`,
+				top: `${box.top - rect.top}px`,
+				width: `${box.right - box.left}px`,
+				height: `${box.bottom - box.top}px`,
+				display: "block",
+				pointerEvents: "none"
+			});
+			canvas.setAttribute("aria-hidden", "true");
+			layer.appendChild(canvas);
+			const ctx = canvas.getContext("2d");
+			if (!ctx) {
+				canvas.remove();
+				return;
+			}
+			for (const spark of sparks) {
+				const [r, g, b] = channels(ctx, spark.color);
+				spark.clear = `rgba(${r}, ${g}, ${b}, 0)`;
+				spark.glow = s.glow * (.35 + .65 * ((.2126 * r + .7152 * g + .0722 * b) / 255));
+			}
+			bursts.push({
+				x: clientX,
+				y: clientY,
+				start: performance.now(),
+				sparks,
+				settings: { ...s },
+				canvas,
+				ctx,
+				ratio,
+				left: box.left,
+				top: box.top
+			});
+			while (bursts.length > MAX_BURSTS) remove(bursts[0]);
+			if (!raf) raf = requestAnimationFrame(frame);
+		};
+		const onPointerDown = (event) => {
+			if (event.pointerType !== "mouse" || event.button !== 0) return;
+			lastPress = {
+				time: performance.now(),
+				x: event.clientX,
+				y: event.clientY
+			};
+			spawn(event.clientX, event.clientY);
+		};
+		const onClick = (event) => {
+			if ("pointerType" in event && event.pointerType === "mouse") return;
+			if (event.detail === 0) {
+				const rect = (event.target instanceof Element ? event.target : root).getBoundingClientRect();
+				spawn(rect.left + rect.width / 2, rect.top + rect.height / 2);
+				return;
+			}
+			if (!(performance.now() - lastPress.time < 700 && Math.hypot(event.clientX - lastPress.x, event.clientY - lastPress.y) < 12)) spawn(event.clientX, event.clientY);
+		};
+		document.addEventListener("pointerdown", onPointerDown);
+		document.addEventListener("click", onClick);
+		engineRef.current = { spark: (x, y) => {
+			const rect = root.getBoundingClientRect();
+			spawn(rect.left + (x ?? rect.width / 2), rect.top + (y ?? rect.height / 2));
+		} };
+		return () => {
+			cancelAnimationFrame(raf);
+			document.removeEventListener("pointerdown", onPointerDown);
+			document.removeEventListener("click", onClick);
+			for (const burst of [...bursts]) remove(burst);
+			engineRef.current = null;
+		};
+	}, []);
+	useImperativeHandle(ref, () => ({ spark: (x, y) => engineRef.current?.spark(x, y) }), []);
+	return /* @__PURE__ */ jsxs("div", {
+		ref: rootRef,
+		className,
+		style: {
+			display: "contents",
+			...style
+		},
+		children: [children, /* @__PURE__ */ jsx("span", {
+			ref: layerRef,
+			"aria-hidden": "true",
+			style: {
+				position: "fixed",
+				inset: 0,
+				zIndex: layer === "back" ? -1 : 1e3,
+				overflow: "visible",
+				pointerEvents: "none"
+			}
+		})]
+	});
+});
+ClickSpark.displayName = "ClickSpark";
 //#endregion
 //#region frontend/src/passage-text.js
 var escapeHtml = (text) => text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
@@ -1022,13 +1939,19 @@ function AppShell({ children, name, immersive = false }) {
 						id: "mobile-product-navigation",
 						className: menu ? "open" : "",
 						"aria-label": "Product navigation",
-						children: navItems.map(([href, Icon, label]) => /* @__PURE__ */ jsxs("a", {
-							className: active(href) ? "active" : "",
-							href,
-							"aria-current": active(href) ? "page" : void 0,
-							title: label,
-							onClick: (event) => travel(event, href, label),
-							children: [/* @__PURE__ */ jsx(Icon, { size: 17 }), /* @__PURE__ */ jsx("span", { children: label })]
+						children: navItems.map(([href, Icon, label]) => /* @__PURE__ */ jsx(Magnet, {
+							padding: 8,
+							magnetStrength: 12,
+							maxOffset: 3,
+							wrapperClassName: "mentics-nav-magnet",
+							children: /* @__PURE__ */ jsxs("a", {
+								className: active(href) ? "active" : "",
+								href,
+								"aria-current": active(href) ? "page" : void 0,
+								title: label,
+								onClick: (event) => travel(event, href, label),
+								children: [/* @__PURE__ */ jsx(Icon, { size: 17 }), /* @__PURE__ */ jsx("span", { children: label })]
+							})
 						}, href))
 					}),
 					/* @__PURE__ */ jsxs("div", {
@@ -7396,21 +8319,45 @@ function Landing() {
 					/* @__PURE__ */ jsxs("nav", {
 						"aria-label": "Main navigation",
 						children: [
-							/* @__PURE__ */ jsx("a", {
-								href: "#how-it-works",
-								children: "How it works"
+							/* @__PURE__ */ jsx(Magnet, {
+								padding: 12,
+								magnetStrength: 10,
+								maxOffset: 3,
+								wrapperClassName: "mentics-nav-magnet",
+								children: /* @__PURE__ */ jsx("a", {
+									href: "#how-it-works",
+									children: "How it works"
+								})
 							}),
-							/* @__PURE__ */ jsx("a", {
-								href: "#platform",
-								children: "Platform"
+							/* @__PURE__ */ jsx(Magnet, {
+								padding: 12,
+								magnetStrength: 10,
+								maxOffset: 3,
+								wrapperClassName: "mentics-nav-magnet",
+								children: /* @__PURE__ */ jsx("a", {
+									href: "#platform",
+									children: "Platform"
+								})
 							}),
-							/* @__PURE__ */ jsx("a", {
-								href: "#suite",
-								children: "Suite"
+							/* @__PURE__ */ jsx(Magnet, {
+								padding: 12,
+								magnetStrength: 10,
+								maxOffset: 3,
+								wrapperClassName: "mentics-nav-magnet",
+								children: /* @__PURE__ */ jsx("a", {
+									href: "#suite",
+									children: "Suite"
+								})
 							}),
-							/* @__PURE__ */ jsx("a", {
-								href: "/sat-prep",
-								children: "SAT prep"
+							/* @__PURE__ */ jsx(Magnet, {
+								padding: 12,
+								magnetStrength: 10,
+								maxOffset: 3,
+								wrapperClassName: "mentics-nav-magnet",
+								children: /* @__PURE__ */ jsx("a", {
+									href: "/sat-prep",
+									children: "SAT prep"
+								})
 							})
 						]
 					}),
@@ -7782,7 +8729,13 @@ function Landing() {
 					}), /* @__PURE__ */ jsxs("div", {
 						className: "suite-grid",
 						children: [
-							/* @__PURE__ */ jsxs("article", {
+							/* @__PURE__ */ jsxs(SpotlightCard, {
+								theme: "light",
+								spotlightColor: "#8953e8",
+								intensity: .45,
+								borderGlow: .55,
+								proximity: 0,
+								flare: false,
 								className: "suite-path",
 								children: [
 									/* @__PURE__ */ jsx(Target, {}),
@@ -7805,7 +8758,13 @@ function Landing() {
 									})
 								]
 							}),
-							/* @__PURE__ */ jsxs("article", {
+							/* @__PURE__ */ jsxs(SpotlightCard, {
+								theme: "light",
+								spotlightColor: "#8953e8",
+								intensity: .45,
+								borderGlow: .55,
+								proximity: 0,
+								flare: false,
 								className: "suite-sprint",
 								children: [
 									/* @__PURE__ */ jsx(Zap, {}),
@@ -7814,7 +8773,13 @@ function Landing() {
 									/* @__PURE__ */ jsx("p", { children: "Short assessments, strategy articles, and immediate explanations make every session count." })
 								]
 							}),
-							/* @__PURE__ */ jsxs("article", {
+							/* @__PURE__ */ jsxs(SpotlightCard, {
+								theme: "light",
+								spotlightColor: "#8953e8",
+								intensity: .45,
+								borderGlow: .55,
+								proximity: 0,
+								flare: false,
 								className: "suite-essay",
 								children: [
 									/* @__PURE__ */ jsx(PenLine, {}),
@@ -7823,7 +8788,13 @@ function Landing() {
 									/* @__PURE__ */ jsx("p", { children: "Get structured feedback while keeping your voice, story, and ideas unmistakably yours." })
 								]
 							}),
-							/* @__PURE__ */ jsxs("article", {
+							/* @__PURE__ */ jsxs(SpotlightCard, {
+								theme: "light",
+								spotlightColor: "#8953e8",
+								intensity: .45,
+								borderGlow: .55,
+								proximity: 0,
+								flare: false,
 								className: "suite-progress",
 								children: [
 									/* @__PURE__ */ jsx(LineChart, {}),
@@ -7832,7 +8803,13 @@ function Landing() {
 									/* @__PURE__ */ jsx("p", { children: "Scores, milestones, history, points, and streaks reveal the pattern behind improvement." })
 								]
 							}),
-							/* @__PURE__ */ jsxs("article", {
+							/* @__PURE__ */ jsxs(SpotlightCard, {
+								theme: "light",
+								spotlightColor: "#8953e8",
+								intensity: .45,
+								borderGlow: .55,
+								proximity: 0,
+								flare: false,
 								className: "suite-community",
 								children: [
 									/* @__PURE__ */ jsx(UsersRound, {}),
@@ -13233,14 +14210,26 @@ function App() {
 			break;
 		default: page = /* @__PURE__ */ jsx(Landing, {});
 	}
-	return /* @__PURE__ */ jsxs(Fragment, { children: [/* @__PURE__ */ jsx(Toaster, {
-		position: "bottom-right",
-		mobileOffset: 16,
-		offset: 24,
-		closeButton: true,
-		theme: "light",
-		toastOptions: { duration: 4200 }
-	}), page] });
+	return /* @__PURE__ */ jsxs(ClickSpark, {
+		sparkColor: [
+			"#a78bfa",
+			"#7c3aed",
+			"#c4b5fd"
+		],
+		sparkSize: 9,
+		sparkRadius: 24,
+		sparkCount: 7,
+		duration: 400,
+		glow: .1,
+		children: [/* @__PURE__ */ jsx(Toaster, {
+			position: "bottom-right",
+			mobileOffset: 16,
+			offset: 24,
+			closeButton: true,
+			theme: "light",
+			toastOptions: { duration: 4200 }
+		}), page]
+	});
 }
 //#endregion
 //#region frontend/src/entry-server.jsx
