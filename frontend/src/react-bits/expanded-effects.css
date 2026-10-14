@@ -1,0 +1,9 @@
+.mentics-count { font: inherit !important; color: inherit !important; letter-spacing: inherit !important; margin-left: 0 !important; font-variant-numeric: tabular-nums; }
+.eyebrow > .mentics-decrypted { width: auto; height: auto; background: none; border-radius: 0; }
+.eyebrow .mentics-decrypted span { background: none !important; border-radius: 0; }
+.eyebrow .mentics-decrypted > [aria-hidden="true"] { width: auto; height: auto; display: inline; }
+/* Native buttons and anchors retain Mentics' own sizing and colors. */
+.path-launcher.star-border { isolation: isolate; }
+@media (prefers-reduced-motion: reduce), (hover: none) {
+  .command-grid .spotlight-card__light, .command-grid .spotlight-card__edge { display: none; }
+}

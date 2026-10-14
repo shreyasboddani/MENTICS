@@ -10,6 +10,7 @@ import { gsap } from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
 import { SplitText } from "gsap/SplitText";
 import { useGSAP } from "@gsap/react";
+import { motion, useInView, useMotionValue, useReducedMotion, useSpring } from "motion/react";
 //#region frontend/src/boot.js
 var initial = typeof window !== "undefined" && window.__MENTICS__ ? window.__MENTICS__ : {
 	page: "landing",
@@ -308,7 +309,7 @@ var gradient = (color, opacity, variant, softness) => {
 		return `color-mix(in srgb, ${color} ${Math.round(Math.min(1, profile(t, softness) * opacity) * 1e3) / 10}%, transparent) ${(t * 100).toFixed(1)}%`;
 	}).join(", ")})`;
 };
-var ease = (t) => (1 - Math.cos(Math.PI * t)) / 2;
+var ease$1 = (t) => (1 - Math.cos(Math.PI * t)) / 2;
 var GlareHover = ({ as: Component = "div", width = "auto", height = "auto", background = "transparent", borderRadius = "10px", borderColor = "transparent", children, glareColor = "#ffffff", glareOpacity = .5, glareAngle = -45, glareSize = 30, softness = .6, variant = "streak", blendMode = "screen", rimGlint = true, mode = "hover", transitionDuration = 650, interval = 3, playOnce = false, intro = false, className = "", style = {}, ...rest }) => {
 	const rootRef = useRef(null);
 	const glareRef = useRef(null);
@@ -391,7 +392,7 @@ var GlareHover = ({ as: Component = "div", width = "auto", height = "auto", back
 			if (state.sweep) {
 				const sweep = state.sweep;
 				const t = Math.min(1, (now - sweep.start) / sweep.duration);
-				state.pos = sweep.from + (sweep.to - sweep.from) * ease(t);
+				state.pos = sweep.from + (sweep.to - sweep.from) * ease$1(t);
 				if (t < 1) moving = true;
 				else state.sweep = null;
 			} else if (mode === "follow") {
@@ -708,13 +709,13 @@ var STEP_STOPS = [
 	[.81, 3],
 	[2, 4]
 ];
-var clamp$3 = (value) => value < 0 ? 0 : value > 1 ? 1 : value;
+var clamp$4 = (value) => value < 0 ? 0 : value > 1 ? 1 : value;
 var smooth = (value) => value * value * (3 - 2 * value);
 var cameraAt = (progress) => {
 	let index = 1;
 	while (index < CAMERA.length - 1 && progress > CAMERA[index].p) index += 1;
 	const from = CAMERA[index - 1], to = CAMERA[index];
-	const eased = smooth(clamp$3((progress - from.p) / (to.p - from.p)));
+	const eased = smooth(clamp$4((progress - from.p) / (to.p - from.p)));
 	const frame = {};
 	for (const key in to) frame[key] = from[key] + (to[key] - from[key]) * eased;
 	return frame;
@@ -787,7 +788,7 @@ function HomeHero({ loggedIn }) {
 				return;
 			}
 			story.dataset.scroll = "active";
-			const progress = clamp$3(-story.getBoundingClientRect().top / range);
+			const progress = clamp$4(-story.getBoundingClientRect().top / range);
 			const current = progress < .17 ? 0 : progress < .58 ? 1 : 2;
 			if (current !== lastChapter) {
 				lastChapter = current;
@@ -801,8 +802,8 @@ function HomeHero({ loggedIn }) {
 			panelsRef.current.forEach((panel, index) => {
 				if (!panel) return;
 				const { enter, exit } = PANELS[index];
-				const arriving = enter[1] > enter[0] ? clamp$3((progress - enter[0]) / (enter[1] - enter[0])) : 1;
-				const leaving = clamp$3((progress - exit[0]) / (exit[1] - exit[0]));
+				const arriving = enter[1] > enter[0] ? clamp$4((progress - enter[0]) / (enter[1] - enter[0])) : 1;
+				const leaving = clamp$4((progress - exit[0]) / (exit[1] - exit[0]));
 				panel.style.opacity = smooth(arriving) * (1 - smooth(leaving));
 				panel.style.transform = `translate3d(0, ${(1 - arriving) * 46 - leaving * 54}px, 0) scale(${1 - (1 - arriving) * .045 - leaving * .035})`;
 			});
@@ -814,9 +815,9 @@ function HomeHero({ loggedIn }) {
 			parallax.forEach(([node, x, y]) => {
 				if (node) node.style.translate = `${(mobile ? 0 : x) * progress}px ${y * progress}px`;
 			});
-			if (prompt) prompt.style.opacity = String(1 - clamp$3(progress / .07));
+			if (prompt) prompt.style.opacity = String(1 - clamp$4(progress / .07));
 			progressRef.current.style.transform = `scaleX(${progress})`;
-			route.style.strokeDashoffset = String(100 - clamp$3((progress - .05) / .8) * 100);
+			route.style.strokeDashoffset = String(100 - clamp$4((progress - .05) / .8) * 100);
 		};
 		const schedule = () => {
 			if (!frame) frame = requestAnimationFrame(render);
@@ -1302,7 +1303,7 @@ function HomeHero({ loggedIn }) {
 }
 //#endregion
 //#region frontend/src/react-bits/SpotlightCard.jsx
-var THEMES = {
+var THEMES$1 = {
 	dark: {
 		surface: "#111111",
 		border: "rgba(255, 255, 255, 0.08)",
@@ -1322,9 +1323,9 @@ var THEMES = {
 };
 var SHAPES$1 = ["circle", "beam"];
 var NOISE = "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E\")";
-var clamp$2 = (value, min, max) => Math.min(max, Math.max(min, value));
+var clamp$3 = (value, min, max) => Math.min(max, Math.max(min, value));
 var falloff = (color, softness) => {
-	const soft = clamp$2(softness, 0, 1);
+	const soft = clamp$3(softness, 0, 1);
 	const core = (1 - soft) ** 1.5 * .85;
 	const stop = (alpha, at) => `color-mix(in srgb, ${color} ${(alpha * 100).toFixed(2)}%, transparent) ${(at * 100).toFixed(2)}%`;
 	const list = [stop(1, 0)];
@@ -1343,20 +1344,20 @@ var SpotlightCard = ({ as: Component = "article", children, className = "", styl
 	const grainRef = useRef(null);
 	const edgeRef = useRef(null);
 	const wakeRef = useRef(null);
-	const palette = THEMES[theme] ?? THEMES.dark;
+	const palette = THEMES$1[theme] ?? THEMES$1.dark;
 	const color = spotlightColor ?? palette.light;
 	const settings = {
 		shape: SHAPES$1.includes(shape) ? shape : "circle",
 		fill: falloff(color, softness),
 		edge: falloff(color, 1),
 		size: Math.max(20, spotlightSize),
-		intensity: clamp$2(intensity, 0, 1) * palette.fill,
-		borderGlow: clamp$2(borderGlow, 0, 1) * palette.edge,
+		intensity: clamp$3(intensity, 0, 1) * palette.fill,
+		borderGlow: clamp$3(borderGlow, 0, 1) * palette.edge,
 		proximity: Math.max(0, proximity),
-		smoothing: clamp$2(smoothing, 0, 1),
+		smoothing: clamp$3(smoothing, 0, 1),
 		ambient,
 		flare,
-		grain: clamp$2(grain, 0, 1)
+		grain: clamp$3(grain, 0, 1)
 	};
 	const settingsRef = useRef(settings);
 	useEffect(() => {
@@ -1605,9 +1606,9 @@ var SHAPES = [
 ];
 var MAX_BURSTS = 32;
 var GRAVITY = 500;
-var clamp$1 = (value, min, max) => Math.min(max, Math.max(min, value));
+var clamp$2 = (value, min, max) => Math.min(max, Math.max(min, value));
 var smoothstep = (a, b, x) => {
-	const t = clamp$1((x - a) / (b - a), 0, 1);
+	const t = clamp$2((x - a) / (b - a), 0, 1);
 	return t * t * (3 - 2 * t);
 };
 var toColors = (value) => {
@@ -1653,16 +1654,16 @@ var ClickSpark = forwardRef(({ sparkColor = "#fff", sparkSize = 14, sparkRadius 
 		colors: toColors(sparkColor),
 		size: Math.max(0, sparkSize),
 		radius: Math.max(0, sparkRadius) * Math.max(0, extraScale),
-		count: clamp$1(Math.round(sparkCount), 1, 64),
+		count: clamp$2(Math.round(sparkCount), 1, 64),
 		width: Math.max(.5, sparkWidth),
 		duration: Math.max(60, duration),
 		ease: EASINGS$1[easing] ?? EASINGS$1["ease-out"],
 		shape: SHAPES.includes(shape) ? shape : "line",
-		randomness: clamp$1(randomness, 0, 1),
+		randomness: clamp$2(randomness, 0, 1),
 		gravity: Math.max(0, gravity),
-		spread: clamp$1(spread, 0, 360),
+		spread: clamp$2(spread, 0, 360),
 		direction,
-		glow: clamp$1(glow, 0, 1),
+		glow: clamp$2(glow, 0, 1),
 		ring,
 		disabled
 	};
@@ -1689,7 +1690,7 @@ var ClickSpark = forwardRef(({ sparkColor = "#fff", sparkSize = 14, sparkRadius 
 			const life = s.duration * spark.life;
 			const p = elapsed / life;
 			if (p >= 1) return false;
-			const e = s.ease(clamp$1(p, 0, 1));
+			const e = s.ease(clamp$2(p, 0, 1));
 			const seconds = elapsed / 1e3;
 			const distance = s.radius * spark.reach * e;
 			const width = s.width * spark.scale;
@@ -1720,7 +1721,7 @@ var ClickSpark = forwardRef(({ sparkColor = "#fff", sparkSize = 14, sparkRadius 
 			}
 			if (s.shape === "streak") {
 				const lag = Math.min(elapsed, 70 + s.size * 4 * spark.scale);
-				const back = s.ease(clamp$1((elapsed - lag) / life, 0, 1));
+				const back = s.ease(clamp$2((elapsed - lag) / life, 0, 1));
 				const [hx, hy] = position(burst, spark, distance, seconds);
 				const [tx, ty] = position(burst, spark, s.radius * spark.reach * back, Math.max(0, seconds - lag / 1e3));
 				const dx = hx - tx;
@@ -1765,7 +1766,7 @@ var ClickSpark = forwardRef(({ sparkColor = "#fff", sparkSize = 14, sparkRadius 
 				return true;
 			}
 			const [x, y] = position(burst, spark, distance, seconds);
-			const twinkle = Math.pow(Math.sin(Math.PI * clamp$1(p * 1.1, 0, 1)), .7);
+			const twinkle = Math.pow(Math.sin(Math.PI * clamp$2(p * 1.1, 0, 1)), .7);
 			const radius = s.size * .6 * spark.scale * twinkle;
 			const rotation = spark.angle + spark.spin * p * Math.PI * .5;
 			if (radius <= .05) return true;
@@ -2173,7 +2174,7 @@ var FALLOFF = [
 	.8,
 	1
 ];
-var clamp = (value, min, max) => Math.min(max, Math.max(min, value));
+var clamp$1 = (value, min, max) => Math.min(max, Math.max(min, value));
 var paint = null;
 var parseColor = (value) => {
 	if (typeof document === "undefined") return null;
@@ -2215,10 +2216,10 @@ var ShinyText = ({ text, children, color = "#b5b5b5", shineColor = "#ffffff", sp
 		speed: Math.max(.1, speed),
 		delay: Math.max(0, delay),
 		angle,
-		shineWidth: clamp(shineWidth, 2, 200),
-		softness: clamp(softness, 0, 1),
-		bands: clamp(Math.round(bands), 1, 3),
-		glow: clamp(glow, 0, 1),
+		shineWidth: clamp$1(shineWidth, 2, 200),
+		softness: clamp$1(softness, 0, 1),
+		bands: clamp$1(Math.round(bands), 1, 3),
+		glow: clamp$1(glow, 0, 1),
 		sign: direction === "right" ? 1 : -1,
 		ease: EASINGS[easing] ?? EASINGS.smooth,
 		trigger: TRIGGERS.includes(trigger) ? trigger : "loop",
@@ -2364,7 +2365,7 @@ var ShinyText = ({ text, children, color = "#b5b5b5", shineColor = "#ffffff", sp
 					raf = requestAnimationFrame(tick);
 					return;
 				}
-				const t = clamp((now - state.start) / state.duration, 0, 1);
+				const t = clamp$1((now - state.start) / state.duration, 0, 1);
 				state.pos = state.from + (state.to - state.from) * s.ease(t);
 				draw();
 				if (t < 1) {
@@ -2495,6 +2496,1006 @@ var ShinyText = ({ text, children, color = "#b5b5b5", shineColor = "#ffffff", sp
 		}) : null]
 	});
 };
+//#endregion
+//#region frontend/src/react-bits/StarBorder.jsx
+var THEMES = {
+	dark: {
+		surface: "#0c0c0f",
+		text: "#fafafa",
+		track: "rgba(255, 255, 255, 0.1)",
+		light: "#ffffff"
+	},
+	light: {
+		surface: "#ffffff",
+		text: "#18181b",
+		track: "rgba(24, 24, 27, 0.12)",
+		light: "#18181b"
+	}
+};
+var HOVERS = [
+	"lap",
+	"brighten",
+	"reveal",
+	"none"
+];
+var BLEED = 48;
+var LAP = .9;
+var TAU = Math.PI * 2;
+var WHITE = [
+	255,
+	255,
+	255
+];
+var clamp = (value, min, max) => Math.min(max, Math.max(min, value));
+var wrap = (value, total) => (value % total + total) % total;
+var ease = (t) => t < .5 ? 4 * t * t * t : 1 - (2 - 2 * t) ** 3 / 2;
+var mix = (a, b, t) => [
+	a[0] + (b[0] - a[0]) * t,
+	a[1] + (b[1] - a[1]) * t,
+	a[2] + (b[2] - a[2]) * t
+];
+var rgba = (rgb, alpha) => `rgba(${Math.round(rgb[0])}, ${Math.round(rgb[1])}, ${Math.round(rgb[2])}, ${clamp(alpha, 0, 1).toFixed(3)})`;
+var colorContext = null;
+var toRgb = (color) => {
+	colorContext = colorContext ?? document.createElement("canvas").getContext("2d");
+	if (!colorContext) return WHITE;
+	colorContext.fillStyle = "#000000";
+	colorContext.fillStyle = color;
+	const value = String(colorContext.fillStyle);
+	if (value.startsWith("#")) {
+		const hex = parseInt(value.slice(1, 7), 16);
+		return [
+			hex >> 16 & 255,
+			hex >> 8 & 255,
+			hex & 255
+		];
+	}
+	const parts = value.match(/[\d.]+/g)?.map(Number) ?? WHITE;
+	return [
+		parts[0],
+		parts[1],
+		parts[2]
+	];
+};
+var outline = (width, height, radius) => {
+	const r = Math.max(0, Math.min(radius, width / 2, height / 2));
+	const arc = Math.PI * r / 2;
+	const across = Math.max(0, width - 2 * r);
+	const down = Math.max(0, height - 2 * r);
+	const segments = [
+		{
+			length: across,
+			x: r,
+			y: 0,
+			dx: 1,
+			dy: 0,
+			angle: null
+		},
+		{
+			length: arc,
+			x: width - r,
+			y: r,
+			dx: 0,
+			dy: 0,
+			angle: -Math.PI / 2
+		},
+		{
+			length: down,
+			x: width,
+			y: r,
+			dx: 0,
+			dy: 1,
+			angle: null
+		},
+		{
+			length: arc,
+			x: width - r,
+			y: height - r,
+			dx: 0,
+			dy: 0,
+			angle: 0
+		},
+		{
+			length: across,
+			x: width - r,
+			y: height,
+			dx: -1,
+			dy: 0,
+			angle: null
+		},
+		{
+			length: arc,
+			x: r,
+			y: height - r,
+			dx: 0,
+			dy: 0,
+			angle: Math.PI / 2
+		},
+		{
+			length: down,
+			x: 0,
+			y: height - r,
+			dx: 0,
+			dy: -1,
+			angle: null
+		},
+		{
+			length: arc,
+			x: r,
+			y: r,
+			dx: 0,
+			dy: 0,
+			angle: Math.PI
+		}
+	];
+	return {
+		r,
+		segments,
+		total: Math.max(1, segments.reduce((sum, segment) => sum + segment.length, 0))
+	};
+};
+var pointAt = (shape, distance, point) => {
+	let s = wrap(distance, shape.total);
+	for (const segment of shape.segments) {
+		if (segment.length > 0 && s <= segment.length) {
+			if (segment.angle === null) {
+				point.x = segment.x + segment.dx * s;
+				point.y = segment.y + segment.dy * s;
+				point.nx = segment.dy;
+				point.ny = -segment.dx;
+			} else {
+				const angle = segment.angle + s / shape.r;
+				point.nx = Math.cos(angle);
+				point.ny = Math.sin(angle);
+				point.x = segment.x + point.nx * shape.r;
+				point.y = segment.y + point.ny * shape.r;
+			}
+			return point;
+		}
+		s -= segment.length;
+	}
+	return point;
+};
+var project = (shape, px, py) => {
+	let best = Infinity;
+	let found = 0;
+	let offset = 0;
+	shape.segments.forEach((segment) => {
+		if (segment.length > 0) {
+			let s;
+			let x;
+			let y;
+			if (segment.angle === null) {
+				s = clamp((px - segment.x) * segment.dx + (py - segment.y) * segment.dy, 0, segment.length);
+				x = segment.x + segment.dx * s;
+				y = segment.y + segment.dy * s;
+			} else {
+				let angle = wrap(Math.atan2(py - segment.y, px - segment.x) - segment.angle, TAU);
+				if (angle > Math.PI / 2) angle = angle > Math.PI * 1.25 ? 0 : Math.PI / 2;
+				s = angle * shape.r;
+				x = segment.x + Math.cos(segment.angle + angle) * shape.r;
+				y = segment.y + Math.sin(segment.angle + angle) * shape.r;
+			}
+			const distance = (px - x) ** 2 + (py - y) ** 2;
+			if (distance < best) {
+				best = distance;
+				found = offset + s;
+			}
+		}
+		offset += segment.length;
+	});
+	return found;
+};
+var StarBorder = ({ as: Component = "button", children, className = "", style, color, trailColor, duration = 4, thickness = 1, radius = 12, trailLength = .3, stars = 1, glow = .6, sparkle = false, direction = "clockwise", hover = "lap", clickPulse = true, theme = "dark", backgroundColor, textColor, borderColor, ...rest }) => {
+	const rootRef = useRef(null);
+	const canvasRef = useRef(null);
+	const wakeRef = useRef(null);
+	const palette = THEMES[theme] ?? THEMES.dark;
+	const light = color ?? palette.light;
+	const settings = {
+		light: theme === "light",
+		color: light,
+		trailColor: trailColor ?? light,
+		duration: Math.max(.3, duration),
+		thickness: Math.max(.5, thickness),
+		radius: Math.max(0, radius),
+		trailLength: clamp(trailLength, 0, 1),
+		stars: clamp(Math.round(stars), 1, 6),
+		glow: clamp(glow, 0, 1),
+		sparkle,
+		direction: direction === "counterclockwise" ? -1 : 1,
+		hover: HOVERS.includes(hover) ? hover : "lap",
+		clickPulse
+	};
+	const settingsRef = useRef(settings);
+	useEffect(() => {
+		settingsRef.current = settings;
+	});
+	useEffect(() => {
+		const root = rootRef.current;
+		const canvas = canvasRef.current;
+		const ctx = canvas?.getContext("2d");
+		if (!root || !canvas || !ctx) return void 0;
+		const motion = window.matchMedia("(prefers-reduced-motion: reduce)");
+		let reduce = motion.matches;
+		const point = {
+			x: 0,
+			y: 0,
+			nx: 0,
+			ny: -1
+		};
+		const state = {
+			width: 0,
+			height: 0,
+			dpr: 1,
+			phase: 0,
+			velocity: 0,
+			motion: 0,
+			lap: -1,
+			time: 0,
+			reveal: 0,
+			boost: 0,
+			flash: 0,
+			emit: 0,
+			hovered: false,
+			focused: false,
+			pointerX: 0,
+			pointerY: 0,
+			visible: true
+		};
+		const pulses = [];
+		const dust = [];
+		const colors = {
+			key: "",
+			head: WHITE,
+			tail: WHITE
+		};
+		let raf = 0;
+		let last = performance.now();
+		let alive = true;
+		const measure = () => {
+			state.width = root.offsetWidth;
+			state.height = root.offsetHeight;
+			state.dpr = Math.min(window.devicePixelRatio || 1, 2);
+			canvas.width = Math.max(1, Math.round((state.width + 96) * state.dpr));
+			canvas.height = Math.max(1, Math.round((state.height + 96) * state.dpr));
+			wake();
+		};
+		const local = (event) => {
+			const rect = root.getBoundingClientRect();
+			const scaleX = rect.width ? state.width / rect.width : 1;
+			const scaleY = rect.height ? state.height / rect.height : 1;
+			return [(event.clientX - rect.left) * scaleX, (event.clientY - rect.top) * scaleY];
+		};
+		const shapeFor = (s) => outline(Math.max(1, state.width - s.thickness), Math.max(1, state.height - s.thickness), s.radius - s.thickness / 2);
+		const stroke = (x1, y1, x2, y2, width, style) => {
+			ctx.lineWidth = width;
+			ctx.strokeStyle = style;
+			ctx.beginPath();
+			ctx.moveTo(x1, y1);
+			ctx.lineTo(x2, y2);
+			ctx.stroke();
+		};
+		const drawTrail = (s, shape, head, length, sign, intensity, tip = true) => {
+			if (length < .5 || intensity <= 0) return;
+			const steps = clamp(Math.ceil(length / 2), 2, 90);
+			pointAt(shape, head, point);
+			let px = point.x;
+			let py = point.y;
+			for (let i = 1; i <= steps; i++) {
+				pointAt(shape, head - sign * length * (i / steps), point);
+				const u = 1 - (i - .5) / steps;
+				const fade = u * u * intensity;
+				let tone = mix(colors.tail, colors.head, u);
+				if (!s.light) tone = mix(tone, WHITE, u ** 6 * .65);
+				ctx.lineCap = tip && i === 1 ? "round" : "butt";
+				stroke(px, py, point.x, point.y, 2 + 6 * s.glow, rgba(tone, fade * (s.light ? .1 : .2) * s.glow));
+				stroke(px, py, point.x, point.y, s.thickness, rgba(tone, fade));
+				px = point.x;
+				py = point.y;
+			}
+		};
+		const drawHead = (s, x, y, intensity, twinkle) => {
+			if (intensity <= 0) return;
+			const tone = colors.head;
+			const reach = (12 + 40 * s.glow) * (s.light ? .6 : 1);
+			const bloom = ctx.createRadialGradient(x, y, 0, x, y, reach);
+			const strength = (s.light ? .08 : .4) * s.glow * intensity;
+			bloom.addColorStop(0, rgba(tone, strength));
+			bloom.addColorStop(.2, rgba(tone, strength * .4));
+			bloom.addColorStop(.5, rgba(tone, strength * .1));
+			bloom.addColorStop(1, rgba(tone, 0));
+			ctx.fillStyle = bloom;
+			ctx.fillRect(x - reach, y - reach, reach * 2, reach * 2);
+			if (!s.sparkle) return;
+			const size = (1 + s.thickness * .6) * (s.light ? .85 : 1);
+			const core = ctx.createRadialGradient(x, y, 0, x, y, size * 2.2);
+			core.addColorStop(0, rgba(s.light ? tone : WHITE, intensity));
+			core.addColorStop(s.light ? .3 : .4, rgba(s.light ? tone : mix(tone, WHITE, .5), intensity * .9));
+			core.addColorStop(s.light ? .55 : 1, rgba(tone, s.light ? intensity * .12 : 0));
+			core.addColorStop(1, rgba(tone, 0));
+			ctx.fillStyle = core;
+			ctx.beginPath();
+			ctx.arc(x, y, size * 2.2, 0, TAU);
+			ctx.fill();
+			const spike = (3 + 4 * s.glow + s.thickness * 1.5) * twinkle;
+			const center = s.light ? tone : WHITE;
+			const horizontal = ctx.createLinearGradient(x - spike, y, x + spike, y);
+			horizontal.addColorStop(0, rgba(tone, 0));
+			horizontal.addColorStop(.5, rgba(center, intensity * .95));
+			horizontal.addColorStop(1, rgba(tone, 0));
+			stroke(x - spike, y, x + spike, y, s.light ? .75 : 1, horizontal);
+			const vertical = ctx.createLinearGradient(x, y - spike, x, y + spike);
+			vertical.addColorStop(0, rgba(tone, 0));
+			vertical.addColorStop(.5, rgba(center, intensity * .95));
+			vertical.addColorStop(1, rgba(tone, 0));
+			stroke(x, y - spike, x, y + spike, s.light ? .75 : 1, vertical);
+		};
+		const spawnDust = (x, y, nx, ny, speed) => {
+			if (dust.length > 48) return;
+			const push = 3 + Math.random() * 10;
+			const drift = (Math.random() - .5) * 8;
+			dust.push({
+				x: x + nx * (Math.random() * 3 - 1),
+				y: y + ny * (Math.random() * 3 - 1),
+				vx: nx * push - ny * drift - speed * -ny * .04,
+				vy: ny * push + nx * drift - speed * nx * .04,
+				age: 0,
+				life: .35 + Math.random() * .5,
+				size: .45 + Math.random() * .7,
+				seed: Math.random() * TAU
+			});
+		};
+		const draw = (base, shape) => {
+			const s = state.boost > .001 ? {
+				...base,
+				glow: Math.min(1.5, base.glow + .4 * state.boost)
+			} : base;
+			ctx.setTransform(1, 0, 0, 1, 0, 0);
+			ctx.clearRect(0, 0, canvas.width, canvas.height);
+			if (state.width < 2 || state.height < 2) return;
+			const offset = (BLEED + s.thickness / 2) * state.dpr;
+			ctx.setTransform(state.dpr, 0, 0, state.dpr, offset, offset);
+			ctx.globalCompositeOperation = s.light ? "source-over" : "lighter";
+			ctx.lineCap = "butt";
+			const total = shape.total;
+			const spacing = total / s.stars;
+			const speed = Math.abs(state.motion);
+			const sign = state.motion >= 0 ? 1 : -1;
+			const span = s.trailLength * s.duration;
+			const length = Math.min(speed * span, spacing * .92, total * .6);
+			const intensity = state.reveal * (1 + .4 * state.boost + .6 * state.flash);
+			const ring = state.flash * (s.light ? .18 : .32) + state.boost * state.reveal * (s.light ? .07 : .12);
+			if (ring > .005) {
+				ctx.lineWidth = s.thickness + 2 * s.glow;
+				ctx.strokeStyle = rgba(colors.head, ring);
+				ctx.beginPath();
+				ctx.roundRect(0, 0, Math.max(1, state.width - s.thickness), Math.max(1, state.height - s.thickness), Math.max(0, shape.r));
+				ctx.stroke();
+			}
+			const still = clamp(1 - speed / Math.max(1, total / s.duration * .6), 0, 1) * Math.min(1, intensity);
+			const rest = (10 + 14 * s.glow + s.thickness * 2) * still;
+			for (let i = 0; i < s.stars; i++) {
+				const head = state.phase + i * spacing;
+				drawTrail(s, shape, head, length, sign, Math.min(1, intensity));
+				if (still > .01) {
+					drawTrail(s, shape, head, rest, 1, still, false);
+					drawTrail(s, shape, head, rest, -1, still, false);
+				}
+			}
+			pulses.forEach((pulse) => {
+				const fade = (1 - pulse.age / .65) ** 2;
+				const travel = total / 2 * (1 - (1 - Math.min(1, pulse.age / .5)) ** 2);
+				const tail = Math.min(travel, total * .16);
+				[1, -1].forEach((way) => {
+					const front = pulse.origin + way * travel;
+					drawTrail(s, shape, front, tail, way, fade);
+					pointAt(shape, front, point);
+					drawHead(s, point.x, point.y, fade * .8, .8);
+				});
+			});
+			for (let i = 0; i < s.stars; i++) {
+				pointAt(shape, state.phase + i * spacing, point);
+				const twinkle = .82 + .18 * Math.sin(state.time * 6.1 + i * 2.3) * Math.sin(state.time * 2.7 + i);
+				drawHead(s, point.x, point.y, Math.min(1.3, intensity), twinkle);
+			}
+			dust.forEach((mote) => {
+				const left = 1 - mote.age / mote.life;
+				const alpha = left * (.45 + .55 * Math.sin(state.time * 20 + mote.seed)) * state.reveal * (s.light ? .35 : .9);
+				if (alpha <= .01) return;
+				ctx.fillStyle = rgba(s.light ? colors.head : mix(colors.tail, WHITE, .6), alpha);
+				ctx.beginPath();
+				ctx.arc(mote.x, mote.y, mote.size * (.6 + .4 * left), 0, TAU);
+				ctx.fill();
+			});
+		};
+		const frame = (now) => {
+			raf = 0;
+			if (!alive) return;
+			const s = settingsRef.current;
+			const dt = Math.min(.05, Math.max(.001, (now - last) / 1e3));
+			last = now;
+			state.time += dt;
+			const key = `${s.color}|${s.trailColor}`;
+			if (key !== colors.key) {
+				colors.key = key;
+				colors.head = toRgb(s.color);
+				colors.tail = toRgb(s.trailColor);
+			}
+			const shape = shapeFor(s);
+			const total = shape.total;
+			const spacing = total / s.stars;
+			const engaged = state.hovered || state.focused;
+			const cruise = reduce ? 0 : s.direction * total / s.duration;
+			const revealTarget = s.hover === "reveal" && !engaged ? 0 : 1;
+			state.reveal += (revealTarget - state.reveal) * (1 - Math.exp(-dt / (revealTarget > state.reveal ? .16 : .45)));
+			const boostTarget = s.hover === "brighten" && engaged ? 1 : 0;
+			state.boost += (boostTarget - state.boost) * (1 - Math.exp(-dt / (boostTarget > state.boost ? .18 : .5)));
+			state.flash *= Math.exp(-dt / .22);
+			state.velocity += (cruise - state.velocity) * (1 - Math.exp(-dt / .45));
+			let extra = 0;
+			if (state.lap >= 0) {
+				const before = ease(Math.min(1, state.lap / LAP));
+				state.lap += dt;
+				extra = (ease(Math.min(1, state.lap / LAP)) - before) * total * s.direction;
+				if (state.lap >= LAP) state.lap = -1;
+			}
+			state.motion = state.velocity + extra / dt;
+			state.phase = wrap(state.phase + state.velocity * dt + extra, total);
+			const pace = Math.abs(state.motion) / Math.max(1, Math.abs(total / s.duration));
+			if (s.sparkle && !reduce && state.reveal > .05) {
+				state.emit += dt * (2 + 6 * Math.min(2, pace)) * s.stars;
+				while (state.emit > 1) {
+					state.emit -= 1;
+					pointAt(shape, state.phase + Math.floor(Math.random() * s.stars) * spacing, point);
+					spawnDust(point.x, point.y, point.nx, point.ny, state.motion);
+				}
+			}
+			for (let i = dust.length - 1; i >= 0; i--) {
+				const mote = dust[i];
+				mote.age += dt;
+				mote.x += mote.vx * dt;
+				mote.y += mote.vy * dt;
+				mote.vx *= Math.exp(-dt * 2.2);
+				mote.vy *= Math.exp(-dt * 2.2);
+				if (mote.age >= mote.life) dust.splice(i, 1);
+			}
+			for (let i = pulses.length - 1; i >= 0; i--) {
+				pulses[i].age += dt;
+				if (pulses[i].age >= .65) pulses.splice(i, 1);
+			}
+			draw(s, shape);
+			const settling = Math.abs(revealTarget - state.reveal) > .002 || Math.abs(boostTarget - state.boost) > .002 || state.flash > .01 || pulses.length > 0 || dust.length > 0;
+			const moving = Math.abs(state.motion) > .05 || cruise !== 0 || state.lap >= 0;
+			const showing = state.reveal > .002 || revealTarget > 0;
+			if (state.visible && (settling || moving && showing || state.hovered)) raf = requestAnimationFrame(frame);
+		};
+		const wake = () => {
+			if (raf || !alive || !state.visible) return;
+			last = performance.now();
+			raf = requestAnimationFrame(frame);
+		};
+		wakeRef.current = wake;
+		const onEnter = (event) => {
+			const s = settingsRef.current;
+			[state.pointerX, state.pointerY] = local(event);
+			state.hovered = true;
+			if (s.hover === "reveal" && state.reveal < .15) {
+				state.phase = project(shapeFor(s), state.pointerX - s.thickness / 2, state.pointerY - s.thickness / 2);
+				state.velocity = 0;
+			}
+			if (s.hover === "lap" && state.lap < 0 && !reduce) state.lap = 0;
+			wake();
+		};
+		const onLeave = () => {
+			state.hovered = false;
+			wake();
+		};
+		const pulse = (origin) => {
+			if (!settingsRef.current.clickPulse) return;
+			pulses.push({
+				origin,
+				age: 0
+			});
+			if (pulses.length > 4) pulses.shift();
+			state.flash = 1;
+			wake();
+		};
+		const onDown = (event) => {
+			if (event.button !== 0 && event.pointerType === "mouse") return;
+			const s = settingsRef.current;
+			const [x, y] = local(event);
+			pulse(project(shapeFor(s), x - s.thickness / 2, y - s.thickness / 2));
+		};
+		const onClick = (event) => {
+			if (event.detail === 0) pulse(state.phase);
+		};
+		const onFocus = () => {
+			state.focused = root.matches(":focus-visible");
+			if (state.focused && settingsRef.current.hover === "lap" && state.lap < 0 && !reduce) state.lap = 0;
+			wake();
+		};
+		const onBlur = () => {
+			state.focused = false;
+			wake();
+		};
+		const resizeObserver = new ResizeObserver(measure);
+		resizeObserver.observe(root);
+		const onMotionChange = () => {
+			reduce = motion.matches;
+			wake();
+		};
+		motion.addEventListener("change", onMotionChange);
+		const visibility = new IntersectionObserver((entries) => {
+			state.visible = entries.some((entry) => entry.isIntersecting);
+			if (state.visible) wake();
+		});
+		visibility.observe(root);
+		root.addEventListener("pointerenter", onEnter);
+		root.addEventListener("pointerleave", onLeave);
+		root.addEventListener("pointerdown", onDown);
+		root.addEventListener("click", onClick);
+		root.addEventListener("focus", onFocus);
+		root.addEventListener("blur", onBlur);
+		measure();
+		return () => {
+			alive = false;
+			wakeRef.current = null;
+			motion.removeEventListener("change", onMotionChange);
+			cancelAnimationFrame(raf);
+			resizeObserver.disconnect();
+			visibility.disconnect();
+			root.removeEventListener("pointerenter", onEnter);
+			root.removeEventListener("pointerleave", onLeave);
+			root.removeEventListener("pointerdown", onDown);
+			root.removeEventListener("click", onClick);
+			root.removeEventListener("focus", onFocus);
+			root.removeEventListener("blur", onBlur);
+		};
+	}, []);
+	useEffect(() => {
+		wakeRef.current?.();
+	});
+	return /* @__PURE__ */ jsxs(Component, {
+		ref: rootRef,
+		className: `star-border${className ? ` ${className}` : ""}`,
+		style: {
+			"--star-border-radius": `${settings.radius}px`,
+			"--star-border-thickness": `${settings.thickness}px`,
+			"--star-border-surface": backgroundColor ?? palette.surface,
+			"--star-border-text": textColor ?? palette.text,
+			"--star-border-track": borderColor ?? palette.track,
+			...style
+		},
+		...Component === "button" && rest.type === void 0 ? { type: "button" } : null,
+		...rest,
+		children: [/* @__PURE__ */ jsx("canvas", {
+			ref: canvasRef,
+			className: "star-border__light",
+			"aria-hidden": "true"
+		}), children]
+	});
+};
+//#endregion
+//#region frontend/src/react-bits/CountUp.jsx
+function CountUp({ to, from = 0, direction = "up", delay = 0, duration = 2, className = "", startWhen = true, separator = "", onStart, onEnd }) {
+	const ref = useRef(null);
+	const reduced = useReducedMotion();
+	const motionValue = useMotionValue(direction === "down" ? to : from);
+	const damping = 20 + 40 * (1 / duration);
+	const stiffness = 100 * (1 / duration);
+	const springValue = useSpring(motionValue, {
+		damping,
+		stiffness
+	});
+	const isInView = useInView(ref, {
+		once: true,
+		margin: "0px"
+	});
+	const getDecimalPlaces = (num) => {
+		const str = num.toString();
+		if (str.includes(".")) {
+			const decimals = str.split(".")[1];
+			if (parseInt(decimals) !== 0) return decimals.length;
+		}
+		return 0;
+	};
+	const maxDecimals = Math.max(getDecimalPlaces(from), getDecimalPlaces(to));
+	const formatValue = useCallback((latest) => {
+		const hasDecimals = maxDecimals > 0;
+		const options = {
+			useGrouping: !!separator,
+			minimumFractionDigits: hasDecimals ? maxDecimals : 0,
+			maximumFractionDigits: hasDecimals ? maxDecimals : 0
+		};
+		const formattedNumber = Intl.NumberFormat("en-US", options).format(latest);
+		return separator ? formattedNumber.replace(/,/g, separator) : formattedNumber;
+	}, [maxDecimals, separator]);
+	useEffect(() => {
+		if (ref.current) ref.current.textContent = formatValue(to);
+	}, [
+		from,
+		to,
+		direction,
+		formatValue,
+		reduced
+	]);
+	useEffect(() => {
+		if (isInView && startWhen && !reduced) {
+			springValue.jump(direction === "down" ? to : from);
+			if (typeof onStart === "function") onStart();
+			const timeoutId = setTimeout(() => {
+				motionValue.set(direction === "down" ? from : to);
+			}, delay * 1e3);
+			const durationTimeoutId = setTimeout(() => {
+				if (typeof onEnd === "function") onEnd();
+			}, delay * 1e3 + duration * 1e3);
+			return () => {
+				clearTimeout(timeoutId);
+				clearTimeout(durationTimeoutId);
+			};
+		}
+	}, [
+		isInView,
+		startWhen,
+		motionValue,
+		direction,
+		from,
+		to,
+		delay,
+		onStart,
+		onEnd,
+		duration,
+		reduced,
+		springValue
+	]);
+	useEffect(() => {
+		const unsubscribe = springValue.on("change", (latest) => {
+			if (ref.current && !reduced && isInView) ref.current.textContent = formatValue(Math.max(Math.min(from, to), Math.min(Math.max(from, to), latest)));
+		});
+		return () => unsubscribe();
+	}, [
+		springValue,
+		formatValue,
+		reduced,
+		isInView,
+		from,
+		to
+	]);
+	return /* @__PURE__ */ jsx("span", {
+		className: `mentics-count ${className}`,
+		ref,
+		"aria-live": "off",
+		children: formatValue(to)
+	});
+}
+//#endregion
+//#region frontend/src/react-bits/DecryptedText.jsx
+var styles = {
+	wrapper: {
+		display: "inline-block",
+		whiteSpace: "pre-wrap"
+	},
+	srOnly: {
+		position: "absolute",
+		width: "1px",
+		height: "1px",
+		padding: 0,
+		margin: "-1px",
+		overflow: "hidden",
+		clip: "rect(0,0,0,0)",
+		border: 0,
+		whiteSpace: "nowrap"
+	}
+};
+function DecryptedText({ text, speed = 50, maxIterations = 10, sequential = false, revealDirection = "start", useOriginalCharsOnly = false, characters = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz!@#$%^&*()_+", className = "", parentClassName = "", encryptedClassName = "", animateOn = "hover", clickMode = "once", ...props }) {
+	const reduced = useReducedMotion();
+	const [displayText, setDisplayText] = useState(text);
+	const [isAnimating, setIsAnimating] = useState(false);
+	const [revealedIndices, setRevealedIndices] = useState(/* @__PURE__ */ new Set());
+	const [hasAnimated, setHasAnimated] = useState(false);
+	const [isDecrypted, setIsDecrypted] = useState(animateOn !== "click");
+	const [direction, setDirection] = useState("forward");
+	const containerRef = useRef(null);
+	const orderRef = useRef([]);
+	const pointerRef = useRef(0);
+	const intervalRef = useRef(null);
+	const availableChars = useMemo(() => {
+		return useOriginalCharsOnly ? Array.from(new Set(text.split(""))).filter((char) => char !== " ") : characters.split("");
+	}, [
+		useOriginalCharsOnly,
+		text,
+		characters
+	]);
+	const shuffleText = useCallback((originalText, currentRevealed) => {
+		return originalText.split("").map((char, i) => {
+			if (char === " ") return " ";
+			if (currentRevealed.has(i)) return originalText[i];
+			return availableChars[Math.floor(Math.random() * availableChars.length)];
+		}).join("");
+	}, [availableChars]);
+	const computeOrder = useCallback((len) => {
+		const order = [];
+		if (len <= 0) return order;
+		if (revealDirection === "start") {
+			for (let i = 0; i < len; i++) order.push(i);
+			return order;
+		}
+		if (revealDirection === "end") {
+			for (let i = len - 1; i >= 0; i--) order.push(i);
+			return order;
+		}
+		const middle = Math.floor(len / 2);
+		let offset = 0;
+		while (order.length < len) {
+			if (offset % 2 === 0) {
+				const idx = middle + offset / 2;
+				if (idx >= 0 && idx < len) order.push(idx);
+			} else {
+				const idx = middle - Math.ceil(offset / 2);
+				if (idx >= 0 && idx < len) order.push(idx);
+			}
+			offset++;
+		}
+		return order.slice(0, len);
+	}, [revealDirection]);
+	const fillAllIndices = useCallback(() => {
+		const s = /* @__PURE__ */ new Set();
+		for (let i = 0; i < text.length; i++) s.add(i);
+		return s;
+	}, [text]);
+	const removeRandomIndices = useCallback((set, count) => {
+		const arr = Array.from(set);
+		for (let i = 0; i < count && arr.length > 0; i++) {
+			const idx = Math.floor(Math.random() * arr.length);
+			arr.splice(idx, 1);
+		}
+		return new Set(arr);
+	}, []);
+	const encryptInstantly = useCallback(() => {
+		const emptySet = /* @__PURE__ */ new Set();
+		setRevealedIndices(emptySet);
+		setDisplayText(shuffleText(text, emptySet));
+		setIsDecrypted(false);
+	}, [text, shuffleText]);
+	const triggerDecrypt = useCallback(() => {
+		if (sequential) {
+			orderRef.current = computeOrder(text.length);
+			pointerRef.current = 0;
+			setRevealedIndices(/* @__PURE__ */ new Set());
+		} else setRevealedIndices(/* @__PURE__ */ new Set());
+		setDirection("forward");
+		setIsAnimating(true);
+	}, [
+		sequential,
+		computeOrder,
+		text.length
+	]);
+	const triggerReverse = useCallback(() => {
+		if (sequential) {
+			orderRef.current = computeOrder(text.length).slice().reverse();
+			pointerRef.current = 0;
+			setRevealedIndices(fillAllIndices());
+			setDisplayText(shuffleText(text, fillAllIndices()));
+		} else {
+			setRevealedIndices(fillAllIndices());
+			setDisplayText(shuffleText(text, fillAllIndices()));
+		}
+		setDirection("reverse");
+		setIsAnimating(true);
+	}, [
+		sequential,
+		computeOrder,
+		fillAllIndices,
+		shuffleText,
+		text
+	]);
+	useEffect(() => {
+		if (!isAnimating || reduced) return;
+		let currentIteration = 0;
+		const getNextIndex = (revealedSet) => {
+			const textLength = text.length;
+			switch (revealDirection) {
+				case "start": return revealedSet.size;
+				case "end": return textLength - 1 - revealedSet.size;
+				case "center": {
+					const middle = Math.floor(textLength / 2);
+					const offset = Math.floor(revealedSet.size / 2);
+					const nextIndex = revealedSet.size % 2 === 0 ? middle + offset : middle - offset - 1;
+					if (nextIndex >= 0 && nextIndex < textLength && !revealedSet.has(nextIndex)) return nextIndex;
+					for (let i = 0; i < textLength; i++) if (!revealedSet.has(i)) return i;
+					return 0;
+				}
+				default: return revealedSet.size;
+			}
+		};
+		intervalRef.current = setInterval(() => {
+			setRevealedIndices((prevRevealed) => {
+				if (sequential) {
+					if (direction === "forward") {
+						if (prevRevealed.size < text.length) {
+							const nextIndex = getNextIndex(prevRevealed);
+							const newRevealed = new Set(prevRevealed);
+							newRevealed.add(nextIndex);
+							setDisplayText(shuffleText(text, newRevealed));
+							return newRevealed;
+						} else {
+							clearInterval(intervalRef.current);
+							setIsAnimating(false);
+							setIsDecrypted(true);
+							return prevRevealed;
+						}
+					}
+					if (direction === "reverse") {
+						if (pointerRef.current < orderRef.current.length) {
+							const idxToRemove = orderRef.current[pointerRef.current++];
+							const newRevealed = new Set(prevRevealed);
+							newRevealed.delete(idxToRemove);
+							setDisplayText(shuffleText(text, newRevealed));
+							if (newRevealed.size === 0) {
+								clearInterval(intervalRef.current);
+								setIsAnimating(false);
+								setIsDecrypted(false);
+							}
+							return newRevealed;
+						} else {
+							clearInterval(intervalRef.current);
+							setIsAnimating(false);
+							setIsDecrypted(false);
+							return prevRevealed;
+						}
+					}
+				} else {
+					if (direction === "forward") {
+						setDisplayText(shuffleText(text, prevRevealed));
+						currentIteration++;
+						if (currentIteration >= maxIterations) {
+							clearInterval(intervalRef.current);
+							setIsAnimating(false);
+							setDisplayText(text);
+							setIsDecrypted(true);
+						}
+						return prevRevealed;
+					}
+					if (direction === "reverse") {
+						let currentSet = prevRevealed;
+						if (currentSet.size === 0) currentSet = fillAllIndices();
+						const removeCount = Math.max(1, Math.ceil(text.length / Math.max(1, maxIterations)));
+						const nextSet = removeRandomIndices(currentSet, removeCount);
+						setDisplayText(shuffleText(text, nextSet));
+						currentIteration++;
+						if (nextSet.size === 0 || currentIteration >= maxIterations) {
+							clearInterval(intervalRef.current);
+							setIsAnimating(false);
+							setIsDecrypted(false);
+							setDisplayText(shuffleText(text, /* @__PURE__ */ new Set()));
+							return /* @__PURE__ */ new Set();
+						}
+						return nextSet;
+					}
+				}
+				return prevRevealed;
+			});
+		}, speed);
+		return () => clearInterval(intervalRef.current);
+	}, [
+		isAnimating,
+		text,
+		speed,
+		maxIterations,
+		sequential,
+		revealDirection,
+		shuffleText,
+		direction,
+		fillAllIndices,
+		removeRandomIndices,
+		characters,
+		useOriginalCharsOnly,
+		reduced
+	]);
+	const handleClick = () => {
+		if (animateOn !== "click") return;
+		if (clickMode === "once") {
+			if (isDecrypted) return;
+			setDirection("forward");
+			triggerDecrypt();
+		}
+		if (clickMode === "toggle") {
+			if (isDecrypted) triggerReverse();
+			else {
+				setDirection("forward");
+				triggerDecrypt();
+			}
+		}
+	};
+	const triggerHoverDecrypt = useCallback(() => {
+		if (isAnimating || reduced) return;
+		setRevealedIndices(/* @__PURE__ */ new Set());
+		setIsDecrypted(false);
+		setDisplayText(text);
+		setDirection("forward");
+		setIsAnimating(true);
+	}, [
+		isAnimating,
+		text,
+		reduced
+	]);
+	const resetToPlainText = useCallback(() => {
+		clearInterval(intervalRef.current);
+		setIsAnimating(false);
+		setRevealedIndices(/* @__PURE__ */ new Set());
+		setDisplayText(text);
+		setIsDecrypted(true);
+		setDirection("forward");
+	}, [text]);
+	useEffect(() => {
+		if (animateOn !== "view" && animateOn !== "inViewHover") return;
+		const observerCallback = (entries) => {
+			entries.forEach((entry) => {
+				if (entry.isIntersecting && !hasAnimated && !reduced) {
+					triggerDecrypt();
+					setHasAnimated(true);
+				}
+			});
+		};
+		const observer = new IntersectionObserver(observerCallback, {
+			root: null,
+			rootMargin: "0px",
+			threshold: .1
+		});
+		const currentRef = containerRef.current;
+		if (currentRef) observer.observe(currentRef);
+		return () => {
+			if (currentRef) observer.unobserve(currentRef);
+		};
+	}, [
+		animateOn,
+		hasAnimated,
+		triggerDecrypt,
+		reduced
+	]);
+	useEffect(() => {
+		const timer = setTimeout(() => {
+			if (animateOn === "click" && !reduced) encryptInstantly();
+			else {
+				setDisplayText(text);
+				setIsDecrypted(true);
+			}
+			setRevealedIndices(/* @__PURE__ */ new Set());
+			setDirection("forward");
+		}, 0);
+		return () => clearTimeout(timer);
+	}, [
+		animateOn,
+		text,
+		encryptInstantly,
+		reduced
+	]);
+	const animateProps = animateOn === "hover" || animateOn === "inViewHover" ? {
+		onMouseEnter: triggerHoverDecrypt,
+		onMouseLeave: resetToPlainText
+	} : animateOn === "click" ? { onClick: handleClick } : {};
+	return /* @__PURE__ */ jsxs(motion.span, {
+		className: parentClassName,
+		ref: containerRef,
+		style: styles.wrapper,
+		...animateProps,
+		...props,
+		children: [/* @__PURE__ */ jsx("span", {
+			style: styles.srOnly,
+			children: text
+		}), /* @__PURE__ */ jsx("span", {
+			"aria-hidden": "true",
+			children: displayText.split("").map((char, index) => {
+				const isRevealedOrDone = revealedIndices.has(index) || !isAnimating && isDecrypted;
+				return /* @__PURE__ */ jsx("span", {
+					className: isRevealedOrDone ? className : encryptedClassName,
+					children: char
+				}, index);
+			})
+		})]
+	});
+}
 //#endregion
 //#region frontend/src/react-bits/useFluidExperience.js
 var contentTargets = [
@@ -9847,7 +10848,12 @@ function Landing() {
 							shineWidth: 25
 						}) }),
 						/* @__PURE__ */ jsx("p", { children: "Build a path that makes your ambition feel possible." }),
-						/* @__PURE__ */ jsxs("a", {
+						/* @__PURE__ */ jsxs(StarBorder, {
+							as: "a",
+							color: "#8b5cf6",
+							duration: 5,
+							radius: 24,
+							glow: .45,
 							className: "button button--light",
 							href: loggedIn ? "/dashboard" : "/signup",
 							children: [
@@ -10093,11 +11099,18 @@ function Dashboard() {
 						className: "dashboard-totals",
 						children: [/* @__PURE__ */ jsxs("span", { children: [
 							/* @__PURE__ */ jsx(Flame, {}),
-							/* @__PURE__ */ jsx("b", { children: d.gameStats?.streak || 0 }),
+							/* @__PURE__ */ jsx("b", { children: /* @__PURE__ */ jsx(CountUp, {
+								to: d.gameStats?.streak || 0,
+								duration: 1.1
+							}) }),
 							/* @__PURE__ */ jsx("small", { children: "DAY STREAK" })
 						] }), /* @__PURE__ */ jsxs("span", { children: [
 							/* @__PURE__ */ jsx(Zap, {}),
-							/* @__PURE__ */ jsx("b", { children: d.gameStats?.points || 0 }),
+							/* @__PURE__ */ jsx("b", { children: /* @__PURE__ */ jsx(CountUp, {
+								to: d.gameStats?.points || 0,
+								duration: 1.1,
+								separator: ","
+							}) }),
 							/* @__PURE__ */ jsx("small", { children: "POINTS" })
 						] })]
 					})]
@@ -10105,7 +11118,12 @@ function Dashboard() {
 				/* @__PURE__ */ jsxs("section", {
 					className: "command-grid",
 					children: [
-						/* @__PURE__ */ jsxs("button", {
+						/* @__PURE__ */ jsxs(StarBorder, {
+							as: "button",
+							color: "#c4b5fd",
+							duration: 6,
+							radius: 24,
+							glow: .35,
 							className: "path-launcher",
 							onClick: () => setPortalOpen(true),
 							children: [
@@ -10145,7 +11163,12 @@ function Dashboard() {
 								/* @__PURE__ */ jsx("small", { children: "LIVE" })
 							] })]
 						}),
-						/* @__PURE__ */ jsxs("article", {
+						/* @__PURE__ */ jsxs(SpotlightCard, {
+							theme: "light",
+							spotlightColor: "#8b5cf6",
+							intensity: .3,
+							proximity: 0,
+							flare: false,
 							className: "dash-module learning-signal-module",
 							children: [
 								/* @__PURE__ */ jsxs("header", { children: [/* @__PURE__ */ jsxs("div", { children: [/* @__PURE__ */ jsx("small", { children: "ADAPTIVE LEARNING SIGNAL" }), /* @__PURE__ */ jsx("h2", { children: "What Mentics is tracking" })] }), /* @__PURE__ */ jsxs("a", {
@@ -10208,7 +11231,12 @@ function Dashboard() {
 							value: d.collegePlanningCompleted || 0,
 							total: d.collegePlanningTotal || 0
 						}),
-						/* @__PURE__ */ jsxs("article", {
+						/* @__PURE__ */ jsxs(SpotlightCard, {
+							theme: "light",
+							spotlightColor: "#8b5cf6",
+							intensity: .3,
+							proximity: 0,
+							flare: false,
 							className: "dash-module activity-module",
 							children: [
 								/* @__PURE__ */ jsxs("header", { children: [/* @__PURE__ */ jsxs("div", { children: [/* @__PURE__ */ jsx("small", { children: "CONSISTENCY TRACKER" }), /* @__PURE__ */ jsx("h2", { children: "Focus intensity" })] }), /* @__PURE__ */ jsx(TrendingUp, {})] }),
@@ -10229,7 +11257,12 @@ function Dashboard() {
 								})
 							]
 						}),
-						/* @__PURE__ */ jsxs("article", {
+						/* @__PURE__ */ jsxs(SpotlightCard, {
+							theme: "light",
+							spotlightColor: "#8b5cf6",
+							intensity: .3,
+							proximity: 0,
+							flare: false,
 							className: "dash-module vital-module",
 							children: [/* @__PURE__ */ jsxs("header", { children: [/* @__PURE__ */ jsx("small", { children: "VITAL STATS" }), /* @__PURE__ */ jsx("a", {
 								href: "/dashboard/stats/edit",
@@ -10240,7 +11273,12 @@ function Dashboard() {
 								/* @__PURE__ */ jsxs("div", { children: [/* @__PURE__ */ jsx("dt", { children: "ACT" }), /* @__PURE__ */ jsx("dd", { children: d.actAverage })] })
 							] })]
 						}),
-						/* @__PURE__ */ jsxs("article", {
+						/* @__PURE__ */ jsxs(SpotlightCard, {
+							theme: "light",
+							spotlightColor: "#8b5cf6",
+							intensity: .3,
+							proximity: 0,
+							flare: false,
 							className: "dash-module insight-module",
 							children: [/* @__PURE__ */ jsx("div", {
 								className: "countdown",
@@ -10265,14 +11303,24 @@ function Dashboard() {
 								]
 							})]
 						}),
-						/* @__PURE__ */ jsxs("article", {
+						/* @__PURE__ */ jsxs(SpotlightCard, {
+							theme: "light",
+							spotlightColor: "#8b5cf6",
+							intensity: .3,
+							proximity: 0,
+							flare: false,
 							className: "dash-module updates-module",
 							children: [/* @__PURE__ */ jsxs("header", { children: [/* @__PURE__ */ jsxs("div", { children: [/* @__PURE__ */ jsx("small", { children: "LATEST SIGNALS" }), /* @__PURE__ */ jsx("h2", { children: "Recent updates" })] }), /* @__PURE__ */ jsx(Clock3, {})] }), /* @__PURE__ */ jsx("div", { children: d.recentActivities?.length ? d.recentActivities.slice(0, 4).map((a, i) => /* @__PURE__ */ jsxs("span", { children: [/* @__PURE__ */ jsx("i", { children: /* @__PURE__ */ jsx(Check, {}) }), /* @__PURE__ */ jsxs("p", { children: [/* @__PURE__ */ jsx("b", { children: activityTitle(a) }), /* @__PURE__ */ jsx("small", { children: activityDetail(a) })] })] }, i)) : /* @__PURE__ */ jsxs("div", {
 								className: "empty-state",
 								children: [/* @__PURE__ */ jsx(Target, {}), /* @__PURE__ */ jsx("p", { children: "Your completed work will show up here." })]
 							}) })]
 						}),
-						/* @__PURE__ */ jsxs("article", {
+						/* @__PURE__ */ jsxs(SpotlightCard, {
+							theme: "light",
+							spotlightColor: "#8b5cf6",
+							intensity: .3,
+							proximity: 0,
+							flare: false,
 							className: `dash-module trophies-module ${trophies.length ? "" : "trophies-module--empty"}`,
 							children: [
 								/* @__PURE__ */ jsxs("header", { children: [/* @__PURE__ */ jsxs("div", { children: [/* @__PURE__ */ jsx("small", { children: "MILESTONES" }), /* @__PURE__ */ jsx("h2", { children: "Trophies" })] }), trophies.length ? /* @__PURE__ */ jsxs("span", {
@@ -12963,7 +14011,13 @@ function PageIntro({ kicker, title, copy, actions }) {
 				children: [
 					/* @__PURE__ */ jsx("span", {}),
 					" ",
-					kicker
+					/* @__PURE__ */ jsx(DecryptedText, {
+						text: kicker,
+						speed: 30,
+						maxIterations: 8,
+						useOriginalCharsOnly: true,
+						parentClassName: "mentics-decrypted"
+					})
 				]
 			}),
 			/* @__PURE__ */ jsx(SplitText$1, {
@@ -13651,7 +14705,11 @@ function StatsPage() {
 							className: "stat-tile stat-tile--accent",
 							children: [
 								/* @__PURE__ */ jsx("small", { children: "TOTAL XP" }),
-								/* @__PURE__ */ jsx("strong", { children: d.points.toLocaleString() }),
+								/* @__PURE__ */ jsx("strong", { children: /* @__PURE__ */ jsx(CountUp, {
+									to: Number(d.points || 0),
+									duration: 1.1,
+									separator: ","
+								}) }),
 								/* @__PURE__ */ jsx("p", { children: "Earned from completed steps" })
 							]
 						}),
@@ -13659,7 +14717,10 @@ function StatsPage() {
 							className: "stat-tile",
 							children: [
 								/* @__PURE__ */ jsx("small", { children: "DAY STREAK" }),
-								/* @__PURE__ */ jsxs("strong", { children: [d.streak, /* @__PURE__ */ jsx("i", { children: /* @__PURE__ */ jsx(Flame, {}) })] }),
+								/* @__PURE__ */ jsxs("strong", { children: [/* @__PURE__ */ jsx(CountUp, {
+									to: d.streak || 0,
+									duration: 1.1
+								}), /* @__PURE__ */ jsx("i", { children: /* @__PURE__ */ jsx(Flame, {}) })] }),
 								/* @__PURE__ */ jsx("p", { children: d.streak > 0 ? "Keep it alive today" : "Finish a step to start one" })
 							]
 						}),
@@ -14820,18 +15881,28 @@ function PointsPage() {
 							className: "points-total",
 							children: [
 								/* @__PURE__ */ jsx("small", { children: "TOTAL POINTS" }),
-								/* @__PURE__ */ jsx("strong", { children: Number(d.points || 0).toLocaleString() }),
+								/* @__PURE__ */ jsx("strong", { children: /* @__PURE__ */ jsx(CountUp, {
+									to: Number(d.points || 0),
+									duration: 1.1,
+									separator: ","
+								}) }),
 								/* @__PURE__ */ jsx("p", { children: "Earned from completed work" })
 							]
 						}),
 						/* @__PURE__ */ jsxs("article", { children: [/* @__PURE__ */ jsx(Flame, {}), /* @__PURE__ */ jsxs("div", { children: [
 							/* @__PURE__ */ jsx("small", { children: "DAY STREAK" }),
-							/* @__PURE__ */ jsx("strong", { children: d.streak || 0 }),
+							/* @__PURE__ */ jsx("strong", { children: /* @__PURE__ */ jsx(CountUp, {
+								to: d.streak || 0,
+								duration: 1.1
+							}) }),
 							/* @__PURE__ */ jsx("p", { children: "Keep showing up one day at a time" })
 						] })] }),
 						/* @__PURE__ */ jsxs("article", { children: [/* @__PURE__ */ jsx(Award, {}), /* @__PURE__ */ jsxs("div", { children: [
 							/* @__PURE__ */ jsx("small", { children: "ACHIEVEMENTS" }),
-							/* @__PURE__ */ jsxs("strong", { children: [earned, /* @__PURE__ */ jsxs("span", { children: ["/", achievements.length] })] }),
+							/* @__PURE__ */ jsxs("strong", { children: [/* @__PURE__ */ jsx(CountUp, {
+								to: earned,
+								duration: 1.1
+							}), /* @__PURE__ */ jsxs("span", { children: ["/", achievements.length] })] }),
 							/* @__PURE__ */ jsx("p", { children: "Unlocked on your path" })
 						] })] })
 					]

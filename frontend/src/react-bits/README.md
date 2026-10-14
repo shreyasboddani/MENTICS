@@ -49,3 +49,13 @@ ShinyText is vendored from `src/content/TextAnimations/ShinyText/ShinyText.jsx`
 and `.css`. It sweeps a lavender highlight over the existing white closing
 heading once when it enters view, then restores the original white. Settings
 are synchronized after commit and live reduced-motion changes cancel the shine.
+
+CountUp, DecryptedText, and StarBorder are vendored from their corresponding
+`src/content/TextAnimations` and `src/content/Animations` JavaScript variants.
+CountUp animates saved points, streaks, and achievements; server markup contains
+the actual final value. Academic scores and timers remain ordinary numbers.
+DecryptedText adds a brief hover reveal to page-intro labels; assistive text stays
+stable. Both use the official `motion` dependency and respect reduced motion.
+StarBorder outlines the path launcher and closing action, preserving native
+button/link semantics, geometry, and backgrounds. Its settings and reduced-motion
+preference update live. Existing dashboard articles now use SpotlightCard too.
