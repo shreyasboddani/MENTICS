@@ -1,0 +1,69 @@
+/* Motion stays local to controls; the original Mentics colors remain unchanged. */
+:root {
+  --fluid-ease: cubic-bezier(.22, 1, .36, 1);
+  --fluid-spring: cubic-bezier(.34, 1.35, .64, 1);
+}
+.button, .google-button, .icon-button, .product-menu {
+  transition: transform 180ms var(--fluid-spring), box-shadow 220ms var(--fluid-ease),
+    background-color 180ms ease, border-color 180ms ease;
+}
+.google-button:active { transform: scale(.985); }
+.product-nav nav a svg, .public-nav .button svg, .google-button > span {
+  transition: transform 240ms var(--fluid-spring);
+}
+@media (hover: hover) and (pointer: fine) {
+  .product-nav nav a:hover svg { transform: translateY(-1px) scale(1.08); }
+  .public-nav .button:hover svg { transform: translateX(3px); }
+}
+.react-form input, .react-form textarea, .react-form select {
+  transition: border-color 180ms ease, box-shadow 220ms var(--fluid-ease), background-color 180ms ease;
+}
+.react-form input:focus-visible, .react-form textarea:focus-visible, .react-form select:focus-visible {
+  box-shadow: 0 0 0 4px rgba(124, 58, 237, .1);
+}
+.fluid-menu-icon { position: relative; display: block; width: 20px; height: 20px; }
+.fluid-menu-icon i {
+  position: absolute; width: 18px; height: 2px; left: 1px; top: 9px;
+  border-radius: 2px; background: currentColor;
+  transition: transform 260ms var(--fluid-ease), opacity 160ms ease;
+}
+.fluid-menu-icon i:first-child { transform: translateY(-6px); }
+.fluid-menu-icon i:last-child { transform: translateY(6px); }
+.fluid-menu-icon.open i:first-child { transform: rotate(45deg); }
+.fluid-menu-icon.open i:nth-child(2) { opacity: 0; transform: scaleX(.4); }
+.fluid-menu-icon.open i:last-child { transform: rotate(-45deg); }
+
+@media (min-width: 760px) {
+  .app-shell--tabs > .menu-scrim { display: none; }
+}
+@media (max-width: 759px) {
+  .app-shell--tabs > .menu-scrim {
+    display: block; opacity: 0; visibility: hidden; pointer-events: none;
+    transition: opacity 240ms ease, visibility 0s linear 240ms;
+  }
+  .app-shell--tabs > .menu-scrim.open {
+    opacity: 1; visibility: visible; pointer-events: auto; transition-delay: 0s;
+  }
+  .product-nav > nav {
+    transform-origin: top right;
+    transition: opacity 180ms ease, transform 320ms var(--fluid-ease), visibility 0s linear 320ms;
+  }
+  .product-nav > nav.open { transition-delay: 0s; }
+  .product-nav > nav .mentics-nav-magnet {
+    opacity: 0; transform: translateY(8px);
+    transition: opacity 140ms ease, transform 220ms var(--fluid-ease);
+    transition-delay: 0s;
+  }
+  .product-nav > nav.open .mentics-nav-magnet {
+    opacity: 1; transform: none;
+    transition-duration: 240ms, 360ms;
+    transition-delay: calc(var(--nav-order, 0) * 16ms);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .fluid-menu-icon i, .product-nav nav a svg, .public-nav .button svg,
+  .google-button > span, .app-shell--tabs > .menu-scrim,
+  .product-nav > nav, .product-nav > nav .mentics-nav-magnet { transition: none; }
+  .product-nav > nav .mentics-nav-magnet { transform: none; }
+  .google-button:active, .product-nav nav a:hover svg, .public-nav .button:hover svg { transform: none; }
+}

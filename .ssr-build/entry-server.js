@@ -4,8 +4,9 @@ import { createPortal } from "react-dom";
 import DOMPurify from "dompurify";
 import { marked } from "marked";
 import { Toaster, toast } from "sonner";
-import { AlertTriangle, ArrowLeft, ArrowRight, Award, BarChart3, BookOpen, Brain, Calculator, CalendarDays, Check, ChevronRight, CircleCheck, Clock3, Dices, Flag, Flame, GraduationCap, GripHorizontal, Hand, Headphones, House, LayoutDashboard, Lightbulb, LineChart, LockKeyhole, LogOut, Mail, Maximize2, Menu, MessageCircle, Minimize2, PenLine, Plus, RotateCcw, RotateCw, Search, Send, Settings, ShieldCheck, SkipForward, Sparkles, Swords, Target, TrendingUp, Trophy, UserRound, UsersRound, Volume2, VolumeX, X, Zap } from "lucide-react";
+import { AlertTriangle, ArrowLeft, ArrowRight, Award, BarChart3, BookOpen, Brain, Calculator, CalendarDays, Check, ChevronRight, CircleCheck, Clock3, Dices, Flag, Flame, GraduationCap, GripHorizontal, Hand, Headphones, House, LayoutDashboard, Lightbulb, LineChart, LockKeyhole, LogOut, Mail, Maximize2, MessageCircle, Minimize2, PenLine, Plus, RotateCcw, RotateCw, Search, Send, Settings, ShieldCheck, SkipForward, Sparkles, Swords, Target, TrendingUp, Trophy, UserRound, UsersRound, Volume2, VolumeX, X, Zap } from "lucide-react";
 import { Fragment, jsx, jsxs } from "react/jsx-runtime";
+import { gsap } from "gsap";
 //#region frontend/src/boot.js
 var initial = typeof window !== "undefined" && window.__MENTICS__ ? window.__MENTICS__ : {
 	page: "landing",
@@ -1656,6 +1657,139 @@ var ClickSpark = forwardRef(({ sparkColor = "#fff", sparkSize = 14, sparkRadius 
 });
 ClickSpark.displayName = "ClickSpark";
 //#endregion
+//#region frontend/src/react-bits/AnimatedContent.jsx
+function createContentReveal(element, { distance = 16, direction = "vertical", reverse = false, duration = .55, ease = "power3.out", initialOpacity = .3, delay = 0, threshold = .08, trigger = "scroll" } = {}) {
+	let observer;
+	let played = false;
+	let context;
+	const motion = window.matchMedia("(prefers-reduced-motion: reduce)");
+	const play = () => {
+		if (played || motion.matches) return;
+		played = true;
+		observer?.disconnect();
+		const axis = direction === "horizontal" ? "x" : "y";
+		context = gsap.context(() => {
+			gsap.fromTo(element, {
+				[axis]: reverse ? -distance : distance,
+				opacity: initialOpacity
+			}, {
+				[axis]: 0,
+				opacity: 1,
+				duration,
+				ease,
+				delay,
+				onComplete: () => context?.revert()
+			});
+		});
+	};
+	const preferenceChanged = () => {
+		if (motion.matches) {
+			observer?.disconnect();
+			context?.revert();
+		} else if (trigger === "mount") play();
+		else observer?.observe(element);
+	};
+	if (trigger === "mount") play();
+	else {
+		observer = new IntersectionObserver((entries) => {
+			if (entries.some((entry) => entry.isIntersecting)) play();
+		}, {
+			threshold,
+			rootMargin: "0px 0px -20px 0px"
+		});
+		if (!motion.matches) observer.observe(element);
+	}
+	motion.addEventListener("change", preferenceChanged);
+	return () => {
+		observer?.disconnect();
+		context?.revert();
+		motion.removeEventListener("change", preferenceChanged);
+	};
+}
+function AnimatedContent({ as: Component = "div", children, distance = 16, direction = "vertical", reverse = false, duration = .55, ease = "power3.out", initialOpacity = .3, delay = 0, threshold = .08, trigger = "scroll", ...props }) {
+	const ref = useRef(null);
+	useEffect(() => createContentReveal(ref.current, {
+		distance,
+		direction,
+		reverse,
+		duration,
+		ease,
+		initialOpacity,
+		delay,
+		threshold,
+		trigger
+	}), [
+		distance,
+		direction,
+		reverse,
+		duration,
+		ease,
+		initialOpacity,
+		delay,
+		threshold,
+		trigger
+	]);
+	return /* @__PURE__ */ jsx(Component, {
+		ref,
+		...props,
+		children
+	});
+}
+//#endregion
+//#region frontend/src/react-bits/useFluidExperience.js
+var contentTargets = [
+	".landing-facts > div",
+	".section-heading",
+	".process-grid article",
+	".signal-story-intro",
+	".signal-story-beats article",
+	".journey-showcase-copy",
+	".platform-copy",
+	".feature-stack > div",
+	".battle-landing-copy",
+	".suite-heading",
+	".suite-grid article",
+	".week-heading",
+	".week-flow article",
+	".faq details",
+	".closing > div",
+	".app-main > :not(.chat-panel):not(.modal-wrap):not(.floating-chat):not(.roadmap)",
+	".onboarding-page main > form > section.active"
+].join(",");
+function useFluidExperience(page) {
+	useEffect(() => {
+		const disposers = [...document.querySelectorAll(contentTargets)].map((element, index) => createContentReveal(element, { delay: Math.min(index % 3, 2) * .045 }));
+		document.querySelectorAll(".auth-panel > *, .auth-panel form > label, .auth-panel form > button").forEach((element, index) => {
+			if (element.tagName !== "FORM") disposers.push(createContentReveal(element, {
+				trigger: "mount",
+				distance: 12,
+				duration: .48,
+				delay: Math.min(index, 7) * .035
+			}));
+		});
+		const onboarding = document.querySelector(".onboarding-page main > form");
+		const stepObserver = onboarding ? new MutationObserver((records) => {
+			for (const record of records) {
+				const element = record.target;
+				if (element.matches("section.active")) disposers.push(createContentReveal(element, {
+					trigger: "mount",
+					duration: .4,
+					distance: 10
+				}));
+			}
+		}) : null;
+		if (onboarding) stepObserver.observe(onboarding, {
+			subtree: true,
+			attributes: true,
+			attributeFilter: ["class"]
+		});
+		return () => {
+			stepObserver?.disconnect();
+			disposers.forEach((dispose) => dispose());
+		};
+	}, [page]);
+}
+//#endregion
 //#region frontend/src/passage-text.js
 var escapeHtml = (text) => text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 var decorate = (text) => text.replace(/\[underlined(?: (\d+))?:\s*([^\]]+)\]/gi, (_, number, words) => `${number ? `<sup>${number}</sup>` : ""}<u>${words}</u>`).replace(/_{3,}/g, "<span class=\"blank\" role=\"img\" aria-label=\"blank\"></span>");
@@ -1859,9 +1993,34 @@ function Starfield({ warp = false, tone = "violet" }) {
 		"aria-hidden": "true"
 	});
 }
+var mobileNavigationQuery = "(max-width: 759px)";
+var subscribeMobileNavigation = (callback) => {
+	const query = window.matchMedia(mobileNavigationQuery);
+	query.addEventListener("change", callback);
+	return () => query.removeEventListener("change", callback);
+};
+var mobileNavigationSnapshot = () => window.matchMedia(mobileNavigationQuery).matches;
+var desktopNavigationSnapshot = () => false;
 function AppShell({ children, name, immersive = false }) {
 	const [menu, setMenu] = useState(false);
+	const mobileNavigation = useSyncExternalStore(subscribeMobileNavigation, mobileNavigationSnapshot, desktopNavigationSnapshot);
 	const [navWarp, setNavWarp] = useState(null);
+	const menuButton = useRef(null);
+	const closeMenu = () => {
+		setMenu(false);
+		menuButton.current?.focus();
+	};
+	useEffect(() => {
+		if (!menu) return;
+		const dismiss = (event) => {
+			if (event.key === "Escape") {
+				setMenu(false);
+				menuButton.current?.focus();
+			}
+		};
+		document.addEventListener("keydown", dismiss);
+		return () => document.removeEventListener("keydown", dismiss);
+	}, [menu]);
 	const current = typeof window === "undefined" ? "" : window.location.pathname;
 	const active = (href) => current === href || href === "/dashboard/test-path-view" && current.startsWith("/dashboard/test-path") || href === "/dashboard/college-path-view" && current.startsWith("/dashboard/college-path") || href !== "/dashboard" && current.startsWith(`${href}/`);
 	const travel = (event, href, label) => {
@@ -1939,11 +2098,14 @@ function AppShell({ children, name, immersive = false }) {
 						id: "mobile-product-navigation",
 						className: menu ? "open" : "",
 						"aria-label": "Product navigation",
-						children: navItems.map(([href, Icon, label]) => /* @__PURE__ */ jsx(Magnet, {
+						inert: mobileNavigation && !menu,
+						"aria-hidden": mobileNavigation && !menu ? true : void 0,
+						children: navItems.map(([href, Icon, label], index) => /* @__PURE__ */ jsx(Magnet, {
 							padding: 8,
 							magnetStrength: 12,
 							maxOffset: 3,
 							wrapperClassName: "mentics-nav-magnet",
+							style: { "--nav-order": index },
 							children: /* @__PURE__ */ jsxs("a", {
 								className: active(href) ? "active" : "",
 								href,
@@ -1972,23 +2134,35 @@ function AppShell({ children, name, immersive = false }) {
 						})]
 					}),
 					/* @__PURE__ */ jsx("button", {
+						ref: menuButton,
 						className: "product-menu",
 						type: "button",
 						onClick: () => setMenu(!menu),
 						"aria-label": menu ? "Close navigation" : "Open navigation",
 						"aria-controls": "mobile-product-navigation",
 						"aria-expanded": menu,
-						children: menu ? /* @__PURE__ */ jsx(X, {}) : /* @__PURE__ */ jsx(Menu, {})
+						children: /* @__PURE__ */ jsxs("span", {
+							className: `fluid-menu-icon ${menu ? "open" : ""}`,
+							"aria-hidden": "true",
+							children: [
+								/* @__PURE__ */ jsx("i", {}),
+								/* @__PURE__ */ jsx("i", {}),
+								/* @__PURE__ */ jsx("i", {})
+							]
+						})
 					})
 				]
 			}),
-			menu && /* @__PURE__ */ jsx("button", {
-				className: "menu-scrim",
-				onClick: () => setMenu(false),
-				"aria-label": "Close navigation"
+			/* @__PURE__ */ jsx("button", {
+				className: `menu-scrim ${menu ? "open" : ""}`,
+				onClick: closeMenu,
+				"aria-label": "Close navigation",
+				"aria-hidden": !menu,
+				tabIndex: -1
 			}),
 			/* @__PURE__ */ jsxs("div", {
 				className: "app-stage",
+				inert: mobileNavigation && menu,
 				children: [[
 					"test-builder",
 					"college-builder",
@@ -8285,25 +8459,6 @@ function ExamLanding({ kind }) {
 }
 function Landing() {
 	const loggedIn = useClientOnly(boot.data.isLoggedIn, false);
-	useEffect(() => {
-		const nodes = [...document.querySelectorAll(".landing-facts > div,.story-chapter,.section-heading,.process-grid article,.signal-story-visual,.signal-story-beats article,.journey-showcase-copy,.journey-demo,.platform-copy,.feature-stack > div,.suite-heading,.suite-grid article,.week-heading,.week-flow article,.faq details,.closing")];
-		nodes.forEach((node) => node.classList.add("mx-reveal"));
-		if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
-			nodes.forEach((node) => node.classList.add("is-visible"));
-			return;
-		}
-		const observer = new IntersectionObserver((entries) => entries.forEach((entry) => {
-			if (entry.isIntersecting) {
-				entry.target.classList.add("is-visible");
-				observer.unobserve(entry.target);
-			}
-		}), {
-			threshold: .12,
-			rootMargin: "0px 0px -7% 0px"
-		});
-		nodes.forEach((node) => observer.observe(node));
-		return () => observer.disconnect();
-	}, []);
 	return /* @__PURE__ */ jsxs("div", {
 		className: "landing home-landing",
 		children: [
@@ -12033,8 +12188,12 @@ function AuthPage({ mode }) {
 				className: "auth-brand",
 				children: /* @__PURE__ */ jsx(Brand, {})
 			}),
-			/* @__PURE__ */ jsxs("div", {
+			/* @__PURE__ */ jsxs(AnimatedContent, {
+				as: "div",
 				className: "auth-art",
+				trigger: "mount",
+				distance: 0,
+				duration: .65,
 				children: [
 					/* @__PURE__ */ jsx("span", { className: "shape shape--peach" }),
 					/* @__PURE__ */ jsx("span", { className: "shape shape--mint" }),
@@ -14122,17 +14281,9 @@ function ArticlePage() {
 	});
 }
 function App() {
+	useFluidExperience(boot.page);
 	useEffect(() => {
 		document.documentElement.dataset.menticsPage = boot.page;
-		const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-		const nodes = [...document.querySelectorAll(".app-main > :not(.chat-panel),.onboarding-page main > form > section.active,.auth-panel > *")];
-		if (!reduced) {
-			nodes.slice(0, 8).forEach((node, index) => {
-				node.classList.add("mx-app-enter");
-				node.style.setProperty("--mx-enter-delay", `${Math.min(index, 5) * 35}ms`);
-			});
-			requestAnimationFrame(() => requestAnimationFrame(() => nodes.forEach((node) => node.classList.add("is-present"))));
-		}
 		return () => {
 			delete document.documentElement.dataset.menticsPage;
 		};

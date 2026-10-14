@@ -1,6 +1,6 @@
 import { Component, useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import { createPortal } from 'react-dom'
-import { LayoutDashboard, Target, GraduationCap, BarChart3, LineChart, Swords, MessageCircle, Award, Settings, LogOut, Menu, X } from 'lucide-react'
+import { LayoutDashboard, Target, GraduationCap, BarChart3, LineChart, Swords, MessageCircle, Award, Settings, LogOut } from 'lucide-react'
 import { boot } from './boot'
 import Magnet from './react-bits/Magnet'
 
@@ -91,9 +91,29 @@ export function Starfield({ warp = false, tone = 'violet' }) {
   return <canvas ref={ref} className={warp ? 'warp-field' : 'star-field'} aria-hidden="true" />
 }
 
+const mobileNavigationQuery = '(max-width: 759px)'
+const subscribeMobileNavigation = callback => {
+  const query = window.matchMedia(mobileNavigationQuery)
+  query.addEventListener('change', callback)
+  return () => query.removeEventListener('change', callback)
+}
+const mobileNavigationSnapshot = () => window.matchMedia(mobileNavigationQuery).matches
+const desktopNavigationSnapshot = () => false
+
 export function AppShell({ children, name, immersive = false }) {
   const [menu, setMenu] = useState(false)
+  const mobileNavigation = useSyncExternalStore(subscribeMobileNavigation, mobileNavigationSnapshot, desktopNavigationSnapshot)
   const [navWarp, setNavWarp] = useState(null)
+  const menuButton = useRef(null)
+  const closeMenu = () => { setMenu(false); menuButton.current?.focus() }
+  useEffect(() => {
+    if (!menu) return
+    const dismiss = event => {
+      if (event.key === 'Escape') { setMenu(false); menuButton.current?.focus() }
+    }
+    document.addEventListener('keydown', dismiss)
+    return () => document.removeEventListener('keydown', dismiss)
+  }, [menu])
   const current = typeof window === 'undefined' ? '' : window.location.pathname
   const active = href => current === href || (href === '/dashboard/test-path-view' && current.startsWith('/dashboard/test-path')) || (href === '/dashboard/college-path-view' && current.startsWith('/dashboard/college-path')) || (href !== '/dashboard' && current.startsWith(`${href}/`))
   const travel = (event, href, label) => {
@@ -121,12 +141,12 @@ export function AppShell({ children, name, immersive = false }) {
     <Starfield />
     <header className="product-nav">
       <Brand />
-      <nav id="mobile-product-navigation" className={menu ? 'open' : ''} aria-label="Product navigation">{navItems.map(([href, Icon, label]) => <Magnet key={href} padding={8} magnetStrength={12} maxOffset={3} wrapperClassName="mentics-nav-magnet"><a className={active(href) ? 'active' : ''} href={href} aria-current={active(href) ? 'page' : undefined} title={label} onClick={event => travel(event, href, label)}><Icon size={17} /><span>{label}</span></a></Magnet>)}</nav>
+      <nav id="mobile-product-navigation" className={menu ? 'open' : ''} aria-label="Product navigation" inert={mobileNavigation && !menu} aria-hidden={mobileNavigation && !menu ? true : undefined}>{navItems.map(([href, Icon, label], index) => <Magnet key={href} padding={8} magnetStrength={12} maxOffset={3} wrapperClassName="mentics-nav-magnet" style={{ '--nav-order': index }}><a className={active(href) ? 'active' : ''} href={href} aria-current={active(href) ? 'page' : undefined} title={label} onClick={event => travel(event, href, label)}><Icon size={17} /><span>{label}</span></a></Magnet>)}</nav>
       <div className="product-account"><a href="/account" onClick={event => travel(event, '/account', 'Settings')}><i>{(name || 'M').slice(0, 1).toUpperCase()}</i><span>{name || 'Mentics student'}</span></a><form className="product-logout" method="POST" action="/logout"><CsrfField /><button type="submit" aria-label="Log out"><LogOut size={17} /></button></form></div>
-      <button className="product-menu" type="button" onClick={() => setMenu(!menu)} aria-label={menu ? 'Close navigation' : 'Open navigation'} aria-controls="mobile-product-navigation" aria-expanded={menu}>{menu ? <X /> : <Menu />}</button>
+      <button ref={menuButton} className="product-menu" type="button" onClick={() => setMenu(!menu)} aria-label={menu ? 'Close navigation' : 'Open navigation'} aria-controls="mobile-product-navigation" aria-expanded={menu}><span className={`fluid-menu-icon ${menu ? 'open' : ''}`} aria-hidden="true"><i /><i /><i /></span></button>
     </header>
-    {menu && <button className="menu-scrim" onClick={() => setMenu(false)} aria-label="Close navigation" />}
-    <div className="app-stage">{['test-builder', 'college-builder', 'edit-stats'].includes(boot.page) && boot.data.error && <div className="shell-error" role="alert">{boot.data.error}</div>}{children}</div>
+    <button className={`menu-scrim ${menu ? 'open' : ''}`} onClick={closeMenu} aria-label="Close navigation" aria-hidden={!menu} tabIndex={-1} />
+    <div className="app-stage" inert={mobileNavigation && menu}>{['test-builder', 'college-builder', 'edit-stats'].includes(boot.page) && boot.data.error && <div className="shell-error" role="alert">{boot.data.error}</div>}{children}</div>
     {navWarp && createPortal(<div className="warp-overlay warp-overlay--nav" aria-live="polite"><Starfield warp tone="violet" /><div><Brand inverse /><p>Opening {navWarp.label}</p></div></div>, document.body)}
   </div>
 }

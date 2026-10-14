@@ -28,6 +28,9 @@ import { HomeHero } from './home-hero'
 import SpotlightCard from './react-bits/SpotlightCard'
 import ClickSpark from './react-bits/ClickSpark'
 import Magnet from './react-bits/Magnet'
+import AnimatedContent from './react-bits/AnimatedContent'
+import { useFluidExperience } from './react-bits/useFluidExperience'
+import './react-bits/fluid-experience.css'
 import { Passage } from './passage'
 import { boot } from './boot'
 import { AppShell, Starfield, Brand, CsrfField, useClientOnly, api } from './app-runtime'
@@ -261,14 +264,7 @@ function ExamLanding({ kind }) {
 
 function Landing() {
   const loggedIn = useClientOnly(boot.data.isLoggedIn, false)
-  useEffect(() => {
-    const nodes = [...document.querySelectorAll('.landing-facts > div,.story-chapter,.section-heading,.process-grid article,.signal-story-visual,.signal-story-beats article,.journey-showcase-copy,.journey-demo,.platform-copy,.feature-stack > div,.suite-heading,.suite-grid article,.week-heading,.week-flow article,.faq details,.closing')]
-    nodes.forEach(node => node.classList.add('mx-reveal'))
-    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) { nodes.forEach(node => node.classList.add('is-visible')); return }
-    const observer = new IntersectionObserver(entries => entries.forEach(entry => { if (entry.isIntersecting) { entry.target.classList.add('is-visible'); observer.unobserve(entry.target) } }), { threshold: .12, rootMargin: '0px 0px -7% 0px' })
-    nodes.forEach(node => observer.observe(node))
-    return () => observer.disconnect()
-  }, [])
+
   return <div className="landing home-landing">
     <div className="story-progress" aria-hidden="true" />
     <Starfield />
@@ -1393,7 +1389,7 @@ function PageIntro({ kicker, title, copy, actions }) {
 
 function AuthPage({ mode }) {
   const signup = mode === 'signup'
-  return <div className="auth-page"><div className="auth-brand"><Brand /></div><div className="auth-art"><span className="shape shape--peach" /><span className="shape shape--mint" /><div><small>YOUR NEXT CHAPTER</small><h1>Ambition feels better with a plan.</h1><p>Build momentum across test prep, college planning, and every goal between.</p></div></div><main className="auth-panel"><div className="auth-copy"><small>{signup ? 'START YOUR PATH' : 'WELCOME BACK'}</small><h2>{signup ? 'Join Mentics.' : 'Continue building.'}</h2><p>{signup ? 'Your focused workspace is a minute away.' : 'Your goals and progress are waiting.'}</p></div>{boot.data.error && <div className="form-error" role="alert">{boot.data.error}</div>}<form method="POST" className="react-form"><CsrfField />{signup && <label>Full name<input name="name" autoComplete="name" required maxLength="100" placeholder="Your name" /></label>}<label>Email address<input type="email" name="email" autoComplete="email" required placeholder="you@example.com" /></label><label>Password<input type="password" name="password" autoComplete={signup ? 'new-password' : 'current-password'} minLength={signup ? 8 : undefined} maxLength="128" required placeholder={signup ? 'At least 8 characters' : 'Your password'} /></label>{signup && <label className="legal-consent"><input type="checkbox" name="legal_acceptance" value="accepted" required /> <span>I agree to the <a href="/terms" target="_blank" rel="noreferrer">Terms of Service</a> and <a href="/privacy" target="_blank" rel="noreferrer">Privacy Policy</a>.</span></label>}<button className="button button--primary" type="submit">{signup ? 'Create my account' : 'Sign in'} <ArrowRight /></button></form><div className="form-divider"><span>or</span></div><a className="google-button" href="/google-login"><span>G</span> Continue with Google</a><p className="oauth-legal-notice">By continuing with Google, you agree to the <a href="/terms" target="_blank" rel="noreferrer">Terms of Service</a> and acknowledge the <a href="/privacy" target="_blank" rel="noreferrer">Privacy Policy</a>.</p><p className="auth-switch">{signup ? 'Already have an account?' : 'New to Mentics?'} <a href={signup ? '/login' : '/signup'}>{signup ? 'Sign in' : 'Create an account'}</a></p></main></div>
+  return <div className="auth-page"><div className="auth-brand"><Brand /></div><AnimatedContent as="div" className="auth-art" trigger="mount" distance={0} duration={.65}><span className="shape shape--peach" /><span className="shape shape--mint" /><div><small>YOUR NEXT CHAPTER</small><h1>Ambition feels better with a plan.</h1><p>Build momentum across test prep, college planning, and every goal between.</p></div></AnimatedContent><main className="auth-panel"><div className="auth-copy"><small>{signup ? 'START YOUR PATH' : 'WELCOME BACK'}</small><h2>{signup ? 'Join Mentics.' : 'Continue building.'}</h2><p>{signup ? 'Your focused workspace is a minute away.' : 'Your goals and progress are waiting.'}</p></div>{boot.data.error && <div className="form-error" role="alert">{boot.data.error}</div>}<form method="POST" className="react-form"><CsrfField />{signup && <label>Full name<input name="name" autoComplete="name" required maxLength="100" placeholder="Your name" /></label>}<label>Email address<input type="email" name="email" autoComplete="email" required placeholder="you@example.com" /></label><label>Password<input type="password" name="password" autoComplete={signup ? 'new-password' : 'current-password'} minLength={signup ? 8 : undefined} maxLength="128" required placeholder={signup ? 'At least 8 characters' : 'Your password'} /></label>{signup && <label className="legal-consent"><input type="checkbox" name="legal_acceptance" value="accepted" required /> <span>I agree to the <a href="/terms" target="_blank" rel="noreferrer">Terms of Service</a> and <a href="/privacy" target="_blank" rel="noreferrer">Privacy Policy</a>.</span></label>}<button className="button button--primary" type="submit">{signup ? 'Create my account' : 'Sign in'} <ArrowRight /></button></form><div className="form-divider"><span>or</span></div><a className="google-button" href="/google-login"><span>G</span> Continue with Google</a><p className="oauth-legal-notice">By continuing with Google, you agree to the <a href="/terms" target="_blank" rel="noreferrer">Terms of Service</a> and acknowledge the <a href="/privacy" target="_blank" rel="noreferrer">Privacy Policy</a>.</p><p className="auth-switch">{signup ? 'Already have an account?' : 'New to Mentics?'} <a href={signup ? '/login' : '/signup'}>{signup ? 'Sign in' : 'Create an account'}</a></p></main></div>
 }
 
 const learningOptions = [['visual', 'Visual', Sparkles, 'I learn by seeing'], ['auditory', 'Auditory', Headphones, 'I learn by hearing'], ['reading_writing', 'Reading / writing', PenLine, 'I learn through words'], ['kinesthetic', 'Hands-on', Hand, 'I learn by doing']]
@@ -1849,17 +1845,9 @@ function LegalPage({ type }) { const d = legalCopy[type]; return <div className=
 function ArticlePage() { const d = boot.data; return <AppShell name={d.name}><main className="app-main article-page"><a href="/dashboard/test-path-view" className="text-button"><ArrowLeft /> Back to path</a><article><div className="eyebrow"><span /> STRATEGY GUIDE</div><h1>{d.article?.title}</h1><Markdown>{d.article?.content || 'This article is not available yet.'}</Markdown></article></main></AppShell> }
 
 function App() {
+  useFluidExperience(boot.page)
   useEffect(() => {
     document.documentElement.dataset.menticsPage = boot.page
-    const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches
-    const nodes = [...document.querySelectorAll('.app-main > :not(.chat-panel),.onboarding-page main > form > section.active,.auth-panel > *')]
-    if (!reduced) {
-      nodes.slice(0, 8).forEach((node, index) => {
-        node.classList.add('mx-app-enter')
-        node.style.setProperty('--mx-enter-delay', `${Math.min(index, 5) * 35}ms`)
-      })
-      requestAnimationFrame(() => requestAnimationFrame(() => nodes.forEach(node => node.classList.add('is-present'))))
-    }
     return () => { delete document.documentElement.dataset.menticsPage }
   }, [])
 
